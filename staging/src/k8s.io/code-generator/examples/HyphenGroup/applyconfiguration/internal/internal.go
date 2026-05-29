@@ -19,44 +19,60 @@ limitations under the License.
 package internal
 
 import (
+	json "encoding/json"
 	fmt "fmt"
 	sync "sync"
 
+	schema "sigs.k8s.io/structured-merge-diff/v6/schema"
 	typed "sigs.k8s.io/structured-merge-diff/v6/typed"
 )
 
 func Parser() *typed.Parser {
 	parserOnce.Do(func() {
-		var err error
-		parser, err = typed.NewParser(schemaYAML)
-		if err != nil {
+		var schemaDef schema.Schema
+		if err := json.Unmarshal([]byte(schemaJSON), &schemaDef); err != nil {
 			panic(fmt.Sprintf("Failed to parse schema: %v", err))
 		}
+		parser = &typed.Parser{Schema: schemaDef}
 	})
 	return parser
 }
 
 var parserOnce sync.Once
 var parser *typed.Parser
-var schemaYAML = typed.YAMLObject(`types:
-- name: __untyped_atomic_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-- name: __untyped_deduced_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-`)
+var schemaJSON = `{
+  "types": [
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "name": "__untyped_atomic_",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "__untyped_deduced_",
+      "scalar": "untyped"
+    }
+  ]
+}`

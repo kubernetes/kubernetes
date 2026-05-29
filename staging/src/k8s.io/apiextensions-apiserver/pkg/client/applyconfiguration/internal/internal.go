@@ -19,1232 +19,2337 @@ limitations under the License.
 package internal
 
 import (
+	json "encoding/json"
 	fmt "fmt"
 	sync "sync"
 
+	schema "sigs.k8s.io/structured-merge-diff/v6/schema"
 	typed "sigs.k8s.io/structured-merge-diff/v6/typed"
 )
 
 func Parser() *typed.Parser {
 	parserOnce.Do(func() {
-		var err error
-		parser, err = typed.NewParser(schemaYAML)
-		if err != nil {
+		var schemaDef schema.Schema
+		if err := json.Unmarshal([]byte(schemaJSON), &schemaDef); err != nil {
 			panic(fmt.Sprintf("Failed to parse schema: %v", err))
 		}
+		parser = &typed.Parser{Schema: schemaDef}
 	})
 	return parser
 }
 
 var parserOnce sync.Once
 var parser *typed.Parser
-var schemaYAML = typed.YAMLObject(`types:
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceColumnDefinition
-  map:
-    fields:
-    - name: description
-      type:
-        scalar: string
-    - name: format
-      type:
-        scalar: string
-    - name: jsonPath
-      type:
-        scalar: string
-      default: ""
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: priority
-      type:
-        scalar: numeric
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceConversion
-  map:
-    fields:
-    - name: strategy
-      type:
-        scalar: string
-      default: ""
-    - name: webhook
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookConversion
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionSpec
-      default: {}
-    - name: status
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionStatus
-      default: {}
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionCondition
-  map:
-    fields:
-    - name: lastTransitionTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: message
-      type:
-        scalar: string
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: reason
-      type:
-        scalar: string
-    - name: status
-      type:
-        scalar: string
-      default: ""
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames
-  map:
-    fields:
-    - name: categories
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: kind
-      type:
-        scalar: string
-      default: ""
-    - name: listKind
-      type:
-        scalar: string
-    - name: plural
-      type:
-        scalar: string
-      default: ""
-    - name: shortNames
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: singular
-      type:
-        scalar: string
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionSpec
-  map:
-    fields:
-    - name: conversion
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceConversion
-    - name: group
-      type:
-        scalar: string
-      default: ""
-    - name: names
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames
-      default: {}
-    - name: preserveUnknownFields
-      type:
-        scalar: boolean
-    - name: scope
-      type:
-        scalar: string
-      default: ""
-    - name: versions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionVersion
-          elementRelationship: atomic
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionStatus
-  map:
-    fields:
-    - name: acceptedNames
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames
-      default: {}
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionCondition
-          elementRelationship: associative
-          keys:
-          - type
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: storedVersions
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionVersion
-  map:
-    fields:
-    - name: additionalPrinterColumns
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceColumnDefinition
-          elementRelationship: atomic
-    - name: deprecated
-      type:
-        scalar: boolean
-    - name: deprecationWarning
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: schema
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceValidation
-    - name: selectableFields
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.SelectableField
-          elementRelationship: atomic
-    - name: served
-      type:
-        scalar: boolean
-      default: false
-    - name: storage
-      type:
-        scalar: boolean
-      default: false
-    - name: subresources
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresources
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceScale
-  map:
-    fields:
-    - name: labelSelectorPath
-      type:
-        scalar: string
-    - name: specReplicasPath
-      type:
-        scalar: string
-      default: ""
-    - name: statusReplicasPath
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceStatus
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresources
-  map:
-    fields:
-    - name: scale
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceScale
-    - name: status
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceStatus
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceValidation
-  map:
-    fields:
-    - name: openAPIV3Schema
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ExternalDocumentation
-  map:
-    fields:
-    - name: description
-      type:
-        scalar: string
-    - name: url
-      type:
-        scalar: string
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-  map:
-    fields:
-    - name: $ref
-      type:
-        scalar: string
-    - name: $schema
-      type:
-        scalar: string
-    - name: additionalItems
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
-    - name: additionalProperties
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
-    - name: allOf
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-          elementRelationship: atomic
-    - name: anyOf
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-          elementRelationship: atomic
-    - name: default
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
-    - name: definitions
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-    - name: dependencies
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray
-    - name: description
-      type:
-        scalar: string
-    - name: enum
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
-          elementRelationship: atomic
-    - name: example
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON
-    - name: exclusiveMaximum
-      type:
-        scalar: boolean
-    - name: exclusiveMinimum
-      type:
-        scalar: boolean
-    - name: externalDocs
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ExternalDocumentation
-    - name: format
-      type:
-        scalar: string
-    - name: id
-      type:
-        scalar: string
-    - name: items
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray
-    - name: maxItems
-      type:
-        scalar: numeric
-    - name: maxLength
-      type:
-        scalar: numeric
-    - name: maxProperties
-      type:
-        scalar: numeric
-    - name: maximum
-      type:
-        scalar: numeric
-    - name: minItems
-      type:
-        scalar: numeric
-    - name: minLength
-      type:
-        scalar: numeric
-    - name: minProperties
-      type:
-        scalar: numeric
-    - name: minimum
-      type:
-        scalar: numeric
-    - name: multipleOf
-      type:
-        scalar: numeric
-    - name: not
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-    - name: nullable
-      type:
-        scalar: boolean
-    - name: oneOf
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-          elementRelationship: atomic
-    - name: pattern
-      type:
-        scalar: string
-    - name: patternProperties
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-    - name: properties
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps
-    - name: required
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: title
-      type:
-        scalar: string
-    - name: type
-      type:
-        scalar: string
-    - name: uniqueItems
-      type:
-        scalar: boolean
-    - name: x-kubernetes-embedded-resource
-      type:
-        scalar: boolean
-    - name: x-kubernetes-int-or-string
-      type:
-        scalar: boolean
-    - name: x-kubernetes-list-map-keys
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: x-kubernetes-list-type
-      type:
-        scalar: string
-    - name: x-kubernetes-map-type
-      type:
-        scalar: string
-    - name: x-kubernetes-preserve-unknown-fields
-      type:
-        scalar: boolean
-    - name: x-kubernetes-validations
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ValidationRule
-          elementRelationship: associative
-          keys:
-          - rule
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.SelectableField
-  map:
-    fields:
-    - name: jsonPath
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ServiceReference
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: path
-      type:
-        scalar: string
-    - name: port
-      type:
-        scalar: numeric
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ValidationRule
-  map:
-    fields:
-    - name: fieldPath
-      type:
-        scalar: string
-    - name: message
-      type:
-        scalar: string
-    - name: messageExpression
-      type:
-        scalar: string
-    - name: optionalOldSelf
-      type:
-        scalar: boolean
-    - name: reason
-      type:
-        scalar: string
-    - name: rule
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookClientConfig
-  map:
-    fields:
-    - name: caBundle
-      type:
-        scalar: string
-    - name: service
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ServiceReference
-    - name: url
-      type:
-        scalar: string
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookConversion
-  map:
-    fields:
-    - name: clientConfig
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookClientConfig
-    - name: conversionReviewVersions
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition
-  map:
-    fields:
-    - name: JSONPath
-      type:
-        scalar: string
-      default: ""
-    - name: description
-      type:
-        scalar: string
-    - name: format
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: priority
-      type:
-        scalar: numeric
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion
-  map:
-    fields:
-    - name: conversionReviewVersions
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: strategy
-      type:
-        scalar: string
-      default: ""
-    - name: webhookClientConfig
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.WebhookClientConfig
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionSpec
-      default: {}
-    - name: status
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus
-      default: {}
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition
-  map:
-    fields:
-    - name: lastTransitionTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: message
-      type:
-        scalar: string
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: reason
-      type:
-        scalar: string
-    - name: status
-      type:
-        scalar: string
-      default: ""
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames
-  map:
-    fields:
-    - name: categories
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: kind
-      type:
-        scalar: string
-      default: ""
-    - name: listKind
-      type:
-        scalar: string
-    - name: plural
-      type:
-        scalar: string
-      default: ""
-    - name: shortNames
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: singular
-      type:
-        scalar: string
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionSpec
-  map:
-    fields:
-    - name: additionalPrinterColumns
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition
-          elementRelationship: atomic
-    - name: conversion
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion
-    - name: group
-      type:
-        scalar: string
-      default: ""
-    - name: names
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames
-      default: {}
-    - name: preserveUnknownFields
-      type:
-        scalar: boolean
-    - name: scope
-      type:
-        scalar: string
-      default: ""
-    - name: selectableFields
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.SelectableField
-          elementRelationship: atomic
-    - name: subresources
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources
-    - name: validation
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation
-    - name: version
-      type:
-        scalar: string
-    - name: versions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion
-          elementRelationship: atomic
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus
-  map:
-    fields:
-    - name: acceptedNames
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames
-      default: {}
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition
-          elementRelationship: associative
-          keys:
-          - type
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: storedVersions
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion
-  map:
-    fields:
-    - name: additionalPrinterColumns
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition
-          elementRelationship: atomic
-    - name: deprecated
-      type:
-        scalar: boolean
-    - name: deprecationWarning
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: schema
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation
-    - name: selectableFields
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.SelectableField
-          elementRelationship: atomic
-    - name: served
-      type:
-        scalar: boolean
-      default: false
-    - name: storage
-      type:
-        scalar: boolean
-      default: false
-    - name: subresources
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceScale
-  map:
-    fields:
-    - name: labelSelectorPath
-      type:
-        scalar: string
-    - name: specReplicasPath
-      type:
-        scalar: string
-      default: ""
-    - name: statusReplicasPath
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceStatus
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources
-  map:
-    fields:
-    - name: scale
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceScale
-    - name: status
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceStatus
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation
-  map:
-    fields:
-    - name: openAPIV3Schema
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ExternalDocumentation
-  map:
-    fields:
-    - name: description
-      type:
-        scalar: string
-    - name: url
-      type:
-        scalar: string
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-  map:
-    fields:
-    - name: $ref
-      type:
-        scalar: string
-    - name: $schema
-      type:
-        scalar: string
-    - name: additionalItems
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool
-    - name: additionalProperties
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool
-    - name: allOf
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-          elementRelationship: atomic
-    - name: anyOf
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-          elementRelationship: atomic
-    - name: default
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON
-    - name: definitions
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-    - name: dependencies
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray
-    - name: description
-      type:
-        scalar: string
-    - name: enum
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON
-          elementRelationship: atomic
-    - name: example
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON
-    - name: exclusiveMaximum
-      type:
-        scalar: boolean
-    - name: exclusiveMinimum
-      type:
-        scalar: boolean
-    - name: externalDocs
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ExternalDocumentation
-    - name: format
-      type:
-        scalar: string
-    - name: id
-      type:
-        scalar: string
-    - name: items
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray
-    - name: maxItems
-      type:
-        scalar: numeric
-    - name: maxLength
-      type:
-        scalar: numeric
-    - name: maxProperties
-      type:
-        scalar: numeric
-    - name: maximum
-      type:
-        scalar: numeric
-    - name: minItems
-      type:
-        scalar: numeric
-    - name: minLength
-      type:
-        scalar: numeric
-    - name: minProperties
-      type:
-        scalar: numeric
-    - name: minimum
-      type:
-        scalar: numeric
-    - name: multipleOf
-      type:
-        scalar: numeric
-    - name: not
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-    - name: nullable
-      type:
-        scalar: boolean
-    - name: oneOf
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-          elementRelationship: atomic
-    - name: pattern
-      type:
-        scalar: string
-    - name: patternProperties
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-    - name: properties
-      type:
-        map:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps
-    - name: required
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: title
-      type:
-        scalar: string
-    - name: type
-      type:
-        scalar: string
-    - name: uniqueItems
-      type:
-        scalar: boolean
-    - name: x-kubernetes-embedded-resource
-      type:
-        scalar: boolean
-    - name: x-kubernetes-int-or-string
-      type:
-        scalar: boolean
-    - name: x-kubernetes-list-map-keys
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: x-kubernetes-list-type
-      type:
-        scalar: string
-    - name: x-kubernetes-map-type
-      type:
-        scalar: string
-    - name: x-kubernetes-preserve-unknown-fields
-      type:
-        scalar: boolean
-    - name: x-kubernetes-validations
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ValidationRule
-          elementRelationship: associative
-          keys:
-          - rule
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.SelectableField
-  map:
-    fields:
-    - name: jsonPath
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ServiceReference
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: path
-      type:
-        scalar: string
-    - name: port
-      type:
-        scalar: numeric
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ValidationRule
-  map:
-    fields:
-    - name: fieldPath
-      type:
-        scalar: string
-    - name: message
-      type:
-        scalar: string
-    - name: messageExpression
-      type:
-        scalar: string
-    - name: optionalOldSelf
-      type:
-        scalar: boolean
-    - name: reason
-      type:
-        scalar: string
-    - name: rule
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.WebhookClientConfig
-  map:
-    fields:
-    - name: caBundle
-      type:
-        scalar: string
-    - name: service
-      type:
-        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ServiceReference
-    - name: url
-      type:
-        scalar: string
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: fieldsType
-      type:
-        scalar: string
-    - name: fieldsV1
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
-    - name: manager
-      type:
-        scalar: string
-    - name: operation
-      type:
-        scalar: string
-    - name: subresource
-      type:
-        scalar: string
-    - name: time
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-  map:
-    fields:
-    - name: annotations
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: creationTimestamp
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: deletionGracePeriodSeconds
-      type:
-        scalar: numeric
-    - name: deletionTimestamp
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: finalizers
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: associative
-    - name: generateName
-      type:
-        scalar: string
-    - name: generation
-      type:
-        scalar: numeric
-    - name: labels
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: managedFields
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
-          elementRelationship: atomic
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-    - name: ownerReferences
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
-          elementRelationship: associative
-          keys:
-          - uid
-    - name: resourceVersion
-      type:
-        scalar: string
-    - name: selfLink
-      type:
-        scalar: string
-    - name: uid
-      type:
-        scalar: string
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-      default: ""
-    - name: blockOwnerDeletion
-      type:
-        scalar: boolean
-    - name: controller
-      type:
-        scalar: boolean
-    - name: kind
-      type:
-        scalar: string
-      default: ""
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: uid
-      type:
-        scalar: string
-      default: ""
-    elementRelationship: atomic
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-  scalar: untyped
-- name: __untyped_atomic_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-- name: __untyped_deduced_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-`)
+var schemaJSON = `{
+  "types": [
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "description",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "format",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "jsonPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "priority",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "default": "",
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceColumnDefinition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": "",
+            "name": "strategy",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "webhook",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookConversion"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceConversion"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": {},
+            "name": "metadata",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+            }
+          },
+          {
+            "default": {},
+            "name": "spec",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionSpec"
+            }
+          },
+          {
+            "default": {},
+            "name": "status",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionStatus"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "lastTransitionTime",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "message",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "observedGeneration",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "reason",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "status",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionCondition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "categories",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "default": "",
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "listKind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "plural",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "shortNames",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "singular",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "conversion",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceConversion"
+            }
+          },
+          {
+            "default": "",
+            "name": "group",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": {},
+            "name": "names",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames"
+            }
+          },
+          {
+            "name": "preserveUnknownFields",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "default": "",
+            "name": "scope",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "versions",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionVersion"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionSpec"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": {},
+            "name": "acceptedNames",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames"
+            }
+          },
+          {
+            "name": "conditions",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionCondition"
+                },
+                "keys": [
+                  "type"
+                ]
+              }
+            }
+          },
+          {
+            "name": "observedGeneration",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "storedVersions",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionStatus"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "additionalPrinterColumns",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceColumnDefinition"
+                }
+              }
+            }
+          },
+          {
+            "name": "deprecated",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "deprecationWarning",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "schema",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceValidation"
+            }
+          },
+          {
+            "name": "selectableFields",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.SelectableField"
+                }
+              }
+            }
+          },
+          {
+            "default": false,
+            "name": "served",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "default": false,
+            "name": "storage",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "subresources",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresources"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionVersion"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "labelSelectorPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "specReplicasPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "statusReplicasPath",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceScale"
+    },
+    {
+      "map": {
+        "elementType": {
+          "list": {
+            "elementRelationship": "atomic",
+            "elementType": {
+              "namedType": "__untyped_atomic_"
+            }
+          },
+          "map": {
+            "elementRelationship": "separable",
+            "elementType": {
+              "namedType": "__untyped_deduced_"
+            }
+          },
+          "scalar": "untyped"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceStatus"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "scale",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceScale"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresourceStatus"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceSubresources"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "openAPIV3Schema",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceValidation"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "description",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "url",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ExternalDocumentation"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON",
+      "scalar": "untyped"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "$ref",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "$schema",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "additionalItems",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool"
+            }
+          },
+          {
+            "name": "additionalProperties",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool"
+            }
+          },
+          {
+            "name": "allOf",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "anyOf",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "default",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"
+            }
+          },
+          {
+            "name": "definitions",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "dependencies",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray"
+                }
+              }
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "enum",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"
+                }
+              }
+            }
+          },
+          {
+            "name": "example",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSON"
+            }
+          },
+          {
+            "name": "exclusiveMaximum",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "exclusiveMinimum",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "externalDocs",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ExternalDocumentation"
+            }
+          },
+          {
+            "name": "format",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "id",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "items",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray"
+            }
+          },
+          {
+            "name": "maxItems",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "maxLength",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "maxProperties",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "maximum",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minItems",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minLength",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minProperties",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minimum",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "multipleOf",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "not",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+            }
+          },
+          {
+            "name": "nullable",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "oneOf",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "pattern",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "patternProperties",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "properties",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "required",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "title",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "uniqueItems",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-embedded-resource",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-int-or-string",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-list-map-keys",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "x-kubernetes-list-type",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "x-kubernetes-map-type",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "x-kubernetes-preserve-unknown-fields",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-validations",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ValidationRule"
+                },
+                "keys": [
+                  "rule"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaProps"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrArray",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrBool",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.JSONSchemaPropsOrStringArray",
+      "scalar": "untyped"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": "",
+            "name": "jsonPath",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.SelectableField"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "namespace",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "path",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "port",
+            "type": {
+              "scalar": "numeric"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ServiceReference"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "fieldPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "message",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "messageExpression",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "optionalOldSelf",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "reason",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "rule",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ValidationRule"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "caBundle",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "service",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ServiceReference"
+            }
+          },
+          {
+            "name": "url",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookClientConfig"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "clientConfig",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookClientConfig"
+            }
+          },
+          {
+            "name": "conversionReviewVersions",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookConversion"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": "",
+            "name": "JSONPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "format",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "priority",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "default": "",
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "conversionReviewVersions",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "default": "",
+            "name": "strategy",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "webhookClientConfig",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.WebhookClientConfig"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": {},
+            "name": "metadata",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+            }
+          },
+          {
+            "default": {},
+            "name": "spec",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionSpec"
+            }
+          },
+          {
+            "default": {},
+            "name": "status",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "lastTransitionTime",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "message",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "observedGeneration",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "reason",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "status",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "categories",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "default": "",
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "listKind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "plural",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "shortNames",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "singular",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "additionalPrinterColumns",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
+                }
+              }
+            }
+          },
+          {
+            "name": "conversion",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceConversion"
+            }
+          },
+          {
+            "default": "",
+            "name": "group",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": {},
+            "name": "names",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames"
+            }
+          },
+          {
+            "name": "preserveUnknownFields",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "default": "",
+            "name": "scope",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "selectableFields",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.SelectableField"
+                }
+              }
+            }
+          },
+          {
+            "name": "subresources",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
+            }
+          },
+          {
+            "name": "validation",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
+            }
+          },
+          {
+            "name": "version",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "versions",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionSpec"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": {},
+            "name": "acceptedNames",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionNames"
+            }
+          },
+          {
+            "name": "conditions",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition"
+                },
+                "keys": [
+                  "type"
+                ]
+              }
+            }
+          },
+          {
+            "name": "observedGeneration",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "storedVersions",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionStatus"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "additionalPrinterColumns",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
+                }
+              }
+            }
+          },
+          {
+            "name": "deprecated",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "deprecationWarning",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "schema",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
+            }
+          },
+          {
+            "name": "selectableFields",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.SelectableField"
+                }
+              }
+            }
+          },
+          {
+            "default": false,
+            "name": "served",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "default": false,
+            "name": "storage",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "subresources",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionVersion"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "labelSelectorPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "specReplicasPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "statusReplicasPath",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceScale"
+    },
+    {
+      "map": {
+        "elementType": {
+          "list": {
+            "elementRelationship": "atomic",
+            "elementType": {
+              "namedType": "__untyped_atomic_"
+            }
+          },
+          "map": {
+            "elementRelationship": "separable",
+            "elementType": {
+              "namedType": "__untyped_deduced_"
+            }
+          },
+          "scalar": "untyped"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceStatus"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "scale",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceScale"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceStatus"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "openAPIV3Schema",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "description",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "url",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ExternalDocumentation"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON",
+      "scalar": "untyped"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "$ref",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "$schema",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "additionalItems",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool"
+            }
+          },
+          {
+            "name": "additionalProperties",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool"
+            }
+          },
+          {
+            "name": "allOf",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "anyOf",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "default",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"
+            }
+          },
+          {
+            "name": "definitions",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "dependencies",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray"
+                }
+              }
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "enum",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"
+                }
+              }
+            }
+          },
+          {
+            "name": "example",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSON"
+            }
+          },
+          {
+            "name": "exclusiveMaximum",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "exclusiveMinimum",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "externalDocs",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ExternalDocumentation"
+            }
+          },
+          {
+            "name": "format",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "id",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "items",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray"
+            }
+          },
+          {
+            "name": "maxItems",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "maxLength",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "maxProperties",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "maximum",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minItems",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minLength",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minProperties",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "minimum",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "multipleOf",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "not",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+            }
+          },
+          {
+            "name": "nullable",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "oneOf",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "pattern",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "patternProperties",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "properties",
+            "type": {
+              "map": {
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+                }
+              }
+            }
+          },
+          {
+            "name": "required",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "title",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "uniqueItems",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-embedded-resource",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-int-or-string",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-list-map-keys",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "x-kubernetes-list-type",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "x-kubernetes-map-type",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "x-kubernetes-preserve-unknown-fields",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "x-kubernetes-validations",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ValidationRule"
+                },
+                "keys": [
+                  "rule"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrArray",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrBool",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaPropsOrStringArray",
+      "scalar": "untyped"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": "",
+            "name": "jsonPath",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.SelectableField"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "namespace",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "path",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "port",
+            "type": {
+              "scalar": "numeric"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ServiceReference"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "fieldPath",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "message",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "messageExpression",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "optionalOldSelf",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "reason",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "rule",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ValidationRule"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "caBundle",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "service",
+            "type": {
+              "namedType": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.ServiceReference"
+            }
+          },
+          {
+            "name": "url",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.WebhookClientConfig"
+    },
+    {
+      "map": {
+        "elementType": {
+          "list": {
+            "elementRelationship": "atomic",
+            "elementType": {
+              "namedType": "__untyped_atomic_"
+            }
+          },
+          "map": {
+            "elementRelationship": "separable",
+            "elementType": {
+              "namedType": "__untyped_deduced_"
+            }
+          },
+          "scalar": "untyped"
+        }
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "fieldsType",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "fieldsV1",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+            }
+          },
+          {
+            "name": "manager",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "operation",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "subresource",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "time",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "annotations",
+            "type": {
+              "map": {
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "creationTimestamp",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "deletionGracePeriodSeconds",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "deletionTimestamp",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "finalizers",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "generateName",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "generation",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "labels",
+            "type": {
+              "map": {
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "managedFields",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                }
+              }
+            }
+          },
+          {
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "namespace",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "ownerReferences",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                },
+                "keys": [
+                  "uid"
+                ]
+              }
+            }
+          },
+          {
+            "name": "resourceVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "selfLink",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+    },
+    {
+      "map": {
+        "elementRelationship": "atomic",
+        "fields": [
+          {
+            "default": "",
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "blockOwnerDeletion",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "controller",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "default": "",
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "uid",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+    },
+    {
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "name": "__untyped_atomic_",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "__untyped_deduced_",
+      "scalar": "untyped"
+    }
+  ]
+}`
