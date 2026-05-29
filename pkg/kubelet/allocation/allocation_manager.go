@@ -73,7 +73,7 @@ type Manager interface {
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
 	// SetAllocatedResources checkpoints the resources allocated to a pod's containers.
-	SetAllocatedResources(allocatedPod *v1.Pod) error
+	SetAllocatedResources(logger klog.Logger, allocatedPod *v1.Pod) error
 
 	// AddPodAdmitHandlers adds the admit handlers to the allocation manager.
 	// TODO: See if we can remove this and just add them in the allocation manager constructor.
@@ -85,10 +85,10 @@ type Manager interface {
 	// the pod cannot be admitted.
 	// allocatedPods should represent the pods that have already been admitted, along with their
 	// admitted (allocated) resources.
-	AddPod(activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
+	AddPod(logger klog.Logger, activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
 
 	// RemovePod removes any stored state for the given pod UID.
-	RemovePod(uid types.UID)
+	RemovePod(logger klog.Logger, uid types.UID)
 
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
@@ -98,7 +98,7 @@ type Manager interface {
 	Run(ctx context.Context)
 
 	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
-	PushPendingResize(uid types.UID)
+	PushPendingResize(logger klog.Logger, uid types.UID)
 
 	// HasPendingResizes returns whether there are currently any pending resizes.
 	HasPendingResizes() bool
@@ -125,7 +125,8 @@ type manager struct {
 	recorder record.EventRecorderLogger
 }
 
-func NewManager(checkpointDirectory string,
+func NewManager(logger klog.Logger,
+	checkpointDirectory string,
 	statusManager status.Manager,
 	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
@@ -133,9 +134,6 @@ func NewManager(checkpointDirectory string,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 ) Manager {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	return &manager{
 		allocated: newStateImpl(logger, checkpointDirectory, allocatedPodsStateFile),
 
@@ -271,10 +269,7 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 	return successfulResizes
 }
 
-func (m *manager) PushPendingResize(uid types.UID) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *manager) PushPendingResize(logger klog.Logger, uid types.UID) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -476,10 +471,7 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 }
 
 // SetAllocatedResources checkpoints the resources allocated to a pod's containers
-func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
 	return m.allocated.SetPodResourceInfo(logger, pod.UID, allocationFromPod(pod))
 }
 
@@ -506,10 +498,7 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	}
 }
 
-func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *manager) AddPod(logger klog.Logger, activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -525,7 +514,7 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
-		if err := m.SetAllocatedResources(pod); err != nil {
+		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			logger.Error(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 		}
@@ -534,10 +523,7 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	return ok, reason, message
 }
 
-func (m *manager) RemovePod(uid types.UID) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {
 	if err := m.allocated.RemovePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		logger.V(3).Info("Failed to delete pod allocation", "podUID", uid, "err", err)
@@ -560,7 +546,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 	fit, reason, message := m.canAdmitPod(logger, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := m.SetAllocatedResources(pod); err != nil {
+		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			return false, err
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
