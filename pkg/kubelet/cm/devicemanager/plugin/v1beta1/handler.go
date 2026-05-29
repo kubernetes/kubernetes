@@ -29,10 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
-func (s *server) GetPluginHandler() cache.PluginHandler {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+func (s *server) GetPluginHandler(ctx context.Context) cache.PluginHandler {
+	logger := klog.FromContext(ctx)
 	if f, err := os.Create(s.socketDir + "DEPRECATION"); err != nil {
 		logger.Error(err, "Failed to create deprecation file at socket dir", "path", s.socketDir)
 	} else {
@@ -42,17 +40,14 @@ func (s *server) GetPluginHandler() cache.PluginHandler {
 	return s
 }
 
-func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
+func (s *server) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
 	return s.connectClient(ctx, pluginName, endpoint)
 }
 
-func (s *server) DeRegisterPlugin(pluginName, endpoint string) {
-	logger := klog.FromContext(context.TODO())
+func (s *server) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
+	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Deregistering plugin", "plugin", pluginName, "endpoint", endpoint)
 	// endpoint in DeRegisterPlugin is the socket path
 	client := s.getClient(pluginName, endpoint)
@@ -63,10 +58,8 @@ func (s *server) DeRegisterPlugin(pluginName, endpoint string) {
 	}
 }
 
-func (s *server) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+func (s *server) ValidatePlugin(ctx context.Context, pluginName string, endpoint string, versions []string) error {
+	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Got plugin at endpoint with versions", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
 
 	if !s.isVersionCompatibleWithPlugin(versions...) {
