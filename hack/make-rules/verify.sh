@@ -87,6 +87,7 @@ QUICK_PATTERNS+=(
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-non-mutating-validation.sh"
+  "verify-owners-schema.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
   "verify-spelling.sh"
