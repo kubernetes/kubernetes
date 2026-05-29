@@ -191,8 +191,16 @@ benchmark: $(OTEL_GO_MOD_DIRS:%=benchmark/%)
 benchmark/%:
 	cd $* && $(GO) test -run='^$$' -bench=. $(ARGS) ./...
 
+# sdk/metric is split into two shards to work around CodSpeed limitations.
+# See https://github.com/CodSpeedHQ/codspeed-go/issues/56
+BENCHMARK_SHARDS := $(filter-out ./sdk/metric,$(OTEL_GO_MOD_DIRS)) ./sdk/metric/root ./sdk/metric/internal
+benchmark/./sdk/metric/root:
+	cd ./sdk/metric && $(GO) test -run='^$$' -bench=. $(ARGS) . ./exemplar/...
+benchmark/./sdk/metric/internal:
+	cd ./sdk/metric && $(GO) test -run='^$$' -bench=. $(ARGS) ./internal/...
+
 print-sharded-benchmarks:
-	@echo $(OTEL_GO_MOD_DIRS) | jq -cR 'split(" ")'
+	@echo $(BENCHMARK_SHARDS) | jq -cR 'split(" ")'
 
 .PHONY: golangci-lint golangci-lint-fix
 golangci-lint-fix: ARGS=--fix

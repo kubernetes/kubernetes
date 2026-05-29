@@ -14,6 +14,10 @@ import (
 )
 
 const (
+	maxParseErrors = 5
+
+	// W3C Baggage specification limits.
+	// https://www.w3.org/TR/baggage/#limits
 	maxMembers               = 64
 	maxBytesPerBaggageString = 8192
 
@@ -493,9 +497,15 @@ func New(members ...Member) (Baggage, error) {
 // from the W3C Baggage specification which allows duplicate list-members, but
 // conforms to the OpenTelemetry Baggage specification.
 //
-// If the baggage-string exceeds the maximum allowed members (64) or bytes
-// (8192), members are dropped until the limits are satisfied and an error is
-// returned along with the partial result.
+// If the raw baggage-string exceeds the maximum allowed bytes (8192), an
+// empty Baggage and an error are returned.
+//
+// Otherwise, members are parsed left-to-right and accumulated until one of
+// the following conditions is reached, at which point parsing stops and an
+// error is returned alongside the partial result:
+//   - accepting the next member would cause the encoded baggage to exceed
+//     8192 bytes, or
+//   - the baggage already contains 64 distinct keys.
 //
 // Invalid members are skipped and the error is returned along with the
 // partial result containing the valid members.
@@ -504,9 +514,14 @@ func Parse(bStr string) (Baggage, error) {
 		return Baggage{}, nil
 	}
 
+	if n := len(bStr); n > maxBytesPerBaggageString {
+		return Baggage{}, fmt.Errorf("%w: %d", errBaggageBytes, n)
+	}
+
 	b := make(baggage.List)
 	sizes := make(map[string]int) // Track per-key byte sizes
 	var totalBytes int
+	var parseErrors int
 	var truncateErr error
 	for memberStr := range strings.SplitSeq(bStr, listDelimiter) {
 		// Check member count limit.
@@ -517,7 +532,10 @@ func Parse(bStr string) (Baggage, error) {
 
 		m, err := parseMember(memberStr)
 		if err != nil {
-			truncateErr = errors.Join(truncateErr, err)
+			parseErrors++
+			if parseErrors <= maxParseErrors {
+				truncateErr = errors.Join(truncateErr, err)
+			}
 			continue // skip invalid member, keep processing
 		}
 
@@ -551,6 +569,10 @@ func Parse(bStr string) (Baggage, error) {
 		}
 		sizes[m.key] = memberBytes
 		totalBytes = newTotalBytes
+	}
+
+	if dropped := parseErrors - maxParseErrors; dropped > 0 {
+		truncateErr = errors.Join(truncateErr, fmt.Errorf("and %d more invalid member(s)", dropped))
 	}
 
 	if len(b) == 0 {
