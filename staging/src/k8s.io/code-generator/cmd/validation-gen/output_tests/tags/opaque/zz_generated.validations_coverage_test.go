@@ -40,6 +40,7 @@ func init() {
 		},
 	)
 }
+
 func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "OtherStruct"},
@@ -53,6 +54,7 @@ func init() {
 		},
 	)
 }
+
 func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "Struct"},
@@ -135,6 +137,7 @@ func init() {
 		},
 	)
 }
+
 func TestMain(m *testing.M) {
 	code := m.Run()
 	if err := coverage.AssertDeclarativeCoverage(); err != nil {

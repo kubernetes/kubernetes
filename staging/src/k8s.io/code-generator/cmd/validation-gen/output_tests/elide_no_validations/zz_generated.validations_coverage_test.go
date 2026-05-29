@@ -68,6 +68,7 @@ func init() {
 		},
 	)
 }
+
 func TestMain(m *testing.M) {
 	code := m.Run()
 	if err := coverage.AssertDeclarativeCoverage(); err != nil {

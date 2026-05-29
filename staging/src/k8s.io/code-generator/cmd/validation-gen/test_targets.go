@@ -237,7 +237,7 @@ func emitRegisterDeclaredRules(sw *generator.SnippetWriter, c *generator.Context
 			}
 			sw.Do("            },\n", nil)
 		}
-		sw.Do("        },\n    )\n}\n", nil)
+		sw.Do("        },\n    )\n}\n\n", nil)
 	}
 }
 
