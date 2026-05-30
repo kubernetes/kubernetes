@@ -510,6 +510,7 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 		case <-t.C():
 			successful, err := verifyStatus()
 			if err != nil {
+				t.Stop()
 				return err
 			}
 			if successful {

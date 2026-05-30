@@ -17,10 +17,12 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,7 +31,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -254,8 +255,11 @@ func TestCSI_VolumeAll(t *testing.T) {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
 
-			factory.Start(wait.NeverStop)
-			factory.WaitForCacheSync(wait.NeverStop)
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			t.Cleanup(factory.Shutdown)
+			factory.Start(ctx.Done())
+			factory.WaitForCacheSync(ctx.Done())
 
 			attachDetachVolumeHost := volumetest.NewFakeAttachDetachVolumeHostWithCSINodeName(t,
 				tmpDir,
@@ -305,7 +309,10 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
+				var attachWg sync.WaitGroup
+				attachWg.Add(1)
 				go func() {
+					defer attachWg.Done()
 					attachID, err := volAttacher.Attach(volSpec, attachDetachVolumeHost.GetNodeName())
 					if err != nil {
 						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
@@ -316,6 +323,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 				// Simulates external-attacher and marks VolumeAttachment.Status.Attached = true
 				markVolumeAttached(t, attachDetachVolumeHost.GetKubeClient(), nil, attachName, storage.VolumeAttachmentStatus{Attached: true})
+				attachWg.Wait()
 
 				// Observe attach on this node.
 				devicePath, err = volAttacher.WaitForAttach(volSpec, "", pod, 500*time.Millisecond)
