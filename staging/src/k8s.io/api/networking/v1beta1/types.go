@@ -409,7 +409,7 @@ type IngressClassParametersReference struct {
 
 	// scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
-	// +optional
+	// +required
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
 
 	// namespace is the namespace of the resource being referenced. This field is
