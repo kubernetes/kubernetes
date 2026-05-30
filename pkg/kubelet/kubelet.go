@@ -1070,9 +1070,13 @@ func NewMainKubelet(ctx context.Context,
 		return eventTime.Sub(lastUpdate) > 600*time.Second
 	}
 
+	// Create a standalone eviction admit handler linked by a shared state.
+	evictionState := eviction.NewNodeConditionsState()
+	evictionAdmitHandler := eviction.NewAdmitHandler(evictionState)
+
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
-		killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
+	evictionManager := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
+		killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation, evictionState)
 
 	klet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}
@@ -1146,9 +1150,14 @@ func NewMainKubelet(ctx context.Context,
 		v1.NamespaceNodeLease,
 		util.SetNodeOwnerFunc(ctx, klet.heartbeatClient, string(klet.nodeName)))
 
+	// Create a standalone shutdown admit handler linked by a shared state.
+	shutdownState := nodeshutdown.NewShutdownState()
+	shutdownAdmitHandler := nodeshutdown.NewAdmitHandler(shutdownState)
+
 	// setup node shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{
 		Logger:                           logger,
+		State:                            shutdownState,
 		VolumeManager:                    klet.volumeManager,
 		Recorder:                         kubeDeps.Recorder,
 		NodeRef:                          nodeRef,
@@ -1161,7 +1170,7 @@ func NewMainKubelet(ctx context.Context,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
-	handlers = append(handlers, shutdownManager)
+	handlers = append(handlers, shutdownAdmitHandler)
 
 	klet.allocationManager.AddPodAdmitHandlers(append([]lifecycle.PodAdmitHandler{resizeAdmitHandler}, handlers...))
 

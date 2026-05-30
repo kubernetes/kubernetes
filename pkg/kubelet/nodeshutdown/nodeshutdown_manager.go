@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,9 +40,6 @@ import (
 
 // Manager interface provides methods for Kubelet to manage node shutdown.
 type Manager interface {
-	lifecycle.PodAdmitHandler
-
-	Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
 	Start(ctx context.Context) error
 	ShutdownStatus() error
 }
@@ -49,6 +47,7 @@ type Manager interface {
 // Config represents Manager configuration
 type Config struct {
 	Logger                           klog.Logger
+	State                            *ShutdownState
 	VolumeManager                    volumemanager.VolumeManager
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference
@@ -64,11 +63,6 @@ type Config struct {
 
 // managerStub is a fake node shutdown managerImpl .
 type managerStub struct{}
-
-// Admit returns a fake Pod admission which always returns true
-func (managerStub) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{Admit: true}
-}
 
 // Start is a no-op always returning nil for non linux platforms.
 func (managerStub) Start(context.Context) error {
@@ -299,4 +293,36 @@ func groupByPriority(shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGr
 		groups[index].Pods = append(groups[index].Pods, pod)
 	}
 	return groups
+}
+
+// ShutdownState is a lightweight object that tracks if the node is shutting down.
+type ShutdownState struct {
+	ShuttingDown atomic.Bool
+}
+
+// NewShutdownState creates a new ShutdownState.
+func NewShutdownState() *ShutdownState {
+	return &ShutdownState{}
+}
+
+// AdmitHandler evaluates if pods can be admitted based on the node shutdown state.
+type AdmitHandler struct {
+	state *ShutdownState
+}
+
+// NewAdmitHandler returns a standalone PodAdmitHandler that uses ShutdownState.
+func NewAdmitHandler(state *ShutdownState) lifecycle.PodAdmitHandler {
+	return &AdmitHandler{state: state}
+}
+
+// Admit rejects pods if the node is actively shutting down.
+func (h *AdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if h.state.ShuttingDown.Load() {
+		return lifecycle.PodAdmitResult{
+			Admit:   false,
+			Reason:  NodeShutdownNotAdmittedReason,
+			Message: nodeShutdownNotAdmittedMessage,
+		}
+	}
+	return lifecycle.PodAdmitResult{Admit: true}
 }

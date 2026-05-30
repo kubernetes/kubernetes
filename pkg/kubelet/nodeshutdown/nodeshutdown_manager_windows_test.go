@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -88,6 +87,7 @@ func TestFeatureEnabled(t *testing.T) {
 
 			manager := NewManager(&Config{
 				Logger:                          logger,
+				State:                           NewShutdownState(),
 				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -120,7 +120,6 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 		getPods                          eviction.ActivePodsFunc
 		killPodFunc                      eviction.KillPodFunc
 		syncNodeStatus                   func(context.Context)
-		nodeShuttingDownNow              bool
 		clock                            clock.Clock
 	}
 	tests := []struct {
@@ -239,13 +238,12 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 				),
 			)
 			m := &managerImpl{
-				logger:                logger,
-				recorder:              tt.fields.recorder,
-				nodeRef:               tt.fields.nodeRef,
-				getPods:               tt.fields.getPods,
-				syncNodeStatus:        tt.fields.syncNodeStatus,
-				nodeShuttingDownMutex: sync.Mutex{},
-				nodeShuttingDownNow:   tt.fields.nodeShuttingDownNow,
+				logger:         logger,
+				recorder:       tt.fields.recorder,
+				nodeRef:        tt.fields.nodeRef,
+				getPods:        tt.fields.getPods,
+				syncNodeStatus: tt.fields.syncNodeStatus,
+				state:          NewShutdownState(),
 				podManager: &podManager{
 					logger:                           logger,
 					volumeManager:                    tt.fields.volumeManager,

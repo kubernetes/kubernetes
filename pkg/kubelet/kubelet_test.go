@@ -397,9 +397,14 @@ func newTestKubeletWithImageList(
 		UID:       types.UID(kubelet.nodeName),
 		Namespace: "",
 	}
+
+	// Create a standalone eviction admit handler linked by a shared state.
+	evictionState := eviction.NewNodeConditionsState()
+	evictionAdmitHandler := eviction.NewAdmitHandler(evictionState)
+
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
-		killPodNow(tCtx, kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
+	evictionManager := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
+		killPodNow(tCtx, kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation(), evictionState)
 
 	kubelet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}
@@ -407,8 +412,10 @@ func newTestKubeletWithImageList(
 	handlers = append(handlers, allocation.NewPodResizesAdmitHandler(kubelet.containerManager, fakeRuntime, kubelet.allocationManager, logger))
 
 	// setup shutdown manager
+	shutdownState := nodeshutdown.NewShutdownState()
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{
 		Logger:                          logger,
+		State:                           shutdownState,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     kubelet.podManager.GetPods,
@@ -422,7 +429,7 @@ func newTestKubeletWithImageList(
 	if err != nil {
 		t.Fatalf("Failed to create UserNsManager: %v", err)
 	}
-	handlers = append(handlers, shutdownManager)
+	handlers = append(handlers, nodeshutdown.NewAdmitHandler(shutdownState))
 
 	// Add this as cleanup predicate pod admitter
 	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))

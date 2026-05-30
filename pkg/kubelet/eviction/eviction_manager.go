@@ -76,8 +76,8 @@ type managerImpl struct {
 	containerGC ContainerGC
 	// protects access to internal state
 	sync.RWMutex
-	// node conditions are the set of conditions present
-	nodeConditions []v1.NodeConditionType
+	// node conditions state shared with the admit handler
+	state *NodeConditionsState
 	// captures when a node condition was last observed based on a threshold being met
 	nodeConditionsLastObservedAt nodeConditionsObservedAt
 	// nodeRef is a reference to the node
@@ -111,46 +111,47 @@ type managerImpl struct {
 // ensure it implements the required interface
 var _ Manager = &managerImpl{}
 
-// NewManager returns a configured Manager and an associated admission handler to enforce eviction configuration.
-func NewManager(
-	summaryProvider stats.SummaryProvider,
-	config Config,
-	killPodFunc KillPodFunc,
-	imageGC ImageGC,
-	containerGC ContainerGC,
-	recorder record.EventRecorder,
-	nodeRef *v1.ObjectReference,
-	clock clock.WithTicker,
-	localStorageCapacityIsolation bool,
-) (Manager, lifecycle.PodAdmitHandler) {
-	manager := &managerImpl{
-		clock:                         clock,
-		killPodFunc:                   killPodFunc,
-		imageGC:                       imageGC,
-		containerGC:                   containerGC,
-		config:                        config,
-		recorder:                      recorder,
-		summaryProvider:               summaryProvider,
-		nodeRef:                       nodeRef,
-		nodeConditionsLastObservedAt:  nodeConditionsObservedAt{},
-		thresholdsFirstObservedAt:     thresholdsObservedAt{},
-		dedicatedImageFs:              nil,
-		splitContainerImageFs:         nil,
-		thresholdNotifiers:            []ThresholdNotifier{},
-		localStorageCapacityIsolation: localStorageCapacityIsolation,
-	}
-	return manager, manager
+// NodeConditionsState allows sharing the current node conditions between the
+// eviction manager and the admit handler.
+type NodeConditionsState struct {
+	sync.RWMutex
+	conditions []v1.NodeConditionType
+}
+
+func NewNodeConditionsState() *NodeConditionsState {
+	return &NodeConditionsState{}
+}
+
+func (s *NodeConditionsState) Get() []v1.NodeConditionType {
+	s.RLock()
+	defer s.RUnlock()
+	return s.conditions
+}
+
+func (s *NodeConditionsState) Set(conditions []v1.NodeConditionType) {
+	s.Lock()
+	defer s.Unlock()
+	s.conditions = conditions
+}
+
+// AdmitHandler evaluates if pods can be admitted based on current node conditions.
+type AdmitHandler struct {
+	state *NodeConditionsState
+}
+
+// NewAdmitHandler returns a standalone PodAdmitHandler that uses NodeConditionsState.
+func NewAdmitHandler(state *NodeConditionsState) lifecycle.PodAdmitHandler {
+	return &AdmitHandler{state: state}
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	m.RLock()
-	defer m.RUnlock()
+func (h *AdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	conditions := h.state.Get()
 
 	ctx := context.Background()
 	logger := klog.FromContext(ctx)
 
-	if len(m.nodeConditions) == 0 {
+	if len(conditions) == 0 {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
@@ -160,7 +161,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 
 	// Conditions other than memory pressure reject all pods
-	nodeOnlyHasMemoryPressureCondition := hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) && len(m.nodeConditions) == 1
+	nodeOnlyHasMemoryPressureCondition := hasNodeCondition(conditions, v1.NodeMemoryPressure) && len(conditions) == 1
 	if nodeOnlyHasMemoryPressureCondition {
 		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
@@ -180,8 +181,41 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  Reason,
-		Message: fmt.Sprintf(nodeConditionMessageFmt, m.nodeConditions),
+		Message: fmt.Sprintf(nodeConditionMessageFmt, conditions),
 	}
+}
+
+// NewManager returns a configured Manager and an associated admission handler to enforce eviction configuration.
+func NewManager(
+	summaryProvider stats.SummaryProvider,
+	config Config,
+	killPodFunc KillPodFunc,
+	imageGC ImageGC,
+	containerGC ContainerGC,
+	recorder record.EventRecorder,
+	nodeRef *v1.ObjectReference,
+	clock clock.WithTicker,
+	localStorageCapacityIsolation bool,
+	state *NodeConditionsState,
+) Manager {
+	manager := &managerImpl{
+		clock:                         clock,
+		killPodFunc:                   killPodFunc,
+		imageGC:                       imageGC,
+		containerGC:                   containerGC,
+		config:                        config,
+		recorder:                      recorder,
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		nodeConditionsLastObservedAt:  nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:     thresholdsObservedAt{},
+		dedicatedImageFs:              nil,
+		splitContainerImageFs:         nil,
+		thresholdNotifiers:            []ThresholdNotifier{},
+		localStorageCapacityIsolation: localStorageCapacityIsolation,
+		state:                         state,
+	}
+	return manager
 }
 
 // Start starts the control loop to observe and response to low compute resources.
@@ -233,23 +267,17 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 
 // IsUnderMemoryPressure returns true if the node is under memory pressure.
 func (m *managerImpl) IsUnderMemoryPressure() bool {
-	m.RLock()
-	defer m.RUnlock()
-	return hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure)
+	return hasNodeCondition(m.state.Get(), v1.NodeMemoryPressure)
 }
 
 // IsUnderDiskPressure returns true if the node is under disk pressure.
 func (m *managerImpl) IsUnderDiskPressure() bool {
-	m.RLock()
-	defer m.RUnlock()
-	return hasNodeCondition(m.nodeConditions, v1.NodeDiskPressure)
+	return hasNodeCondition(m.state.Get(), v1.NodeDiskPressure)
 }
 
 // IsUnderPIDPressure returns true if the node is under PID pressure.
 func (m *managerImpl) IsUnderPIDPressure() bool {
-	m.RLock()
-	defer m.RUnlock()
-	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
+	return hasNodeCondition(m.state.Get(), v1.NodePIDPressure)
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
@@ -356,7 +384,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 
 	// update internal state
 	m.Lock()
-	m.nodeConditions = nodeConditions
+	m.state.Set(nodeConditions)
 	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
 	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
 	m.thresholdsMet = thresholds
