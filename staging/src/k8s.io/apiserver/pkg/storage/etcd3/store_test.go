@@ -1064,7 +1064,7 @@ func BenchmarkStoreList(b *testing.B) {
 		for _, sizeBasedEnabled := range []bool{true, false} {
 			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
 			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-				data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+				data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 				ctx, store, _ := testSetup(b)
 				var out example.Pod
 				for _, pod := range data.Pods {
@@ -1131,7 +1131,7 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	data := storagetesting.PrepareBenchchmarkData(50, 3_000, 5_000)
+	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
 	ctx, store, _ := testSetup(b)
 	var out example.Pod
 	for _, pod := range data.Pods {
@@ -1148,7 +1148,7 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	namespaceCount := 50
 	podPerNamespaceCount := 3_000
-	data := storagetesting.PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
+	data := storagetesting.PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
 	ctx, store, _ := testSetup(b)
 	var out example.Pod
 	for _, pod := range data.Pods {

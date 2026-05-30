@@ -204,7 +204,6 @@ func podAttr(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 func PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (data BenchmarkData) {
 	exemplar := loadExemplarPod()
-
 	data.NodeNames = make([]string, nodeCount)
 	for i := 0; i < nodeCount; i++ {
 		data.NodeNames[i] = rand.String(10)
