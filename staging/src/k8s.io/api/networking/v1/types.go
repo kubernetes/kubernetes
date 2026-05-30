@@ -514,7 +514,7 @@ type HTTPIngressPath struct {
 
 	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
-	// +optional
+	// +required
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
@@ -542,7 +542,7 @@ type IngressServiceBackend struct {
 
 	// port of the referenced service. A port name or port number
 	// is required for a IngressServiceBackend.
-	// +optional
+	// +required
 	Port ServiceBackendPort `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 
@@ -592,7 +592,7 @@ type IngressClassSpec struct {
 	// same implementing controller. This should be specified as a
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
-	// +optional
+	// +required
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional
