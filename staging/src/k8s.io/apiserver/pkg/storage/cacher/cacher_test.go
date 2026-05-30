@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -724,22 +725,27 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 		return true, nil
 	})
 }
-
-func BenchmarkStoreCreateList(b *testing.B) {
+func BenchmarkStoreWriteThroughput(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	for _, rvm := range []metav1.ResourceVersionMatch{metav1.ResourceVersionMatchNotOlderThan, metav1.ResourceVersionMatchExact} {
-		b.Run(fmt.Sprintf("RV=%s", rvm), func(b *testing.B) {
-			for _, useIndex := range []bool{true, false} {
-				b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
-					opts := []setupOption{}
-					if useIndex {
-						opts = append(opts, withNodeNameAndNamespaceIndex)
-					}
-					ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
-					b.Cleanup(terminate)
-					storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, rvm)
-				})
-			}
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			opts := []setupOption{withNodeNameAndNamespaceIndex}
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
+			b.Cleanup(terminate)
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			b.ResetTimer()
+			storagetesting.RunBenchmarkWriteThroughput(ctx, b, cacher, data, true)
 		})
 	}
 }
@@ -773,13 +779,7 @@ func BenchmarkStoreList(b *testing.B) {
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
 			b.Cleanup(terminate)
-			var out example.Pod
-			for _, pod := range data.Pods {
-				err := cacher.Create(ctx, computePodKey(pod), pod, &out, 0)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
+			require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, cacher, data))
 			for _, useIndex := range []bool{true, false} {
 				b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
 					storagetesting.RunBenchmarkStoreList(ctx, b, cacher, data, useIndex)
