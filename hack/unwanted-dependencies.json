@@ -24,6 +24,7 @@
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
+      "github.com/envoyproxy/protoc-gen-validate": "unmaintained, archive mode, refer to #139389",
       "github.com/evanphx/json-patch/v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "github.com/flynn/go-shlex": "unmaintained, archive mode",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
@@ -138,6 +139,9 @@
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
+      ],
+      "github.com/envoyproxy/protoc-gen-validate": [
+        "google.golang.org/grpc"
       ],
       "github.com/flynn/go-shlex": [
         "github.com/coredns/caddy"
