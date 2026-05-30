@@ -97,7 +97,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				"invalid: max taints exceeded": {
 					input: mkResourceSliceWithDevices(tweakDeviceTaints(17)),
 					expectedErrs: field.ErrorList{
-						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), 17, 16).WithOrigin("maxItems"),
+						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("taints"), 17, 16).WithOrigin("maxItems").MarkAlpha(),
 					},
 				},
 				"invalid: taint empty": {

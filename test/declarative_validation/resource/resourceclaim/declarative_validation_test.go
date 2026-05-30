@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
