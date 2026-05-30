@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 )
@@ -68,9 +66,8 @@ type managerImpl struct {
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
 
-	nodeShuttingDownMutex sync.Mutex
-	nodeShuttingDownNow   bool
-	podManager            *podManager
+	state      *ShutdownState
+	podManager *podManager
 
 	enableMetrics bool
 	storage       storage
@@ -97,6 +94,7 @@ func NewManager(conf *Config) Manager {
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,
 		syncNodeStatus: conf.SyncNodeStatusFunc,
+		state:          conf.State,
 		podManager:     podManager,
 		enableMetrics:  utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
 		storage: localStorage{
@@ -109,20 +107,6 @@ func NewManager(conf *Config) Manager {
 		"shutdownGracePeriodByPodPriority", podManager.shutdownGracePeriodByPodPriority,
 	)
 	return manager
-}
-
-// Admit rejects all pods if node is shutting
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	nodeShuttingDown := m.ShutdownStatus() != nil
-
-	if nodeShuttingDown {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  NodeShutdownNotAdmittedReason,
-			Message: nodeShutdownNotAdmittedMessage,
-		}
-	}
-	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 // setMetrics sets the metrics for the node shutdown manager.
@@ -282,9 +266,7 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 					m.recorder.Event(m.nodeRef, v1.EventTypeNormal, kubeletevents.NodeShutdown, "Shutdown manager detected shutdown cancellation")
 				}
 
-				m.nodeShuttingDownMutex.Lock()
-				m.nodeShuttingDownNow = isShuttingDown
-				m.nodeShuttingDownMutex.Unlock()
+				m.state.ShuttingDown.Store(isShuttingDown)
 
 				if isShuttingDown {
 					// Update node status and ready condition
@@ -317,10 +299,7 @@ func (m *managerImpl) acquireInhibitLock() error {
 
 // ShutdownStatus will return an error if the node is currently shutting down.
 func (m *managerImpl) ShutdownStatus() error {
-	m.nodeShuttingDownMutex.Lock()
-	defer m.nodeShuttingDownMutex.Unlock()
-
-	if m.nodeShuttingDownNow {
+	if m.state.ShuttingDown.Load() {
 		return fmt.Errorf("node is shutting down")
 	}
 	return nil

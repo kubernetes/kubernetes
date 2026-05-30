@@ -1146,9 +1146,14 @@ func NewMainKubelet(ctx context.Context,
 		v1.NamespaceNodeLease,
 		util.SetNodeOwnerFunc(ctx, klet.heartbeatClient, string(klet.nodeName)))
 
+	// Create a standalone shutdown admit handler linked by a shared state.
+	shutdownState := nodeshutdown.NewShutdownState()
+	shutdownAdmitHandler := nodeshutdown.NewAdmitHandler(shutdownState)
+
 	// setup node shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{
 		Logger:                           logger,
+		State:                            shutdownState,
 		VolumeManager:                    klet.volumeManager,
 		Recorder:                         kubeDeps.Recorder,
 		NodeRef:                          nodeRef,
@@ -1161,7 +1166,7 @@ func NewMainKubelet(ctx context.Context,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
-	handlers = append(handlers, shutdownManager)
+	handlers = append(handlers, shutdownAdmitHandler)
 
 	klet.allocationManager.AddPodAdmitHandlers(append([]lifecycle.PodAdmitHandler{resizeAdmitHandler}, handlers...))
 

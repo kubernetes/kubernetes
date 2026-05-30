@@ -340,6 +340,7 @@ func TestManager(t *testing.T) {
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager := NewManager(&Config{
 				Logger:                          logger,
+				State:                           NewShutdownState(),
 				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -365,7 +366,6 @@ func TestManager(t *testing.T) {
 				assert.NoError(t, err, "expected manager.Start() to not return error")
 				assert.True(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
 				assert.NoError(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
-				assert.True(t, manager.Admit(nil).Admit)
 
 				// Send fake shutdown event
 				select {
@@ -387,7 +387,6 @@ func TestManager(t *testing.T) {
 				}
 
 				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
-				assert.False(t, manager.Admit(nil).Admit)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
 				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 				if tc.expectedPodStatuses != nil {
@@ -445,6 +444,7 @@ func TestFeatureEnabled(t *testing.T) {
 
 			manager := NewManager(&Config{
 				Logger:                          logger,
+				State:                           NewShutdownState(),
 				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -504,6 +504,7 @@ func TestRestart(t *testing.T) {
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager := NewManager(&Config{
 		Logger:                          logger,
+		State:                           NewShutdownState(),
 		VolumeManager:                   fakeVolumeManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
@@ -565,6 +566,7 @@ func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
 
 	manager := NewManager(&Config{
 		Logger:                          logger,
+		State:                           NewShutdownState(),
 		VolumeManager:                   volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false),
 		Recorder:                        &record.FakeRecorder{},
 		NodeRef:                         &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""},
@@ -618,7 +620,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		syncNodeStatus                   func(context.Context)
 		dbusCon                          dbusInhibiter
 		inhibitLock                      systemd.InhibitLock
-		nodeShuttingDownNow              bool
 		clock                            clock.Clock
 	}
 	tests := []struct {
@@ -671,15 +672,14 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				),
 			)
 			m := &managerImpl{
-				logger:                logger,
-				recorder:              tt.fields.recorder,
-				nodeRef:               tt.fields.nodeRef,
-				getPods:               tt.fields.getPods,
-				syncNodeStatus:        tt.fields.syncNodeStatus,
-				dbusCon:               tt.fields.dbusCon,
-				inhibitLock:           tt.fields.inhibitLock,
-				nodeShuttingDownMutex: sync.Mutex{},
-				nodeShuttingDownNow:   tt.fields.nodeShuttingDownNow,
+				logger:         logger,
+				recorder:       tt.fields.recorder,
+				nodeRef:        tt.fields.nodeRef,
+				getPods:        tt.fields.getPods,
+				syncNodeStatus: tt.fields.syncNodeStatus,
+				dbusCon:        tt.fields.dbusCon,
+				inhibitLock:    tt.fields.inhibitLock,
+				state:          &ShutdownState{},
 				podManager: &podManager{
 					logger:                           logger,
 					volumeManager:                    tt.fields.volumeManager,
