@@ -1412,14 +1412,9 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	if !allocatedDevices.Has(sharedDeviceID) {
 		allErrs = append(allErrs, field.Invalid(fldPath, sharedDeviceID, "must be an allocated device in the claim"))
 	}
-	if len(device.Conditions) > resource.AllocatedDeviceStatusMaxConditions {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions).WithOrigin("maxItems").MarkCoveredByDeclarative())
-	}
-	// Allow declarative validation to handle duplicates (via +listType=map, +listMapKey=type)
+	// Declarative validation owns the maxItems and duplicate checks.
 	for _, err := range metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions")) {
-		if err.Type == field.ErrorTypeDuplicate {
-			allErrs = append(allErrs, err.MarkCoveredByDeclarative())
-		} else {
+		if err.Type != field.ErrorTypeDuplicate {
 			allErrs = append(allErrs, err)
 		}
 	}

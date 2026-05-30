@@ -387,7 +387,7 @@ type Device struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:maxItems=16
+	// +k8s:alpha(since: "1.36")=+k8s:maxItems=16
 	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,8,rep,name=taints"`
 
 	// BindsToNode indicates if the usage of an allocation involving this device

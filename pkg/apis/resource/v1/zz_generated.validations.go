@@ -146,29 +146,42 @@ func Validate_AllocatedDeviceStatus(
 		errs = append(errs, fn(fldPath.Child("shareID"), obj.ShareID, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.AllocatedDeviceStatus.Conditions
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []metav1.Condition, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field resourcev1.AllocatedDeviceStatus.Conditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []metav1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a metav1.Condition, b metav1.Condition) bool { return a.Type == b.Type })...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a metav1.Condition, b metav1.Condition) bool { return a.Type == b.Type }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *resourcev1.AllocatedDeviceStatus) []metav1.Condition { return oldObj.Conditions }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.AllocatedDeviceStatus) []metav1.Condition {
+				return oldObj.Conditions
+			})
+		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
+	}
 
 	// field resourcev1.AllocatedDeviceStatus.Data has no validation
 
