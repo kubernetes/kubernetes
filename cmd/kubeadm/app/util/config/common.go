@@ -85,7 +85,9 @@ func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allo
 	}
 
 	// Experimental API versions are present here until released. Can be used only if allowed.
-	experimentalAPIVersions := map[string]string{}
+	experimentalAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1": {},
+	}
 
 	// Deprecated API versions are supported until removed. They throw a warning.
 	deprecatedAPIVersions := map[string]struct{}{}
