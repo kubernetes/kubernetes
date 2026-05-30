@@ -138,7 +138,7 @@ type watchCache struct {
 	eventHandler func(*watchCacheEvent)
 
 	// for testing timeouts.
-	clock clock.Clock
+	clock clock.WithTicker
 
 	// eventFreshDuration defines the minimum watch history watchcache will store.
 	eventFreshDuration time.Duration
@@ -161,6 +161,9 @@ type watchCache struct {
 	snapshottingEnabled atomic.Bool
 
 	getCurrentRV func(context.Context) (uint64, error)
+
+	// stopCh is closed to signal the idle shrink goroutine to stop.
+	stopCh chan struct{}
 }
 
 func newWatchCache(
@@ -194,6 +197,7 @@ func newWatchCache(
 		groupResource:       groupResource,
 		waitingUntilFresh:   progressRequester,
 		getCurrentRV:        getCurrentRV,
+		stopCh:              make(chan struct{}),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		wc.snapshottingEnabled.Store(true)
@@ -203,7 +207,49 @@ func newWatchCache(
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.indexValidator = wc.isIndexValidLocked
 
+	wc.startIdleShrinkLoop()
+
 	return wc
+}
+
+// Stop closes the stop channel to signal the idle shrink goroutine to stop.
+func (w *watchCache) Stop() {
+	close(w.stopCh)
+}
+
+// startIdleShrinkLoop starts a background goroutine that periodically attempts to shrink
+// the cache if it's been idle. This fixes the memory leak where the cache grows during
+// bursts but never shrinks afterward.
+func (w *watchCache) startIdleShrinkLoop() {
+	go func() {
+		ticker := w.clock.NewTicker(w.eventFreshDuration)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C():
+				w.Lock()
+				w.maybeShrinkIdleLocked()
+				w.Unlock()
+			case <-w.stopCh:
+				return
+			}
+		}
+	}()
+}
+
+// maybeShrinkIdleLocked attempts to shrink the cache if it's idle (has fewer active events
+// than half its capacity). Unlike resizeCacheLocked, this bypasses the isCacheFullLocked
+// gate to allow shrinking when the ring is not completely full.
+// Assumes that lock is already held for write.
+func (w *watchCache) maybeShrinkIdleLocked() {
+	eventCount := w.endIndex - w.startIndex
+	// Only shrink if we have much fewer events than capacity
+	if eventCount < w.capacity/2 {
+		newCapacity := max(eventCount, w.lowerBoundCapacity)
+		if newCapacity < w.capacity {
+			w.doCacheResizeLocked(newCapacity)
+		}
+	}
 }
 
 // capacityUpperBound denotes the maximum possible capacity of the watch cache

@@ -1406,3 +1406,60 @@ func TestCacheSnapshots(t *testing.T) {
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
 }
+
+// TestMaybeShrinkIdleLocked verifies that maybeShrinkIdleLocked correctly shrinks the cache
+// when events are sparse (eventCount < capacity/2). This tests the core logic of the fix
+// for issue #139250 where the cache would grow during bursts but never shrink afterward.
+func TestMaybeShrinkIdleLocked(t *testing.T) {
+	store := newTestWatchCache(100, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+
+	// Phase 1: Grow the cache by filling it with events during a "burst"
+	// Create many events rapidly to trigger capacity growth.
+	store.lowerBoundCapacity = 50
+	store.upperBoundCapacity = 200
+	for i := 0; i < 150; i++ {
+		event := &watchCacheEvent{
+			Key:        fmt.Sprintf("event-%d", i),
+			RecordTime: store.clock.Now(),
+		}
+		store.Lock()
+		store.updateCache(event)
+		store.Unlock()
+	}
+
+	grownCapacity := store.capacity
+	if grownCapacity <= 100 {
+		t.Fatalf("expected capacity to grow beyond 100, but got %d", grownCapacity)
+	}
+
+	// Phase 2: Simulate idle by removing most events (keeping only a few)
+	// Move the startIndex forward to "delete" old events, leaving only ~25% of the capacity in use.
+	store.Lock()
+	store.startIndex = store.endIndex - (grownCapacity / 4)
+	eventCount := store.endIndex - store.startIndex
+	store.Unlock()
+
+	if eventCount >= grownCapacity/2 {
+		t.Fatalf("setup error: expected sparse events (< capacity/2), but got %d events in capacity %d", eventCount, grownCapacity)
+	}
+
+	// Phase 3: Call maybeShrinkIdleLocked and verify capacity reduces
+	store.Lock()
+	store.maybeShrinkIdleLocked()
+	store.Unlock()
+
+	if store.capacity >= grownCapacity {
+		t.Errorf("expected capacity to shrink from %d, but it's still %d", grownCapacity, store.capacity)
+	}
+
+	// Verify capacity is at least the lower bound
+	if store.capacity < store.lowerBoundCapacity {
+		t.Errorf("capacity %d is below lower bound %d", store.capacity, store.lowerBoundCapacity)
+	}
+
+	// Verify event data is still intact
+	if store.endIndex-store.startIndex != eventCount {
+		t.Errorf("expected %d events after shrink, but got %d", eventCount, store.endIndex-store.startIndex)
+	}
+}

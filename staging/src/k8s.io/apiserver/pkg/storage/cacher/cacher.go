@@ -1190,6 +1190,7 @@ func (c *Cacher) Stop() {
 	c.ready.stop()
 	c.stopLock.Unlock()
 	close(c.stopCh)
+	c.watchCache.Stop()
 	c.stopWg.Wait()
 }
 
