@@ -189,11 +189,20 @@ var testcases = map[string]struct {
 	},
 	"attribute-access-causes-match-error": {
 		enableListTypeAttributes: new(false),
+		envType:                  ptr.To(environment.NewExpressions),
 		expression:               `device.attributes["dra.example.com"].names`,
 		attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {StringValues: []string{"fish", "bird"}}},
 		driver:                   "dra.example.com",
 		expectMatchError:         "attribute names: unsupported attribute value",
 		expectCost:               4,
+	},
+	"includes-function-on-string-list-stored-gate-off": {
+		enableListTypeAttributes: new(false),
+		expression:               `device.attributes["dra.example.com"].name.includes("fish")`,
+		attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               4 + 48, /* cost of "includes" is max list length */
 	},
 	"list-of-bool": {
 		enableListTypeAttributes: new(true),

@@ -104,6 +104,14 @@ type CompilationResult struct {
 
 	emptyMapVal ref.Val
 
+	// allowListTypeAttributesInEval controls whether list-typed attribute values
+	// are decoded during expression evaluation.
+	//
+	// This depends on the compilation context:
+	// - stored expressions accept list-typed attributes for skew-safe evaluation
+	// - new expressions follow feature-gated behavior
+	allowListTypeAttributesInEval bool
+
 	features Features
 }
 
@@ -154,19 +162,23 @@ type Options struct {
 //
 // TODO (https://github.com/kubernetes/kubernetes/issues/125826): validate AST to detect invalid attribute names.
 func (c compiler) CompileCELExpression(expression string, options Options) CompilationResult {
+	envType := ptr.Deref(options.EnvType, environment.StoredExpressions)
+	allowListTypeAttributesInEval := envType == environment.StoredExpressions || c.features.EnableListTypeAttributes
+
 	resultError := func(errorString string, errType apiservercel.ErrorType) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
 				Type:   errType,
 				Detail: errorString,
 			},
-			Expression: expression,
-			MaxCost:    math.MaxUint64,
-			features:   c.features,
+			Expression:                    expression,
+			MaxCost:                       math.MaxUint64,
+			allowListTypeAttributesInEval: allowListTypeAttributesInEval,
+			features:                      c.features,
 		}
 	}
 
-	env, err := c.envset.Env(ptr.Deref(options.EnvType, environment.StoredExpressions))
+	env, err := c.envset.Env(envType)
 	if err != nil {
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
@@ -210,13 +222,14 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	}
 
 	compilationResult := CompilationResult{
-		Program:     prog,
-		Expression:  expression,
-		OutputType:  ast.OutputType(),
-		Environment: env,
-		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
-		MaxCost:     math.MaxUint64,
-		features:    c.features,
+		Program:                       prog,
+		Expression:                    expression,
+		OutputType:                    ast.OutputType(),
+		Environment:                   env,
+		emptyMapVal:                   env.CELTypeAdapter().NativeToValue(map[string]any{}),
+		MaxCost:                       math.MaxUint64,
+		allowListTypeAttributesInEval: allowListTypeAttributesInEval,
+		features:                      c.features,
 	}
 
 	if !options.DisableCostEstimation {
@@ -242,15 +255,8 @@ func (c *compiler) newCostEstimator() checker.CostEstimator {
 // getAttributeValue returns the native representation of the one value that
 // should be stored in the attribute, otherwise an error. An error is
 // also returned when there is no supported value.
-//
-// If the DRAListTypeAttributes feature  is disabled and an attribute
-// contains a list value, then we fall through to returning the
-// "unsupported attribute value" error below.
-// This failure then aborts scheduling until ResourceSlices get updated.
-// This is better than incorrectly scheduling a pod
-// because that is harder to correct.
 func (c CompilationResult) getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
-	if c.features.EnableListTypeAttributes {
+	if c.allowListTypeAttributesInEval {
 		switch {
 		case attr.IntValues != nil:
 			return attr.IntValues, nil
