@@ -21637,6 +21637,25 @@ func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback)
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"mountOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "mountOptions is a list of mount options (noexec, nodev, nosuid) to apply to the volume when it is mounted into containers. These options are passed through CRI to the container runtime and enforced at the OS level. Only VFS-level bind mount flags are permitted; filesystem-specific options are not allowed. This is an alpha field and requires the EmptyDirMountOptions feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

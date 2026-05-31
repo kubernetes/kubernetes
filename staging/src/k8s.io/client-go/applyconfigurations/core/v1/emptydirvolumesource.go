@@ -41,6 +41,13 @@ type EmptyDirVolumeSourceApplyConfiguration struct {
 	// The default is nil which means that the limit is undefined.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
+	// mountOptions is a list of mount options (noexec, nodev, nosuid) to apply
+	// to the volume when it is mounted into containers. These options are passed
+	// through CRI to the container runtime and enforced at the OS level.
+	// Only VFS-level bind mount flags are permitted; filesystem-specific
+	// options are not allowed.
+	// This is an alpha field and requires the EmptyDirMountOptions feature gate.
+	MountOptions []string `json:"mountOptions,omitempty"`
 }
 
 // EmptyDirVolumeSourceApplyConfiguration constructs a declarative configuration of the EmptyDirVolumeSource type for use with
@@ -62,5 +69,15 @@ func (b *EmptyDirVolumeSourceApplyConfiguration) WithMedium(value corev1.Storage
 // If called multiple times, the SizeLimit field is set to the value of the last call.
 func (b *EmptyDirVolumeSourceApplyConfiguration) WithSizeLimit(value resource.Quantity) *EmptyDirVolumeSourceApplyConfiguration {
 	b.SizeLimit = &value
+	return b
+}
+
+// WithMountOptions adds the given value to the MountOptions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MountOptions field.
+func (b *EmptyDirVolumeSourceApplyConfiguration) WithMountOptions(values ...string) *EmptyDirVolumeSourceApplyConfiguration {
+	for i := range values {
+		b.MountOptions = append(b.MountOptions, values[i])
+	}
 	return b
 }
