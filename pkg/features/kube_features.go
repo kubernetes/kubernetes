@@ -332,6 +332,13 @@ const (
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @nispriha
+	// kep: https://kep.k8s.io/5855
+	//
+	// Enables mount options (noexec, nodev, nosuid) on emptyDir volumes,
+	// passed through CRI to the container runtime.
+	EmptyDirMountOptions featuregate.Feature = "EmptyDirMountOptions"
+
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/3721
 	//
@@ -1382,6 +1389,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// TODO (https://github.com/kubernetes/kubernetes/issues/134459): remove completely in 1.38
 	},
 
+	EmptyDirMountOptions: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	EnvFiles: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2312,6 +2323,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DisableNodeKubeProxyVersion: {},
 
 	DynamicResourceAllocation: {},
+
+	EmptyDirMountOptions: {},
 
 	EnvFiles: {},
 
