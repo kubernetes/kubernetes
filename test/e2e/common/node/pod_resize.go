@@ -1105,7 +1105,7 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 					testPod.Spec.Containers[i].Command = []string{"/bin/sh"}
 					testPod.Spec.Containers[i].Args = []string{
 						"-c",
-						fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=%s count=1", allocateMem),
+						fmt.Sprintf("dd if=/dev/zero of=/dev/shm/oom bs=%s count=1 && sleep 600 ", allocateMem),
 					}
 					break
 				}
