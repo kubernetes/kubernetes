@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -362,6 +363,18 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
 		gomega.Expect(result).To(gomega.Equal(expectedResult), "failed to match expected string %s with %s", expectedResult, result)
 	})
+
+	f.It("should enforce noexec mount option on disk-backed volume [LinuxOnly]",
+		framework.WithFeatureGate(features.EmptyDirMountOptions),
+		func(ctx context.Context) {
+			doTestMountOptions(ctx, f, v1.StorageMediumDefault)
+		})
+
+	f.It("should enforce noexec mount option on tmpfs-backed volume [LinuxOnly]",
+		framework.WithFeatureGate(features.EmptyDirMountOptions),
+		func(ctx context.Context) {
+			doTestMountOptions(ctx, f, v1.StorageMediumMemory)
+		})
 })
 
 const (
@@ -637,4 +650,56 @@ func testPodWithVolume(uid int64, path string, source *v1.EmptyDirVolumeSource) 
 	}
 
 	return pod
+}
+
+func doTestMountOptions(ctx context.Context, f *framework.Framework, medium v1.StorageMedium) {
+	mountPath := "/data"
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-mount-options-" + string(uuid.NewUUID()),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "test",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sleep", "3600"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "data",
+							MountPath: mountPath,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "data",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:       medium,
+							MountOptions: []string{"noexec", "nodev", "nosuid"},
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("Verifying mount options in /proc/self/mountinfo")
+	for _, opt := range []string{"noexec", "nodev", "nosuid"} {
+		result := e2epod.ExecShellInContainer(f, pod.Name, "test",
+			fmt.Sprintf("grep ' %s ' /proc/self/mountinfo | grep '%s'", mountPath, opt))
+		gomega.Expect(result).NotTo(gomega.BeEmpty(),
+			fmt.Sprintf("expected %s in mountinfo for %s", opt, mountPath))
+	}
+
+	ginkgo.By("Verifying noexec is enforced — executing a binary from the volume should fail")
+	result := e2epod.ExecShellInContainer(f, pod.Name, "test",
+		fmt.Sprintf("cp /bin/ls %s/ls && %s/ls 2>&1 || true", mountPath, mountPath))
+	gomega.Expect(result).To(gomega.ContainSubstring("Permission denied"),
+		"expected 'Permission denied' when executing binary from noexec volume")
 }
