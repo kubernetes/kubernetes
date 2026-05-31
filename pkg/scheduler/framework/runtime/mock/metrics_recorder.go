@@ -67,6 +67,17 @@ func (f *MetricsRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hi
 func (f *MetricsRecorder) ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool) {
 }
 
+// ObserveFrameworkExtensionPointDurationAsync is a no-op in the runtime mock.
+func (f *MetricsRecorder) ObserveFrameworkExtensionPointDurationAsync(extensionPoint, status, profileName string, value float64) {
+}
+
+// StoppedCh returns a closed channel since the mock has no background goroutine.
+func (f *MetricsRecorder) StoppedCh() <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
+}
+
 // FlushMetrics is a no-op in the runtime mock.
 func (f *MetricsRecorder) FlushMetrics() {
 }

@@ -144,6 +144,11 @@ func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-ch
 	return recorder
 }
 
+// StoppedCh returns a channel that is closed when the recorder's background goroutine has stopped.
+func (r *MetricAsyncRecorder) StoppedCh() <-chan struct{} {
+	return r.IsStoppedCh
+}
+
 // ObserveFrameworkExtensionPointDurationAsync observes the framework_extension_point_duration_seconds metric.
 // The metric will be flushed to Prometheus asynchronously.
 func (r *MetricAsyncRecorder) ObserveFrameworkExtensionPointDurationAsync(extensionPoint, status, profileName string, value float64) {
