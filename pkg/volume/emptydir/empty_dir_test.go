@@ -1207,3 +1207,55 @@ func TestTmpfsMountOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestMountOptionsVersionSkew(t *testing.T) {
+	basePath, err := utiltesting.MkTmpdir("emptydir_volume_test")
+	if err != nil {
+		t.Fatalf("can't make a temp rootdir: %v", err)
+	}
+	defer os.RemoveAll(basePath)
+
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+	physicalMounter := mount.NewFakeMounter(nil)
+	mountDetector := fakeMountDetector{}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+
+	spec := &v1.Volume{
+		Name: "test-volume",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				MountOptions: []string{"noexec"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		wantErr     bool
+	}{
+		{
+			name:        "gate enabled, mountOptions accepted",
+			gateEnabled: true,
+			wantErr:     false,
+		},
+		{
+			name:        "gate disabled, mountOptions rejected",
+			gateEnabled: false,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, tt.gateEnabled)
+			_, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, physicalMounter, &mountDetector)
+			if tt.wantErr && err == nil {
+				t.Error("expected error but got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
