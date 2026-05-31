@@ -5601,6 +5601,58 @@ func TestValidateVolumes(t *testing.T) {
 
 }
 
+func TestValidateEmptyDirMountOptions(t *testing.T) {
+	testCases := []struct {
+		name        string
+		gateEnabled bool
+		mountOpts   []string
+		wantErrors  int
+	}{
+		{
+			name:        "gate enabled, valid options",
+			gateEnabled: true,
+			mountOpts:   []string{"noexec", "nodev", "nosuid"},
+			wantErrors:  0,
+		},
+		{
+			name:        "gate enabled, invalid option",
+			gateEnabled: true,
+			mountOpts:   []string{"noexec", "rw"},
+			wantErrors:  1,
+		},
+		{
+			name:        "gate enabled, all invalid options",
+			gateEnabled: true,
+			mountOpts:   []string{"rw", "sync"},
+			wantErrors:  2,
+		},
+		{
+			name:        "gate disabled, mountOptions specified",
+			gateEnabled: false,
+			mountOpts:   []string{"noexec"},
+			wantErrors:  1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, tc.gateEnabled)
+			vol := core.Volume{
+				Name: "test-vol",
+				VolumeSource: core.VolumeSource{
+					EmptyDir: &core.EmptyDirVolumeSource{
+						MountOptions: tc.mountOpts,
+					},
+				},
+			}
+			_, errs := ValidateVolumes([]core.Volume{vol}, nil, field.NewPath("field"), PodValidationOptions{})
+			if len(errs) != tc.wantErrors {
+				t.Errorf("expected %d errors, got %d: %v", tc.wantErrors, len(errs), errs)
+			}
+		})
+	}
+}
+
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
 		pod         *core.Pod
