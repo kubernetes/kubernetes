@@ -2726,7 +2726,7 @@ type testPodAdmitHandler struct {
 }
 
 // Admit rejects all pods in the podsToReject list with a matching UID.
-func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (a *testPodAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	for _, podToReject := range a.podsToReject {
 		if podToReject.UID == attrs.Pod.UID {
 			return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "Pod is rejected"}
