@@ -415,8 +415,8 @@ const (
 	// initial configuration is not valid.
 	// This reason is set for the Failed condition.
 	EvictionConditionReasonEvictionInvalid EvictionConditionReason = "EvictionInvalid"
-	// EvictionConditionReasonCanceledDueToNoRequesters means that the Eviction is canceled because it has
-	// no requesters with an eviction intent.
+	// EvictionConditionReasonCanceledDueToNoRequesters means that the Eviction is canceled because there is no
+	// EvictionRequest with the same target and Eviction intent in .spec.intent.
 	// This reason is set for the Failed condition.
 	EvictionConditionReasonCanceledDueToNoRequesters EvictionConditionReason = "CanceledDueToNoRequesters"
 	// EvictionConditionReasonSucceeded means that the Eviction has successfully evicted the target.
@@ -509,8 +509,8 @@ type TargetResponder struct {
 	//   request is passed over to the next responder. Only one responder can be active at a time.
 	// - Interrupted means that the responder has failed to start or failed to update
 	//   heartbeatTime in ResponderStatus in a timely manner.
-	// - Canceled means that the responder has been canceled. In other words, there is no
-	//   Eviction intent in .spec.requesters.
+	// - Canceled means that the responder has been canceled. In other words, there	is no
+	//   EvictionRequest with the same target and Eviction intent in .spec.intent.
 	// - Completed means that the responder has successfully completed and set completionTime
 	//   in ResponderStatus.
 	//
@@ -542,8 +542,8 @@ const (
 	// heartbeatTime in ResponderStatus in a timely manner.
 	ResponderStateInterrupted ResponderStateType = "Interrupted"
 
-	// ResponderStateCanceled means that the responder has been canceled. In other words, there is no
-	// Eviction intent in .spec.requesters.
+	// ResponderStateCanceled means that the responder has been canceled. In other words, there
+	// is no EvictionRequest with the same target and Eviction intent in .spec.intent.
 	ResponderStateCanceled ResponderStateType = "Canceled"
 
 	// ResponderStateCompleted means that the responder has successfully completed and set completionTime
