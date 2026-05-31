@@ -68,6 +68,13 @@ type MetricsRecorder interface {
 	// ObserveInFlightEventsAsync observes the scheduler_in_flight_events metric.
 	// The metric will be flushed asynchronously. Setting forceFlush to true forces immediate flushing and should be used rarely.
 	ObserveInFlightEventsAsync(eventLabel string, valueToAdd float64, forceFlush bool)
+
+	// ObserveFrameworkExtensionPointDurationAsync observes the framework_extension_point_duration_seconds metric.
+	// The metric will be flushed asynchronously.
+	ObserveFrameworkExtensionPointDurationAsync(extensionPoint, status, profileName string, value float64)
+
+	// StoppedCh returns a channel that is closed when the recorder's background goroutine has stopped.
+	StoppedCh() <-chan struct{}
 }
 
 // frameworkImpl is the component responsible for initializing and running scheduler
@@ -538,7 +545,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 // to stop those background goroutines.
 func WaitForShutdown(f framework.Framework) {
 	if f.(*frameworkImpl).metricsRecorder != nil {
-		<-f.(*frameworkImpl).metricsRecorder.IsStoppedCh
+		<-f.(*frameworkImpl).metricsRecorder.StoppedCh()
 	}
 }
 

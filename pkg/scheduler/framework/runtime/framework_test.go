@@ -4021,6 +4021,43 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "Permit",
 			wantStatus:         fwk.Success,
 		},
+		{
+			name: "PlacementGenerate - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementGeneratePlugins(ctx, state, nil, []fwk.NodeInfo{framework.NewNodeInfo()})
+			},
+			inject:             injectedResult{GeneratePlacementsResult: []*fwk.Placement{{}}},
+			wantExtensionPoint: "PlacementGenerate",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name: "PlacementScore - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
+			},
+			wantExtensionPoint: "PlacementScore",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name: "PlacementFeasible - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil, framework.PlacementFeasibleArgs{})
+			},
+			wantExtensionPoint: "PlacementFeasible",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name: "PodGroupPostFilter - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					return &fwk.PodGroupAssignments{}, nil
+				}
+				f.RunPodGroupPostFilterPlugins(ctx, state, &framework.QueuedPodGroupInfo{PodGroupInfo: &framework.PodGroupInfo{}}, pgSchedulingFunc)
+			},
+			inject:             injectedResult{PodGroupPostFilterStatus: int(fwk.Success)},
+			wantExtensionPoint: "PodGroupPostFilter",
+			wantStatus:         fwk.Success,
+		},
 
 		{
 			name:               "PreFilter - Error",
@@ -4080,12 +4117,54 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "Permit",
 			wantStatus:         fwk.Wait,
 		},
+		{
+			name: "PlacementGenerate - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementGeneratePlugins(ctx, state, nil, []fwk.NodeInfo{framework.NewNodeInfo()})
+			},
+			inject:             injectedResult{GeneratePlacementsStatus: int(fwk.Error)},
+			wantExtensionPoint: "PlacementGenerate",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name: "PlacementScore - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
+			},
+			inject:             injectedResult{PlacementScoreStatus: int(fwk.Error)},
+			wantExtensionPoint: "PlacementScore",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name: "PlacementFeasible - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil, framework.PlacementFeasibleArgs{})
+			},
+			inject:             injectedResult{PlacementFeasibleStatus: int(fwk.Error)},
+			wantExtensionPoint: "PlacementFeasible",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name: "PodGroupPostFilter - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					return &fwk.PodGroupAssignments{}, nil
+				}
+				f.RunPodGroupPostFilterPlugins(ctx, state, &framework.QueuedPodGroupInfo{PodGroupInfo: &framework.PodGroupInfo{}}, pgSchedulingFunc)
+			},
+			inject:             injectedResult{PodGroupPostFilterStatus: int(fwk.Error)},
+			wantExtensionPoint: "PodGroupPostFilter",
+			wantStatus:         fwk.Error,
+		},
 	}
 
 	// Test with both metrics enabled and disabled
 	for _, metricsEnabled := range []bool{true, false} {
 		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%s/metrics_enabled=%v", tt.name, metricsEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload: true,
+				})
 				_, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
@@ -4102,15 +4181,18 @@ func TestRecordingMetrics(t *testing.T) {
 
 				pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
 				plugins := &config.Plugins{
-					Score:     pluginSet,
-					PreFilter: pluginSet,
-					Filter:    pluginSet,
-					PreScore:  pluginSet,
-					Reserve:   pluginSet,
-					Permit:    pluginSet,
-					PreBind:   pluginSet,
-					Bind:      pluginSet,
-					PostBind:  pluginSet,
+					Score:              pluginSet,
+					PreFilter:          pluginSet,
+					Filter:             pluginSet,
+					PreScore:           pluginSet,
+					Reserve:            pluginSet,
+					Permit:             pluginSet,
+					PreBind:            pluginSet,
+					Bind:               pluginSet,
+					PostBind:           pluginSet,
+					PlacementGenerate:  pluginSet,
+					PlacementScore:     pluginSet,
+					PodGroupPostFilter: pluginSet,
 				}
 				if err := r.Register(testPlugin,
 					func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
@@ -4137,6 +4219,10 @@ func TestRecordingMetrics(t *testing.T) {
 				defer func() {
 					_ = f.Close()
 				}()
+
+				if tt.wantExtensionPoint == "PlacementFeasible" {
+					f.(*frameworkImpl).placementFeasiblePlugins = []framework.PlacementFeasiblePlugin{plugin}
+				}
 
 				// Run the action
 				tt.action(ctx, f)
@@ -4276,7 +4362,7 @@ func TestRunBindPlugins(t *testing.T) {
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
 			cancel()
-			<-recorder.IsStoppedCh
+			<-recorder.StoppedCh()
 			// Try to clean up the metrics buffer again in case it's not empty.
 			recorder.FlushMetrics()
 			collectAndCompareFrameworkMetrics(t, "Bind", tt.wantStatus)
