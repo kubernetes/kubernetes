@@ -7457,3 +7457,59 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestDropDisabledEmptyDirMountOptions(t *testing.T) {
+	podSpecWithMountOpts := func() *api.PodSpec {
+		return &api.PodSpec{
+			Volumes: []api.Volume{{
+				Name: "scratch",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{
+						MountOptions: []string{"noexec"},
+					},
+				},
+			}},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		oldPodSpec  *api.PodSpec
+		podSpec     *api.PodSpec
+		wantOpts    bool
+	}{
+		{
+			name:        "gate enabled, new pod with options",
+			gateEnabled: true,
+			oldPodSpec:  nil,
+			podSpec:     podSpecWithMountOpts(),
+			wantOpts:    true,
+		},
+		{
+			name:        "gate disabled, new pod with options — stripped",
+			gateEnabled: false,
+			oldPodSpec:  nil,
+			podSpec:     podSpecWithMountOpts(),
+			wantOpts:    false,
+		},
+		{
+			name:        "gate disabled, old pod already has options — preserved",
+			gateEnabled: false,
+			oldPodSpec:  podSpecWithMountOpts(),
+			podSpec:     podSpecWithMountOpts(),
+			wantOpts:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, tt.gateEnabled)
+			dropDisabledEmptyDirMountOptions(tt.podSpec, tt.oldPodSpec)
+			gotOpts := len(tt.podSpec.Volumes[0].EmptyDir.MountOptions) > 0
+			if gotOpts != tt.wantOpts {
+				t.Errorf("mountOptions present = %v, want %v", gotOpts, tt.wantOpts)
+			}
+		})
+	}
+}
