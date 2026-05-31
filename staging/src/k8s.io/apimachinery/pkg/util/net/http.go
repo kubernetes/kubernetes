@@ -176,6 +176,13 @@ func pingTimeoutSeconds() int {
 }
 
 func configureHTTP2Transport(t *http.Transport) error {
+	// Some tests on client-go depend on a side effect of setting the TLSClientConfig,
+	// which is not longer present since version 1.27. To keep the existing behavior
+	// we set the TLSClientConfig if it is not set.
+	// Ref: https://github.com/golang/net/commit/c9307462b7e76d9c3203671fd993b10bc5dbcb3c
+	if t.TLSClientConfig == nil {
+		t.TLSClientConfig = &tls.Config{}
+	}
 	t2, err := http2.ConfigureTransports(t)
 	if err != nil {
 		return err
