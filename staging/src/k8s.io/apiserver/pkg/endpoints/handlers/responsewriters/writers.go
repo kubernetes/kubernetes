@@ -24,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -104,7 +103,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
 		statusCode:      statusCode,
-		contentEncoding: negotiateContentEncoding(req),
+		contentEncoding: responseContentEncodingSupported(req),
 		hw:              hw,
 		ctx:             ctx,
 	}
@@ -161,34 +160,6 @@ const (
 	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
 	firstWriteStreamingThresholdBytes = 4
 )
-
-// negotiateContentEncoding returns a supported client-requested content encoding for the
-// provided request. It will return the empty string if no supported content encoding was
-// found or if response compression is disabled.
-func negotiateContentEncoding(req *http.Request) string {
-	encoding := req.Header.Get("Accept-Encoding")
-	if len(encoding) == 0 {
-		return ""
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) {
-		return ""
-	}
-	for len(encoding) > 0 {
-		var token string
-		if next := strings.Index(encoding, ","); next != -1 {
-			token = encoding[:next]
-			encoding = encoding[next+1:]
-		} else {
-			token = encoding
-			encoding = ""
-		}
-		switch strings.TrimSpace(token) {
-		case "gzip":
-			return "gzip"
-		}
-	}
-	return ""
-}
 
 type deferredResponseWriter struct {
 	mediaType       string
