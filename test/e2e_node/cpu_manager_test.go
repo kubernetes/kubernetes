@@ -1737,6 +1737,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		// don't duplicate the all the tests
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.Skipf("DisableCPUQuotaWithExclusiveCPUs is locked to its default (true); enforcing CFS quota for exclusive CPUs is no longer configurable")
 			requireCGroupV2()
 			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
 			//          this means on more-than-2-way SMT systems this test will prove nothing
@@ -4031,7 +4032,11 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
-	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
+	// DisableCPUQuotaWithExclusiveCPUs is locked to its default (true); the
+	// kubelet rejects setting it to false, so only set it when true.
+	if kubeletArguments.disableCPUQuotaWithExclusiveCPUs {
+		newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = true
+	}
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
 	// InPlacePodLevelResourcesVerticalScaling is only supported when PodLevelResources is enabled
 	if !kubeletArguments.enablePodLevelResources {
