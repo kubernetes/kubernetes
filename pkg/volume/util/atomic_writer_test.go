@@ -1018,6 +1018,19 @@ func TestSetPerms(t *testing.T) {
 		t.Fatalf("unexpected number of calls to setPerms: %v", setPermsCalled)
 	}
 
+	// Test that setPerms() is called even when the payload has not changed.
+	setPermsCalled = 0
+	err = writer.Write(payload1, func(_ string) error {
+		setPermsCalled++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error writing: %v", err)
+	}
+	if setPermsCalled != 1 {
+		t.Fatalf("expected setPerms to be called once for unchanged payload, got: %v", setPermsCalled)
+	}
+
 	// Test that errors from setPerms() are propagated.
 	payload2 := map[string]FileProjection{
 		"foo/bar.txt": {Mode: 0644, Data: []byte("foo2")},

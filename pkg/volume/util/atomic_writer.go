@@ -88,7 +88,8 @@ const (
 // setPerms is an optional pointer to a function that caller can provide to set the
 // permissions of the newly created files before they are published. The function is
 // passed subPath which is the name of the timestamped directory that was created
-// under target directory.
+// under target directory, or an empty string if the payload was unchanged (no new
+// timestamped directory was created). Callers must handle both cases.
 //
 // The Write algorithm is:
 //
@@ -107,7 +108,11 @@ const (
 //
 //  6. The payload is written to the new timestamped directory.
 //
-//  7. Permissions are set (if setPerms is not nil) on the new timestamped directory and files.
+//  7. Permissions are set (if setPerms is not nil) on the new timestamped directory
+//     and files. If the payload was unchanged (no write was needed), setPerms is
+//     still called with an empty subPath to ensure permissions are correct after
+//     potential partial failures (e.g., a process crash between file write and the
+//     previous setPerms call).
 //
 //  8. A symlink to the new timestamped directory ..data_tmp is created that will
 //     become the new data directory.
@@ -240,6 +245,13 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 				klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, err)
 			}
 			klog.Errorf("%s: error renaming symbolic link for data directory %s: %v", w.logContext, newDataDirPath, err)
+			return err
+		}
+	} else if setPerms != nil {
+		// (7) Even when the payload is unchanged, setPerms must still be called to
+		// ensure file permissions are correct.
+		if err := setPerms(""); err != nil {
+			klog.Errorf("%s: error applying ownership settings: %v", w.logContext, err)
 			return err
 		}
 	}
