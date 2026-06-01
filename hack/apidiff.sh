@@ -181,7 +181,7 @@ export GOBIN="${KUBE_TEMP}"
 PATH="${GOBIN}:${PATH}"
 echo "Installing apidiff into ${GOBIN}."
 go install golang.org/x/exp/cmd/apidiff@latest
-echo "Building apidiff tool."
+echo "Installing apidiff-changelog into ${GOBIN}."
 go install ./hack/apidiff-changelog
 
 # tryBuild checks whether some other project builds with the staging repos
@@ -224,14 +224,11 @@ if ${from_merge_commit}; then
 fi
 
 res=0
-set +e
-apidiff-changelog "${apidiff_flags[@]}" "${targets[@]}"
-apidiff_exit=$?
-set -e
+(set -x; apidiff-changelog "${apidiff_flags[@]}" "${targets[@]}") && apidiff_exit=0 || apidiff_exit=$?
 
 # Fail if apidiff-changelog failed, unless the exit code indicates that all
 # incompatible changes were documented.
-if [ "${apidiff_exit}" -ne 0 ] && ! [ "${apidiff_exit}" -ne 3 ]; then
+if [ ${apidiff_exit} -ne 0 ] && [ ${apidiff_exit} -ne 3 ]; then
     res=1
 fi
 

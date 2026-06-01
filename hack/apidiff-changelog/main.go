@@ -85,10 +85,12 @@ func main() {
 		mergeCommit:     *mergeCommit,
 	}
 	if err := runDiff(opts, flag.Args()); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		if err, ok := errors.AsType[exitError](err); ok {
-			os.Exit(err.exitCode)
+		if errExit, ok := errors.AsType[exitError](err); ok {
+			// Don't include "Error", that might be too strong.
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(errExit.exitCode)
 		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -168,6 +170,7 @@ with three dots (...).`
 	var failures []string
 	var changelogEntries []changelogEntry
 	documentedFailures := 0
+	updatedFailures := 0
 
 	fmt.Println()
 	for _, dir := range dirs {
@@ -212,7 +215,7 @@ with three dots (...).`
 			if err := insertChangelog(changelog, incompatible, title, description); err != nil {
 				return fmt.Errorf("inserting changelog entry for %s: %w", dir, err)
 			}
-			documentedFailures++
+			updatedFailures++
 		} else {
 			// Write the entry into a temp copy for patch generation later.
 			tempChangelog := filepath.Join(tempDir, changelog)
@@ -244,6 +247,11 @@ Detected incompatible changes on modules:
 	for _, f := range failures {
 		fmt.Println(f)
 	}
+	fmt.Print(`
+For more information about incompatible changes, see
+https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/go_api_changes.md
+
+`)
 
 	if len(changelogEntries) > 0 {
 		dirArgs := strings.Join(dirs, " ")
@@ -280,19 +288,20 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 `)
 	}
 
-	fmt.Print(`
-For more information about incompatible Go API changes, see
-https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/go_api_changes.md
-
-`)
-
-	// Special exit codes for apidiff.sh.
-	exitCode := 2 // Incompatible changes found.
+	// 3 indicates to apidiff.sh that it should consider the check a success, despite having
+	// some incompatible changes.
+	if len(failures) == updatedFailures {
+		return fmt.Errorf("Documented changes in %d module(s)%w", len(failures), exitError{3})
+	}
 	if len(failures) == documentedFailures {
-		exitCode = 3 // But all were documented or are now.
+		return fmt.Errorf("Found documentation of changes in %d module(s)%w", len(failures), exitError{3})
+	}
+	if len(failures) == updatedFailures+documentedFailures {
+		return fmt.Errorf("Found documentation of changes or updated documentation in %d module(s)%w", len(failures), exitError{3})
 	}
 
-	return fmt.Errorf("incompatible changes in %d module(s)%w", len(failures), exitError{exitCode})
+	// 2 indicates that there's missing documentation.
+	return fmt.Errorf("Error: incompatible changes in %d module(s)%w", len(failures), exitError{2})
 }
 
 // setupWorktree creates a git worktree at worktreePath for the specified revision.
