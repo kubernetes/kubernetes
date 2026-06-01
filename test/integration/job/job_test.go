@@ -4726,6 +4726,79 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 	}
 }
 
+// TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted verifies that
+// scheduling directives can be mutated on a suspended Job that has never started,
+// even before the JobSuspended condition is set by the job controller.
+func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
+
+	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	// Create a suspended Job.
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](1),
+			Completions: ptr.To[int32](1),
+			Suspend:     ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// Immediately update the nodeSelector without waiting for the JobSuspended
+	// condition to be set. This simulates external controllers (e.g. MultiKueue)
+	// that inject scheduling directives right after creating a suspended Job.
+	nodeSelector := map[string]string{"foo": "bar"}
+	job.Spec.Template.Spec.NodeSelector = nodeSelector
+	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update scheduling directives on suspended Job that was never started: %v", err)
+	}
+}
+
+// TestMutablePodResourcesForSuspendedJobsNotYetStarted verifies that
+// pod resources can be mutated on a suspended Job that has never started,
+// even before the JobSuspended condition is set by the job controller.
+func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
+
+	closeFn, restConfig, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	// Create a suspended Job.
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](1),
+			Completions: ptr.To[int32](1),
+			Suspend:     ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// Immediately update the pod resources without waiting for the JobSuspended
+	// condition to be set. This simulates external controllers (e.g. MultiKueue)
+	// that inject resource requirements right after creating a suspended Job.
+	wantResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("200m"),
+			v1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
+	job.Spec.Template.Spec.Containers[0].Resources = wantResources
+	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update pod resources on suspended Job that was never started: %v", err)
+	}
+}
+
 type podsByStatus struct {
 	Active      int
 	Ready       *int32
