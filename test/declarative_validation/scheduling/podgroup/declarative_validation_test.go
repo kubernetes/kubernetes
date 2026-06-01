@@ -243,7 +243,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "priority"), "")},
 		},
 		"too high priority, workload aware preemption enabled": {
-			input:                         mkValidWAPPodGroup(setPriority(scheduling.HighestUserDefinablePriority+1)),
+			input:                         mkValidWAPPodGroup(setPriority(scheduling.HighestUserDefinablePriority + 1)),
 			enableWorkloadAwarePreemption: true,
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "priority"), nil, "").WithOrigin("maximum"),
