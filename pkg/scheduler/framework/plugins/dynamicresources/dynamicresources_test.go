@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -4390,14 +4391,25 @@ func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) *
 // k8s.io/dynamic-resource-allocation/structured because that code has no access
 // to feature gate definitions.
 func TestAllocatorSelection(t *testing.T) {
+	// We want to be sure that each feature as identified by the fields in structured.Features
+	// is covered by a dedicated test cases.
+	allFeatures := sets.New[string]()
+	coveredFeatures := sets.New[string]()
+	featureType := reflect.TypeFor[structured.Features]()
+	for field := range featureType.Fields() {
+		allFeatures.Insert(field.Name)
+	}
+
 	for name, tc := range map[string]struct {
 		features             string
+		usingFeatureGroup    bool
 		expectImplementation string
 	}{
 		// The most conservative implementation: only used when explicitly asking
 		// for the most stable Kubernetes (no alpha or beta features).
 		"only-GA": {
 			features:             "AllAlpha=false,AllBeta=false",
+			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},
 
@@ -4405,13 +4417,47 @@ func TestAllocatorSelection(t *testing.T) {
 		// is used.
 		"default": {
 			features:             "",
+			usingFeatureGroup:    true,
 			expectImplementation: "incubating",
 		},
 
-		// Alpha features need the experimental implementation.
+		// Alpha features may need the experimental implementation, if there are any
+		// and if those influence allocation.
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
+			usingFeatureGroup:    true,
+			expectImplementation: "experimental",
+		},
+
+		// Let's also determine which allocator is picked for each of the
+		// individual features which influence that decision.
+		"AdminAccess": {
+			features:             "AllAlpha=false,AllBeta=false,DRAAdminAccess=true",
+			expectImplementation: "stable",
+		},
+		"ConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true",
 			expectImplementation: "incubating",
+		},
+		"DeviceBindingAndStatus": {
+			features:             "AllAlpha=false,AllBeta=false,DRAResourceClaimDeviceStatus=true,DRADeviceBindingConditions=true",
+			expectImplementation: "incubating",
+		},
+		"DeviceTaints": {
+			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true",
+			expectImplementation: "stable",
+		},
+		"ListTypeAttributes": {
+			features:             "AllAlpha=false,AllBeta=false,DRAListTypeAttributes=true",
+			expectImplementation: "experimental",
+		},
+		"PartitionableDevices": {
+			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true",
+			expectImplementation: "stable",
+		},
+		"PrioritizedList": {
+			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true",
+			expectImplementation: "stable",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -4429,7 +4475,20 @@ func TestAllocatorSelection(t *testing.T) {
 			if !strings.Contains(allocatorType, tc.expectImplementation) {
 				tCtx.Fatalf("Expected allocator implementation %q, got %s", tc.expectImplementation, allocatorType)
 			}
+
+			if !tc.usingFeatureGroup {
+				for field := range featureType.Fields() {
+					if !reflect.ValueOf(features).FieldByName(field.Name).IsZero() {
+						coveredFeatures.Insert(field.Name)
+					}
+				}
+			}
 		})
+	}
+
+	notCovered := allFeatures.Difference(coveredFeatures)
+	if len(notCovered) > 0 {
+		t.Errorf("Some feature fields in %T were never set by any of the dedicated sub-tests: %s\nA test case for a new feature is missing and/or AllocatorFeatures was not updated to set the field.", structured.Features{}, strings.Join(sets.List(notCovered), ", "))
 	}
 }
 
