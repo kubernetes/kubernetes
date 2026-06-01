@@ -301,7 +301,6 @@ func TestBytesToInitConfiguration(t *testing.T) {
 					diffOpts := []cmp.Option{
 						cmpopts.IgnoreFields(kubeadmapi.NodeRegistrationOptions{}, "Name"),
 						cmpopts.IgnoreFields(kubeadmapi.InitConfiguration{}, "Timeouts", "BootstrapTokens", "LocalAPIEndpoint"),
-						cmpopts.IgnoreFields(kubeadmapi.APIServer{}, "TimeoutForControlPlane"),
 						cmpopts.IgnoreFields(kubeadmapi.ClusterConfiguration{}, "ComponentConfigs", "KubernetesVersion",
 							"CertificateValidityPeriod", "CACertificateValidityPeriod"),
 					}

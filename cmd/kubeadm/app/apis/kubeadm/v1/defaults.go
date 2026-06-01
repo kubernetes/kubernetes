@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta3
+package v1
 
 import (
 	"net/url"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -53,11 +53,12 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
-	DefaultDiscoveryTimeout = 5 * time.Minute
 
 	// DefaultImagePullPolicy is the default image pull policy in kubeadm
 	DefaultImagePullPolicy = corev1.PullIfNotPresent
+
+	// DefaultEncryptionAlgorithm is the default encryption algorithm.
+	DefaultEncryptionAlgorithm = EncryptionAlgorithmRSA2048
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -69,6 +70,10 @@ func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
@@ -97,17 +102,22 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	SetDefaults_Etcd(obj)
-	SetDefaults_APIServer(&obj.APIServer)
-}
+	if obj.EncryptionAlgorithm == "" {
+		obj.EncryptionAlgorithm = DefaultEncryptionAlgorithm
+	}
 
-// SetDefaults_APIServer assigns default values for the API Server
-func SetDefaults_APIServer(obj *APIServer) {
-	if obj.TimeoutForControlPlane == nil {
-		obj.TimeoutForControlPlane = &metav1.Duration{
-			Duration: constants.ControlPlaneComponentHealthCheckTimeout,
+	if obj.CertificateValidityPeriod == nil {
+		obj.CertificateValidityPeriod = &metav1.Duration{
+			Duration: constants.CertificateValidityPeriod,
 		}
 	}
+	if obj.CACertificateValidityPeriod == nil {
+		obj.CACertificateValidityPeriod = &metav1.Duration{
+			Duration: constants.CACertificateValidityPeriod,
+		}
+	}
+
+	SetDefaults_Etcd(obj)
 }
 
 // SetDefaults_Etcd assigns default values for the proxy
@@ -120,6 +130,19 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
 		}
 	}
+	if obj.Etcd.External != nil {
+		SetDefaults_ExternalEtcd(obj.Etcd.External)
+	}
+}
+
+// SetDefaults_ExternalEtcd assigns default values for the external etcd
+func SetDefaults_ExternalEtcd(obj *ExternalEtcd) {
+	// If HTTPEndpoints is not set, default it to Endpoints
+	// This allows HTTP traffic (metrics, health checks) to use the same endpoints as gRPC traffic
+	if len(obj.HTTPEndpoints) == 0 && len(obj.Endpoints) > 0 {
+		obj.HTTPEndpoints = make([]string, len(obj.Endpoints))
+		copy(obj.HTTPEndpoints, obj.Endpoints)
+	}
 }
 
 // SetDefaults_JoinConfiguration assigns default values to a regular node
@@ -131,6 +154,10 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_JoinControlPlane(obj.ControlPlane)
 	SetDefaults_Discovery(&obj.Discovery)
 	SetDefaults_NodeRegistration(&obj.NodeRegistration)
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }
 
 // SetDefaults_JoinControlPlane assigns default values for a joining control plane node
@@ -144,12 +171,6 @@ func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
 func SetDefaults_Discovery(obj *Discovery) {
 	if len(obj.TLSBootstrapToken) == 0 && obj.BootstrapToken != nil {
 		obj.TLSBootstrapToken = obj.BootstrapToken.Token
-	}
-
-	if obj.Timeout == nil {
-		obj.Timeout = &metav1.Duration{
-			Duration: DefaultDiscoveryTimeout,
-		}
 	}
 
 	if obj.File != nil {
@@ -196,4 +217,107 @@ func SetDefaults_NodeRegistration(obj *NodeRegistrationOptions) {
 	if len(obj.ImagePullPolicy) == 0 {
 		obj.ImagePullPolicy = DefaultImagePullPolicy
 	}
+	if obj.ImagePullSerial == nil {
+		obj.ImagePullSerial = ptr.To(true)
+	}
+}
+
+// SetDefaults_ResetConfiguration assigns default values for the ResetConfiguration object
+func SetDefaults_ResetConfiguration(obj *ResetConfiguration) {
+	if obj.CertificatesDir == "" {
+		obj.CertificatesDir = DefaultCertificatesDir
+	}
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
+}
+
+// SetDefaults_EnvVar assigns default values for EnvVar.
+// +k8s:defaulter-gen=covers
+func SetDefaults_EnvVar(obj *EnvVar) {
+	if obj.ValueFrom != nil {
+		if obj.ValueFrom.FieldRef != nil {
+			if obj.ValueFrom.FieldRef.APIVersion == "" {
+				obj.ValueFrom.FieldRef.APIVersion = "v1"
+			}
+		}
+	}
+}
+
+// SetDefaults_Timeouts assigns default values for timeouts.
+func SetDefaults_Timeouts(obj *Timeouts) {
+	if obj.ControlPlaneComponentHealthCheck == nil {
+		obj.ControlPlaneComponentHealthCheck = &metav1.Duration{
+			Duration: constants.ControlPlaneComponentHealthCheckTimeout,
+		}
+	}
+	if obj.KubeletHealthCheck == nil {
+		obj.KubeletHealthCheck = &metav1.Duration{
+			Duration: constants.KubeletHealthCheckTimeout,
+		}
+	}
+	if obj.KubernetesAPICall == nil {
+		obj.KubernetesAPICall = &metav1.Duration{
+			Duration: constants.KubernetesAPICallTimeout,
+		}
+	}
+	if obj.EtcdAPICall == nil {
+		obj.EtcdAPICall = &metav1.Duration{
+			Duration: constants.EtcdAPICallTimeout,
+		}
+	}
+	if obj.TLSBootstrap == nil {
+		obj.TLSBootstrap = &metav1.Duration{
+			Duration: constants.TLSBootstrapTimeout,
+		}
+	}
+	if obj.Discovery == nil {
+		obj.Discovery = &metav1.Duration{
+			Duration: constants.DiscoveryTimeout,
+		}
+	}
+	if obj.UpgradeManifests == nil {
+		obj.UpgradeManifests = &metav1.Duration{
+			Duration: constants.UpgradeManifestsTimeout,
+		}
+	}
+}
+
+// SetDefaults_UpgradeConfiguration assigns default values for the UpgradeConfiguration
+func SetDefaults_UpgradeConfiguration(obj *UpgradeConfiguration) {
+	if obj.Node.EtcdUpgrade == nil {
+		obj.Node.EtcdUpgrade = ptr.To(true)
+	}
+	if obj.Node.CertificateRenewal == nil {
+		obj.Node.CertificateRenewal = ptr.To(true)
+	}
+	if len(obj.Node.ImagePullPolicy) == 0 {
+		obj.Node.ImagePullPolicy = DefaultImagePullPolicy
+	}
+	if obj.Node.ImagePullSerial == nil {
+		obj.Node.ImagePullSerial = ptr.To(true)
+	}
+
+	if obj.Apply.EtcdUpgrade == nil {
+		obj.Apply.EtcdUpgrade = ptr.To(true)
+	}
+	if obj.Apply.CertificateRenewal == nil {
+		obj.Apply.CertificateRenewal = ptr.To(true)
+	}
+	if len(obj.Apply.ImagePullPolicy) == 0 {
+		obj.Apply.ImagePullPolicy = DefaultImagePullPolicy
+	}
+	if obj.Apply.ImagePullSerial == nil {
+		obj.Apply.ImagePullSerial = ptr.To(true)
+	}
+
+	if obj.Plan.EtcdUpgrade == nil {
+		obj.Plan.EtcdUpgrade = ptr.To(true)
+	}
+
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }

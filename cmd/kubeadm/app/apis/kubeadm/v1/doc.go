@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,49 +19,38 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
-// Package v1beta3 defines the v1beta3 version of the kubeadm configuration file format.
-// This version improves on the v1beta2 format by fixing some minor issues and adding a few new fields.
+// Package v1 defines the v1 version of the kubeadm configuration file format.
+// This version improves on the v1beta4 format by fixing some minor issues and adding a few new fields.
 //
-// DEPRECATED: v1beta3 is deprecated in favor of v1beta4 and will be removed in a future release, 1.34 or later.
-// Please migrate.
+// TODO: tracking issue for v1:
+//   - https://github.com/kubernetes/kubeadm/issues/3160
 //
-// A list of changes since v1beta2:
-//   - The deprecated "ClusterConfiguration.useHyperKubeImage" field has been removed.
-//     Kubeadm no longer supports the hyperkube image.
-//   - The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
-//     DNS server type by kubeadm.
-//   - Include "datapolicy" tags on the fields that hold secrets.
-//     This would result in the field values to be omitted when API structures are printed with klog.
-//   - Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
-//     a list of phases during kubeadm init/join command execution.
-//   - Add "InitConfiguration.NodeRegistration.ImagePullPolicy" and "JoinConfiguration.NodeRegistration.ImagePullPolicy"
-//     to allow specifying the images pull policy during kubeadm "init" and "join". The value must be one of "Always", "Never" or
-//     "IfNotPresent". "IfNotPresent" is the default, which has been the existing behavior prior to this addition.
-//   - Add "InitConfiguration.Patches.Directory", "JoinConfiguration.Patches.Directory" to allow
-//     the user to configure a directory from which to take patches for components deployed by kubeadm.
-//   - Move the BootstrapToken* API and related utilities out of the "kubeadm" API group to a new group
-//     "bootstraptoken". The kubeadm API version v1beta3 no longer contains the BootstrapToken* structures.
+// A list of changes since v1beta4:
+// vx.yy:
+//   - TODO
 //
 // Migration from old kubeadm config versions
 //
 //   - kubeadm v1.15.x and newer can be used to migrate from v1beta1 to v1beta2.
 //   - kubeadm v1.22.x and newer no longer support v1beta1 and older APIs, but can be used to migrate v1beta2 to v1beta3.
 //   - kubeadm v1.27.x and newer no longer support v1beta2 and older APIs.
+//   - kubeadm v1.31.x and newer can be used to migrate from v1beta3 to v1beta4.
+//   - kubeadm TODO and newer can be used to migrate from v1beta4 to v1.
 //
 // # Basics
 //
-// The preferred way to configure kubeadm is to pass an YAML configuration file with the --config option. Some of the
+// The preferred way to configure kubeadm is to pass a YAML configuration file with the --config option. Some of the
 // configuration options defined in the kubeadm config file are also available as command line flags, but only
 // the most common/simple use case are supported with this approach.
 //
-// A kubeadm config file could contain multiple configuration types separated using three dashes (“---”).
+// A kubeadm config file could contain multiple configuration types separated using three dashes ("---").
 //
 // kubeadm supports the following configuration types:
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: InitConfiguration
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: ClusterConfiguration
 //
 //	apiVersion: kubelet.config.k8s.io/v1beta1
@@ -70,13 +59,21 @@ limitations under the License.
 //	apiVersion: kubeproxy.config.k8s.io/v1alpha1
 //	kind: KubeProxyConfiguration
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: JoinConfiguration
+//
+//	apiVersion: kubeadm.k8s.io/v1
+//	kind: ResetConfiguration
+//
+//	apiVersion: kubeadm.k8s.io/v1
+//	kind: UpgradeConfiguration
 //
 // To print the defaults for "init" and "join" actions use the following commands:
 //
 //	kubeadm config print init-defaults
 //	kubeadm config print join-defaults
+//	kubeadm config print reset-defaults
+//	kubeadm config print upgrade-defaults
 //
 // The list of configuration types that must be included in a configuration file depends by the action you are
 // performing (init or join) and by the configuration options you are going to use (defaults or advanced customization).
@@ -97,7 +94,7 @@ limitations under the License.
 // InitConfiguration, ClusterConfiguration, KubeProxyConfiguration, KubeletConfiguration, but only one
 // between InitConfiguration and ClusterConfiguration is mandatory.
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: InitConfiguration
 //	bootstrapTokens:
 //	    ...
@@ -115,7 +112,7 @@ limitations under the License.
 // - LocalAPIEndpoint, that represents the endpoint of the instance of the API server to be deployed on this node;
 // use it e.g. to customize the API server advertise address.
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: ClusterConfiguration
 //	networking:
 //	    ...
@@ -163,7 +160,7 @@ limitations under the License.
 // Here is a fully populated example of a single YAML file containing multiple
 // configuration types to be used during a `kubeadm init` run.
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: InitConfiguration
 //	bootstrapTokens:
 //	- token: "9a08jv.c0izixklcxtmnze7"
@@ -184,18 +181,23 @@ limitations under the License.
 //	    value: "someValue"
 //	    effect: "NoSchedule"
 //	  kubeletExtraArgs:
-//	    v: 4
+//	  - name: "v"
+//	    value: "5"
 //	  ignorePreflightErrors:
 //	  - IsPrivilegedUser
 //	  imagePullPolicy: "IfNotPresent"
+//	  imagePullSerial: true
 //	localAPIEndpoint:
 //	  advertiseAddress: "10.100.0.1"
 //	  bindPort: 6443
 //	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
 //	skipPhases:
-//	- addon/kube-proxy
+//	- preflight
+//	timeouts:
+//	  controlPlaneComponentHealthCheck: "60s"
+//	  kubernetesAPICall: "40s"
 //	---
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: ClusterConfiguration
 //	etcd:
 //	  # one of local or external
@@ -204,9 +206,13 @@ limitations under the License.
 //	    imageTag: "3.2.24"
 //	    dataDir: "/var/lib/etcd"
 //	    extraArgs:
-//	      listen-client-urls: "http://10.100.0.1:2379"
+//	    - name: "listen-client-urls"
+//	      value: "http://10.100.0.1:2379"
+//	    extraEnvs:
+//	    - name: "SOME_VAR"
+//	      value: "SOME_VALUE"
 //	    serverCertSANs:
-//	    -  "ec2-10-100-0-1.compute-1.amazonaws.com"
+//	    - "ec2-10-100-0-1.compute-1.amazonaws.com"
 //	    peerCertSANs:
 //	    - "10.100.0.1"
 //	  # external:
@@ -224,7 +230,11 @@ limitations under the License.
 //	controlPlaneEndpoint: "10.100.0.1:6443"
 //	apiServer:
 //	  extraArgs:
-//	    authorization-mode: "Node,RBAC"
+//	  - name: "authorization-mode"
+//	    value: "Node,RBAC"
+//	  extraEnvs:
+//	  - name: "SOME_VAR"
+//	    value: "SOME_VALUE"
 //	  extraVolumes:
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
@@ -234,10 +244,10 @@ limitations under the License.
 //	  certSANs:
 //	  - "10.100.1.1"
 //	  - "ec2-10-100-0-1.compute-1.amazonaws.com"
-//	  timeoutForControlPlane: 4m0s
 //	controllerManager:
 //	  extraArgs:
-//	    "node-cidr-mask-size": "20"
+//	  - name: "node-cidr-mask-size"
+//	    value: "20"
 //	  extraVolumes:
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
@@ -246,7 +256,8 @@ limitations under the License.
 //	    pathType: File
 //	scheduler:
 //	  extraArgs:
-//	    address: "10.100.0.1"
+//	  - name: "address"
+//	    value: "10.100.0.1"
 //	  extraVolumes:
 //	  - name: "some-volume"
 //	    hostPath: "/etc/some-path"
@@ -256,6 +267,11 @@ limitations under the License.
 //	certificatesDir: "/etc/kubernetes/pki"
 //	imageRepository: "registry.k8s.io"
 //	clusterName: "example-cluster"
+//	encryptionAlgorithm: "ECDSA-P256"
+//	dns:
+//	  disabled: true # disable CoreDNS
+//	proxy:
+//	  disabled: true # disable kube-proxy
 //	---
 //	apiVersion: kubelet.config.k8s.io/v1beta1
 //	kind: KubeletConfiguration
@@ -269,9 +285,14 @@ limitations under the License.
 //
 // When executing kubeadm join with the --config option, the JoinConfiguration type should be provided.
 //
-//	apiVersion: kubeadm.k8s.io/v1beta3
+//	apiVersion: kubeadm.k8s.io/v1
 //	kind: JoinConfiguration
-//	   ...
+//	discovery:
+//	  bootstrapToken:
+//	    apiServerEndpoint: some-address:6443
+//	    token: abcdef.0123456789abcdef
+//	    unsafeSkipCAVerification: true
+//	  tlsBootstrapToken: abcdef.0123456789abcdef
 //
 // The JoinConfiguration type should be used to configure runtime settings, that in case of kubeadm join
 // are the discovery method used for accessing the cluster info and all the setting which are specific
@@ -282,4 +303,31 @@ limitations under the License.
 // node only (e.g. the node ip).
 //
 // - APIEndpoint, that represents the endpoint of the instance of the API server to be eventually deployed on this node.
-package v1beta3
+//
+// # Kubeadm reset configuration types
+//
+// When executing kubeadm reset with the --config option, the ResetConfiguration type should be provided.
+//
+//	apiVersion: kubeadm.k8s.io/v1
+//	kind: ResetConfiguration
+//	   ...
+//
+// # Kubeadm upgrade configuration types
+//
+// When executing kubeadm upgrade with the --config option, the UpgradeConfiguration type should be provided.
+//
+//	apiVersion: kubeadm.k8s.io/v1
+//	kind: UpgradeConfiguration
+//	apply:
+//	  ...
+//	diff:
+//	  ...
+//	node:
+//	  ...
+//	plan:
+//	  ...
+//
+// The UpgradeConfiguration structure includes a few substructures that only apply to different subcommands of "kubeadm upgrade".
+// For example, the "apply" substructure will be used with the "kubeadm upgrade apply" subcommand and all other substructures
+// will be ignored in such a case.
+package v1
