@@ -44,6 +44,23 @@
         "patch",
         "update"
       ]
+    },
+    {
+      "kind": "ClusterTrustBundle",
+      "name": "clustertrustbundles",
+      "namespaced": false,
+      "singularName": "clustertrustbundle",
+      "storageVersionHash": "v5yhuVertL4=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
     }
   ]
 }

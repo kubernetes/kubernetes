@@ -679,6 +679,26 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "clustertrustbundles",
+              "responseKind": {
+                "group": "",
+                "kind": "ClusterTrustBundle",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "clustertrustbundle",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1"

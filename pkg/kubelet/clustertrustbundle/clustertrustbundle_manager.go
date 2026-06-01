@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +48,7 @@ const (
 
 // clusterTrustBundle is a type constraint for version-independent ClusterTrustBundle API
 type clusterTrustBundle interface {
-	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle
+	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle | certificatesv1.ClusterTrustBundle
 }
 
 // clusterTrustBundlesLister is an API-verion independent ClusterTrustBundles lister
@@ -63,8 +64,8 @@ type clusterTrustBundleHandlers[T clusterTrustBundle] interface {
 }
 
 type alphaClusterTrustBundleHandlers struct{}
-
 type betaClusterTrustBundleHandlers struct{}
+type gaClusterTrustBundleHandlers struct{}
 
 func (b *alphaClusterTrustBundleHandlers) GetName(ctb *certificatesv1alpha1.ClusterTrustBundle) string {
 	return ctb.Name
@@ -78,7 +79,7 @@ func (b *alphaClusterTrustBundleHandlers) GetTrustBundle(ctb *certificatesv1alph
 	return ctb.Spec.TrustBundle
 }
 
-func (b betaClusterTrustBundleHandlers) GetName(ctb *certificatesv1beta1.ClusterTrustBundle) string {
+func (b *betaClusterTrustBundleHandlers) GetName(ctb *certificatesv1beta1.ClusterTrustBundle) string {
 	return ctb.Name
 }
 
@@ -87,6 +88,18 @@ func (b *betaClusterTrustBundleHandlers) GetSignerName(ctb *certificatesv1beta1.
 }
 
 func (b *betaClusterTrustBundleHandlers) GetTrustBundle(ctb *certificatesv1beta1.ClusterTrustBundle) string {
+	return ctb.Spec.TrustBundle
+}
+
+func (b *gaClusterTrustBundleHandlers) GetName(ctb *certificatesv1.ClusterTrustBundle) string {
+	return ctb.Name
+}
+
+func (b *gaClusterTrustBundleHandlers) GetSignerName(ctb *certificatesv1.ClusterTrustBundle) string {
+	return ctb.Spec.SignerName
+}
+
+func (b *gaClusterTrustBundleHandlers) GetTrustBundle(ctb *certificatesv1.ClusterTrustBundle) string {
 	return ctb.Spec.TrustBundle
 }
 
@@ -108,7 +121,7 @@ type InformerManager[T clusterTrustBundle] struct {
 	cacheTTL           time.Duration
 }
 
-var _ Manager = (*InformerManager[certificatesv1beta1.ClusterTrustBundle])(nil)
+var _ Manager = (*InformerManager[certificatesv1.ClusterTrustBundle])(nil)
 
 func NewAlphaInformerManager(
 	ctx context.Context, informerFactory informers.SharedInformerFactory, cacheSize int, cacheTTL time.Duration,
@@ -125,6 +138,15 @@ func NewBetaInformerManager(
 	bundlesInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
 	return newInformerManager(
 		ctx, &betaClusterTrustBundleHandlers{}, bundlesInformer.Informer(), bundlesInformer.Lister(), cacheSize, cacheTTL,
+	)
+}
+
+func NewGAInformerManager(
+	ctx context.Context, informerFactory informers.SharedInformerFactory, cacheSize int, cacheTTL time.Duration,
+) (Manager, error) {
+	bundlesInformer := informerFactory.Certificates().V1().ClusterTrustBundles()
+	return newInformerManager(
+		ctx, &gaClusterTrustBundleHandlers{}, bundlesInformer.Informer(), bundlesInformer.Lister(), cacheSize, cacheTTL,
 	)
 }
 
@@ -393,13 +415,18 @@ func (m *LazyInformerManager) ensureManagerSet() error {
 	managerSchema := map[schema.GroupVersion]managerConstructor{
 		certificatesv1alpha1.SchemeGroupVersion: NewAlphaInformerManager,
 		certificatesv1beta1.SchemeGroupVersion:  NewBetaInformerManager,
+		certificatesv1.SchemeGroupVersion:       NewGAInformerManager,
 	}
 
 	kubeInformers := informers.NewSharedInformerFactoryWithOptions(m.client, 0)
 
 	var clusterTrustBundleManager Manager
 	var foundGV string
-	for _, gv := range []schema.GroupVersion{certificatesv1beta1.SchemeGroupVersion, certificatesv1alpha1.SchemeGroupVersion} {
+	for _, gv := range []schema.GroupVersion{
+		certificatesv1.SchemeGroupVersion,
+		certificatesv1beta1.SchemeGroupVersion,
+		certificatesv1alpha1.SchemeGroupVersion,
+	} {
 		ctbAPIAvailable, err := clusterTrustBundlesAvailable(m.client, gv)
 		if err != nil {
 			return fmt.Errorf("failed to determine which informer manager to choose: %w", err)

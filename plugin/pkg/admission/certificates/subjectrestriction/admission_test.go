@@ -25,7 +25,7 @@ import (
 	"encoding/pem"
 	"testing"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -71,7 +71,7 @@ func TestPlugin_Validate(t *testing.T) {
 				resource: certificatesapi.Resource("certificatesigningrequests"),
 				obj: &certificatesapi.CertificateSigningRequest{Spec: certificatesapi.CertificateSigningRequestSpec{
 					Request:    pemWithGroup("system:masters"),
-					SignerName: certificatesv1beta1.KubeAPIServerClientKubeletSignerName,
+					SignerName: certificatesv1.KubeAPIServerClientKubeletSignerName,
 				}},
 			},
 			wantErr: "",
@@ -82,7 +82,7 @@ func TestPlugin_Validate(t *testing.T) {
 				resource: certificatesapi.Resource("certificatesigningrequests"),
 				obj: &certificatesapi.CertificateSigningRequest{Spec: certificatesapi.CertificateSigningRequestSpec{
 					Request:    []byte("this is not a CSR"),
-					SignerName: certificatesv1beta1.KubeAPIServerClientSignerName,
+					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 				}},
 				name: "bear",
 			},
@@ -94,7 +94,7 @@ func TestPlugin_Validate(t *testing.T) {
 				resource: certificatesapi.Resource("certificatesigningrequests"),
 				obj: &certificatesapi.CertificateSigningRequest{Spec: certificatesapi.CertificateSigningRequestSpec{
 					Request:    pemWithGroup("system:admin"),
-					SignerName: certificatesv1beta1.KubeAPIServerClientSignerName,
+					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 				}},
 			},
 			wantErr: "",
@@ -105,7 +105,7 @@ func TestPlugin_Validate(t *testing.T) {
 				resource: certificatesapi.Resource("certificatesigningrequests"),
 				obj: &certificatesapi.CertificateSigningRequest{Spec: certificatesapi.CertificateSigningRequestSpec{
 					Request:    pemWithGroup("system:masters"),
-					SignerName: certificatesv1beta1.KubeAPIServerClientSignerName,
+					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 				}},
 				name: "pooh",
 			},

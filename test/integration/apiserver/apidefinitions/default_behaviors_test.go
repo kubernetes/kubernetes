@@ -84,6 +84,7 @@ func TestGenerateName(t *testing.T) {
 		"apiservices.v1.apiregistration.k8s.io",
 		"clustertrustbundles.v1alpha1.certificates.k8s.io",
 		"clustertrustbundles.v1beta1.certificates.k8s.io",
+		"clustertrustbundles.v1.certificates.k8s.io",
 		"customresourcedefinitions.v1.apiextensions.k8s.io",
 		"ipaddresses.v1.networking.k8s.io",
 		"storageversions.v1alpha1.internal.apiserver.k8s.io",
