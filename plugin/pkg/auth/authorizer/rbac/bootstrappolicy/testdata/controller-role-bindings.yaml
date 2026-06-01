@@ -263,6 +263,22 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:kube-apiserver-serving-clustertrustbundle-publisher
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:kube-apiserver-serving-clustertrustbundle-publisher
+  subjects:
+  - kind: ServiceAccount
+    name: kube-apiserver-serving-clustertrustbundle-publisher
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:legacy-service-account-token-cleaner
   roleRef:
     apiGroup: rbac.authorization.k8s.io
