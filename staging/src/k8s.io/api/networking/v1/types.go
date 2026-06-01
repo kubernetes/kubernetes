@@ -514,7 +514,7 @@ type HTTPIngressPath struct {
 
 	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
-	// +required
+	// +optional
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
@@ -542,7 +542,7 @@ type IngressServiceBackend struct {
 
 	// port of the referenced service. A port name or port number
 	// is required for a IngressServiceBackend.
-	// +required
+	// +optional
 	Port ServiceBackendPort `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 
@@ -580,7 +580,7 @@ type IngressClass struct {
 
 	// spec is the desired state of the IngressClass.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec IngressClassSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
