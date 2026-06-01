@@ -542,6 +542,12 @@ func TestQuantityParse(t *testing.T) {
 		"-3.01i",
 		"-3.01e-",
 
+		// exponents that do not fit in the int32 scale are rejected rather
+		// than silently truncated to an unrelated value
+		"1e2147483648",
+		"1e-2147483648",
+		"1e9223372036854775807",
+
 		// trailing whitespace is forbidden
 		" 1",
 		"1 ",

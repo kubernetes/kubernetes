@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"math"
 	"strconv"
 )
 
@@ -189,6 +190,12 @@ func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt For
 	if len(suffix) > 1 && (suffix[0] == 'E' || suffix[0] == 'e') {
 		parsed, err := strconv.ParseInt(string(suffix[1:]), 10, 64)
 		if err != nil {
+			return 0, 0, DecimalExponent, false
+		}
+		// The exponent is held in an int32 scale that is negated when adapted to
+		// an inf.Scale, so reject anything that would not survive that round trip
+		// instead of silently truncating it to an unrelated value.
+		if parsed > math.MaxInt32 || parsed < -math.MaxInt32 {
 			return 0, 0, DecimalExponent, false
 		}
 		return 10, int32(parsed), DecimalExponent, true
