@@ -94,44 +94,6 @@ func TestMatchesWithWildcard(t *testing.T) {
 	}
 }
 
-func TestFindFirstHeadingPosition(t *testing.T) {
-	tests := []struct {
-		name     string
-		content  string
-		expected int
-	}{
-		{
-			name:     "heading-at-start",
-			content:  "# Heading\nContent",
-			expected: 0,
-		},
-		{
-			name:     "heading-after-text",
-			content:  "Some text\n# Heading",
-			expected: 10,
-		},
-		{
-			name:     "no-heading",
-			content:  "Just some text\nNo heading here",
-			expected: -1,
-		},
-		{
-			name:     "empty-file",
-			content:  "",
-			expected: -1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := findFirstHeadingPosition([]byte(tt.content))
-			if result != tt.expected {
-				t.Errorf("findFirstHeadingPosition() = %v, expected %v", result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestExtractFirstHeadingAndCodeBlocks(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -225,8 +187,8 @@ code block
 }
 
 func TestInsertHeading(t *testing.T) {
-	defaultTitle := "Replace with a short title"
-	defaultDescription := "Replace this text with a short summary of the change\nand how users of the package can deal with this breaking\nchange. If users are not expected to be affected, then\ninstead explain why. If the changes are too long,\nyou may shorten them by replacing multiple lines\nwith three dots (...)."
+	testTitle := "Replace with a short title"
+	testDescription := "Replace this text with a short summary of the change"
 
 	tests := []struct {
 		name           string
@@ -234,14 +196,14 @@ func TestInsertHeading(t *testing.T) {
 		changes        string
 		title          string
 		description    string
-		expectContains []string
+		expectContains []string // Each entry is a line without newline, order as in the expected result.
 	}{
 		{
 			name:        "insert-before-existing-heading",
 			content:     "# Existing Heading\n\nContent",
 			changes:     "test changes",
-			title:       defaultTitle,
-			description: defaultDescription,
+			title:       testTitle,
+			description: testDescription,
 			expectContains: []string{
 				"### Replace with a short title",
 				"test changes",
@@ -252,8 +214,8 @@ func TestInsertHeading(t *testing.T) {
 			name:        "append-to-empty-file",
 			content:     "",
 			changes:     "new changes",
-			title:       defaultTitle,
-			description: defaultDescription,
+			title:       testTitle,
+			description: testDescription,
 			expectContains: []string{
 				"### Replace with a short title",
 				"new changes",
@@ -263,8 +225,8 @@ func TestInsertHeading(t *testing.T) {
 			name:        "append-to-file-without-headings",
 			content:     "Some text without headings",
 			changes:     "api changes",
-			title:       defaultTitle,
-			description: defaultDescription,
+			title:       testTitle,
+			description: testDescription,
 			expectContains: []string{
 				"Some text without headings",
 				"### Replace with a short title",
@@ -283,6 +245,19 @@ func TestInsertHeading(t *testing.T) {
 				"changes",
 			},
 		},
+		{
+			name:        "not-a-heading",
+			content:     "some text with hash # in the middle\n",
+			changes:     "changes",
+			title:       "Custom Title",
+			description: "Custom description text",
+			expectContains: []string{
+				"some text with hash # in the middle",
+				"### Custom Title",
+				"Custom description text",
+				"changes",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -292,10 +267,16 @@ func TestInsertHeading(t *testing.T) {
 				t.Fatalf("insertHeading() error = %v", err)
 			}
 
+			previousIndex := -1
 			for _, expected := range tt.expectContains {
-				if !strings.Contains(result, expected) {
-					t.Errorf("insertHeading() result does not contain %q", expected)
+				index := strings.Index(result, expected+"\n")
+				if index == -1 {
+					t.Fatalf("insertHeading() result does not contain line %q, got:\n%s", expected, result)
 				}
+				if index < previousIndex {
+					t.Fatalf("insertHeading() result has line %q before previous expected line:\n%s", expected, result)
+				}
+				previousIndex = index
 			}
 
 			if tt.content != "" && strings.HasPrefix(tt.content, "#") {

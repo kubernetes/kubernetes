@@ -228,7 +228,7 @@ res=0
 
 # Fail if apidiff-changelog failed, unless the exit code indicates that all
 # incompatible changes were documented.
-if [ ${apidiff_exit} -ne 0 ] && [ ${apidiff_exit} -ne 3 ]; then
+if [ "${apidiff_exit}" -ne 0 ] && [ "${apidiff_exit}" -ne 3 ]; then
     res=1
 fi
 

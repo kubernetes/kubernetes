@@ -290,17 +290,12 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
 	// 3 indicates to apidiff.sh that it should consider the check a success, despite having
 	// some incompatible changes.
-	if len(failures) == updatedFailures {
-		return fmt.Errorf("Documented changes in %d module(s)%w", len(failures), exitError{3})
-	}
 	if len(failures) == documentedFailures {
 		return fmt.Errorf("Found documentation of changes in %d module(s)%w", len(failures), exitError{3})
 	}
-	if len(failures) == updatedFailures+documentedFailures {
-		return fmt.Errorf("Found documentation of changes or updated documentation in %d module(s)%w", len(failures), exitError{3})
-	}
 
-	// 2 indicates that there's missing documentation.
+	// 2 indicates that there's missing documentation or some action must be taken
+	// (like editing and commiting the updated CHANGELOG.md).
 	return fmt.Errorf("Error: incompatible changes in %d module(s)%w", len(failures), exitError{2})
 }
 
@@ -647,6 +642,9 @@ func insertChangelog(file, changes, title, description string) error {
 // inserts before the first existing heading.
 func insertHeading(content []byte, changes, title, description string) (string, error) {
 	lines := string(content)
+	if !strings.HasSuffix(changes, "\n") {
+		changes += "\n"
+	}
 	newHeading := `### ` + title + `
 
 ` + description + `
@@ -655,20 +653,12 @@ func insertHeading(content []byte, changes, title, description string) (string, 
 ` + changes +
 		"```" + `
 `
-	firstHeadingPos := findFirstHeadingPosition(content)
-	if firstHeadingPos == -1 {
+	firstHeading := headingRE.FindIndex(content)
+	if firstHeading == nil {
 		return lines + "\n" + newHeading, nil
 	}
+	firstHeadingPos := firstHeading[0]
 	return lines[:firstHeadingPos] + newHeading + "\n" + lines[firstHeadingPos:], nil
 }
 
-// findFirstHeadingPosition returns the byte position of the first '#' character,
-// which indicates the start of a markdown heading. Returns -1 if no heading is found.
-func findFirstHeadingPosition(content []byte) int {
-	for i := 0; i < len(content); i++ {
-		if content[i] == '#' {
-			return i
-		}
-	}
-	return -1
-}
+var headingRE = regexp.MustCompile(`(?m)^#`)
