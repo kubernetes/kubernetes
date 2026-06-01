@@ -18,20 +18,27 @@ package testing
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 )
+
+//go:embed testdata/exemplar_pod.yaml
+var exemplarPodYAML []byte
 
 type scope string
 
@@ -43,14 +50,11 @@ var (
 
 func RunBenchmarkStoreListCreate(ctx context.Context, b *testing.B, store storage.Interface, match metav1.ResourceVersionMatch) {
 	objectCount := atomic.Uint64{}
-	pods := make([]*example.Pod, 0, b.N)
-	for i := 0; i < b.N; i++ {
-		name := rand.String(100)
-		pods = append(pods, &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name}})
-	}
+	data := PrepareBenchchmarkData(1, b.N, 1)
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pod := pods[i]
+		pod := data.Pods[i]
 		podOut := &example.Pod{}
 		err := store.Create(ctx, computePodKey(pod), pod, podOut, 0)
 		if err != nil {
@@ -199,6 +203,8 @@ func podAttr(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 func PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (data BenchmarkData) {
+	exemplar := loadExemplarPod()
+
 	data.NodeNames = make([]string, nodeCount)
 	for i := 0; i < nodeCount; i++ {
 		data.NodeNames[i] = rand.String(10)
@@ -208,8 +214,9 @@ func PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int)
 		namespace := rand.String(10)
 		data.NamespaceNames[i] = namespace
 		for j := 0; j < podPerNamespaceCount; j++ {
-			name := rand.String(10)
-			data.Pods = append(data.Pods, &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}, Spec: example.PodSpec{NodeName: data.NodeNames[rand.Intn(nodeCount)]}})
+			p := exemplar.DeepCopy()
+			randomizePod(p, namespace, data.NodeNames[rand.Intn(nodeCount)])
+			data.Pods = append(data.Pods, p)
 		}
 	}
 	return data
@@ -219,6 +226,25 @@ type BenchmarkData struct {
 	Pods           []*example.Pod
 	NamespaceNames []string
 	NodeNames      []string
+}
+
+func loadExemplarPod() *example.Pod {
+	var pod example.Pod
+	if len(exemplarPodYAML) == 0 {
+		panic("exemplar pod empty")
+	}
+	if err := yaml.Unmarshal(exemplarPodYAML, &pod); err != nil {
+		panic(fmt.Sprintf("decode exemplar pod: %v", err))
+	}
+	return &pod
+}
+
+func randomizePod(pod *example.Pod, ns string, nodeName string) {
+	pod.Namespace = ns
+	pod.Name = pod.GenerateName + rand.String(10)
+	pod.UID = types.UID(rand.String(36))
+	pod.ResourceVersion = ""
+	pod.Spec.NodeName = nodeName
 }
 
 func RunBenchmarkStoreStats(ctx context.Context, b *testing.B, store storage.Interface) {
