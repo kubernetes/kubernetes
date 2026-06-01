@@ -476,7 +476,7 @@ var (
 	Volumes = framework.WithFeature(framework.ValidFeatures.Add("Volumes"))
 
 	// Owner: sig-windows
-	// TODO: document the feature (when to use this feature for a test)
+	// Indicates that tests labeled with this feature depend on Windows and thus may only be run on Windows nodes.
 	Windows = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
 
 	// Owner: sig-windows
