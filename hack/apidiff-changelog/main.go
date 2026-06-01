@@ -295,7 +295,7 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 	}
 
 	// 2 indicates that there's missing documentation or some action must be taken
-	// (like editing and commiting the updated CHANGELOG.md).
+	// (like editing and committing the updated CHANGELOG.md).
 	return fmt.Errorf("Error: incompatible changes in %d module(s)%w", len(failures), exitError{2})
 }
 
