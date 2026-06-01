@@ -131,6 +131,7 @@ var (
 		version.V3_6: {
 			addNewField(Meta, MetaStorageVersionName, emptyStorageVersion),
 		},
+		version.V3_7: {},
 	}
 	// emptyStorageVersion is used for v3.6 Step for the first time, in all other version StoragetVersion should be set by migrator.
 	// Adding a addNewField for StorageVersion we can reuse logic to remove it when downgrading to v3.5

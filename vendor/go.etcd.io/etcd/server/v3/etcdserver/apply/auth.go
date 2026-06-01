@@ -20,6 +20,7 @@ import (
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
 	"go.etcd.io/etcd/server/v3/auth"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
 	"go.etcd.io/etcd/server/v3/lease"
 )
 
@@ -39,7 +40,7 @@ func newAuthApplierV3(as auth.AuthStore, base applierV3, lessor lease.Lessor) *a
 	return &authApplierV3{applierV3: base, as: as, lessor: lessor}
 }
 
-func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest, applyFunc applyFunc) *Result {
+func (aa *authApplierV3) Apply(r *InternalRaftRequestWrapper, shouldApplyV3 membership.ShouldApplyV3, applyFunc applyFunc) *Result {
 	aa.mu.Lock()
 	defer aa.mu.Unlock()
 	if r.Header != nil {
@@ -48,14 +49,14 @@ func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest, applyFunc applyFunc) *
 		aa.authInfo.Username = r.Header.Username
 		aa.authInfo.Revision = r.Header.AuthRevision
 	}
-	if needAdminPermission(r) {
+	if needAdminPermission(r.InternalRaftRequest) {
 		if err := aa.as.IsAdminPermitted(&aa.authInfo); err != nil {
 			aa.authInfo.Username = ""
 			aa.authInfo.Revision = 0
 			return &Result{Err: err}
 		}
 	}
-	ret := aa.applierV3.Apply(r, applyFunc)
+	ret := aa.applierV3.Apply(r, shouldApplyV3, applyFunc)
 	aa.authInfo.Username = ""
 	aa.authInfo.Revision = 0
 	return ret
@@ -113,11 +114,11 @@ func (aa *authApplierV3) DeleteRange(r *pb.DeleteRangeRequest) (*pb.DeleteRangeR
 	return aa.applierV3.DeleteRange(r)
 }
 
-func (aa *authApplierV3) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, *traceutil.Trace, error) {
+func (aa *authApplierV3) Txn(rt *pb.TxnRequest, skipRangeExecution bool) (*pb.TxnResponse, *traceutil.Trace, error) {
 	if err := CheckTxnAuth(aa.as, &aa.authInfo, aa.lessor, rt); err != nil {
 		return nil, nil, err
 	}
-	return aa.applierV3.Txn(rt)
+	return aa.applierV3.Txn(rt, skipRangeExecution)
 }
 
 func CheckTxnAuth(as auth.AuthStore, ai *auth.AuthInfo, lessor lease.Lessor, rt *pb.TxnRequest) error {
@@ -245,8 +246,6 @@ func needAdminPermission(r *pb.InternalRaftRequest) bool {
 	case r.AuthEnable != nil:
 		return true
 	case r.AuthDisable != nil:
-		return true
-	case r.AuthStatus != nil:
 		return true
 	case r.AuthUserAdd != nil:
 		return true

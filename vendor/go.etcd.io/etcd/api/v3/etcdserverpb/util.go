@@ -1,4 +1,4 @@
-// Copyright 2015 The etcd Authors
+// Copyright 2026 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package etcdserverpb
 
-import "fmt"
+import "google.golang.org/protobuf/proto"
 
-type ClusterError struct {
-	Errors []error
-}
-
-func (ce *ClusterError) Error() string {
-	s := ErrClusterUnavailable.Error()
-	for i, e := range ce.Errors {
-		s += fmt.Sprintf("; error #%d: %s\n", i, e)
+// Clone returns a deep copy of h, or an empty ResponseHeader if h is nil.
+func (h *ResponseHeader) Clone() *ResponseHeader {
+	if h == nil {
+		return &ResponseHeader{}
 	}
-	return s
-}
-
-func (ce *ClusterError) Detail() string {
-	s := ""
-	for i, e := range ce.Errors {
-		s += fmt.Sprintf("error #%d: %s\n", i, e)
-	}
-	return s
+	return proto.Clone(h).(*ResponseHeader)
 }

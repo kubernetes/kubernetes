@@ -66,9 +66,18 @@ func DisableVerifications() func() {
 
 // Verify performs verification if the assertions are enabled.
 // In the default setup running in tests and skipped in the production code.
-func Verify(f func()) {
+func Verify(msg string, f VerifyFunc) {
 	if IsVerificationEnabled(envVerifyValueAssert) {
-		f()
+		ok, details := f()
+		verifier(ok, msg, details)
+	}
+}
+
+type VerifyFunc func() (condition bool, details map[string]any)
+
+func verifier(condition bool, msg string, details map[string]any) {
+	if !condition {
+		panic(fmt.Sprintf("%s. details: %v.", msg, details))
 	}
 }
 

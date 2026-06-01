@@ -74,19 +74,27 @@ func (p *Page) IsFreelistPage() bool {
 	return p.flags == FreelistPageFlag
 }
 
+// IsValidPage checks Page flags correctness, only a single proper flag can be used.
+func (p *Page) IsValidPage() bool {
+	return p.IsBranchPage() ||
+		p.IsLeafPage() ||
+		p.IsMetaPage() ||
+		p.IsFreelistPage()
+}
+
 // Meta returns a pointer to the metadata section of the page.
 func (p *Page) Meta() *Meta {
 	return (*Meta)(UnsafeAdd(unsafe.Pointer(p), unsafe.Sizeof(*p)))
 }
 
 func (p *Page) FastCheck(id Pgid) {
-	Assert(p.id == id, "Page expected to be: %v, but self identifies as %v", id, p.id)
+	if p.id != id {
+		panic(fmt.Sprintf("assertion failed: Page expected to be: %v, but self identifies as %v", id, p.id))
+	}
 	// Only one flag of page-type can be set.
-	Assert(p.IsBranchPage() ||
-		p.IsLeafPage() ||
-		p.IsMetaPage() ||
-		p.IsFreelistPage(),
-		"page %v: has unexpected type/flags: %x", p.id, p.flags)
+	if !p.IsValidPage() {
+		panic(fmt.Sprintf("assertion failed: page %v: has unexpected type/flags: %x", p.id, p.flags))
+	}
 }
 
 // LeafPageElement retrieves the leaf node by index
@@ -122,7 +130,9 @@ func (p *Page) BranchPageElements() []branchPageElement {
 }
 
 func (p *Page) FreelistPageCount() (int, int) {
-	Assert(p.IsFreelistPage(), fmt.Sprintf("can't get freelist page count from a non-freelist page: %2x", p.flags))
+	if !p.IsFreelistPage() {
+		panic(fmt.Sprintf("assertion failed: can't get freelist page count from a non-freelist page: %2x", p.flags))
+	}
 
 	// If the page.count is at the max uint16 value (64k) then it's considered
 	// an overflow and the size of the freelist is stored as the first element.
@@ -140,7 +150,9 @@ func (p *Page) FreelistPageCount() (int, int) {
 }
 
 func (p *Page) FreelistPageIds() []Pgid {
-	Assert(p.IsFreelistPage(), fmt.Sprintf("can't get freelist page IDs from a non-freelist page: %2x", p.flags))
+	if !p.IsFreelistPage() {
+		panic(fmt.Sprintf("assertion failed: can't get freelist page IDs from a non-freelist page: %2x", p.flags))
+	}
 
 	idx, count := p.FreelistPageCount()
 
@@ -335,16 +347,16 @@ func (s Pgids) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s Pgids) Less(i, j int) bool { return s[i] < s[j] }
 
 // Merge returns the sorted union of a and b.
-func (a Pgids) Merge(b Pgids) Pgids {
+func (s Pgids) Merge(b Pgids) Pgids {
 	// Return the opposite slice if one is nil.
-	if len(a) == 0 {
+	if len(s) == 0 {
 		return b
 	}
 	if len(b) == 0 {
-		return a
+		return s
 	}
-	merged := make(Pgids, len(a)+len(b))
-	Mergepgids(merged, a, b)
+	merged := make(Pgids, len(s)+len(b))
+	Mergepgids(merged, s, b)
 	return merged
 }
 

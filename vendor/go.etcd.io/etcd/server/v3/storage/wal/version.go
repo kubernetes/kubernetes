@@ -19,13 +19,12 @@ import (
 	"strings"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto" //nolint:staticcheck // TODO: remove for a supported version
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/version"
-	"go.etcd.io/etcd/pkg/v3/pbutil"
 	"go.etcd.io/raft/v3/raftpb"
 )
 
@@ -46,7 +45,7 @@ func ReadWALVersion(w *WAL) (Version, error) {
 }
 
 type walVersion struct {
-	entries []raftpb.Entry
+	entries []*raftpb.Entry
 }
 
 // MinimalEtcdVersion returns minimal etcd able to interpret entries from  WAL log,
@@ -57,7 +56,7 @@ func (w *walVersion) MinimalEtcdVersion() *semver.Version {
 // MinimalEtcdVersion returns minimal etcd able to interpret entries from  WAL log,
 // determined by looking at entries since the last snapshot and returning the highest
 // etcd version annotation from used messages, fields, enums and their values.
-func MinimalEtcdVersion(ents []raftpb.Entry) *semver.Version {
+func MinimalEtcdVersion(ents []*raftpb.Entry) *semver.Version {
 	var maxVer *semver.Version
 	for _, ent := range ents {
 		err := visitEntry(ent, func(path protoreflect.FullName, ver *semver.Version) error {
@@ -94,12 +93,12 @@ func VisitFileDescriptor(file protoreflect.FileDescriptor, visitor Visitor) erro
 	return nil
 }
 
-func visitEntry(ent raftpb.Entry, visitor Visitor) error {
-	err := visitMessage(proto.MessageReflect(&ent), visitor)
+func visitEntry(ent *raftpb.Entry, visitor Visitor) error {
+	err := visitMessage(proto.MessageReflect(ent), visitor)
 	if err != nil {
 		return err
 	}
-	return visitEntryData(ent.Type, ent.Data, visitor)
+	return visitEntryData(ent.GetType(), ent.Data, visitor)
 }
 
 func visitEntryData(entryType raftpb.EntryType, data []byte, visitor Visitor) error {
@@ -107,15 +106,8 @@ func visitEntryData(entryType raftpb.EntryType, data []byte, visitor Visitor) er
 	switch entryType {
 	case raftpb.EntryNormal:
 		var raftReq etcdserverpb.InternalRaftRequest
-		if err := pbutil.Unmarshaler(&raftReq).Unmarshal(data); err != nil {
-			// try V2 Request
-			var r etcdserverpb.Request
-			if pbutil.Unmarshaler(&r).Unmarshal(data) != nil {
-				// return original error
-				return err
-			}
-			msg = proto.MessageReflect(&r)
-			break
+		if err := proto.Unmarshal(data, &raftReq); err != nil {
+			return err
 		}
 		msg = proto.MessageReflect(&raftReq)
 		if raftReq.DowngradeVersionTest != nil {
@@ -130,7 +122,7 @@ func visitEntryData(entryType raftpb.EntryType, data []byte, visitor Visitor) er
 		}
 	case raftpb.EntryConfChange:
 		var confChange raftpb.ConfChange
-		err := pbutil.Unmarshaler(&confChange).Unmarshal(data)
+		err := proto.Unmarshal(data, &confChange)
 		if err != nil {
 			return nil
 		}
@@ -138,7 +130,7 @@ func visitEntryData(entryType raftpb.EntryType, data []byte, visitor Visitor) er
 		return visitor(msg.Descriptor().FullName(), &version.V3_0)
 	case raftpb.EntryConfChangeV2:
 		var confChange raftpb.ConfChangeV2
-		err := pbutil.Unmarshaler(&confChange).Unmarshal(data)
+		err := proto.Unmarshal(data, &confChange)
 		if err != nil {
 			return nil
 		}
