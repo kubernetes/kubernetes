@@ -1285,6 +1285,36 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("status", "devices").Index(1), "driver1/pool1/device1").MarkAlpha(),
 			},
 		},
+		"invalid status device conditions, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(standardAllocatedDeviceStatus()),
+				tweakStatusDeviceConditions(
+					"Condition-0",
+					"Condition-1",
+					"Condition-2",
+					"Condition-3",
+					"Condition-4",
+					"Condition-5",
+					"Condition-6",
+					"Condition-7",
+					"Condition-8",
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), 9, 8).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+			},
+		},
+		"invalid status device conditions, duplicate type": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusDevices(standardAllocatedDeviceStatus()),
+				tweakStatusDeviceConditions("Ready", "Ready"),
+			),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("conditions").Index(1), "Ready"),
+			},
+		},
 		// .Status.Allocation.Devices.Results[%d].BindingConditions
 		"valid binding conditions, max items": {
 			old: mkValidResourceClaim(),
@@ -1654,6 +1684,24 @@ func tweakStatusBindingFailureConditions(count int) func(rc *resource.ResourceCl
 			for j := 0; j < count; j++ {
 				rc.Status.Allocation.Devices.Results[i].BindingFailureConditions = append(rc.Status.Allocation.Devices.Results[i].BindingFailureConditions, fmt.Sprintf("failure-condition-%d", j))
 			}
+		}
+	}
+}
+
+func tweakStatusDeviceConditions(types ...string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if len(rc.Status.Devices) == 0 {
+			rc.Status.Devices = []resource.AllocatedDeviceStatus{standardAllocatedDeviceStatus()}
+		}
+		rc.Status.Devices[0].Conditions = make([]v1.Condition, 0, len(types))
+		for _, conditionType := range types {
+			rc.Status.Devices[0].Conditions = append(rc.Status.Devices[0].Conditions, v1.Condition{
+				Type:               conditionType,
+				Status:             v1.ConditionTrue,
+				Reason:             "Reason",
+				Message:            "Message",
+				LastTransitionTime: v1.Now(),
+			})
 		}
 	}
 }

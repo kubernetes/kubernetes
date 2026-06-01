@@ -56,6 +56,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.devices[*].basic.taints": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
 			"spec.devices[*].basic.taints[*].effect": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
