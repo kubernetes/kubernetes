@@ -378,6 +378,54 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 
 		})
 	})
+
+	ginkgo.It("should be able to mount CTBs with user fields [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+
+		for _, tt := range []struct {
+			name           string
+			ctbName        string
+			itemUser       *int64
+			defaultUser    *int64
+			expectedOutput []string
+		}{
+			{
+				name:           "set ownership when DefaultUser is present",
+				ctbName:        "test.test.signer-one.4" + f.UniqueName,
+				defaultUser:    ptr.To[int64](1000),
+				expectedOutput: []string{"owner UID of \"/var/run/ctbtest/..data/trust-anchors.pem\": 1000"},
+			},
+			{
+				name:           "set ownership when User is present",
+				ctbName:        "test.test.signer-one.4" + f.UniqueName,
+				itemUser:       ptr.To[int64](1000),
+				expectedOutput: []string{"owner UID of \"/var/run/ctbtest/..data/trust-anchors.pem\": 1000"},
+			},
+			{
+				name:           "set ownership when DefaultUser and User is present",
+				ctbName:        "test.test.signer-one.4" + f.UniqueName,
+				defaultUser:    ptr.To[int64](1001),
+				itemUser:       ptr.To[int64](1000),
+				expectedOutput: []string{"owner UID of \"/var/run/ctbtest/..data/trust-anchors.pem\": 1000"},
+			},
+		} {
+			pod := podForCTBProjection(v1.VolumeProjection{
+				ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+					Name: &tt.ctbName,
+					Path: "trust-anchors.pem",
+					User: tt.itemUser,
+				},
+			})
+			pod.Spec.Containers[0].Args = []string{
+				"mounttest",
+				"--file_owner=/var/run/ctbtest/..data/trust-anchors.pem",
+			}
+
+			if tt.defaultUser != nil {
+				pod.Spec.Volumes[0].VolumeSource.Projected.DefaultUser = tt.defaultUser
+			}
+			e2epodoutput.TestContainerOutputRegexp(ctx, f, "project cluster trust bundle", pod, 0, tt.expectedOutput)
+		}
+	})
 })
 
 func expectedRegexFromPEMs(certPEMs ...string) []string {
