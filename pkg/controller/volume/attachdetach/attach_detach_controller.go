@@ -28,9 +28,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
@@ -50,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -58,6 +62,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/mount-utils"
+)
+
+var (
+	nodeResource = v1.SchemeGroupVersion.WithResource("nodes").GroupResource()
 )
 
 // TimerConfig contains configuration of internal attach/detach timers and
@@ -164,6 +172,15 @@ func NewAttachDetachController(
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
 
+	var consistencyStore consistencyutil.ConsistencyStore
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeControllerCircuitBreaker) {
+		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+			nodeResource: nodeInformer.Informer().GetStore(),
+		})
+	} else {
+		consistencyStore = consistencyutil.NewNoopConsistencyStore()
+	}
+
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
 		timerConfig.ReconcilerLoopPeriod,
@@ -176,7 +193,9 @@ func NewAttachDetachController(
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
 		adc.nodeLister,
-		recorder)
+		recorder,
+		kubeClient,
+		consistencyStore)
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
