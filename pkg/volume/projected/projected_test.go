@@ -1445,7 +1445,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: ptr.To("foo"),
+							Name: new("foo"),
 							Path: "bundle.pem",
 						},
 					},
@@ -1477,7 +1477,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: ptr.To("foo"),
+							Name: new("foo"),
 							Path: "bundle.pem",
 						},
 					},
@@ -1509,7 +1509,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: ptr.To("foo"),
+							Name: new("foo"),
 							Path: "bundle.pem",
 							User: ptr.To[int64](1000),
 						},
@@ -1541,7 +1541,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: ptr.To("foo"),
+							Name: new("foo"),
 							Path: "bundle.pem",
 						},
 					},
@@ -1574,7 +1574,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: ptr.To("foo"),
+							Name: new("foo"),
 							Path: "bundle.pem",
 							User: ptr.To[int64](1002),
 						},
@@ -1608,7 +1608,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: ptr.To("foo"),
+							Name: new("foo"),
 							Path: "bundle.pem",
 						},
 					},
