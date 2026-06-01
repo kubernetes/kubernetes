@@ -156,6 +156,13 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
 	}
+	var metricsProvider volume.MetricsProvider
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && medium == v1.StorageMediumMemory {
+		metricsProvider = volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host))
+	} else {
+		metricsProvider = volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))
+	}
+
 	return &emptyDir{
 		pod:             pod,
 		volName:         spec.Name(),
@@ -164,7 +171,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
-		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
+		MetricsProvider: metricsProvider,
 	}, nil
 }
 
