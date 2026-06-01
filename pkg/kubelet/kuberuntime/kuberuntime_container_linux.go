@@ -204,6 +204,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			}
 			logger.V(4).Info("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
 		}
+	} else if isCgroup2UnifiedMode() {
+		// When MemoryQoS is off, explicitly reset memory.high to "max" so
+		// that InPlacePodResize clears the stale throttle limit on containers
+		// that were created while MemoryQoS was enabled.
+		if lcr.Unified == nil {
+			lcr.Unified = map[string]string{}
+		}
+		lcr.Unified[cm.Cgroup2MemoryHigh] = "max"
 	}
 
 	return lcr
