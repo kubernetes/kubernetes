@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -506,4 +507,44 @@ func formatErrors(err error) error {
 		errStrings[i] = err.Error()
 	}
 	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
+}
+
+func getEmptyDirVolumeSizeLimit(volStatus *v1.VolumeMountStatus) *resource.Quantity {
+	if volStatus != nil && volStatus.VolumeStatus != nil && volStatus.VolumeStatus.EmptyDir != nil {
+		return volStatus.VolumeStatus.EmptyDir.SizeLimit
+	}
+	return nil
+}
+
+func VerifyVolumeStatusSizeLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, volName string, expectedSize int64) {
+	ginkgo.GinkgoHelper()
+	framework.ExpectNoError(framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
+		WithTimeout(f.Timeouts.PodStart).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+			if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
+				return func() string { return "pod or container status is not available yet" }, nil
+			}
+			var volStatus *v1.VolumeMountStatus
+			for idx := range pod.Status.ContainerStatuses[0].VolumeMounts {
+				if pod.Status.ContainerStatuses[0].VolumeMounts[idx].Name == volName {
+					volStatus = &pod.Status.ContainerStatuses[0].VolumeMounts[idx]
+					break
+				}
+			}
+			if volStatus == nil {
+				return func() string { return fmt.Sprintf("volume mount status for %s not found in container status", volName) }, nil
+			}
+			sizeLimit := getEmptyDirVolumeSizeLimit(volStatus)
+			if sizeLimit == nil {
+				return func() string { return fmt.Sprintf("emptyDir sizeLimit is not populated yet for volume %s", volName) }, nil
+			}
+			actualSize := sizeLimit.Value()
+			if actualSize != expectedSize {
+				return func() string {
+					return fmt.Sprintf("volume sizeLimit expected to be %d, but got %d", expectedSize, actualSize)
+				}, nil
+			}
+			return nil, nil
+		})))
 }
