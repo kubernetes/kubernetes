@@ -3139,6 +3139,19 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
 		allErrs = append(allErrs, validateMountRecursiveReadOnly(mnt, fldPath.Child("recursiveReadOnly"))...)
+
+		if len(mnt.MountOptions) > 0 {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeMountOptions) {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("mountOptions"), "mount options require the VolumeMountOptions feature gate to be enabled"))
+			} else {
+				allowedOptions := sets.New("noexec", "nodev", "nosuid")
+				for j, opt := range mnt.MountOptions {
+					if !allowedOptions.Has(opt) {
+						allErrs = append(allErrs, field.NotSupported(idxPath.Child("mountOptions").Index(j), opt, sets.List(allowedOptions)))
+					}
+				}
+			}
+		}
 	}
 	return allErrs
 }

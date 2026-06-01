@@ -2195,6 +2195,10 @@ type VolumeMount struct {
 	// SubPathExpr and SubPath are mutually exclusive.
 	// +optional
 	SubPathExpr string
+	// mountOptions is a list of mount options (noexec, nodev, nosuid) to apply
+	// when mounting this volume into the container.
+	// +optional
+	MountOptions []string
 }
 
 // MountPropagationMode describes mount propagation.

@@ -650,7 +650,10 @@
                 "mountPath": "mountPathValue",
                 "subPath": "subPathValue",
                 "mountPropagation": "mountPropagationValue",
-                "subPathExpr": "subPathExprValue"
+                "subPathExpr": "subPathExprValue",
+                "mountOptions": [
+                  "mountOptionsValue"
+                ]
               }
             ],
             "volumeDevices": [
@@ -964,7 +967,10 @@
                 "mountPath": "mountPathValue",
                 "subPath": "subPathValue",
                 "mountPropagation": "mountPropagationValue",
-                "subPathExpr": "subPathExprValue"
+                "subPathExpr": "subPathExprValue",
+                "mountOptions": [
+                  "mountOptionsValue"
+                ]
               }
             ],
             "volumeDevices": [
@@ -1278,7 +1284,10 @@
                 "mountPath": "mountPathValue",
                 "subPath": "subPathValue",
                 "mountPropagation": "mountPropagationValue",
-                "subPathExpr": "subPathExprValue"
+                "subPathExpr": "subPathExprValue",
+                "mountOptions": [
+                  "mountOptionsValue"
+                ]
               }
             ],
             "volumeDevices": [

@@ -67,6 +67,13 @@ type VolumeMountApplyConfiguration struct {
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
 	SubPathExpr *string `json:"subPathExpr,omitempty"`
+	// mountOptions is a list of mount options (noexec, nodev, nosuid) to apply
+	// when mounting this volume into the container. These options are passed
+	// through CRI to the container runtime and enforced at the OS level.
+	// Only VFS-level bind mount flags are permitted; filesystem-specific
+	// options are not allowed.
+	// This is an alpha field and requires the VolumeMountOptions feature gate.
+	MountOptions []string `json:"mountOptions,omitempty"`
 }
 
 // VolumeMountApplyConfiguration constructs a declarative configuration of the VolumeMount type for use with
@@ -128,5 +135,15 @@ func (b *VolumeMountApplyConfiguration) WithMountPropagation(value corev1.MountP
 // If called multiple times, the SubPathExpr field is set to the value of the last call.
 func (b *VolumeMountApplyConfiguration) WithSubPathExpr(value string) *VolumeMountApplyConfiguration {
 	b.SubPathExpr = &value
+	return b
+}
+
+// WithMountOptions adds the given value to the MountOptions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MountOptions field.
+func (b *VolumeMountApplyConfiguration) WithMountOptions(values ...string) *VolumeMountApplyConfiguration {
+	for i := range values {
+		b.MountOptions = append(b.MountOptions, values[i])
+	}
 	return b
 }

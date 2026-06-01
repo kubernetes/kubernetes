@@ -6952,6 +6952,17 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+
+  // mountOptions is a list of mount options (noexec, nodev, nosuid) to apply
+  // when mounting this volume into the container. These options are passed
+  // through CRI to the container runtime and enforced at the OS level.
+  // Only VFS-level bind mount flags are permitted; filesystem-specific
+  // options are not allowed.
+  // This is an alpha field and requires the VolumeMountOptions feature gate.
+  // +featureGate=VolumeMountOptions
+  // +optional
+  // +listType=atomic
+  repeated string mountOptions = 8;
 }
 
 // VolumeMountStatus shows status of volume mounts.

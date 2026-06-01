@@ -511,6 +511,9 @@ type Mount struct {
 	// ImageSubPath is set if an image volume sub path should get mounted. This
 	// field is only required if the above Image is set.
 	ImageSubPath string
+	// MountOptions specifies additional mount options (noexec, nodev, nosuid)
+	// to pass through CRI to the container runtime.
+	MountOptions []string
 }
 
 // ImageVolumes is a map of image specs by volume name.

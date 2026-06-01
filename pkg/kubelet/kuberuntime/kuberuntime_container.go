@@ -495,6 +495,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			RecursiveReadOnly: v.RecursiveReadOnly,
 			Image:             v.Image,
 			ImageSubPath:      v.ImageSubPath,
+			MountOptions:      v.MountOptions,
 		}
 
 		volumeMounts = append(volumeMounts, mount)
@@ -771,6 +772,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 			Propagation:       mount.Propagation,
 			Image:             mount.Image,
 			ImageSubPath:      mount.ImageSubPath,
+			MountOptions:      mount.MountOptions,
 		})
 	}
 	return cStatus

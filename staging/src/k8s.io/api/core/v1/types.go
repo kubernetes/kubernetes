@@ -2422,6 +2422,16 @@ type VolumeMount struct {
 	// SubPathExpr and SubPath are mutually exclusive.
 	// +optional
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
+	// mountOptions is a list of mount options (noexec, nodev, nosuid) to apply
+	// when mounting this volume into the container. These options are passed
+	// through CRI to the container runtime and enforced at the OS level.
+	// Only VFS-level bind mount flags are permitted; filesystem-specific
+	// options are not allowed.
+	// This is an alpha field and requires the VolumeMountOptions feature gate.
+	// +featureGate=VolumeMountOptions
+	// +optional
+	// +listType=atomic
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,8,rep,name=mountOptions"`
 }
 
 // MountPropagationMode describes mount propagation.

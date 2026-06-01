@@ -32985,6 +32985,26 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 							Format:      "",
 						},
 					},
+					"mountOptions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "mountOptions is a list of mount options (noexec, nodev, nosuid) to apply when mounting this volume into the container. These options are passed through CRI to the container runtime and enforced at the OS level. Only VFS-level bind mount flags are permitted; filesystem-specific options are not allowed. This is an alpha field and requires the VolumeMountOptions feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "mountPath"},
 			},

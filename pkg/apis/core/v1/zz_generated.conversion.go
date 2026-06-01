@@ -9167,6 +9167,7 @@ func autoConvert_v1_VolumeMount_To_core_VolumeMount(in *corev1.VolumeMount, out 
 	out.SubPath = in.SubPath
 	out.MountPropagation = (*core.MountPropagationMode)(unsafe.Pointer(in.MountPropagation))
 	out.SubPathExpr = in.SubPathExpr
+	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	return nil
 }
 
@@ -9183,6 +9184,7 @@ func autoConvert_core_VolumeMount_To_v1_VolumeMount(in *core.VolumeMount, out *c
 	out.SubPath = in.SubPath
 	out.MountPropagation = (*corev1.MountPropagationMode)(unsafe.Pointer(in.MountPropagation))
 	out.SubPathExpr = in.SubPathExpr
+	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	return nil
 }
 
