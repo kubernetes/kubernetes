@@ -119,7 +119,7 @@ func TestZeroOrOneOfUnionRatcheting(t *testing.T) {
 				M2: &m2{},
 			},
 			expected: field.ErrorList{
-				field.Invalid(nil, "{m1, m2}", "must specify at most one of: `m1`, `m2`").WithOrigin("zeroOrOneOf"),
+				field.Invalid(nil, "{m1, m2}", "must specify at most one of: `m1`, `m2`, `m3`, `m4`").WithOrigin("zeroOrOneOf"),
 			},
 		},
 		{
@@ -142,7 +142,7 @@ func TestZeroOrOneOfUnionRatcheting(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			members := []UnionMember{NewUnionMember("m1"), NewUnionMember("m2")}
+			members := []UnionMember{NewUnionMember("m1"), NewUnionMember("m2"), NewUnionMember("m3"), NewUnionMember("m4")}
 			got := ZeroOrOneOfUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, tc.newStruct, tc.oldStruct,
 				NewUnionMembership(members...), extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {

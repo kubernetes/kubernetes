@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -32,17 +33,24 @@ const (
 
 	// This tag always returns an error from ExtractValidations.
 	validateErrorTagName = "k8s:validateError"
+
+	// validate true alpha/beta  test tags.
+	validateAlphaTagName = "k8s:validateTrueAlpha"
+	validateBetaTagName  = "k8s:validateTrueBeta"
 )
 
 func init() {
 	RegisterTagValidator(fixedResultTagValidator{result: true})
 	RegisterTagValidator(fixedResultTagValidator{result: false})
 	RegisterTagValidator(fixedResultTagValidator{error: true})
+	RegisterTagValidator(fixedResultTagValidator{result: true, stability: TagStabilityLevelAlpha})
+	RegisterTagValidator(fixedResultTagValidator{result: true, stability: TagStabilityLevelBeta})
 }
 
 type fixedResultTagValidator struct {
-	result bool
-	error  bool
+	result    bool
+	error     bool
+	stability TagStabilityLevel
 }
 
 func (fixedResultTagValidator) Init(_ Config) {}
@@ -51,7 +59,14 @@ func (frtv fixedResultTagValidator) TagName() string {
 	if frtv.error {
 		return validateErrorTagName
 	} else if frtv.result {
-		return validateTrueTagName
+		switch frtv.stability {
+		case TagStabilityLevelAlpha:
+			return validateAlphaTagName
+		case TagStabilityLevelBeta:
+			return validateBetaTagName
+		default:
+			return validateTrueTagName
+		}
 	}
 	return validateFalseTagName
 }
@@ -73,7 +88,9 @@ func (frtv fixedResultTagValidator) GetValidations(context Context, tag codetags
 	if err != nil {
 		return result, fmt.Errorf("can't decode tag payload: %w", err)
 	}
-	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).WithTypeArgs(args.typeArgs...)
+	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).
+		WithTypeArgs(args.typeArgs...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "validateFalse", ""})
 	fn.Cohort = args.cohort
 	result.AddFunction(fn)
 
@@ -125,9 +142,13 @@ func (fixedResultTagValidator) toFixedResultArgs(in codetags.Tag) (fixedResultAr
 }
 
 func (frtv fixedResultTagValidator) Docs() TagDoc {
+	tagStabilityLevel := TagStabilityLevelAlpha
+	if frtv.stability != "" {
+		tagStabilityLevel = frtv.stability
+	}
 	doc := TagDoc{
 		Tag:            frtv.TagName(),
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: tagStabilityLevel,
 		Scopes:         sets.List(frtv.ValidScopes()),
 	}
 	doc.PayloadsType = codetags.ValueTypeString

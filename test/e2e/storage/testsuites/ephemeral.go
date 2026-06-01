@@ -276,7 +276,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 			return nil
 		}
 		l.testCase.TestEphemeral(ctx)

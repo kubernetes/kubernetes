@@ -547,6 +547,8 @@ message ConfigMap {
   // the Data field, this is enforced during validation process.
   // Using this field will require 1.10+ apiserver and
   // kubelet.
+  // Note: BinaryData keys are not currently propagated to container env vars
+  // via ConfigMapKeyRef or ConfigMapRef env sources; only Data keys are used.
   // +optional
   map<string, bytes> binaryData = 3;
 }
@@ -556,6 +558,7 @@ message ConfigMap {
 //
 // The contents of the target ConfigMap's Data field will represent the
 // key-value pairs as environment variables.
+// Keys in the BinaryData field are not currently propagated to container env vars.
 message ConfigMapEnvSource {
   // The ConfigMap to select from.
   optional LocalObjectReference localObjectReference = 1;
@@ -571,7 +574,8 @@ message ConfigMapKeySelector {
   // The ConfigMap to select from.
   optional LocalObjectReference localObjectReference = 1;
 
-  // The key to select.
+  // The key to select from the ConfigMap's Data field.
+  // Keys in the BinaryData field are not currently propagated to container env vars.
   optional string key = 2;
 
   // Specify whether the ConfigMap or its key must be defined
@@ -2557,6 +2561,7 @@ message NFSVolumeSource {
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
+// +k8s:supportsSubresource="/status"
 message Namespace {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -2634,6 +2639,8 @@ message NamespaceStatus {
 
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/proxy"
 message Node {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -2684,6 +2691,22 @@ message NodeAffinity {
   // +optional
   // +listType=atomic
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
+}
+
+// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
+message NodeAllocatableResourceClaimStatus {
+  // ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+  // +required
+  optional string resourceClaimName = 1;
+
+  // Containers lists the names of all containers in this pod that reference the claim.
+  // +optional
+  // +listType=set
+  repeated string containers = 2;
+
+  // Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+  // +required
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> resources = 3;
 }
 
 // NodeCondition contains condition information for a node.
@@ -3119,6 +3142,7 @@ message ObjectReference {
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+// +k8s:supportsSubresource="/status"
 message PersistentVolume {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -3140,6 +3164,7 @@ message PersistentVolume {
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// +k8s:supportsSubresource="/status"
 message PersistentVolumeClaim {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -3240,8 +3265,8 @@ message PersistentVolumeClaimSpec {
   // * An existing PVC (PersistentVolumeClaim)
   // If the provisioner or an external controller can support the specified data source,
   // it will create a new volume based on the contents of the specified data source.
-  // When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
-  // and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+  // dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+  // copied to dataSource when dataSourceRef.namespace is not specified.
   // If the namespace is specified, then dataSourceRef will not be copied to dataSource.
   // +optional
   optional TypedLocalObjectReference dataSource = 7;
@@ -3267,7 +3292,6 @@ message PersistentVolumeClaimSpec {
   //   specified.
   // * While dataSource only allows local objects, dataSourceRef allows objects
   //   in any namespaces.
-  // (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
   // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
   optional TypedObjectReference dataSourceRef = 8;
@@ -3660,6 +3684,8 @@ message PhotonPersistentDiskVolumeSource {
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/ephemeralcontainers"
 message Pod {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -4157,6 +4183,14 @@ message PodReadinessGate {
 //
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
+//
+// When the DRAWorkloadResourceClaims feature gate is enabled and this Pod
+// belongs to a PodGroup, a PodResourceClaim is matched to a
+// PodGroupResourceClaim if all of their fields are equal (Name,
+// ResourceClaimName, and ResourceClaimTemplateName). A matched claim references
+// a single ResourceClaim shared across all Pods in the PodGroup, reserved for
+// the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual
+// Pods.
 message PodResourceClaim {
   // Name uniquely identifies this resource claim inside the pod.
   // This must be a DNS_LABEL.
@@ -4178,6 +4212,16 @@ message PodResourceClaim {
   // generated component, will be used to form a unique name for the
   // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
   //
+  // When the DRAWorkloadResourceClaims feature gate is enabled and the pod
+  // belongs to a PodGroup that defines a PodGroupResourceClaim with the same
+  // Name and ResourceClaimTemplateName, this PodResourceClaim resolves to the
+  // ResourceClaim generated for the PodGroup. All pods in the group that
+  // define an equivalent PodResourceClaim matching the
+  // PodGroupResourceClaim's Name and ResourceClaimTemplateName share the same
+  // generated ResourceClaim. ResourceClaims generated for a PodGroup are
+  // owned by the PodGroup and their lifecycles are tied to the PodGroup
+  // instead of any individual pod.
+  //
   // This field is immutable and no changes will be made to the
   // corresponding ResourceClaim by the control plane after creating the
   // ResourceClaim.
@@ -4197,9 +4241,16 @@ message PodResourceClaimStatus {
   optional string name = 1;
 
   // ResourceClaimName is the name of the ResourceClaim that was
-  // generated for the Pod in the namespace of the Pod. If this is
-  // unset, then generating a ResourceClaim was not necessary. The
-  // pod.spec.resourceClaims entry can be ignored in this case.
+  // generated for the Pod in the namespace of the Pod.
+  //
+  // When the DRAWorkloadResourceClaims feature is enabled and the
+  // corresponding PodResourceClaim matches a PodGroupResourceClaim
+  // made by the Pod's PodGroup, then this is the name of the
+  // ResourceClaim generated and reserved for the PodGroup.
+  //
+  // If this is unset, then generating a ResourceClaim was not
+  // necessary. The pod.spec.resourceClaims entry can be ignored in
+  // this case.
   //
   // +optional
   optional string resourceClaimName = 2;
@@ -4944,22 +4995,16 @@ message PodStatus {
   // +featureGate=InPlacePodLevelResourcesVerticalScaling
   // +optional
   optional ResourceRequirements resources = 20;
-}
 
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
-message PodStatusResult {
-  // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
+  // that were allocated for this pod through DRA claims. This includes resources currently
+  // reported in v1.Node `status.allocatable` that are not extended resources
+  // (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+  // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+  // +featureGate=DRANodeAllocatableResources
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Most recently observed status of the pod.
-  // This data may not be up to date.
-  // Populated by the system.
-  // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
-  optional PodStatus status = 2;
+  // +listType=atomic
+  repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -5498,6 +5543,7 @@ message ResourceHealth {
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
+// +k8s:supportsSubresource="/status"
 message ResourceQuota {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -6025,6 +6071,8 @@ message SerializedReference {
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/proxy"
 message Service {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -6868,8 +6916,7 @@ message VolumeMount {
   // +optional
   optional string recursiveReadOnly = 7;
 
-  // Path within the container at which the volume should be mounted.  Must
-  // not contain ':'.
+  // Path within the container at which the volume should be mounted.
   optional string mountPath = 3;
 
   // Path within the volume from which the container's volume should be mounted.

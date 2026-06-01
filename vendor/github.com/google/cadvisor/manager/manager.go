@@ -1238,6 +1238,7 @@ func (m *manager) watchForNewOoms() error {
 					OomKill: &info.OomKillEventData{
 						Pid:         oomInstance.Pid,
 						ProcessName: oomInstance.ProcessName,
+						Constraint:  oomInstance.Constraint,
 					},
 				},
 			}

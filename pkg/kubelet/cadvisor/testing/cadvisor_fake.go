@@ -21,6 +21,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
@@ -58,7 +59,7 @@ func (c *Fake) GetRequestedContainersInfo(containerName string, options cadvisor
 }
 
 // MachineInfo is a fake implementation of Interface.MachineInfo.
-func (c *Fake) MachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (c *Fake) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	// Simulate a machine with 1 core and 3.75GB of memory.
 	// We set it to non-zero values to make non-zero-capacity machines in Kubemark.
 	return &cadvisorapi.MachineInfo{

@@ -60,8 +60,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				modified:      false,
 			},
 		}
-		for _, t := range tests {
-			test := t
+		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
@@ -118,8 +117,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				newFSGroupPolicy: storagev1.FileFSGroupPolicy,
 			},
 		}
-		for _, t := range tests {
-			test := t
+		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")

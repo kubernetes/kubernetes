@@ -48,7 +48,7 @@ const (
 	defaultSpamQPS   = 1. / 300.
 )
 
-// getEventKey builds unique event key based on source, involvedObject, reason, message
+// getEventKey builds unique event key based on source, involvedObject, reason, message.
 func getEventKey(event *v1.Event) string {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -66,7 +66,7 @@ func getEventKey(event *v1.Event) string {
 		"")
 }
 
-// getSpamKey builds unique event key based on source, involvedObject
+// getSpamKey builds unique event key based on source, involvedObject.
 func getSpamKey(event *v1.Event) string {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -124,6 +124,7 @@ type spamRecord struct {
 }
 
 // Filter controls that a given source+object are not exceeding the allowed rate.
+// The event parameter must not be nil.
 func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 	var record spamRecord
 
@@ -157,7 +158,8 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey string, localKey string)
 
 // EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type,
-// event.Reason, event.ReportingController and event.ReportingInstance
+// event.Reason, event.ReportingController and event.ReportingInstance.
+// The event parameter must not be nil.
 func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -235,6 +237,8 @@ type aggregateRecord struct {
 //   - The cache key for the event, for correlation purposes. This will be set to
 //     the full key for normal events, and to the result of
 //     EventAggregatorMessageFunc for aggregate events.
+//
+// The newEvent parameter must not be nil.
 func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string) {
 	now := metav1.NewTime(e.clock.Now())
 	var record aggregateRecord
@@ -515,7 +519,8 @@ func (c *EventCorrelator) EventCorrelate(newEvent *v1.Event) (*EventCorrelateRes
 	return &EventCorrelateResult{Event: observedEvent, Patch: patch}, err
 }
 
-// UpdateState based on the latest observed state from server
+// UpdateState based on the latest observed state from server.
+// The event parameter must not be nil.
 func (c *EventCorrelator) UpdateState(event *v1.Event) {
 	c.logger.updateState(event)
 }

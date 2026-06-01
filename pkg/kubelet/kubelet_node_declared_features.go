@@ -37,9 +37,16 @@ func (a FeatureGateAdapter) Enabled(key string) bool {
 // discoverNodeDeclaredFeatures determines the final set of node features to be declared by using the discovery library.
 func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	adaptedFG := FeatureGateAdapter{FeatureGate: utilfeature.DefaultFeatureGate}
+
+	runtimeFeatures := nodedeclaredfeatures.RuntimeFeatures{}
+	if features := kl.runtimeState.runtimeFeatures(); features != nil {
+		runtimeFeatures.UserNamespacesHostNetwork = features.UserNamespacesHostNetwork
+	}
+
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
-		FeatureGates: adaptedFG,
-		Version:      kl.version,
+		FeatureGates:    adaptedFG,
+		Version:         kl.version,
+		RuntimeFeatures: runtimeFeatures,
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)
 }

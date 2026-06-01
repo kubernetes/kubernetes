@@ -50,12 +50,12 @@ import (
 
 // jobStrategy implements verification logic for Replication Controllers.
 type jobStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
-var Strategy = jobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = jobStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1 for backwards compatibility,
 // and DeleteDependents for all other versions.
@@ -101,29 +101,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
 		job.Spec.ManagedBy = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) {
-		job.Spec.SuccessPolicy = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
-		job.Spec.BackoffLimitPerIndex = nil
-		job.Spec.MaxFailedIndexes = nil
-		if job.Spec.PodFailurePolicy != nil {
-			// We drop the FailIndex pod failure policy rules because
-			// JobBackoffLimitPerIndex is disabled.
-			index := 0
-			for _, rule := range job.Spec.PodFailurePolicy.Rules {
-				if rule.Action != batch.PodFailurePolicyActionFailIndex {
-					job.Spec.PodFailurePolicy.Rules[index] = rule
-					index++
-				}
-			}
-			job.Spec.PodFailurePolicy.Rules = job.Spec.PodFailurePolicy.Rules[:index]
-		}
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		job.Spec.PodReplacementPolicy = nil
-	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
@@ -133,27 +110,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) && oldJob.Spec.SuccessPolicy == nil {
-		newJob.Spec.SuccessPolicy = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
-		if oldJob.Spec.BackoffLimitPerIndex == nil {
-			newJob.Spec.BackoffLimitPerIndex = nil
-		}
-		if oldJob.Spec.MaxFailedIndexes == nil {
-			newJob.Spec.MaxFailedIndexes = nil
-		}
-		// We keep pod failure policy rules with FailIndex actions (is any),
-		// since the pod failure policy is immutable. Note that, if the old job
-		// had BackoffLimitPerIndex set, the new Job will also have it, so the
-		// validation of the pod failure policy with FailIndex rules will
-		// continue to pass.
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
-		newJob.Spec.PodReplacementPolicy = nil
-	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 
@@ -170,6 +126,16 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	job := obj.(*batch.Job)
 	opts := validationOptionsForJob(job, nil)
 	return batchvalidation.ValidateJob(job, opts)
+}
+
+// shouldAllowMutablePodTemplate returns true if the Job's pod template should
+// be mutable. This is safe for suspended jobs with no active pods that either
+// have never started or have the JobSuspended condition set.
+func shouldAllowMutablePodTemplate(job *batch.Job) bool {
+	suspended := job.Spec.Suspend != nil && *job.Spec.Suspend
+	notStarted := job.Status.StartTime == nil
+	hasSuspendedCondition := batchvalidation.IsConditionTrue(job.Status.Conditions, batch.JobSuspended)
+	return suspended && (notStarted || hasSuspendedCondition) && job.Status.Active == 0
 }
 
 func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValidationOptions {
@@ -191,11 +157,12 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
+		allowMutablePodTemplate := shouldAllowMutablePodTemplate(oldJob)
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePodResourcesForSuspendedJobs) {
-			opts.AllowMutablePodResources = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutablePodResources = allowMutablePodTemplate
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableSchedulingDirectivesForSuspendedJobs) {
-			opts.AllowMutableSchedulingDirectives = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutableSchedulingDirectives = allowMutablePodTemplate
 		}
 		// Validation should not fail jobs if they don't have the new labels.
 		// This can be removed once we have high confidence that both labels exist (1.30 at least)
@@ -284,12 +251,12 @@ func generateSelector(obj *batch.Job) {
 func (jobStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (jobStrategy) AllowUnconditionalUpdate() bool {
+func (jobStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for jobs; this means a POST is needed to create one.
-func (jobStrategy) AllowCreateOnUpdate() bool {
+func (jobStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -413,19 +380,12 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
 			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
 			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
-			AllowForSuccessCriteriaMetInExtendedScope:    true,
 			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
 			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		return batchvalidation.JobStatusValidationOptions{
-			AllowForSuccessCriteriaMetInExtendedScope: true,
-		}
-	}
-	return batchvalidation.JobStatusValidationOptions{
-		AllowForSuccessCriteriaMetInExtendedScope: batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet),
-	}
+
+	return batchvalidation.JobStatusValidationOptions{}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

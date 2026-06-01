@@ -25,9 +25,12 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -139,6 +142,11 @@ func TestPodSubresourceAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Wait for the permissions to become effective by ensuring a create request is allowed
+	waitContext, cancel := context.WithTimeout(context.TODO(), wait.ForeverTestTimeout)
+	defer cancel()
+	authutil.WaitForNamedAuthorizationUpdate(t, waitContext, adminClientset.AuthorizationV1(), podCreatorUsername, ns, "create", "", schema.GroupResource{Group: "", Resource: "pods/exec"}, true)
 
 	subresources := []string{"exec", "attach", "portforward"}
 	for _, subresource := range subresources {

@@ -17,10 +17,9 @@ limitations under the License.
 package framework
 
 import (
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -50,6 +49,13 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+	PodGroupStates() PodGroupStateLister
+}
+
+// PodGroupStateLister provides read access to pod group states.
+type PodGroupStateLister interface {
+	// Get returns the PodGroupState of the given pod group.
+	Get(namespace string, podGroupName string) (PodGroupState, error)
 }
 
 type CSINodeLister interface {
@@ -99,15 +105,20 @@ type ResourceClaimTracker interface {
 	GatherAllocatedState() (*structured.AllocatedState, error)
 
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
-	// binding phase. This change is immediately reflected in the result of List() and the other accessors.
+	// binding phase, therefore the given ResourceClaim must be non-nil and have a non-nil Status.Allocation.
+	// If the claim already has a pending allocation, then the allocation becomes shared. The same number of SignalClaimPendingAllocation() callers
+	// for a given claimUID is expected to eventually call MaybeRemoveClaimPendingAllocation() for that claimUID.
+	// This change is immediately reflected in the result of List() and the other accessors.
 	SignalClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error
 	// ClaimHasPendingAllocation answers whether a given claim has a pending allocation during the binding phase. It can be used to avoid
 	// race conditions in subsequent scheduling phases.
-	ClaimHasPendingAllocation(claimUID types.UID) bool
-	// RemoveClaimPendingAllocation removes the pending allocation for the given ResourceClaim from the tracker if any was signaled via
-	// SignalClaimPendingAllocation(). Returns whether there was a pending allocation to remove. List() and the other accessors immediately
-	// stop reflecting the pending allocation in the results.
-	RemoveClaimPendingAllocation(claimUID types.UID) (deleted bool)
+	GetPendingAllocation(claimUID types.UID) *resourceapi.AllocationResult
+	// MaybeRemoveClaimPendingAllocation might remove the pending allocation for the given ResourceClaim from the tracker if any was signaled via
+	// SignalClaimPendingAllocation(). When `forceRemove` is true, it always removes the pending allocation. Otherwise, it removes the pending
+	// allocation only when no other pods are still using that pending allocation (from SignalClaimPendingAllocation and AcquirePendingAllocation).
+	// Returns whether there was a pending allocation and it was removed.
+	// List() and the other accessors immediately stop reflecting the pending allocation in the results when the pending allocation is removed.
+	MaybeRemoveClaimPendingAllocation(claimUID types.UID, forceRemove bool) (deleted bool)
 
 	// AssumeClaimAfterAPICall signals to the tracker that an API call modifying the given ResourceClaim was made in the binding phase, and the
 	// changes should be reflected in informers very soon. This change is immediately reflected in the result of List() and the other accessors.
@@ -127,6 +138,12 @@ type DeviceClassResolver interface {
 	GetDeviceClass(resourceName v1.ResourceName) *resourceapi.DeviceClass
 }
 
+// PodGroupLister can be used to obtain PodGroups.
+type PodGroupLister interface {
+	// Get returns the PodGroup with the given podGroupName.
+	Get(namespace, podGroupName string) (*schedulingapi.PodGroup, error)
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -136,6 +153,7 @@ type SharedDRAManager interface {
 	ResourceSlices() ResourceSliceLister
 	DeviceClasses() DeviceClassLister
 	DeviceClassResolver() DeviceClassResolver
+	PodGroups() PodGroupLister
 }
 
 // CSIManager can be used to obtain CSINode objects, and track changes to CSINode objects in-memory.
@@ -146,14 +164,13 @@ type CSIManager interface {
 	CSINodes() CSINodeLister
 }
 
-// PodGroupManager provides an interface for scheduling plugins to provide workload-aware scheduling.
-// It acts as the central source of truth for runtime information about pod groups.
+// PodGroupManager provides an interface for runtime information about pod groups in the scheduler cache.
 type PodGroupManager interface {
-	// PodGroupState retrieves the runtime state for a specific pod group, identified by pod group's name and namespace.
-	PodGroupState(namespace string, schedulingGroup *v1.PodSchedulingGroup) (PodGroupState, error)
+	// PodGroupStates returns the PodGroupStateLister.
+	PodGroupStates() PodGroupStateLister
 }
 
-// PodGroupState provides an interface to view and modify the state of a single pod group.
+// PodGroupState provides an interface to view the state of a single pod group.
 type PodGroupState interface {
 	// AllPods returns the UIDs of all pods known to the scheduler for this group.
 	AllPods() sets.Set[types.UID]
@@ -168,13 +185,8 @@ type PodGroupState interface {
 	AssumedPods() sets.Set[types.UID]
 	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
 	AssignedPods() sets.Set[types.UID]
+	// ScheduledPods returns the pods that are either assumed or assigned for this pod group.
+	ScheduledPods() []*v1.Pod
 	// ScheduledPodsCount returns the number of pods for this group that are either assumed or assigned.
 	ScheduledPodsCount() int
-	// AssumePod marks a pod as having reached the Reserve stage.
-	AssumePod(podUID types.UID)
-	// ForgetPod removes a pod from the assumed state.
-	ForgetPod(podUID types.UID)
-	// SchedulingTimeout returns the remaining time until the pod group scheduling times out.
-	// A new deadline is created if one doesn't exist, or if the previous one has expired.
-	SchedulingTimeout() time.Duration
 }

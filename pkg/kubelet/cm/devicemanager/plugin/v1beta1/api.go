@@ -32,7 +32,7 @@ type RegistrationHandler interface {
 // ClientHandler is an interface for handling device plugin connections.
 type ClientHandler interface {
 	PluginConnected(context.Context, string, DevicePlugin) error
-	PluginDisconnected(klog.Logger, string)
+	PluginDisconnected(klog.Logger, string, string)
 	PluginListAndWatchReceiver(klog.Logger, string, *api.ListAndWatchResponse)
 }
 

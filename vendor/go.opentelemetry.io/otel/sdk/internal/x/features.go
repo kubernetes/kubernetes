@@ -37,3 +37,18 @@ var Observability = newFeature(
 		return "", false
 	},
 )
+
+// PerSeriesStartTimestamps is an experimental feature flag that determines if the SDK
+// uses the new Start Timestamps specification.
+//
+// To enable this feature set the OTEL_GO_X_PER_SERIES_START_TIMESTAMPS environment variable
+// to the case-insensitive string value of "true".
+var PerSeriesStartTimestamps = newFeature(
+	[]string{"PER_SERIES_START_TIMESTAMPS"},
+	func(v string) (bool, bool) {
+		if strings.EqualFold(v, "true") {
+			return true, true
+		}
+		return false, false
+	},
+)

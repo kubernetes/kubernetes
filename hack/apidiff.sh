@@ -16,7 +16,12 @@
 
 # This script analyzes API changes between specified revisions this repository.
 # It uses the apidiff tool to detect differences, reports incompatible changes, and optionally
-# builds downstream projects to assess the impact of those changes. 
+# builds downstream projects to assess the impact of those changes.
+#
+# Any directory with a CHANGELOG.md file must have incompatible changes documented
+# in that file, otherwise the script fails with an error. If there are only
+# compatible changes or all incompatible changes are documented, the script
+# returns success.
 
 usage () {
   cat <<EOF >&2
@@ -30,7 +35,14 @@ Usage: $0 [-r <revision>] [directory ...]"
                   staging repo. May be given more than once. Must be an
                   absolute path.
                   WARNING: this will modify the go.mod in that directory.
+   -u             Update changelog files if incompatible changes are found.
+   -m             When enabled, -t must be used and must be given a merge commit
+                  for a GitHub pull request. The diff is then calculated for
+                  the merged branch. When updating the changelog, populates
+                  the new changelog section with information about the pull request.
+                  -r is ignored.
    [directory]:   Check one or more specific directory instead of everything.
+
 EOF
   exit 1
 }
@@ -41,11 +53,14 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+cd "${KUBE_ROOT}"
 
 base=
 target=
 builds=()
-while getopts "r:t:b:" o; do
+update_changelog=false
+from_merge_commit=false
+while getopts "r:t:b:um" o; do
     case "${o}" in
         r)
             base="${OPTARG}"
@@ -71,12 +86,29 @@ while getopts "r:t:b:" o; do
             fi
             builds+=("${OPTARG}")
             ;;
+       u)
+            update_changelog=true
+            ;;
+       m)
+            from_merge_commit=true
+            ;;
         *)
             usage
             ;;
     esac
 done
 shift $((OPTIND - 1))
+
+if ${from_merge_commit}; then
+    # Populating the changelog from merge commits is not a common
+    # operation and thus skips detailed error handling.
+    #
+    # shellcheck disable=SC2207 # Here we intentionally split into words.
+    parents=( $(git show --no-patch --format=%P "$target") )
+    base=$(git merge-base "${parents[0]}" "${parents[1]}")
+    merge_commit=${target}
+    target=${parents[1]}
+fi
 
 # default from prow env if unset from args
 # https://docs.prow.k8s.io/docs/jobs/#job-environment-variables
@@ -144,120 +176,16 @@ echo "Checking $(if [ -n "${target}" ]; then describe "${target}"; else echo "cu
 kube::golang::setup_env
 kube::util::ensure-temp-dir
 
-# Install apidiff and make sure it's found.
+# Install tools and make sure they are found.
 export GOBIN="${KUBE_TEMP}"
 PATH="${GOBIN}:${PATH}"
 echo "Installing apidiff into ${GOBIN}."
 go install golang.org/x/exp/cmd/apidiff@latest
-
-cd "${KUBE_ROOT}"
-
-# output_name targets a target directory and prints the base name of
-# an output file for that target.
-output_name () {
-    what="$1"
-
-    echo "${what}" | sed -e 's/[^a-zA-Z0-9_-]/_/g' -e 's/$/.out/'
-}
-
-# run invokes apidiff once per target and stores the output
-# file(s) in the given directory.
-#
-# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
-run () {
-    out="$1"
-    mkdir -p "$out"
-    for d in "${targets[@]}"; do
-        if ! [ -d "${d}" ]; then
-            echo "module ${d} does not exist, skipping ..."
-            continue
-        fi
-        # cd to the path for modules that are intree but not part of the go workspace
-        # per example staging/src/k8s.io/code-generator/examples
-        (
-            cd "${d}"
-            apidiff -m -w "${out}/$(output_name "${d}")" .
-        ) &
-    done
-    wait
-}
-
-# inWorktree checks out a specific revision, then invokes the given
-# command there.
-#
-# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
-inWorktree () {
-    local worktree="$1"
-    shift
-    local rev="$1"
-    shift
-
-    # Create a copy of the repo with the specific revision checked out.
-    # Might already have been done before.
-    if ! [ -d "${worktree}" ]; then
-        git worktree add -f -d "${worktree}" "${rev}"
-        # Clean up the copy on exit.
-        kube::util::trap_add "git worktree remove -f ${worktree}" EXIT
-    fi
-
-    # Ready for apidiff.
-    (
-        cd "${worktree}"
-        "$@"
-    )
-}
-
-# inTarget runs the given command in the target revision of Kubernetes,
-# checking it out in a work tree if necessary.
-inTarget () {
-    if [ -z "${target}" ]; then
-        "$@"
-    else
-        inWorktree "${KUBE_TEMP}/target" "${target}" "$@"
-    fi
-}
-
-# Dump old and new api state.
-inTarget run "${KUBE_TEMP}/after"
-inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
-
-# Now produce a report. All changes get reported because exporting some API
-# unnecessarily might also be good to know, but the final exit code will only
-# be non-zero if there are incompatible changes.
-#
-# The report is Markdown-formatted and can be copied into a PR comment verbatim.
-failures=()
-echo
-compare () {
-    what="$1"
-    before="$2"
-    after="$3"
-    if [ ! -f "${before}" ] || [ ! -f "${after}" ]; then
-        echo "can not compare changes, module didn't exist before or after"
-        return
-    fi
-    changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
-    echo "## ${what}"
-    if [ -z "$changes" ]; then
-        echo "no changes"
-    else
-        echo "$changes"
-        echo
-    fi
-    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
-    if [ -n "$incompatible" ]; then
-        failures+=("${what}")
-    fi
-}
-
-for d in "${targets[@]}"; do
-    compare "${d}" "${KUBE_TEMP}/before/$(output_name "${d}")" "${KUBE_TEMP}/after/$(output_name "${d}")"
-done
+echo "Installing apidiff-changelog into ${GOBIN}."
+go install ./hack/apidiff-changelog
 
 # tryBuild checks whether some other project builds with the staging repos
 # of the current Kubernetes directory.
-#
-# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
 tryBuild () {
     local build="$1"
 
@@ -283,36 +211,37 @@ tryBuild () {
     )
 }
 
+# Build the flags for apidiff-changelog.
+apidiff_flags=(-base="${base}")
+if [ -n "${target}" ]; then
+    apidiff_flags+=(-target="${target}")
+fi
+if ${update_changelog}; then
+    apidiff_flags+=(-update-changelog)
+fi
+if ${from_merge_commit}; then
+    apidiff_flags+=(-merge-commit="${merge_commit}")
+fi
+
 res=0
-if [ ${#failures[@]} -gt 0 ]; then
+(set -x; apidiff-changelog "${apidiff_flags[@]}" "${targets[@]}") && apidiff_exit=0 || apidiff_exit=$?
+
+# Fail if apidiff-changelog failed, unless the exit code indicates that all
+# incompatible changes were documented.
+if [ ${apidiff_exit} -ne 0 ] && [ ${apidiff_exit} -ne 3 ]; then
     res=1
-    echo "Detected incompatible changes on modules:"
-    printf '%s\n' "${failures[@]}"
+fi
+
+# Were any incompatible changes detected?
+if [ "${apidiff_exit}" -gt 1 ] && [ ${#builds[@]} -gt 0 ]; then
     cat <<EOF
-
-Some notes about API differences:
-
-Changes in internal packages are usually okay.
-However, remember that custom schedulers
-and scheduler plugins depend on pkg/scheduler/framework.
-
-API changes in staging repos are more critical.
-Try to avoid them as much as possible.
-But sometimes changing an API is the lesser evil
-and/or the impact on downstream consumers is low.
-Use common sense and code searches.
-EOF
-
-    if [ ${#builds[@]} -gt 0 ]; then
-
-cat <<EOF
 
 To help with assessing the real-world impact of an
 API change, $0 will now try to build code in
 ${builds[@]}.
 EOF
 
-        if [[ "${builds[*]}" =~ controller-runtime ]]; then
+    if [[ "${builds[*]}" =~ controller-runtime ]]; then
 cat <<EOF
 
 controller-runtime is used because
@@ -329,22 +258,21 @@ explicitly states that a controller-runtime
 release cannot be expected to work with a newer
 release of the Kubernetes Go packages.
 EOF
-        fi
+    fi
 
-        for build in "${builds[@]}"; do
-            echo
-            echo "vvvvvvvvvvvvvvvv ${build} vvvvvvvvvvvvvvvvvv"
-            if inTarget tryBuild "${build}"; then
-                echo "${build} builds without errors."
-            else
-                cat <<EOF
+    for build in "${builds[@]}"; do
+        echo
+        echo "vvvvvvvvvvvvvvvv ${build} vvvvvvvvvvvvvvvvvv"
+        if tryBuild "${build}"; then
+            echo "${build} builds without errors."
+        else
+            cat <<EOF
 
 WARNING: Building ${build} failed. This may or may not be because of the API changes!
 EOF
-            fi
-            echo "^^^^^^^^^^^^^^^^ ${build} ^^^^^^^^^^^^^^^^^^"
-        done
-    fi
+        fi
+        echo "^^^^^^^^^^^^^^^^ ${build} ^^^^^^^^^^^^^^^^^^"
+    done
 fi
 
 exit "$res"

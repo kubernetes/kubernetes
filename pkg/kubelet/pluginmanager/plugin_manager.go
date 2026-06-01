@@ -119,7 +119,7 @@ func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesRea
 	logger.V(2).Info("The desired_state_of_world populator (plugin watcher) starts")
 
 	logger.Info("Starting Kubelet Plugin Manager")
-	go pm.reconciler.Run(stopCh)
+	go pm.reconciler.Run(ctx)
 
 	metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
 	<-stopCh

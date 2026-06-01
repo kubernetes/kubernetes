@@ -186,10 +186,10 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo)
 
 	wantInitCtrs, wantCtrs := separateContainers(wantInfo)
 	var errs []error
-	if err := verifyPodContainersStatusResources(gotPod.Status.InitContainerStatuses, wantInitCtrs); err != nil {
+	if err := VerifyPodContainersStatusResources(gotPod.Status.InitContainerStatuses, wantInitCtrs); err != nil {
 		errs = append(errs, err)
 	}
-	if err := verifyPodContainersStatusResources(gotPod.Status.ContainerStatuses, wantCtrs); err != nil {
+	if err := VerifyPodContainersStatusResources(gotPod.Status.ContainerStatuses, wantCtrs); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -208,7 +208,7 @@ func VerifyPodLevelStatusResources(gotPod *v1.Pod, wantPodResources *v1.Resource
 	return utilerrors.NewAggregate(errs)
 }
 
-func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wantCtrs []v1.Container) error {
+func VerifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wantCtrs []v1.Container) error {
 	ginkgo.GinkgoHelper()
 
 	var errs []error
@@ -295,7 +295,7 @@ func addResourceList(des, src v1.ResourceList) {
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod)
+	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 
 	var errs []error
 	for _, ci := range tcInfo {
@@ -375,13 +375,14 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 					return "resize is infeasible"
 				}, nil
 			}
-			// TODO: Replace this check with a combination of checking the status.observedGeneration
-			// and the resize status when available.
-			if resourceErrs := VerifyPodStatusResources(pod, expectedContainers); resourceErrs != nil {
+
+			if pod.Status.ObservedGeneration < pod.Generation {
 				return func() string {
-					return fmt.Sprintf("container status resources don't match expected: %v", formatErrors(resourceErrs))
+					return fmt.Sprintf("waiting for observedGeneration (%d) to catch up to generation (%d)",
+						pod.Status.ObservedGeneration, pod.Generation)
 				}, nil
 			}
+
 			// Wait for kubelet to clear the resize status conditions.
 			for _, c := range pod.Status.Conditions {
 				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
@@ -390,6 +391,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 					}, nil
 				}
 			}
+
 			// Wait for the pod to be ready.
 			if !podutils.IsPodReady(pod) {
 				return func() string { return "pod is not ready" }, nil

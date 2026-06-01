@@ -38,78 +38,127 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type MyType
-	scheme.AddValidationFunc((*MyType)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_MyType(ctx, op, nil /* fldPath */, obj.(*MyType), safe.Cast[*MyType](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*MyType)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_MyType(
+					ctx, op, nil, /* fldPath */
+					obj.(*MyType),
+					safe.Cast[*MyType](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_MyType validates an instance of MyType according
 // to declarative validation rules in the API schema.
-func Validate_MyType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyType) (errs field.ErrorList) {
+func Validate_MyType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *MyType) (errs field.ErrorList) {
+
 	// field MyType.TypeMeta has no validation
 
-	// field MyType.NameField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field MyType.NameField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("nameField"), &obj.NameField, safe.Field(oldObj, func(oldObj *MyType) *string { return &oldObj.NameField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *MyType) *string {
+				return &oldObj.NameField
+			})
+		errs = append(errs, fn(fldPath.Child("nameField"), &obj.NameField, oldVal, oldObj != nil)...)
+	}
 
-	// field MyType.NamePtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field MyType.NamePtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("namePtrField"), obj.NamePtrField, safe.Field(oldObj, func(oldObj *MyType) *string { return oldObj.NamePtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *MyType) *string {
+				return oldObj.NamePtrField
+			})
+		errs = append(errs, fn(fldPath.Child("namePtrField"), obj.NamePtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field MyType.NameTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *NameStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field MyType.NameTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *NameStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_NameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("nameTypedefField"), &obj.NameTypedefField, safe.Field(oldObj, func(oldObj *MyType) *NameStringType { return &oldObj.NameTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *MyType) *NameStringType {
+				return &oldObj.NameTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("nameTypedefField"), &obj.NameTypedefField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_NameStringType validates an instance of NameStringType according
 // to declarative validation rules in the API schema.
-func Validate_NameStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NameStringType) (errs field.ErrorList) {
-	errs = append(errs, validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj)...)
+func Validate_NameStringType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *NameStringType) (errs field.ErrorList) {
+
+	if e := validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }

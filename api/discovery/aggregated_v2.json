@@ -1733,7 +1733,7 @@
               ]
             }
           ],
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
@@ -2248,6 +2248,41 @@
                   "responseKind": {
                     "group": "",
                     "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourcepoolstatusrequests",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourcePoolStatusRequest",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourcepoolstatusrequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ResourcePoolStatusRequest",
                     "version": ""
                   },
                   "subresource": "status",

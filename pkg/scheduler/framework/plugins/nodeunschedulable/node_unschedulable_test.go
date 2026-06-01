@@ -235,13 +235,6 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 			expectedErr:  true,
 		},
 		{
-			name:         "skip-different-pod-update",
-			pod:          st.MakePod().UID("uid").Obj(),
-			newObj:       st.MakePod().UID("different-uid").Toleration(v1.TaintNodeUnschedulable).Obj(),
-			oldObj:       st.MakePod().UID("different-uid").Obj(),
-			expectedHint: fwk.QueueSkip,
-		},
-		{
 			name:         "queue-when-the-unsched-pod-gets-toleration",
 			pod:          st.MakePod().UID("uid").Obj(),
 			newObj:       st.MakePod().UID("uid").Toleration(v1.TaintNodeUnschedulable).Obj(),
@@ -261,7 +254,7 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			pl := &NodeUnschedulable{}
-			got, err := pl.isSchedulableAfterPodTolerationChange(logger, testCase.pod, testCase.oldObj, testCase.newObj)
+			got, err := pl.isSchedulableAfterTargetPodTolerationChange(logger, testCase.pod, testCase.oldObj, testCase.newObj)
 			if err != nil && !testCase.expectedErr {
 				t.Errorf("unexpected error: %v", err)
 			}

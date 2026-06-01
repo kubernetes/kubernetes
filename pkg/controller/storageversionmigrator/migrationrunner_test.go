@@ -17,7 +17,6 @@ limitations under the License.
 package storageversionmigrator
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -34,6 +33,7 @@ import (
 	svminformers "k8s.io/client-go/informers"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -348,7 +348,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			_, ctx := ktesting.NewTestContext(t)
 			var initialSVMs []runtime.Object
 			for _, svm := range tc.svms {
 				initialSVMs = append(initialSVMs, svm)
@@ -384,6 +384,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 				svmInformer,
 				crdClientSet.ApiextensionsV1().CustomResourceDefinitions(),
 			)
+			defer controller.queue.ShutDown()
 
 			resource := metav1.GroupResource{Group: "example.com", Resource: "widgets"}
 			if len(tc.svms) > 0 {

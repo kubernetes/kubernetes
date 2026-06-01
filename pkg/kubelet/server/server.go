@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -82,6 +83,7 @@ import (
 	remotecommandserver "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -90,6 +92,8 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
+	kubeletcadvisor "k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
@@ -264,6 +268,32 @@ func ListenAndServePodResources(ctx context.Context, endpoint string, providers 
 	}
 }
 
+// ListenAndServePodsServer initializes an HTTP server to serve the Pod API.
+func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1alpha1.PodsServer) {
+	logger := klog.FromContext(ctx)
+	server := grpc.NewServer(apisgrpc.WithRateLimiter(ctx, "pods", pods.DefaultQPS, pods.DefaultBurstTokens))
+
+	podsv1alpha1.RegisterPodsServer(server, srv)
+
+	l, err := util.CreateListener(endpoint)
+	if err != nil {
+		logger.Error(err, "Failed to create listener for pods API endpoint")
+		os.Exit(1)
+	}
+
+	logger.Info("Starting to serve the pods API", "endpoint", endpoint)
+	go func() {
+		if err := server.Serve(l); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			logger.Error(err, "Failed to serve")
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info("Shutting down pods API server")
+	server.GracefulStop()
+}
+
 type NodeRequestAttributesGetter interface {
 	GetRequestAttributes(ctx context.Context, u user.Info, r *http.Request) []authorizer.Attributes
 }
@@ -272,7 +302,7 @@ type NodeRequestAttributesGetter interface {
 type AuthInterface interface {
 	authenticator.Request
 	NodeRequestAttributesGetter
-	authorizer.Authorizer
+	authorizer.UnconditionalAuthorizer
 	dynamiccertificates.CAContentProvider
 }
 
@@ -452,6 +482,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path(podsPath).
 		Produces(restful.MIME_JSON)
@@ -484,7 +515,9 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		if kubeletcadvisor.IsPsiEnabled(logger) {
+			includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+		}
 	}
 
 	// cAdvisor metrics are exposed under the secured handler as well
@@ -604,6 +637,7 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("containerLogs")
 	ws = new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path("/containerLogs")
 	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
@@ -617,6 +651,7 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path(runningPodsPath).
 		Produces(restful.MIME_JSON)
@@ -667,6 +702,7 @@ func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool, enableSyst
 	s.addMetricsBucketMatcher("logs")
 	if enableSystemLogHandler {
 		ws := new(restful.WebService)
+		ws.Filter(GETOnlyRestfulFilter())
 		ws.Path(logsPath)
 		ws.Route(ws.GET("").
 			To(s.getLogs).
@@ -738,6 +774,7 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 
 	// Setup pprof handlers.
 	ws := new(restful.WebService).Path(pprofBasePath)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.Route(ws.GET("/{subpath:*}").To(handlePprofEndpoint)).Doc("pprof endpoint")
 	s.restfulCont.Add(ws)
 
@@ -901,6 +938,32 @@ func (s *Server) getLogs(request *restful.Request, response *restful.Response) {
 	s.host.ServeLogs(response, request.Request)
 }
 
+// GETOnlyRestfulFilter allows only GET. Use on WebServices that register read-only
+// kubelet APIs.
+func GETOnlyRestfulFilter() restful.FilterFunction {
+	return AllowedMethodsRestfulFilter(http.MethodGet)
+}
+
+// AllowedMethodsRestfulFilter returns a restful.FilterFunction that rejects requests
+// whose HTTP method is not listed in allowed. It responds with 405 Method Not Allowed
+// and an Allow header listing the permitted methods (RFC 9110).
+func AllowedMethodsRestfulFilter(allowed ...string) restful.FilterFunction {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, m := range allowed {
+		allowedSet[m] = struct{}{}
+	}
+	allowHeader := strings.Join(allowed, ", ")
+
+	return func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+		if _, ok := allowedSet[req.Request.Method]; ok {
+			chain.ProcessFilter(req, resp)
+			return
+		}
+		resp.Header().Set("Allow", allowHeader)
+		_ = resp.WriteErrorString(http.StatusMethodNotAllowed, "Method Not Allowed")
+	}
+}
+
 type execRequestParams struct {
 	podNamespace  string
 	podName       string
@@ -936,9 +999,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+	logger := klog.FromContext(req.Context())
 	logger.Error(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }

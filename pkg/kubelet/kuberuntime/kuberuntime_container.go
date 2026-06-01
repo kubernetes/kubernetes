@@ -34,6 +34,7 @@ import (
 	"time"
 
 	codes "google.golang.org/grpc/codes"
+
 	crierror "k8s.io/cri-api/pkg/errors"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -398,7 +399,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		e := opts.Envs[idx]
 		envs[idx] = &runtimeapi.KeyValue{
 			Key:   e.Name,
-			Value: e.Value,
+			Value: []byte(e.Value),
 		}
 	}
 	config.Envs = envs
@@ -723,9 +724,9 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 		signal := status.GetStopSignal().String()
-		// Here Signal_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
+		// Here Signal_SIGNAL_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
 		// This happens only when the container runtime version doesn't support StopSignal yet
-		if signal != "" && signal != "RUNTIME_DEFAULT" {
+		if signal != "" && signal != runtimeapi.Signal_SIGNAL_RUNTIME_DEFAULT.String() {
 			cStatusStopSignal = runtimeSignalToString(status.GetStopSignal())
 		}
 	}
@@ -1139,6 +1140,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
+					// computePodResizeAction updates 'changes' if resize policy requires restarting this container
+					_ = m.computePodResizeAction(ctx, pod, i, true, status, changes)
+				}
 				break
 			} else { // If container is restartable
 				if container.StartupProbe != nil {

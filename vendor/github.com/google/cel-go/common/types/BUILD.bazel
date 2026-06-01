@@ -40,7 +40,6 @@ go_library(
         "//common/types/pb:go_default_library",
         "//common/types/ref:go_default_library",
         "//common/types/traits:go_default_library",
-        "@com_github_stoewer_go_strcase//:go_default_library",
         "@dev_cel_expr//:expr",
         "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
         "@org_golang_google_protobuf//encoding/protojson:go_default_library",

@@ -19,11 +19,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv/v1.39.0"
-	"go.opentelemetry.io/otel/semconv/v1.39.0/httpconv"
+	"go.opentelemetry.io/otel/semconv/v1.40.0"
+	"go.opentelemetry.io/otel/semconv/v1.40.0/httpconv"
 )
 
-type HTTPClient struct{
+type HTTPClient struct {
 	requestBodySize httpconv.ClientRequestBodySize
 	requestDuration httpconv.ClientRequestDuration
 }
@@ -57,14 +57,14 @@ func (n HTTPClient) Status(code int) (codes.Code, string) {
 // RequestTraceAttrs returns trace attributes for an HTTP request made by a client.
 func (n HTTPClient) RequestTraceAttrs(req *http.Request) []attribute.KeyValue {
 	/*
-		 below attributes are returned:
-		 - http.request.method
-		 - http.request.method.original
-		 - url.full
-		 - server.address
-		 - server.port
-		 - network.protocol.name
-		 - network.protocol.version
+	 below attributes are returned:
+	 - http.request.method
+	 - http.request.method.original
+	 - url.full
+	 - server.address
+	 - server.port
+	 - network.protocol.name
+	 - network.protocol.version
 	*/
 	numOfAttributes := 3 // URL, server address, proto, and method.
 
@@ -139,9 +139,9 @@ func (n HTTPClient) RequestTraceAttrs(req *http.Request) []attribute.KeyValue {
 // ResponseTraceAttrs returns trace attributes for an HTTP response made by a client.
 func (n HTTPClient) ResponseTraceAttrs(resp *http.Response) []attribute.KeyValue {
 	/*
-		 below attributes are returned:
-		 - http.response.status_code
-		 - error.type
+	 below attributes are returned:
+	 - http.response.status_code
+	 - error.type
 	*/
 	var count int
 	if resp.StatusCode > 0 {
@@ -247,22 +247,26 @@ func (o MetricOpts) AddOptions() metric.AddOption {
 	return o.addOptions
 }
 
-func (n HTTPClient) MetricOptions(ma MetricAttributes) map[string]MetricOpts {
-	opts := map[string]MetricOpts{}
-
+func (n HTTPClient) MetricOptions(ma MetricAttributes) MetricOpts {
 	attributes := n.MetricAttributes(ma.Req, ma.StatusCode, ma.AdditionalAttributes)
 	set := metric.WithAttributeSet(attribute.NewSet(attributes...))
-	opts["new"] = MetricOpts{
+
+	return MetricOpts{
 		measurement: set,
 		addOptions:  set,
 	}
-
-	return opts
 }
 
-func (n HTTPClient) RecordMetrics(ctx context.Context, md MetricData, opts map[string]MetricOpts) {
-	n.requestBodySize.Inst().Record(ctx, md.RequestSize, opts["new"].MeasurementOption())
-	n.requestDuration.Inst().Record(ctx, md.ElapsedTime/1000, opts["new"].MeasurementOption())
+func (n HTTPClient) RecordMetrics(ctx context.Context, md MetricData, opts MetricOpts) {
+	recordOpts := metricRecordOptionPool.Get().(*[]metric.RecordOption)
+	defer func() {
+		*recordOpts = (*recordOpts)[:0]
+		metricRecordOptionPool.Put(recordOpts)
+	}()
+	*recordOpts = append(*recordOpts, opts.MeasurementOption())
+
+	n.requestBodySize.Inst().Record(ctx, md.RequestSize, *recordOpts...)
+	n.requestDuration.Inst().Record(ctx, durationToSeconds(md.RequestDuration), *recordOpts...)
 }
 
 // TraceAttributes returns attributes for httptrace.

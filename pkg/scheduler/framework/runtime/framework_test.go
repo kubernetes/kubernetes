@@ -28,19 +28,24 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
@@ -63,6 +68,7 @@ const (
 	bindPlugin                        = "bind-plugin"
 	testCloseErrorPlugin              = "test-close-error-plugin"
 	placementGeneratePlugin           = "placement-generate-plugin"
+	defaultPreemptionPlugin           = names.DefaultPreemption
 
 	testProfileName              = "test-profile"
 	testPercentageOfNodesToScore = 35
@@ -206,7 +212,7 @@ func (pl *TestPlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestPlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
+func (pl *TestPlugin) Less(fwk.QueuedEntityInfo, fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -220,6 +226,10 @@ func (pl *TestPlugin) ScoreExtensions() fwk.ScoreExtensions {
 
 func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return pl.inj.PreFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PreFilterStatus), injectReason)
+}
+
+func (pl *TestPlugin) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PlacementFeasibleStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
@@ -268,12 +278,16 @@ func (pl *TestPlugin) GeneratePlacements(ctx context.Context, state fwk.PodGroup
 	return &fwk.GeneratePlacementsResult{Placements: pl.inj.GeneratePlacementsResult}, fwk.NewStatus(fwk.Code(pl.inj.GeneratePlacementsStatus), injectReason)
 }
 
-func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return 0, fwk.NewStatus(fwk.Code(pl.inj.PlacementScoreStatus), injectReason)
 }
 
 func (pl *TestPlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 	return nil
+}
+
+func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
 }
 
 func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
@@ -403,7 +417,7 @@ func (pl *TestQueueSortPlugin) Name() string {
 	return queueSortPlugin
 }
 
-func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedPodInfo) bool {
+func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -461,6 +475,7 @@ var registry = func() Registry {
 	r.Register(testCloseErrorPlugin, newTestCloseErrorPlugin)
 	r.Register(placementGeneratePlugin, newTestPlacementGeneratePlugin)
 	r.Register(placementScorePlugin1, newPlacementScorePluginFactory(placementScorePlugin1))
+	r.Register(defaultPreemptionPlugin, newTestPlugin)
 	return r
 }()
 
@@ -646,6 +661,237 @@ func TestNewFrameworkErrors(t *testing.T) {
 			_, err := NewFramework(ctx, registry, profile)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestPodGroupPostFilterPlugins(t *testing.T) {
+	tests := []struct {
+		name                   string
+		plugins                *config.Plugins
+		featureGate            bool
+		wantPodGroupPostFilter bool
+	}{
+		{
+			name: "should fill pod group post filter with feature gate and default preemption",
+			plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+					},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+					},
+				},
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: defaultPreemptionPlugin},
+					},
+				},
+			},
+			featureGate:            true,
+			wantPodGroupPostFilter: true,
+		},
+		{
+			name: "should not fill pod group post filter when feature gate is disabled",
+			plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+					},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+					},
+				},
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: defaultPreemptionPlugin},
+					},
+				},
+			},
+			featureGate:            false,
+			wantPodGroupPostFilter: false,
+		},
+		{
+			name: "should not fill pod group post filter when post filter plugin is not default preemption",
+			plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: queueSortPlugin},
+					},
+				},
+				Bind: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: bindPlugin},
+					},
+				},
+				PostFilter: config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: testPlugin},
+					},
+				},
+			},
+			featureGate:            false,
+			wantPodGroupPostFilter: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.featureGate {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:         true,
+					features.GangScheduling:          true,
+					features.WorkloadAwarePreemption: true,
+				})
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			profile := &config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: queueSortPlugin},
+						},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: bindPlugin},
+						},
+					},
+					PostFilter: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: defaultPreemptionPlugin},
+						},
+					},
+				},
+			}
+			f, _ := NewFramework(ctx, registry, profile)
+
+			if tc.wantPodGroupPostFilter && len(f.PodGroupPostFilterPlugins()) != 1 {
+				t.Errorf("Expected 1 pod group post filter plugin, got %d", len(f.PodGroupPostFilterPlugins()))
+			}
+			if !tc.wantPodGroupPostFilter && len(f.PodGroupPostFilterPlugins()) != 0 {
+				t.Errorf("Expected 0 pod group post filter plugin, got %d", len(f.PodGroupPostFilterPlugins()))
+			}
+		})
+	}
+
+}
+
+type mockPlacementFeasiblePlugin struct {
+	name   string
+	status *fwk.Status
+	called bool
+}
+
+func (p *mockPlacementFeasiblePlugin) Name() string { return p.name }
+
+func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	p.called = true
+	return p.status
+}
+
+func TestRunPlacementFeasiblePlugins(t *testing.T) {
+	tests := []struct {
+		name           string
+		plugins        []*mockPlacementFeasiblePlugin
+		expectedStatus *fwk.Status
+		expectedCalled []bool
+	}{
+		{
+			name: "All plugins succeed",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: nil},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: nil,
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Unschedulable, continues",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns UnschedulableAndUnresolvable, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "First plugin returns Unschedulable, second returns UnschedulableAndUnresolvable, returns unresolvable",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+				{name: "p2", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Unschedulable, second returns Unschedulable, returns last unschedulable",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable1")},
+				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable2")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable2").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "Plugin returns Error, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Error, "error")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.AsStatus(fmt.Errorf("running PlacementFeasible plugin: %w", errors.New("error"))).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "Plugin returns unexpected status, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Skip, "error")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: Skip")).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			f := &frameworkImpl{
+				placementFeasiblePlugins: make([]framework.PlacementFeasiblePlugin, len(tc.plugins)),
+			}
+			for i, p := range tc.plugins {
+				f.placementFeasiblePlugins[i] = p
+			}
+
+			status := f.RunPlacementFeasiblePlugins(ctx, framework.NewCycleState(), nil)
+
+			if diff := cmp.Diff(tc.expectedStatus, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			}
+
+			for i, p := range tc.plugins {
+				if p.called != tc.expectedCalled[i] {
+					t.Errorf("Expected plugin %s called=%v, got %v", p.name, tc.expectedCalled[i], p.called)
+				}
 			}
 		})
 	}
@@ -2271,9 +2517,10 @@ func TestFilterPlugins(t *testing.T) {
 
 func TestPostFilterPlugins(t *testing.T) {
 	tests := []struct {
-		name       string
-		plugins    []*TestPlugin
-		wantStatus *fwk.Status
+		name        string
+		skipPlugins bool
+		plugins     []*TestPlugin
+		wantStatus  *fwk.Status
 	}{
 		{
 			name: "a single plugin makes a Pod schedulable",
@@ -2284,6 +2531,21 @@ func TestPostFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: fwk.NewStatus(fwk.Success, injectReason),
+		},
+		{
+			name:        "skips all post filters if state has SkipPostFilterPlugins",
+			skipPlugins: true,
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PostFilterStatus: int(fwk.Unschedulable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PostFilterStatus: int(fwk.Success)},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "All PostFilter plugins are skipped"),
 		},
 		{
 			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod schedulable",
@@ -2387,6 +2649,8 @@ func TestPostFilterPlugins(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
+			state := framework.NewCycleState()
+			state.SetSkipAllPostFilterPlugins(tt.skipPlugins)
 			_, gotStatus := f.RunPostFilterPlugins(ctx, state, pod, nil)
 
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
@@ -3402,9 +3666,17 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			wantExtensionPoint: "PlacementScore",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name: "PlacementFeasible - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil)
+			},
+			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Success,
 		},
 
@@ -3478,10 +3750,19 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			inject:             injectedResult{PlacementScoreStatus: int(fwk.Error)},
 			wantExtensionPoint: "PlacementScore",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name: "PlacementFeasible - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil)
+			},
+			inject:             injectedResult{PlacementFeasibleStatus: int(fwk.Error)},
+			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Error,
 		},
 	}
@@ -3532,6 +3813,10 @@ func TestRecordingMetrics(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
+
+			if tt.wantExtensionPoint == "PlacementFeasible" {
+				f.(*frameworkImpl).placementFeasiblePlugins = []framework.PlacementFeasiblePlugin{plugin}
+			}
 
 			tt.action(ctx, f)
 
@@ -3924,6 +4209,7 @@ type injectedResult struct {
 	GeneratePlacementsResult []*fwk.Placement     `json:"generatePlacementsResult,omitempty"`
 	GeneratePlacementsStatus int                  `json:"generatePlacementsStatus,omitempty"`
 	PlacementScoreStatus     int                  `json:"placementScoreStatus,omitempty"`
+	PlacementFeasibleStatus  int                  `json:"placementFeasibleStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *fwk.Status) {
@@ -4154,7 +4440,7 @@ func (pl *testPlacementScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	r := pl.results[placement.Placement]
 	return r.score, r.status
 }
@@ -4396,11 +4682,13 @@ func TestRunPlacementScorePlugins(t *testing.T) {
 				t.Fatalf("Unexpected error during calling NewFramework, got %v", err)
 			}
 			assumedPlacements := make([]*fwk.PodGroupAssignments, len(placements))
+			placementStates := make([]fwk.PlacementCycleState, len(placements))
 			for i := range placements {
 				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i]}
+				placementStates[i] = framework.NewCycleState()
 			}
 
-			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements)
+			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements, placementStates)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("got status code %s, want %s", status.Code(), tt.wantStatusCode)
 			}
@@ -4408,5 +4696,121 @@ func TestRunPlacementScorePlugins(t *testing.T) {
 				t.Errorf("Unexpected placement score (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPluginEvaluationTotalMetric(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	metrics.PluginEvaluationTotal.Reset()
+
+	registry := Registry{}
+
+	const (
+		preFilterPluginName = "plugin-eval-prefilter"
+		filterPluginNameA   = "plugin-eval-filter-a"
+		filterPluginNameB   = "plugin-eval-filter-b"
+		preScorePluginName  = "plugin-eval-prescore"
+		scorePluginName     = "plugin-eval-score"
+		profileName2        = "test-profile-2"
+	)
+
+	preFilterPl := &TestPlugin{name: preFilterPluginName, inj: injectedResult{PreFilterStatus: int(fwk.Success)}}
+	if err := registry.Register(preFilterPluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return preFilterPl, nil
+	}); err != nil {
+		t.Fatalf("failed to register prefilter plugin %q: %v", preFilterPluginName, err)
+	}
+
+	filterPlA := &TestPlugin{name: filterPluginNameA, inj: injectedResult{FilterStatus: int(fwk.Success)}}
+	if err := registry.Register(filterPluginNameA, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return filterPlA, nil
+	}); err != nil {
+		t.Fatalf("failed to register filter plugin %q: %v", filterPluginNameA, err)
+	}
+
+	filterPlB := &TestPlugin{name: filterPluginNameB, inj: injectedResult{FilterStatus: int(fwk.Success)}}
+	if err := registry.Register(filterPluginNameB, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return filterPlB, nil
+	}); err != nil {
+		t.Fatalf("failed to register filter plugin %q: %v", filterPluginNameB, err)
+	}
+
+	preScorePl := &TestPlugin{name: preScorePluginName, inj: injectedResult{PreScoreStatus: int(fwk.Success)}}
+	if err := registry.Register(preScorePluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return preScorePl, nil
+	}); err != nil {
+		t.Fatalf("failed to register prescore plugin %q: %v", preScorePluginName, err)
+	}
+
+	scorePl := &TestPlugin{name: scorePluginName, inj: injectedResult{}}
+	if err := registry.Register(scorePluginName, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return scorePl, nil
+	}); err != nil {
+		t.Fatalf("failed to register score plugin %q: %v", scorePluginName, err)
+	}
+
+	// Profile 1: exercise PreFilter, Filter, PreScore and Score extension points.
+	cfgPls1 := &config.Plugins{}
+	cfgPls1.PreFilter.Enabled = append(cfgPls1.PreFilter.Enabled, config.Plugin{Name: preFilterPluginName})
+	cfgPls1.Filter.Enabled = append(cfgPls1.Filter.Enabled, config.Plugin{Name: filterPluginNameA})
+	cfgPls1.PreScore.Enabled = append(cfgPls1.PreScore.Enabled, config.Plugin{Name: preScorePluginName})
+	cfgPls1.Score.Enabled = append(cfgPls1.Score.Enabled, config.Plugin{Name: scorePluginName})
+	profile1 := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins:       cfgPls1,
+	}
+
+	f1, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile1, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework (profile=%q): %v", testProfileName, err)
+	}
+	defer func() { _ = f1.Close() }()
+
+	state1 := framework.NewCycleState()
+	if _, st, _ := f1.RunPreFilterPlugins(ctx, state1, pod); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunPreFilterPlugins returned unexpected status: %v", st)
+	}
+	if st := f1.RunFilterPlugins(ctx, state1, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunFilterPlugins returned unexpected status: %v", st)
+	}
+	if st := f1.RunPreScorePlugins(ctx, state1, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunPreScorePlugins returned unexpected status: %v", st)
+	}
+	if _, st := f1.RunScorePlugins(ctx, state1, pod, BuildNodeInfos(nodes)); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunScorePlugins returned unexpected status: %v", st)
+	}
+
+	// Profile 2: exercise a different plugin and profile label on Filter.
+	cfgPls2 := &config.Plugins{}
+	cfgPls2.Filter.Enabled = append(cfgPls2.Filter.Enabled, config.Plugin{Name: filterPluginNameB})
+	profile2 := config.KubeSchedulerProfile{
+		SchedulerName: profileName2,
+		Plugins:       cfgPls2,
+	}
+
+	f2, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile2, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework (profile=%q): %v", profileName2, err)
+	}
+	defer func() { _ = f2.Close() }()
+
+	state2 := framework.NewCycleState()
+	if st := f2.RunFilterPlugins(ctx, state2, pod, nil); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunFilterPlugins returned unexpected status: %v", st)
+	}
+
+	want := `# HELP scheduler_plugin_evaluation_total Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).
+# TYPE scheduler_plugin_evaluation_total counter
+scheduler_plugin_evaluation_total{extension_point="Filter",plugin="plugin-eval-filter-a",profile="test-profile"} 1
+scheduler_plugin_evaluation_total{extension_point="Filter",plugin="plugin-eval-filter-b",profile="test-profile-2"} 1
+scheduler_plugin_evaluation_total{extension_point="PreFilter",plugin="plugin-eval-prefilter",profile="test-profile"} 1
+scheduler_plugin_evaluation_total{extension_point="PreScore",plugin="plugin-eval-prescore",profile="test-profile"} 1
+scheduler_plugin_evaluation_total{extension_point="Score",plugin="plugin-eval-score",profile="test-profile"} 1
+`
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(want), metrics.PluginEvaluationTotal.Name); err != nil {
+		t.Fatalf("unexpected plugin_evaluation_total metric output:\n%v", err)
 	}
 }

@@ -1,6 +1,15 @@
 {
   "spec": {
-    "pinnedModules": {},
+    "pinnedModules": {
+      "github.com/google/cel-go": {
+        "version": "v0.27.0",
+        "reason": "pin to v0.27.0 to fix context cancellation test failures, see #138334"
+      },
+      "github.com/fsnotify/fsnotify": {
+        "version": "v1.9.0",
+        "reason": "pin to v1.9.0 until we figure out what the future of fsnotify library is, see #138812"
+      }
+    },
     "unwantedModules": {
       "cloud.google.com/go": "cloud dependency",
       "cloud.google.com/go/bigquery": "cloud dependency",
@@ -15,6 +24,7 @@
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
+      "github.com/envoyproxy/protoc-gen-validate": "unmaintained, archive mode, refer to #139389",
       "github.com/evanphx/json-patch/v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "github.com/flynn/go-shlex": "unmaintained, archive mode",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
@@ -96,8 +106,6 @@
       "github.com/davecgh/go-spew": [
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
@@ -105,7 +113,6 @@
         "github.com/json-iterator/go",
         "github.com/prometheus/common",
         "github.com/sirupsen/logrus",
-        "github.com/stretchr/objx",
         "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
@@ -133,6 +140,9 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+      "github.com/envoyproxy/protoc-gen-validate": [
+        "google.golang.org/grpc"
+      ],
       "github.com/flynn/go-shlex": [
         "github.com/coredns/caddy"
       ],
@@ -153,7 +163,6 @@
       ],
       "github.com/golang/protobuf": [
         "github.com/container-storage-interface/spec",
-        "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",
@@ -172,7 +181,6 @@
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/klauspost/compress": [
@@ -181,9 +189,6 @@
         "go.etcd.io/etcd/server/v3"
       ],
       "github.com/mailru/easyjson": [
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
@@ -191,13 +196,11 @@
       "github.com/modern-go/concurrent": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/planetscale/vtprotobuf": [
@@ -213,16 +216,11 @@
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
-        "github.com/go-openapi/jsonpointer",
-        "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
-        "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/prometheus/common",
-        "github.com/spf13/cobra",
-        "github.com/stretchr/objx",
         "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
@@ -256,7 +254,6 @@
       "github.com/golang/protobuf",
       "github.com/google/btree",
       "github.com/json-iterator/go",
-      "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
       "github.com/modern-go/reflect2",
       "golang.org/x/exp",

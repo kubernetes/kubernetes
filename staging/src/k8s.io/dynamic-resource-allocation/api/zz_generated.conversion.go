@@ -164,6 +164,7 @@ func autoConvert_api_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.AllowMultipleAllocations = (*bool)(unsafe.Pointer(in.AllowMultipleAllocations))
+	out.NodeAllocatableResourceMappings = *(*map[corev1.ResourceName]v1.NodeAllocatableResourceMapping)(unsafe.Pointer(&in.NodeAllocatableResourceMappings))
 	return nil
 }
 
@@ -199,6 +200,7 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.AllowMultipleAllocations = (*bool)(unsafe.Pointer(in.AllowMultipleAllocations))
+	out.NodeAllocatableResourceMappings = *(*map[corev1.ResourceName]v1.NodeAllocatableResourceMapping)(unsafe.Pointer(&in.NodeAllocatableResourceMappings))
 	return nil
 }
 

@@ -16,6 +16,7 @@ package interpreter
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/types"
@@ -207,10 +208,19 @@ func (fac *partialAttributeFactory) AbsoluteAttribute(id int64, names ...string)
 // 'maybe' NamespacedAttribute values are produced using the partialAttributeFactory rather than
 // the base AttributeFactory implementation.
 func (fac *partialAttributeFactory) MaybeAttribute(id int64, name string) Attribute {
+	var names []string
+	// When there's a single name with a dot prefix, it indicates that the 'maybe' attribute is a
+	// globally namespaced identifier.
+	if strings.HasPrefix(name, ".") {
+		names = append(names, name)
+	} else {
+		// In all other cases, the candidate names should be inferred.
+		names = fac.container.ResolveCandidateNames(name)
+	}
 	return &maybeAttribute{
 		id: id,
 		attrs: []NamespacedAttribute{
-			fac.AbsoluteAttribute(id, fac.container.ResolveCandidateNames(name)...),
+			fac.AbsoluteAttribute(id, names...),
 		},
 		adapter:  fac.adapter,
 		provider: fac.provider,

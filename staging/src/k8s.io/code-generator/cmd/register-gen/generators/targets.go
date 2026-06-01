@@ -26,7 +26,7 @@ import (
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/code-generator/cmd/register-gen/args"
-	genutil "k8s.io/code-generator/pkg/util"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -51,9 +51,17 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	targets := []generator.Target{}
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
+	targetList := []generator.Target{}
 	for _, input := range context.Inputs {
 		pkg := context.Universe.Package(input)
+		if !isRegisterGenTarget(pkg, idOpts) {
+			continue
+		}
 		internal, err := isInternal(pkg)
 		if err != nil {
 			klog.V(5).Infof("skipping the generation of %s file, due to err %v", args.OutputFile, err)
@@ -84,15 +92,13 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 			// if there is a comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io",
 			// extract the fully qualified API group name from it and overwrite the group inferred from the package path
-			override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, pkg.Comments)
+			override, ok, err := apidefinitions.GroupNameForPackage(pkg.Comments)
 			if err != nil {
-				klog.Errorf("error extracting groupName tags: %v", err)
-				continue
+				klog.Fatalf("error resolving group name: %v", err)
 			}
-			if override["groupName"] != nil {
-				groupName := override["groupName"][0]
-				klog.V(5).Infof("overriding the group name with = %s", groupName)
-				gv.Group = clientgentypes.Group(groupName)
+			if ok {
+				klog.V(5).Infof("overriding the group name with = %s", override)
+				gv.Group = clientgentypes.Group(override)
 			}
 		}
 
@@ -106,7 +112,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			}
 		}
 
-		targets = append(targets,
+		targetList = append(targetList,
 			&generator.SimpleTarget{
 				PkgName:       pkg.Name,
 				PkgPath:       pkg.Path, // output to same pkg as input
@@ -128,7 +134,18 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			})
 	}
 
-	return targets
+	return targetList
+}
+
+// isRegisterGenTarget reports whether pkg has opted in to register-gen.
+// Activation rules are encoded in apidefinitions.Register's Spec
+// (Boolean ActivationTag with a +groupName= fallback).
+func isRegisterGenTarget(pkg *types.Package, idOpts []apidefinitions.Option) bool {
+	info, err := apidefinitions.Identify(pkg, apidefinitions.Register, idOpts...)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	return info.ShouldGenerate()
 }
 
 // isInternal determines whether the given package

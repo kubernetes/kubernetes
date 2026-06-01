@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -54,6 +53,7 @@ import (
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -86,6 +86,7 @@ const (
 	// state files
 	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
+	usernsStateFiles       = "/var/lib/kubelet/pods/*/userns"
 )
 
 var (
@@ -180,10 +181,22 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	})
 }
 
+func addBeforeEachForCleaningUpPods(f *framework.Framework) {
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		ginkgo.By("Deleting any Pods created by previous test(s) in all namespaces")
+		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, p := range l.Items {
+			framework.Logf("Deleting pod: %s in %s", p.Name, p.Namespace)
+			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		}
+	})
+}
+
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
+		return e2enode.HealthCheck(kubeletHealthCheckURL)
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	// Wait for the Kubelet to be ready.
@@ -284,7 +297,8 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider())
+	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
+	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -294,7 +308,7 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider())
+	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -419,7 +433,7 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 
 	// wait until the kubelet health check fail
 	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
+		return e2enode.HealthCheck(kubeletHealthCheckURL)
 	}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
 
 	return func(ctx context.Context) {
@@ -428,27 +442,6 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 		waitForKubeletToStart(ctx, f)
 	}
-}
-
-func kubeletHealthCheck(url string) bool {
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	insecureHTTPClient := &http.Client{
-		Transport: insecureTransport,
-	}
-
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
-	resp, err := insecureHTTPClient.Do(req)
-	if err != nil {
-		klog.Warningf("Health check on %q failed, error=%v", url, err)
-	} else if resp.StatusCode != http.StatusOK {
-		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
-	}
-	return err == nil && resp.StatusCode == http.StatusOK
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {

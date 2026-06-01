@@ -106,7 +106,7 @@ func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
 	}
 }
 
-func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.String, error) {
+func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.Set[string], error) {
 	if key == nil {
 		return nil, nil
 	}
@@ -130,13 +130,13 @@ func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjecti
 }
 
 // getServicesForPod returns a set of services matching the given pod's namespace and labels (via service selector).
-func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.String, error) {
+func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.Set[string], error) {
 	services, err := serviceLister.Services(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	set := sets.String{}
+	set := sets.Set[string]{}
 	for _, service := range services {
 		if service.Spec.Selector == nil {
 			// If the service has a nil selector this means selectors match nothing, not everything.
@@ -269,7 +269,7 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 		pod1.Spec.Subdomain == pod2.Spec.Subdomain
 }
 
-func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
+func determineNeededServiceUpdates(oldServices, services sets.Set[string], podChanged bool) sets.Set[string] {
 	if podChanged {
 		// if the labels and pod changed, all services need to be updated
 		services = services.Union(oldServices)

@@ -23,6 +23,7 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 
 import (
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -558,7 +559,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			}
 			err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
-			if !contains(test.endpointKeys, test.ip) {
+			if !slices.Contains(test.endpointKeys, test.ip) {
 				if !storage.IsNotFound(err) {
 					t.Errorf("expected error StorageError: key not found, Code: 1, Key: /registry/base/key/%s got:  %v", test.ip, err)
 				}
@@ -583,15 +584,6 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
-			return true
-		}
-	}
-	return false
 }
 
 func TestApiserverShutdown(t *testing.T) {

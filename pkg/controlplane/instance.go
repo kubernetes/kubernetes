@@ -54,7 +54,7 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
-	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -346,6 +346,11 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
+
+	if err := c.Extra.EndpointReconcilerConfig.Reconciler.ValidateIP(c.ControlPlane.Generic.PublicAddress); err != nil {
+		return nil, fmt.Errorf("cannot use public IP %s with endpoint reconciler: %w", c.ControlPlane.Generic.PublicAddress.String(), err)
+	}
+
 	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
 		PublicIP: c.ControlPlane.Generic.PublicAddress,
 
@@ -432,7 +437,10 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
 		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
-		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()},
+		resourcerest.RESTStorageProvider{
+			NamespaceClient: client.CoreV1().Namespaces(),
+			Authorizer:      c.ControlPlane.Generic.Authorization.Authorizer,
+		},
 	}
 
 	if AdditionalStorageProvidersForTests != nil {
@@ -501,7 +509,7 @@ var (
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		resourcev1alpha3.SchemeGroupVersion,
-		schedulingapiv1alpha2.SchemeGroupVersion,
+		schedulingapiv1alpha3.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 	}
 )

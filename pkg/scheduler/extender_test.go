@@ -332,7 +332,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, nil)
+			cache := internalcache.New(ctx, nil, false)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}

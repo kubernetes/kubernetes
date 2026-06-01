@@ -188,6 +188,9 @@ func TestValidateWorkload(t *testing.T) {
 		"no controllerRef": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef = nil
 		}),
+		"no scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.PodGroupTemplates[1].SchedulingConstraints = nil
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -302,59 +305,6 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 				w.Namespace += "bar"
 			}),
 		},
-		"set controller ref": {
-			old: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-			update: mkWorkload(),
-		},
-		"unset controller ref": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-		},
-		"change pod group name": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[0].Name += "bar"
-			}),
-		},
-		"add pod group": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates = append(w.Spec.PodGroupTemplates, scheduling.PodGroupTemplate{
-					Name: "group3",
-					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-						Basic: &scheduling.BasicSchedulingPolicy{},
-					},
-				})
-			}),
-		},
-		"delete pod group": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates = w.Spec.PodGroupTemplates[:1]
-			}),
-		},
-		"change gang min count": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.PodGroupTemplates[1].SchedulingPolicy.Gang.MinCount = 5
-			}),
-		},
-		"change controllerRef": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef.Kind += "bar"
-			}),
-		},
-		"delete controllerRef": {
-			old: mkWorkload(),
-			update: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.ControllerRef = nil
-			}),
-		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -381,11 +331,21 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Basic: &scheduling.BasicSchedulingPolicy{},
 				},
+				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
+					},
+				},
 			}, {
 				Name: "group2",
 				SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 					Gang: &scheduling.GangSchedulingPolicy{
 						MinCount: 2,
+					},
+				},
+				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
 					},
 				},
 			}},
@@ -400,6 +360,9 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 func TestValidatePodGroup(t *testing.T) {
 	successCases := map[string]*scheduling.PodGroup{
 		"gang policy": mkPodGroup(),
+		"no scheduling constraints": mkPodGroup(func(pg *scheduling.PodGroup) {
+			pg.Spec.SchedulingConstraints = nil
+		}),
 	}
 	for name, podGroup := range successCases {
 		errs := ValidatePodGroup(podGroup)
@@ -526,44 +489,6 @@ func TestValidatePodGroupUpdate(t *testing.T) {
 				pg.Namespace += "bar"
 			}),
 		},
-		"change podGroup template ref name": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.PodGroupTemplateRef.Workload.PodGroupTemplateName = "new-template"
-			}),
-		},
-		"change podGroup template ref workload name": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.PodGroupTemplateRef.Workload.WorkloadName = "new-workload"
-			}),
-		},
-		"delete podGroup template ref": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.PodGroupTemplateRef = nil
-			}),
-		},
-		"change gang min count": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingPolicy.Gang.MinCount = 10
-			}),
-		},
-		"change scheduling policy": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
-					Basic: &scheduling.BasicSchedulingPolicy{},
-				}
-			}),
-		},
-		"multiple scheduling policies": {
-			old: mkPodGroup(),
-			update: mkPodGroup(func(pg *scheduling.PodGroup) {
-				pg.Spec.SchedulingPolicy.Basic = &scheduling.BasicSchedulingPolicy{}
-			}),
-		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -595,6 +520,24 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 					Message:            "Test status condition message",
 					LastTransitionTime: now,
 				})
+			}),
+		},
+		"ok resource claim status": {
+			old: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+			}),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Spec.ResourceClaims = []scheduling.PodGroupResourceClaim{
+					{Name: "my-claim", ResourceClaimName: new("a-claim")},
+					{Name: "my-other-claim", ResourceClaimName: new("a-claim")},
+				}
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: new("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
+				}
 			}),
 		},
 	}
@@ -710,6 +653,14 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 				pg.Status.Conditions = append(pg.Status.Conditions, conditions...)
 			}),
 		},
+		"non-existent resource claim in status": {
+			old: mkPodGroup(),
+			update: mkPodGroup(func(pg *scheduling.PodGroup) {
+				pg.Status.ResourceClaimStatuses = []scheduling.PodGroupResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: new("my-claim")},
+				}
+			}),
+		},
 	}
 	for name, tc := range failureCases {
 		tc.old.ResourceVersion = "0"
@@ -735,6 +686,11 @@ func mkPodGroup(tweaks ...func(pg *scheduling.PodGroup)) *scheduling.PodGroup {
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{
 					MinCount: 5,
+				},
+			},
+			SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+				Topology: []scheduling.TopologyConstraint{
+					{Key: "foo"},
 				},
 			},
 		},

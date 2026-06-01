@@ -26,8 +26,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-// Attributes is an interface used by an Authorizer to get information about a request
-// that is used to make an authorization decision.
+// Attributes is an interface used by an Authorizer to get information about a
+// request's metadata, that is used to compute an unconditional or conditional
+// authorization decision.
 type Attributes interface {
 	// GetUser returns the user.Info object to authorize
 	GetUser() user.Info
@@ -77,17 +78,60 @@ type Attributes interface {
 	GetLabelSelector() (labels.Requirements, error)
 }
 
-// Authorizer makes an authorization decision based on information gained by making
-// zero or more calls to methods of the Attributes interface.  It returns nil when an action is
-// authorized, otherwise it returns an error.
-type Authorizer interface {
+// UnconditionalAuthorizer is a downscoped variant of Authorizer, which only gives the
+// caller the ability to call the conditions-unaware Authorize method.
+type UnconditionalAuthorizer interface {
 	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
 }
+
+// Authorizer makes an authorization decision based on information gained by making
+// zero or more calls to methods of the Attributes interface. It might return
+// an error together with any decision. It is up to the caller to decide whether
+// that error is critical or not.
+//
+// The kube-apiserver WithAuthorization filter ignores errors when the decision is
+// Allow, but returns response code 500 if an error is returned with a Deny or
+// NoOpinion (instead of the usual 403).
+//
+// Any authorizer must implement this interface, but when passing a handle to an
+// authorizer, one might choose whether to pass the Authorizer or smaller UnconditionalAuthorizer
+// interface, depending on whether the receiver should be able to perform conditional
+// authorization or not.
+type Authorizer interface {
+	UnconditionalAuthorizer
+
+	// ConditionsAwareAuthorize returns an unconditional, conditional, or unioned
+	// decision, where the error and reason is part of the Decision struct.
+	//
+	// An authorizer who is not conditions-aware MUST implement this function as
+	// "return authorizer.ConditionsAwareDecisionFromParts(self.Authorize(ctx, a))",
+	// such that conditions-aware callers to this authorizer get the same output
+	// as if they called Authorize. Callers are only expected to call one of
+	// Authorize or ConditionsAwareAuthorize, not both.
+	ConditionsAwareAuthorize(ctx context.Context, a Attributes) ConditionsAwareDecision
+
+	// EvaluateConditions evaluates a conditional or unioned ConditionsAwareDecision against previously-unknown data.
+	//
+	// An authorizer who does not support conditions should fail closed and
+	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
+}
+
+// AuthorizerFunc implements Authorizer
+var _ Authorizer = AuthorizerFunc(nil)
 
 type AuthorizerFunc func(ctx context.Context, a Attributes) (Decision, string, error)
 
 func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, string, error) {
 	return f(ctx, a)
+}
+
+func (f AuthorizerFunc) ConditionsAwareAuthorize(ctx context.Context, a Attributes) ConditionsAwareDecision {
+	return ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+func (f AuthorizerFunc) EvaluateConditions(_ context.Context, _ ConditionsAwareDecision, _ ConditionsData) (Decision, string, error) {
+	return DecisionDeny, "", ErrorConditionEvaluationNotSupported
 }
 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
@@ -172,6 +216,8 @@ func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
 	return a.LabelSelectorRequirements, a.LabelSelectorParsingErr
 }
 
+// Decision represents an final, unconditional authorization decision.
+// The zero value (0) of Decision is DecisionDeny.
 type Decision int
 
 const (
@@ -180,7 +226,8 @@ const (
 	// DecisionAllow means that an authorizer decided to allow the action.
 	DecisionAllow
 	// DecisionNoOpinion means that an authorizer has no opinion on whether
-	// to allow or deny an action.
+	// to allow or deny an action. If there are multiple unioned authorizers,
+	// this means that the request can thus get allowed by some later authorizer.
 	DecisionNoOpinion
 )
 

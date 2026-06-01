@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// DeviceTaintRules returns a DeviceTaintRuleInformer.
 	DeviceTaintRules() DeviceTaintRuleInformer
+	// ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
+	ResourcePoolStatusRequests() ResourcePoolStatusRequestInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // DeviceTaintRules returns a DeviceTaintRuleInformer.
 func (v *version) DeviceTaintRules() DeviceTaintRuleInformer {
 	return &deviceTaintRuleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
+func (v *version) ResourcePoolStatusRequests() ResourcePoolStatusRequestInformer {
+	return &resourcePoolStatusRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

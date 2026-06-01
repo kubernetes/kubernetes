@@ -27,8 +27,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -46,34 +44,32 @@ func ResourceAttributesFrom(user user.Info, in authorizationapi.ResourceAttribut
 		ResourceRequest: true,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		if in.LabelSelector != nil {
-			if len(in.LabelSelector.RawSelector) > 0 {
-				labelSelector, err := labels.Parse(in.LabelSelector.RawSelector)
-				if err != nil {
-					ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = nil, err
-				} else {
-					requirements, _ /*selectable*/ := labelSelector.Requirements()
-					ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = requirements, nil
-				}
-			}
-			if len(in.LabelSelector.Requirements) > 0 {
-				ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = labelSelectorAsSelector(in.LabelSelector.Requirements)
+	if in.LabelSelector != nil {
+		if len(in.LabelSelector.RawSelector) > 0 {
+			labelSelector, err := labels.Parse(in.LabelSelector.RawSelector)
+			if err != nil {
+				ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = nil, err
+			} else {
+				requirements, _ /*selectable*/ := labelSelector.Requirements()
+				ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = requirements, nil
 			}
 		}
+		if len(in.LabelSelector.Requirements) > 0 {
+			ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = labelSelectorAsSelector(in.LabelSelector.Requirements)
+		}
+	}
 
-		if in.FieldSelector != nil {
-			if len(in.FieldSelector.RawSelector) > 0 {
-				fieldSelector, err := fields.ParseSelector(in.FieldSelector.RawSelector)
-				if err != nil {
-					ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = nil, err
-				} else {
-					ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
-				}
+	if in.FieldSelector != nil {
+		if len(in.FieldSelector.RawSelector) > 0 {
+			fieldSelector, err := fields.ParseSelector(in.FieldSelector.RawSelector)
+			if err != nil {
+				ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = nil, err
+			} else {
+				ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
 			}
-			if len(in.FieldSelector.Requirements) > 0 {
-				ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = fieldSelectorAsSelector(in.FieldSelector.Requirements)
-			}
+		}
+		if len(in.FieldSelector.Requirements) > 0 {
+			ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = fieldSelectorAsSelector(in.FieldSelector.Requirements)
 		}
 	}
 

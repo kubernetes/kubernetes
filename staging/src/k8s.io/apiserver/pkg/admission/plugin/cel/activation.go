@@ -19,34 +19,35 @@ package cel
 import (
 	"context"
 	"fmt"
-	"github.com/google/cel-go/interpreter"
 	"math"
 	"time"
+
+	"github.com/google/cel-go/interpreter"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
 func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
-	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
+	celOldObjVal, err := versionedAttr.VersionedOldObject.CELValue()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
-	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
+
+	celObjVal, err := versionedAttr.VersionedObject.CELValue()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
 	}
+
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
-		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
-		if err != nil {
-			return nil, fmt.Errorf("failed to prepare params variable for evaluation: %w", err)
-		}
+		paramsVal = common.SchemalessTypedToVal(inputs.VersionedParams)
 	}
 
 	if inputs.Authorizer != nil {
@@ -54,19 +55,13 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
-	requestVal, err := convertObjectToUnstructured(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare request variable for evaluation: %w", err)
-	}
-	namespaceVal, err := objectToResolveVal(namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare namespace variable for evaluation: %w", err)
-	}
+	requestVal := common.SchemalessTypedToVal(request)
+	namespaceVal := common.SchemalessTypedToVal(namespace)
 	va := &evaluationActivation{
-		object:                    objectVal,
-		oldObject:                 oldObjectVal,
+		object:                    celObjVal,
+		oldObject:                 celOldObjVal,
 		params:                    paramsVal,
-		request:                   requestVal.Object,
+		request:                   requestVal,
 		namespace:                 namespaceVal,
 		authorizer:                authorizerVal,
 		requestResourceAuthorizer: requestResourceAuthorizerVal,

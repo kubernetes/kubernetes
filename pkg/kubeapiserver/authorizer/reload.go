@@ -47,6 +47,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
+var _ = authorizer.Authorizer(&reloadableAuthorizerResolver{})
+var _ = authorizer.RuleResolver(&reloadableAuthorizerResolver{})
+
 type reloadableAuthorizerResolver struct {
 	// initialConfig holds the ReloadFile used to initiate background reloading,
 	// and information used to construct webhooks that isn't exposed in the authorization
@@ -77,6 +80,16 @@ type authorizerResolver struct {
 
 func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return r.current.Load().authorizer.Authorize(ctx, a)
+}
+
+// ConditionsAwareAuthorize delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return r.current.Load().authorizer.ConditionsAwareAuthorize(ctx, a)
+}
+
+// EvaluateConditions delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return r.current.Load().authorizer.EvaluateConditions(ctx, decision, data)
 }
 
 func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {

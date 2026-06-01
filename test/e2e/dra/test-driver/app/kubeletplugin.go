@@ -410,6 +410,13 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 			ShareID:      result.ShareID,
 			Requests:     []string{result.Request}, // May also return baseRequestName here.
 			CDIDeviceIDs: []string{cdiDeviceID},
+			Metadata: &kubeletplugin.DeviceMetadata{
+				Attributes: map[string]resourceapi.DeviceAttribute{
+					"driverName": {StringValue: &ex.driverName},
+					"pool":       {StringValue: &result.Pool},
+					"device":     {StringValue: &result.Device},
+				},
+			},
 		}
 		devices = append(devices, device)
 	}

@@ -221,6 +221,8 @@ type Pod struct {
 	// Sandboxes are sorted by creation time, newest -> oldest.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container
+	// Timestamp is the time that this Pod object was read from the runtime.
+	Timestamp time.Time
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -247,12 +249,9 @@ func BuildContainerID(typ, ID string) ContainerID {
 }
 
 // ParseContainerID is a convenience method for creating a ContainerID from an ID string.
-func ParseContainerID(containerID string) ContainerID {
+func ParseContainerID(logger klog.Logger, containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		// Use klog.TODO() because we currently do not have a proper logger to pass in.
-		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
-		logger := klog.TODO()
 		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
@@ -476,7 +475,7 @@ type Image struct {
 // EnvVar represents the environment variable.
 type EnvVar struct {
 	Name  string
-	Value string
+	Value string // TODO: switch to []byte
 }
 
 // Annotation represents an annotation.
@@ -666,7 +665,8 @@ func (c *RuntimeCondition) String() string {
 
 // RuntimeFeatures contains the set of features implemented by the runtime
 type RuntimeFeatures struct {
-	SupplementalGroupsPolicy bool
+	SupplementalGroupsPolicy  bool
+	UserNamespacesHostNetwork bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -674,7 +674,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
 }
 
 // Pods represents the list of pods

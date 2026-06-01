@@ -1188,17 +1188,20 @@ func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
 
 	noFailT := ignoreFailures{} // these create and delete requests are not coordinated with the rest of the test and can fail
 
-	const workers = 10
+	const workers = 5
 	wg.Add(workers)
 	for i := range workers {
 		go func() {
 			defer wg.Done()
 
+			ticker := time.NewTicker(100 * time.Millisecond) // 10 ops/sec
+			defer ticker.Stop()
+
 			for {
 				select {
 				case <-ctx.Done():
 					return
-				default:
+				case <-ticker.C:
 				}
 
 				_ = svm.createCR(ctx, noFailT, "chaos-cr-"+strconv.Itoa(i), "v1")

@@ -390,7 +390,6 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 				}
 			}
 
-			// TODO: Use transactions when we have them.
 			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment, true); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err

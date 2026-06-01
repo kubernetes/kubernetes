@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -60,27 +61,26 @@ type Interface interface {
 	OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64
 }
 
+// Evaluator is a preemption evaluator. It runs preemption logic with a given Interface.
 type Evaluator struct {
 	PluginName string
 	Handler    fwk.Handle
 	PodLister  corelisters.PodLister
 	PdbLister  policylisters.PodDisruptionBudgetLister
 
-	enableAsyncPreemption bool
-
-	*Executor
 	Interface
+	executor *Executor
 }
 
-func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
+// NewEvaluator creates a new Evaluator.
+func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, executor *Executor) *Evaluator {
 	return &Evaluator{
-		PluginName:            pluginName,
-		Handler:               fh,
-		PodLister:             fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		PdbLister:             fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		enableAsyncPreemption: enableAsyncPreemption,
-		Executor:              newExecutor(fh),
-		Interface:             i,
+		PluginName: pluginName,
+		Handler:    fh,
+		PodLister:  fh.SharedInformerFactory().Core().V1().Pods().Lister(),
+		PdbLister:  fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
+		Interface:  i,
+		executor:   executor,
 	}
 }
 
@@ -161,13 +161,9 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
 
-	// 5) Perform preparation work before nominating the selected candidate.
-	if ev.enableAsyncPreemption {
-		ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName)
-	} else {
-		if status := ev.prepareCandidate(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
-			return nil, status
-		}
+	// 5) Actuate the preemption.
+	if status := ev.executor.actuatePodPreemption(ctx, bestCandidate.Name(), bestCandidate.Victims(), pod, ev.PluginName); !status.IsSuccess() {
+		return nil, status
 	}
 
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success)
@@ -458,4 +454,65 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
+}
+
+func filterVictimsWithPDBViolation(victims []*victim, pdbs []*policy.PodDisruptionBudget) (violatingVictims, nonViolatingVictims []*victim) {
+	pdbsAllowed := make([]int32, len(pdbs))
+	podIsViolating := func(pod *v1.Pod) bool {
+		if len(pod.Labels) == 0 {
+			return false
+		}
+
+		for i, pdb := range pdbs {
+			if pdb.Namespace != pod.Namespace {
+				continue
+			}
+			selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+			if err != nil {
+				// This object has an invalid selector, it does not match the pod
+				continue
+			}
+			// A PDB with a nil or empty selector matches nothing.
+			if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+				continue
+			}
+
+			// Existing in DisruptedPods means it has been processed in API server,
+			// we don't treat it as a violating case.
+			if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
+				continue
+			}
+			// Only decrement the matched pdb when it's not in its <DisruptedPods>;
+			// otherwise we may over-decrement the budget number.
+			pdbsAllowed[i]--
+			// We have found a matching PDB.
+			if pdbsAllowed[i] < 0 {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	for i, pdb := range pdbs {
+		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
+	}
+
+	for _, victim := range victims {
+		isUnitViolating := false
+
+		for _, pi := range victim.Pods() {
+			if podIsViolating(pi.GetPod()) {
+				isUnitViolating = true
+				break
+			}
+		}
+		if isUnitViolating {
+			violatingVictims = append(violatingVictims, victim)
+		} else {
+			nonViolatingVictims = append(nonViolatingVictims, victim)
+		}
+	}
+
+	return violatingVictims, nonViolatingVictims
 }

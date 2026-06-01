@@ -134,7 +134,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 		framework.ExpectNoError(err)
 
 		// get the actual projected token from the pod.
-		nodeScopedSAToken, stderr, err := e2epod.ExecWithOptionsContext(ctx, f, e2epod.ExecOptions{
+		nodeScopedSAToken, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
 			Command:            []string{"cat", "/var/run/secrets/kubernetes.io/serviceaccount/token"},
 			Namespace:          actualPod.Namespace,
 			PodName:            actualPod.Name,

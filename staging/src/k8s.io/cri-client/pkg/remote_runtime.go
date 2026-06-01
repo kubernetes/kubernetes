@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -33,7 +35,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/component-base/logs/logreduction"
-	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -49,6 +50,12 @@ type remoteRuntimeService struct {
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
 	conn         *grpc.ClientConn
+	// useStreaming indicates whether to use streaming RPCs for list operations
+	// when the CRIListStreaming feature gate is enabled. It falls back to false
+	// if a streaming RPC returns Unimplemented. Multiple goroutines may
+	// concurrently observe Unimplemented and store false, but that is harmless
+	// because the store is idempotent.
+	useStreaming atomic.Bool
 }
 
 const (
@@ -79,7 +86,13 @@ const (
 )
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider) (internalapi.RuntimeService, error) {
+// If useStreaming is true, streaming RPCs will be used for list operations
+// instead of unary RPCs. If the runtime returns an Unimplemented error,
+// the client automatically falls back to unary RPCs.
+// NOTE: useStreaming is supposed to be gated by the CRIListStreaming feature
+// gate and is expected to default to true once the feature graduates to GA,
+// at which point this parameter may be removed.
+func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, useStreaming bool) (internalapi.RuntimeService, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Connecting to runtime service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
@@ -98,7 +111,7 @@ func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTim
 	if tp != nil {
 		tracingOpts := []otelgrpc.Option{
 			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
-			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithPropagators(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})),
 			otelgrpc.WithTracerProvider(tp),
 		}
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
@@ -117,7 +130,7 @@ func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTim
 		grpc.WithConnectParams(connParams),
 	)
 
-	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
+	conn, err := grpc.NewClient(clientTargetForAddress(addr), dialOpts...)
 	if err != nil {
 		logger.Error(err, "Connect remote runtime service failed", "address", addr)
 		return nil, err
@@ -128,6 +141,7 @@ func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTim
 		logReduction: logreduction.NewLogReduction(identicalErrorDelay),
 		conn:         conn,
 	}
+	service.useStreaming.Store(useStreaming)
 
 	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
 		return nil, fmt.Errorf("validate service connection: %w", err)
@@ -318,6 +332,9 @@ func (r *remoteRuntimeService) ListPodSandbox(ctx context.Context, filter *runti
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
+	if r.useStreaming.Load() {
+		return r.streamPodSandboxesV1(ctx, filter)
+	}
 	return r.listPodSandboxV1(ctx, filter)
 }
 
@@ -334,6 +351,42 @@ func (r *remoteRuntimeService) listPodSandboxV1(ctx context.Context, filter *run
 	logger.V(10).Info("[RemoteRuntimeService] ListPodSandbox Response", "filter", filter, "items", resp.Items)
 
 	return resp.Items, nil
+}
+
+func (r *remoteRuntimeService) streamPodSandboxesV1(ctx context.Context, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+	logger := klog.FromContext(ctx)
+	stream, err := r.runtimeClient.StreamPodSandboxes(ctx, &runtimeapi.StreamPodSandboxesRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		logger.Error(err, "StreamPodSandboxes from runtime service failed", "filter", filter)
+		return nil, err
+	}
+
+	var items []*runtimeapi.PodSandbox
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// If the RPC is unimplemented, disable streaming and fall back to the unary RPC.
+			// The Unimplemented status is not returned when creating the stream,
+			// but when calling Recv() on the stream.
+			if status.Code(err) == codes.Unimplemented {
+				logger.Info("StreamPodSandboxes not implemented, falling back to ListPodSandbox", "filter", filter)
+				r.useStreaming.Store(false)
+				return r.listPodSandboxV1(ctx, filter)
+			}
+			logger.Error(err, "StreamPodSandboxes recv failed", "filter", filter, "itemsReceived", len(items))
+			return nil, err
+		}
+		items = append(items, resp.PodSandboxes...)
+	}
+
+	logger.V(10).Info("[RemoteRuntimeService] StreamPodSandboxes Response", "filter", filter, "items", items)
+
+	return items, nil
 }
 
 // CreateContainer creates a new container in the specified PodSandbox.
@@ -438,6 +491,9 @@ func (r *remoteRuntimeService) ListContainers(ctx context.Context, filter *runti
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
+	if r.useStreaming.Load() {
+		return r.streamContainersV1(ctx, filter)
+	}
 	return r.listContainersV1(ctx, filter)
 }
 
@@ -453,6 +509,42 @@ func (r *remoteRuntimeService) listContainersV1(ctx context.Context, filter *run
 	logger.V(10).Info("[RemoteRuntimeService] ListContainers Response", "filter", filter, "containers", resp.Containers)
 
 	return resp.Containers, nil
+}
+
+func (r *remoteRuntimeService) streamContainersV1(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+	logger := klog.FromContext(ctx)
+	stream, err := r.runtimeClient.StreamContainers(ctx, &runtimeapi.StreamContainersRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		logger.Error(err, "StreamContainers from runtime service failed", "filter", filter)
+		return nil, err
+	}
+
+	var containers []*runtimeapi.Container
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// If the RPC is unimplemented, disable streaming and fall back to the unary RPC.
+			// The Unimplemented status is not returned when creating the stream,
+			// but when calling Recv() on the stream.
+			if status.Code(err) == codes.Unimplemented {
+				logger.Info("StreamContainers not implemented, falling back to ListContainers", "filter", filter)
+				r.useStreaming.Store(false)
+				return r.listContainersV1(ctx, filter)
+			}
+			logger.Error(err, "StreamContainers recv failed", "filter", filter, "itemsReceived", len(containers))
+			return nil, err
+		}
+		containers = append(containers, resp.Containers...)
+	}
+
+	logger.V(10).Info("[RemoteRuntimeService] StreamContainers Response", "filter", filter, "containers", containers)
+
+	return containers, nil
 }
 
 // ContainerStatus returns the container status.
@@ -756,6 +848,9 @@ func (r *remoteRuntimeService) ListContainerStats(ctx context.Context, filter *r
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
+	if r.useStreaming.Load() {
+		return r.streamContainerStatsV1(ctx, filter)
+	}
 	return r.listContainerStatsV1(ctx, filter)
 }
 
@@ -771,6 +866,42 @@ func (r *remoteRuntimeService) listContainerStatsV1(ctx context.Context, filter 
 	logger.V(10).Info("[RemoteRuntimeService] ListContainerStats Response", "filter", filter, "stats", resp.GetStats())
 
 	return resp.GetStats(), nil
+}
+
+func (r *remoteRuntimeService) streamContainerStatsV1(ctx context.Context, filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+	logger := klog.FromContext(ctx)
+	stream, err := r.runtimeClient.StreamContainerStats(ctx, &runtimeapi.StreamContainerStatsRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		logger.Error(err, "StreamContainerStats from runtime service failed", "filter", filter)
+		return nil, err
+	}
+
+	var stats []*runtimeapi.ContainerStats
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// If the RPC is unimplemented, disable streaming and fall back to the unary RPC.
+			// The Unimplemented status is not returned when creating the stream,
+			// but when calling Recv() on the stream.
+			if status.Code(err) == codes.Unimplemented {
+				logger.Info("StreamContainerStats not implemented, falling back to ListContainerStats", "filter", filter)
+				r.useStreaming.Store(false)
+				return r.listContainerStatsV1(ctx, filter)
+			}
+			logger.Error(err, "StreamContainerStats recv failed", "filter", filter, "itemsReceived", len(stats))
+			return nil, err
+		}
+		stats = append(stats, resp.ContainerStats...)
+	}
+
+	logger.V(10).Info("[RemoteRuntimeService] StreamContainerStats Response", "filter", filter, "stats", stats)
+
+	return stats, nil
 }
 
 // PodSandboxStats returns the stats of the pod.
@@ -808,6 +939,9 @@ func (r *remoteRuntimeService) ListPodSandboxStats(ctx context.Context, filter *
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
+	if r.useStreaming.Load() {
+		return r.streamPodSandboxStatsV1(ctx, filter)
+	}
 	return r.listPodSandboxStatsV1(ctx, filter)
 }
 
@@ -823,6 +957,42 @@ func (r *remoteRuntimeService) listPodSandboxStatsV1(ctx context.Context, filter
 	logger.V(10).Info("[RemoteRuntimeService] ListPodSandboxStats Response", "filter", filter, "stats", resp.GetStats())
 
 	return resp.GetStats(), nil
+}
+
+func (r *remoteRuntimeService) streamPodSandboxStatsV1(ctx context.Context, filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	logger := klog.FromContext(ctx)
+	stream, err := r.runtimeClient.StreamPodSandboxStats(ctx, &runtimeapi.StreamPodSandboxStatsRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		logger.Error(err, "StreamPodSandboxStats from runtime service failed", "filter", filter)
+		return nil, err
+	}
+
+	var stats []*runtimeapi.PodSandboxStats
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// If the RPC is unimplemented, disable streaming and fall back to the unary RPC.
+			// The Unimplemented status is not returned when creating the stream,
+			// but when calling Recv() on the stream.
+			if status.Code(err) == codes.Unimplemented {
+				logger.Info("StreamPodSandboxStats not implemented, falling back to ListPodSandboxStats", "filter", filter)
+				r.useStreaming.Store(false)
+				return r.listPodSandboxStatsV1(ctx, filter)
+			}
+			logger.Error(err, "StreamPodSandboxStats recv failed", "filter", filter, "itemsReceived", len(stats))
+			return nil, err
+		}
+		stats = append(stats, resp.PodSandboxStats...)
+	}
+
+	logger.V(10).Info("[RemoteRuntimeService] StreamPodSandboxStats Response", "filter", filter, "stats", stats)
+
+	return stats, nil
 }
 
 // ReopenContainerLog reopens the container log file.
@@ -908,7 +1078,7 @@ func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, container
 
 	for {
 		resp, err := containerEventsStreamingClient.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			logger.Error(err, "container events stream is closed")
 			return err
 		}
@@ -944,6 +1114,13 @@ func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*ru
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
+	if r.useStreaming.Load() {
+		return r.streamPodSandboxMetricsV1(ctx)
+	}
+	return r.listPodSandboxMetricsV1(ctx)
+}
+
+func (r *remoteRuntimeService) listPodSandboxMetricsV1(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
 	resp, err := r.runtimeClient.ListPodSandboxMetrics(ctx, &runtimeapi.ListPodSandboxMetricsRequest{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
@@ -953,6 +1130,40 @@ func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*ru
 	logger.V(10).Info("[RemoteRuntimeService] ListPodSandboxMetrics Response", "stats", resp.GetPodMetrics())
 
 	return resp.GetPodMetrics(), nil
+}
+
+func (r *remoteRuntimeService) streamPodSandboxMetricsV1(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
+	logger := klog.FromContext(ctx)
+	stream, err := r.runtimeClient.StreamPodSandboxMetrics(ctx, &runtimeapi.StreamPodSandboxMetricsRequest{})
+	if err != nil {
+		logger.Error(err, "StreamPodSandboxMetrics from runtime service failed")
+		return nil, err
+	}
+
+	var metrics []*runtimeapi.PodSandboxMetrics
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// If the RPC is unimplemented, disable streaming and fall back to the unary RPC.
+			// The Unimplemented status is not returned when creating the stream,
+			// but when calling Recv() on the stream.
+			if status.Code(err) == codes.Unimplemented {
+				logger.Info("StreamPodSandboxMetrics not implemented, falling back to ListPodSandboxMetrics")
+				r.useStreaming.Store(false)
+				return r.listPodSandboxMetricsV1(ctx)
+			}
+			logger.Error(err, "StreamPodSandboxMetrics recv failed", "itemsReceived", len(metrics))
+			return nil, err
+		}
+		metrics = append(metrics, resp.PodSandboxMetrics...)
+	}
+
+	logger.V(10).Info("[RemoteRuntimeService] StreamPodSandboxMetrics Response", "metrics", metrics)
+
+	return metrics, nil
 }
 
 // RuntimeConfig returns the configuration information of the runtime.

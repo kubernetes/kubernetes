@@ -814,6 +814,16 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (i impersonateAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(i.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (impersonateAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestImpersonateIsForbidden(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -1014,9 +1024,9 @@ func TestImpersonateWithUID(t *testing.T) {
 			t.Fatalf("CSR spec was different than expected, -got, +want:\n %s", diff)
 		}
 
-		withUID := allowedImpersonationEvent("create", http.StatusCreated, "alice", "system:authenticated", "certificatesigningrequests", nil)
+		withUID := allowedImpersonationEvent("create", http.StatusCreated, "alice", "system:authenticated", "certificatesigningrequests", new("impersonate:user-info"))
 		withUID.ImpersonatedUID = "1234"
-		assertImpersonationAuditEvents(t, auditLogFile, user.APIServerUser, withUID)
+		assertImpersonationAuditEventsNoLatency(t, auditLogFile, user.APIServerUser, withUID)
 	})
 
 	t.Run("impersonation with only UID fails", func(t *testing.T) {
@@ -1032,7 +1042,7 @@ func TestImpersonateWithUID(t *testing.T) {
 			t.Fatalf("expected bad request, got %T %v", err, err)
 		}
 		if diff := cmp.Diff(
-			`requested [{UID  1234  authentication.k8s.io/v1  }] without impersonating a user`,
+			`requested &user.DefaultInfo{Name:"", UID:"1234", Groups:[]string(nil), Extra:map[string][]string(nil)} without impersonating a user name`,
 			err.Error(),
 		); diff != "" {
 			t.Fatalf("bad request different than expected, -got, +want:\n %s", diff)
@@ -1045,10 +1055,17 @@ func TestImpersonateWithUID(t *testing.T) {
 
 		authutil.GrantUserAuthorization(t, ctx, adminClient, "system:anonymous",
 			rbacv1.PolicyRule{
-				Verbs:         []string{"impersonate"},
-				APIGroups:     []string{""},
+				Verbs:         []string{"impersonate:user-info"},
+				APIGroups:     []string{"authentication.k8s.io"},
 				Resources:     []string{"users"},
 				ResourceNames: []string{"some-user-anonymous-can-impersonate"},
+			},
+		)
+		authutil.GrantUserAuthorization(t, ctx, adminClient, "system:anonymous",
+			rbacv1.PolicyRule{
+				Verbs:     []string{"impersonate-on:user-info:list"},
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
 			},
 		)
 
@@ -1066,14 +1083,14 @@ func TestImpersonateWithUID(t *testing.T) {
 		}
 		if diff := cmp.Diff(
 			`uids.authentication.k8s.io "1234" is forbidden: `+
-				`User "system:anonymous" cannot impersonate resource "uids" in API group "authentication.k8s.io" at the cluster scope`,
+				`User "system:anonymous" cannot impersonate:user-info resource "uids" in API group "authentication.k8s.io" at the cluster scope`,
 			err.Error(),
 		); diff != "" {
 			t.Fatalf("forbidden error different than expected, -got, +want:\n %s", diff)
 		}
 
-		assertImpersonationAuditEvents(t, auditLogFile, "system:anonymous",
-			deniedImpersonationEvent("list", `uids.authentication.k8s.io "1234" is forbidden: User "system:anonymous" cannot impersonate resource "uids" in API group "authentication.k8s.io" at the cluster scope`, "nodes"),
+		assertImpersonationAuditEventsNoLatency(t, auditLogFile, "system:anonymous",
+			deniedImpersonationEvent("list", `uids.authentication.k8s.io "1234" is forbidden: User "system:anonymous" cannot impersonate:user-info resource "uids" in API group "authentication.k8s.io" at the cluster scope`, "nodes"),
 		)
 	})
 }
@@ -1445,7 +1462,7 @@ func assertImpersonationMetrics(t *testing.T, ctx context.Context, client client
 	}
 
 	var gotMetricStrings []string
-	trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+	trimFP := regexp.MustCompile(`(} )[\de.+-]+(.*)`)
 	for line := range strings.SplitSeq(string(body), "\n") {
 		if !strings.HasPrefix(line, "apiserver_impersonation_") {
 			continue
@@ -1455,7 +1472,7 @@ func assertImpersonationMetrics(t *testing.T, ctx context.Context, client client
 			continue
 		}
 		if strings.Contains(line, "_seconds_sum") {
-			line = trimFP.ReplaceAllString(line, `$1`) + "} FP"
+			line = trimFP.ReplaceAllString(line, "${1}FP")
 		}
 		gotMetricStrings = append(gotMetricStrings, line)
 	}
@@ -1532,6 +1549,16 @@ func getAuditEvents(t *testing.T, logFilePath string) []testutils.AuditEvent {
 
 func assertImpersonationAuditEvents(t *testing.T, logFilePath, wantUser string, wantEvents ...testutils.AuditEvent) {
 	t.Helper()
+	doAssertImpersonationAuditEvents(t, logFilePath, wantUser, false, wantEvents...)
+}
+
+func assertImpersonationAuditEventsNoLatency(t *testing.T, logFilePath, wantUser string, wantEvents ...testutils.AuditEvent) {
+	t.Helper()
+	doAssertImpersonationAuditEvents(t, logFilePath, wantUser, true, wantEvents...)
+}
+
+func doAssertImpersonationAuditEvents(t *testing.T, logFilePath, wantUser string, skipLatency bool, wantEvents ...testutils.AuditEvent) {
+	t.Helper()
 
 	latencyPattern := regexp.MustCompile("^[0-9.]+[µnm]s$")
 
@@ -1567,7 +1594,7 @@ func assertImpersonationAuditEvents(t *testing.T, logFilePath, wantUser string, 
 		if diff := cmp.Diff(wantEvents[i], got); len(diff) > 0 {
 			t.Errorf("audit event[%d] mismatch (-want +got): %s", i, diff)
 		}
-		if event.Verb != "watch" && utilfeature.DefaultFeatureGate.Enabled(features.ConstrainedImpersonation) {
+		if !skipLatency && event.Verb != "watch" && utilfeature.DefaultFeatureGate.Enabled(features.ConstrainedImpersonation) {
 			latency := event.CustomAuditAnnotations["apiserver.latency.k8s.io/impersonation"]
 			if !latencyPattern.MatchString(latency) {
 				t.Errorf("audit event[%d] expected valid impersonation latency annotation, got %q", i, latency)
@@ -1813,6 +1840,16 @@ type trackingAuthorizer struct {
 func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	a.requestAttributes = append(a.requestAttributes, attributes)
 	return authorizer.DecisionAllow, "", nil
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (a *trackingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attributes authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(a.Authorize(ctx, attributes))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (a *trackingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly

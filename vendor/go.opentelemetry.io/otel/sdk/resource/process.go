@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 )
 
 type (
@@ -164,7 +164,8 @@ func (processRuntimeVersionDetector) Detect(context.Context) (*Resource, error) 
 // Detect returns a *Resource that describes the runtime of this process.
 func (processRuntimeDescriptionDetector) Detect(context.Context) (*Resource, error) {
 	runtimeDescription := fmt.Sprintf(
-		"go version %s %s/%s", runtimeVersion(), runtimeOS(), runtimeArch())
+		"go version %s %s/%s", runtimeVersion(), runtimeOS(), runtimeArch(),
+	)
 
 	return NewWithAttributes(
 		semconv.SchemaURL,

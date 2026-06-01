@@ -72,6 +72,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
@@ -82,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
@@ -307,7 +309,7 @@ func (*fakeKubelet) ImageFsStats(context.Context) (*statsapi.FsStats, *statsapi.
 	return nil, nil, nil
 }
 func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
-func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (*fakeKubelet) GetCgroupStats(context.Context, string, bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
 func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
@@ -419,13 +421,11 @@ func TestServeLogs(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
-
 	fw.fakeKubelet.logFunc = func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-Type", "text/html")
 		w.Write([]byte(content))
 	}
-
 	resp, err := http.Get(fw.testHTTPServer.URL + "/logs/")
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
@@ -440,6 +440,38 @@ func TestServeLogs(t *testing.T) {
 	result := string(body)
 	if !strings.Contains(result, "kubelet.log") || !strings.Contains(result, "google.log") {
 		t.Errorf("Received wrong data: %s", result)
+	}
+
+}
+
+func TestGETOnlyEndpointsRejectPostWithAllowHeader(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "pods", path: "/pods/"},
+		{name: "containerLogs", path: "/containerLogs/default/mypod/mycontainer"},
+		{name: "runningpods", path: "/runningpods/"},
+		{name: "logs", path: "/logs/"},
+		{name: "pprof", path: "/debug/pprof/profile?seconds=1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, fw.testHTTPServer.URL+tt.path, nil)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close() //nolint:errcheck
+
+			assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+			assert.Equal(t, http.MethodGet, resp.Header.Get("Allow"))
+		})
 	}
 }
 
@@ -2482,4 +2514,27 @@ kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
 			}
 		})
 	}
+}
+
+func TestKubeletNativeHistogramMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+	kubeletmetrics.Register()
+
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	histogramMetric := "kubelet_pod_start_duration_seconds"
+	metrics, err := testutil.ScrapeMetricsProto(fw.testHTTPServer.URL+"/metrics", fw.testHTTPServer.Client())
+	if err != nil {
+		t.Fatalf("failed to scrape metrics: %v", err)
+	}
+
+	mf, ok := metrics[histogramMetric]
+	if !ok {
+		t.Fatalf("metric %q not found in kubelet metrics endpoint", histogramMetric)
+	}
+
+	testutil.AssertHasNativeHistogram(t, mf, nil)
 }

@@ -40,33 +40,53 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type CronJob
-	scheme.AddValidationFunc((*batchv1beta1.CronJob)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_CronJob(ctx, op, nil /* fldPath */, obj.(*batchv1beta1.CronJob), safe.Cast[*batchv1beta1.CronJob](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*batchv1beta1.CronJob)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_CronJob(
+					ctx, op, nil, /* fldPath */
+					obj.(*batchv1beta1.CronJob),
+					safe.Cast[*batchv1beta1.CronJob](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_CronJob validates an instance of CronJob according
 // to declarative validation rules in the API schema.
-func Validate_CronJob(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *batchv1beta1.CronJob) (errs field.ErrorList) {
+func Validate_CronJob(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1beta1.CronJob) (errs field.ErrorList) {
+
 	// field batchv1beta1.CronJob.TypeMeta has no validation
 	// field batchv1beta1.CronJob.ObjectMeta has no validation
 
-	// field batchv1beta1.CronJob.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *batchv1beta1.CronJobSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field batchv1beta1.CronJob.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1beta1.CronJobSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_CronJobSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *batchv1beta1.CronJob) *batchv1beta1.CronJobSpec { return &oldObj.Spec }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1beta1.CronJob) *batchv1beta1.CronJobSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	// field batchv1beta1.CronJob.Status has no validation
 	return errs
@@ -74,17 +94,24 @@ func Validate_CronJob(ctx context.Context, op operation.Operation, fldPath *fiel
 
 // Validate_CronJobSpec validates an instance of CronJobSpec according
 // to declarative validation rules in the API schema.
-func Validate_CronJobSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *batchv1beta1.CronJobSpec) (errs field.ErrorList) {
-	// field batchv1beta1.CronJobSpec.Schedule
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_CronJobSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1beta1.CronJobSpec) (errs field.ErrorList) {
+
+	{ // field batchv1beta1.CronJobSpec.Schedule
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -92,7 +119,13 @@ func Validate_CronJobSpec(ctx context.Context, op operation.Operation, fldPath *
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("schedule"), &obj.Schedule, safe.Field(oldObj, func(oldObj *batchv1beta1.CronJobSpec) *string { return &oldObj.Schedule }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1beta1.CronJobSpec) *string {
+				return &oldObj.Schedule
+			})
+		errs = append(errs, fn(fldPath.Child("schedule"), &obj.Schedule, oldVal, oldObj != nil)...)
+	}
 
 	// field batchv1beta1.CronJobSpec.TimeZone has no validation
 	// field batchv1beta1.CronJobSpec.StartingDeadlineSeconds has no validation

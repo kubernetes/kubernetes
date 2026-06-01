@@ -23,7 +23,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 )
 
 func TestCleanupErr(t *testing.T) {
@@ -109,14 +109,17 @@ func TestCause(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
+				tCtx := Init(t)
 				ctx, cancel := withTimeout(tt.parentCtx(t), t, tt.timeout, timeoutCause.Error())
 				if tt.cancelCause != "" {
 					cancel(tt.cancelCause)
 				}
 				if tt.expectDeadline != 0 {
 					actualDeadline, ok := ctx.Deadline()
-					if assert.True(t, ok, "should have had a deadline") {
-						assert.Equal(t, tt.expectDeadline, time.Until(actualDeadline), "remaining time till Deadline()")
+					if !ok {
+						tCtx.Error("should have a deadline and hasn't")
+					} else {
+						tCtx.Assert(time.Until(actualDeadline)).To(gomega.Equal(tt.expectDeadline), "remaining time till Deadline()")
 					}
 				}
 				// Unblock background goroutines.
@@ -126,9 +129,54 @@ func TestCause(t *testing.T) {
 				// Now check.
 				actualErr := ctx.Err()
 				actualCause := context.Cause(ctx)
-				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")
-				assert.Equal(t, tt.expectCause, actualCause, "context.Cause()")
+				if tt.expectErr == nil {
+					tCtx.Assert(actualErr).To(gomega.Succeed(), "ctx.Err()")
+				} else {
+					tCtx.Assert(actualErr).To(gomega.MatchError(tt.expectErr), "ctx.Err()")
+				}
+				if tt.expectCause == nil {
+					tCtx.Assert(actualCause).To(gomega.Succeed(), "context.Cause()")
+				} else {
+					tCtx.Assert(actualCause).To(gomega.MatchError(tt.expectCause), "context.Cause()")
+				}
 			})
 		})
 	}
+}
+
+// TestCancel checks how cancellation propagates or doesn't propagate
+// when setting up child contexts through WithCancel or WithoutCancel.
+func TestCancel(t *testing.T) {
+	tCtx := Init(t)
+	tCtx2 := tCtx.WithoutCancel()
+	tCtx3 := tCtx.WithoutCancel()
+	tCtx4 := tCtx.WithCancel()
+	tCtx5 := tCtx.WithCancel()
+
+	tCtx.AssertNoError(tCtx.Err())
+	tCtx.AssertNoError(tCtx2.Err())
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.AssertNoError(tCtx4.Err())
+	tCtx.AssertNoError(tCtx5.Err())
+
+	tCtx2.Cancel("cancel 2")
+	tCtx.AssertNoError(tCtx.Err())
+	tCtx.Assert(context.Cause(tCtx2)).To(gomega.MatchError(gomega.ContainSubstring("cancel 2")))
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.AssertNoError(tCtx4.Err())
+	tCtx.AssertNoError(tCtx5.Err())
+
+	tCtx4.Cancel("cancel 4")
+	tCtx.AssertNoError(tCtx.Err())
+	tCtx.Assert(context.Cause(tCtx2)).To(gomega.MatchError(gomega.ContainSubstring("cancel 2")))
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.Assert(context.Cause(tCtx4)).To(gomega.MatchError(gomega.ContainSubstring("cancel 4")))
+	tCtx.AssertNoError(tCtx5.Err())
+
+	tCtx.Cancel("cancel root")
+	tCtx.Assert(context.Cause(tCtx)).To(gomega.MatchError(gomega.ContainSubstring("cancel root")))
+	tCtx.Assert(context.Cause(tCtx2)).To(gomega.MatchError(gomega.ContainSubstring("cancel 2")))
+	tCtx.AssertNoError(tCtx3.Err())
+	tCtx.Assert(context.Cause(tCtx4)).To(gomega.MatchError(gomega.ContainSubstring("cancel 4")))
+	tCtx.Assert(context.Cause(tCtx5)).To(gomega.MatchError(gomega.ContainSubstring("cancel root")))
 }

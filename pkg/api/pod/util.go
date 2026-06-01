@@ -430,14 +430,14 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 		AllowUserNamespacesWithVolumeDevices:                false,
 		// This also allows restart rules on sidecar containers.
-		AllowRestartAllContainers:  utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
-		AllowImageVolumeWithDigest: utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		AllowRestartAllContainers:                               utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
+		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
+		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
 	// we must allow it
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
-	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
@@ -485,6 +485,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
 		opts.AllowUserNamespacesWithVolumeDevices = hasUserNamespacesWithVolumeDevices(oldPodSpec)
+
+		// If old spec already had an image volume with empty reference, allow it
+		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -515,30 +518,6 @@ func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) b
 		}
 	}
 
-	return false
-}
-
-func useRelaxedDNSSearchValidation(oldPodSpec *api.PodSpec) bool {
-	// Return true early if feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedDNSSearchValidation) {
-		return true
-	}
-
-	// Return false early if there is no DNSConfig or Searches.
-	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil || oldPodSpec.DNSConfig.Searches == nil {
-		return false
-	}
-
-	return hasDotOrUnderscore(oldPodSpec.DNSConfig.Searches)
-}
-
-// Helper function to check if any domain is a dot or contains an underscore.
-func hasDotOrUnderscore(searches []string) bool {
-	for _, domain := range searches {
-		if domain == "." || strings.Contains(domain, "_") {
-			return true
-		}
-	}
 	return false
 }
 
@@ -769,14 +748,6 @@ func dropDisabledFields(
 		for i := range podSpec.EphemeralContainers {
 			podSpec.EphemeralContainers[i].ResizePolicy = nil
 		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
-		// Drop the RestartPolicy field of init containers.
-		for i := range podSpec.InitContainers {
-			podSpec.InitContainers[i].RestartPolicy = nil
-		}
-		// For other types of containers, validateContainers will handle them.
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
@@ -1105,6 +1076,8 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropImageVolumeWithDigest(podStatus)
 	}
 
+	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
+
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1124,6 +1097,20 @@ func draExendedResourceInUse(podStatus *api.PodStatus) bool {
 		return true
 	}
 	return false
+}
+
+func dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus *api.PodStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourceStatusInUse(oldPodStatus) {
+		return
+	}
+	podStatus.NodeAllocatableResourceClaimStatuses = nil
+}
+
+func draNodeAllocatableResourceStatusInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.NodeAllocatableResourceClaimStatuses) > 0
 }
 
 func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {
@@ -1460,23 +1447,6 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-// restartableInitContainersInUse returns true if the pod spec is non-nil and
-// it has any init container with ContainerRestartPolicyAlways.
-func restartableInitContainersInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	VisitContainers(podSpec, InitContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
-}
-
 func clusterTrustBundleProjectionInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -1770,6 +1740,19 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 	return false
 }
 
+// hasEmptyImageVolumeReference returns true if the pod spec has any image volume with an empty reference.
+func hasEmptyImageVolumeReference(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Image != nil && len(v.Image.Reference) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // HasAPIObjectReference returns true if a reference to an API object is found in the pod spec,
 // along with the plural resource of the referenced API type, or an error if an unknown field is encountered.
 func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
@@ -1958,7 +1941,7 @@ func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
 
 	for _, containerStatus := range oldPodStatus.ContainerStatuses {
 		for _, volumeMount := range containerStatus.VolumeMounts {
-			if volumeMount.VolumeStatus.Image != nil {
+			if volumeMount.VolumeStatus != nil {
 				return true
 			}
 		}
@@ -1966,7 +1949,7 @@ func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
 
 	for _, containerStatus := range oldPodStatus.InitContainerStatuses {
 		for _, volumeMount := range containerStatus.VolumeMounts {
-			if volumeMount.VolumeStatus.Image != nil {
+			if volumeMount.VolumeStatus != nil {
 				return true
 			}
 		}
@@ -1974,7 +1957,7 @@ func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
 
 	for _, containerStatus := range oldPodStatus.EphemeralContainerStatuses {
 		for _, volumeMount := range containerStatus.VolumeMounts {
-			if volumeMount.VolumeStatus.Image != nil {
+			if volumeMount.VolumeStatus != nil {
 				return true
 			}
 		}
@@ -1990,19 +1973,37 @@ func dropImageVolumeWithDigest(podStatus *api.PodStatus) {
 
 	for i := range podStatus.ContainerStatuses {
 		for j := range podStatus.ContainerStatuses[i].VolumeMounts {
-			podStatus.ContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+			podStatus.ContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
 		}
 	}
 
 	for i := range podStatus.InitContainerStatuses {
 		for j := range podStatus.InitContainerStatuses[i].VolumeMounts {
-			podStatus.InitContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+			podStatus.InitContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
 		}
 	}
 
 	for i := range podStatus.EphemeralContainerStatuses {
 		for j := range podStatus.EphemeralContainerStatuses[i].VolumeMounts {
-			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus.Image = nil
+			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
 		}
 	}
+}
+
+// hasRestartContainerForNonSidecarInitContainer returns true if any non-sidecar init container
+// has a RestartContainer resize policy.
+func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
+	if spec == nil {
+		return false
+	}
+	for _, c := range spec.InitContainers {
+		if !IsRestartableInitContainer(&c) {
+			for _, p := range c.ResizePolicy {
+				if p.RestartPolicy == api.RestartContainer {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

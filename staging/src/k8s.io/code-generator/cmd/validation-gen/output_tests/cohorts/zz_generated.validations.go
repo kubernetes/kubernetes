@@ -38,94 +38,126 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type T
-	scheme.AddValidationFunc((*T)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_T(ctx, op, nil /* fldPath */, obj.(*T), safe.Cast[*T](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*T)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_T(
+					ctx, op, nil, /* fldPath */
+					obj.(*T),
+					safe.Cast[*T](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_T validates an instance of T according
 // to declarative validation rules in the API schema.
-func Validate_T(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T) (errs field.ErrorList) {
+func Validate_T(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *T) (errs field.ErrorList) {
+
 	earlyReturn := false
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T ShortCircuit"); len(e) != 0 {
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
 	}
 	if earlyReturn {
 		return // do not proceed
 	}
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T Regular")...)
-	func() { // cohort c2
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T Regular"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	func() { // cohort = "c2"
 		earlyReturn := false
-		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 ShortCircuit"); len(e) != 0 {
+		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
 		}
 		if earlyReturn {
 			return // do not proceed
 		}
-		errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 Regular")...)
+		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 Regular"); len(e) != 0 {
+			errs = append(errs, e...)
+		}
 	}()
-	func() { // cohort c1
+	func() { // cohort = "c1"
 		earlyReturn := false
-		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 ShortCircuit"); len(e) != 0 {
+		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
 		}
 		if earlyReturn {
 			return // do not proceed
 		}
-		errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 Regular")...)
+		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 Regular"); len(e) != 0 {
+			errs = append(errs, e...)
+		}
 	}()
 
 	// field T.TypeMeta has no validation
 
-	// field T.S
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field T.S
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S ShortCircuit"); len(e) != 0 {
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S Regular")...)
-			func() { // cohort c2
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S Regular"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "c2"
 				earlyReturn := false
-				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 ShortCircuit"); len(e) != 0 {
+				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
-				errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 Regular")...)
+				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 Regular"); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
-			func() { // cohort c1
+			func() { // cohort = "c1"
 				earlyReturn := false
-				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 ShortCircuit"); len(e) != 0 {
+				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
-				errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 Regular")...)
+				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 Regular"); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T) *string { return &oldObj.S }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T) *string {
+				return &oldObj.S
+			})
+		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

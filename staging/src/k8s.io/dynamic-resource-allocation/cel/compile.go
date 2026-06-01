@@ -56,10 +56,6 @@ var (
 	lazyCompiler      *compiler
 	lazyFeatures      Features
 
-	// A variant of AnyType = https://github.com/kubernetes/kubernetes/blob/ec2e0de35a298363872897e5904501b029817af3/staging/src/k8s.io/apiserver/pkg/cel/types.go#L550:
-	// unknown actual type (could be bool, int, string, etc.) but with a known maximum size.
-	attributeType = withMaxElements(apiservercel.AnyType, resourceapi.DeviceAttributeMaxValueLength)
-
 	// Other strings also have a known maximum size.
 	domainType = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxDomainLength)
 	idType     = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxIDLength)
@@ -70,10 +66,6 @@ var (
 	// actual cost in compile_test.go).
 	multiAllocType = withMaxElements(apiservercel.BoolType, 1)
 
-	// Each map is bound by the maximum number of different attributes.
-	innerAttributesMapType = apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-	outerAttributesMapType = apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-
 	// Same for capacity.
 	innerCapacityMapType = apiservercel.NewMapType(idType, apiservercel.QuantityDeclType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
 	outerCapacityMapType = apiservercel.NewMapType(domainType, innerCapacityMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
@@ -82,6 +74,7 @@ var (
 // Features contains feature gates supported by the package.
 type Features struct {
 	EnableConsumableCapacity bool
+	EnableListTypeAttributes bool
 }
 
 func GetCompiler(features Features) *compiler {
@@ -110,6 +103,8 @@ type CompilationResult struct {
 	MaxCost uint64
 
 	emptyMapVal ref.Val
+
+	features Features
 }
 
 // Device defines the input values for a CEL selector expression.
@@ -131,6 +126,13 @@ type compiler struct {
 	// cost estimates version-dependent.
 	deviceType *apiservercel.DeclType
 	envset     *environment.EnvSet
+
+	// A variant of AnyType = https://github.com/kubernetes/kubernetes/blob/ec2e0de35a298363872897e5904501b029817af3/staging/src/k8s.io/apiserver/pkg/cel/types.go#L550:
+	// unknown actual type (could be bool, int, string, etc.) but with a known maximum size.
+	// If DRAListTypeAttributes is enabled, this also applies to list attributes, so that the cost estimator can take into account the size of the list.
+	attributeType *apiservercel.DeclType
+
+	features Features
 }
 
 // Options contains several additional parameters
@@ -160,6 +162,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 			},
 			Expression: expression,
 			MaxCost:    math.MaxUint64,
+			features:   c.features,
 		}
 	}
 
@@ -172,11 +175,24 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	if issues != nil {
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
+
+	// When the DRAListTypeAttributes feature is enabled,
+	// we use DynType instead of AnyType for the attributes
+	// so that standard iterate functions(e.g., exists, all etc.)
+	// and overridden includes function can work (See newCompiler() for details).
+	// Thus, the unknown return type can also be DynType, not just AnyType as before.
+	//
+	// This has to be valid because the end result of a CEL expression might be
+	// a boolean attribute, which then has AnyType/DynType.
 	expectedReturnType := cel.BoolType
-	if ast.OutputType() != expectedReturnType &&
-		ast.OutputType() != cel.AnyType {
+	if ast.OutputType() == expectedReturnType ||
+		ast.OutputType() == cel.AnyType ||
+		c.features.EnableListTypeAttributes && ast.OutputType() == cel.DynType {
+		// Okay, is one of the acceptable types.
+	} else {
 		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
 	}
+
 	_, err = cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
@@ -200,6 +216,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
 		MaxCost:     math.MaxUint64,
+		features:    c.features,
 	}
 
 	if !options.DisableCostEstimation {
@@ -217,14 +234,42 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	return compilationResult
 }
 
-func (c *compiler) newCostEstimator() *library.CostEstimator {
-	return &library.CostEstimator{SizeEstimator: &sizeEstimator{compiler: c}}
+func (c *compiler) newCostEstimator() checker.CostEstimator {
+	base := &library.CostEstimator{SizeEstimator: &sizeEstimator{compiler: c}}
+	return &draCostEstimator{base: base}
 }
 
 // getAttributeValue returns the native representation of the one value that
 // should be stored in the attribute, otherwise an error. An error is
 // also returned when there is no supported value.
-func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+//
+// If the DRAListTypeAttributes feature  is disabled and an attribute
+// contains a list value, then we fall through to returning the
+// "unsupported attribute value" error below.
+// This failure then aborts scheduling until ResourceSlices get updated.
+// This is better than incorrectly scheduling a pod
+// because that is harder to correct.
+func (c CompilationResult) getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+	if c.features.EnableListTypeAttributes {
+		switch {
+		case attr.IntValues != nil:
+			return attr.IntValues, nil
+		case attr.BoolValues != nil:
+			return attr.BoolValues, nil
+		case attr.StringValues != nil:
+			return attr.StringValues, nil
+		case attr.VersionValues != nil:
+			semVers := make([]apiservercel.Semver, len(attr.VersionValues))
+			for i, versionStr := range attr.VersionValues {
+				v, err := semver.Parse(versionStr)
+				if err != nil {
+					return nil, fmt.Errorf("parse semantic version: %w", err)
+				}
+				semVers[i] = apiservercel.Semver{Version: v}
+			}
+			return semVers, nil
+		}
+	}
 	switch {
 	case attr.IntValue != nil:
 		return *attr.IntValue, nil
@@ -250,7 +295,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
 	for name, attr := range input.Attributes {
-		value, err := getAttributeValue(attr)
+		value, err := c.getAttributeValue(attr)
 		if err != nil {
 			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
 		}
@@ -312,6 +357,24 @@ func newCompiler(features Features) *compiler {
 		return result
 	}
 
+	attributeType := withMaxElements(apiservercel.AnyType, resourceapi.DeviceAttributeMaxValueLength)
+	if features.EnableListTypeAttributes {
+		attributeType = withMaxElements(
+			// use DynType instead of AnyType so that iterate functions can work(e.g., exists, all, etc.)
+			apiservercel.DynType,
+			// When DRAListTypeAttributes feature gate is enabled, we cannot
+			// determine statically whether an attribute will be a scalar or a list
+			// at compile time. MaxElements should describe
+			// - the max number of items when it's a list.
+			// - the max length of the string representation when it's a scalar.
+			// Thus, we set it to the larger one of the two cases.
+			uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+		)
+	}
+	// Each map is bound by the maximum number of different attributes.
+	innerAttributesMapType := apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+	outerAttributesMapType := apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+
 	fieldsV131 := []*apiservercel.DeclField{
 		field(driverVar, driverType, true),
 		field(attributesVar, outerAttributesMapType, true),
@@ -363,13 +426,60 @@ func newCompiler(features Features) *compiler {
 				deviceTypeV134ConsumableCapacity,
 			},
 		},
+		{
+			IntroducedVersion: version.MajorMinor(1, 36),
+			FeatureEnabled: func() bool {
+				return features.EnableListTypeAttributes
+			},
+			EnvOptions: []cel.EnvOption{
+				cel.Function("includes",
+					cel.MemberOverload("dra_includes_dyn_dyn",
+						[]*cel.Type{cel.DynType, cel.DynType},
+						cel.BoolType,
+						cel.BinaryBinding(includesFunc),
+					),
+				),
+			},
+		},
 	}
 	envset, err := envset.Extend(versioned...)
 	if err != nil {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
 	// return with newest deviceType
-	return &compiler{envset: envset, deviceType: deviceTypeV134ConsumableCapacity}
+	return &compiler{envset: envset, deviceType: deviceTypeV134ConsumableCapacity, features: features, attributeType: attributeType}
+}
+
+// includesFunc implements the "includes" function for CEL (<target>.includes(<arg>)),
+// which checks whether the target includes the argument.
+// It supports both singular values and lists.
+//
+// WARNING: includes is not applicable to lists longer than
+// resourceapi.ResourceSliceMaxAttributeValuesPerDevice. A runtime error gets
+// returned in that case to prevent unbounded execution cost.
+// The target is expected to be a scalar or list attribute, but users can
+// technically call "includes" on any value.
+func includesFunc(target, arg ref.Val) ref.Val {
+	if list, ok := target.(traits.Lister); ok {
+		i := 0
+		it := list.Iterator()
+		for it.HasNext() == types.True {
+			if i >= resourceapi.ResourceSliceMaxAttributeValuesPerDevice {
+				return types.NewErr("'includes' function cannot be applied to lists longer than %d values", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+			}
+			item := it.Next()
+			if item.Equal(arg) == types.True {
+				return types.True
+			}
+			i++
+		}
+		return types.False
+	}
+
+	if target.Equal(arg) == types.True {
+		return types.True
+	}
+	return types.False
 }
 
 func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiservercel.DeclType {
@@ -414,7 +524,29 @@ func (m mapper) Find(key ref.Val) (ref.Val, bool) {
 	return m.defaultValue, true
 }
 
-// sizeEstimator tells the cost estimator the maximum size of maps or strings accessible through the `device` variable.
+// draCostEstimator is a wrapper around the base CEL CostEstimator to provide custom cost estimates for DRA-specific functions and types.
+type draCostEstimator struct {
+	base *library.CostEstimator
+}
+
+func (e *draCostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
+	return e.base.EstimateSize(element)
+}
+
+func (e *draCostEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if function == "includes" && overloadID == "dra_includes_dyn_dyn" {
+		// "<target>.includes(<arg>)" is equivalent with "<arg> in <target>"
+		// whose complexity is linear with the size of the target.
+		if target != nil {
+			targetSizeEstimate := checker.SizeEstimate{Min: 0, Max: resourceapi.ResourceSliceMaxAttributeValuesPerDevice}
+			return &checker.CallEstimate{CostEstimate: targetSizeEstimate.MultiplyByCost(checker.CostEstimate{Min: 1, Max: 1})}
+		}
+	}
+
+	return e.base.EstimateCallCost(function, overloadID, target, args)
+}
+
+// sizeEstimator tells the cost estimator the maximum size of maps, strings, or lists accessible through the `device` variable.
 // Without this, the maximum string size of e.g. `device.attributes["dra.example.com"].services` would be unknown.
 //
 // sizeEstimator is derived from the sizeEstimator in k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel.
@@ -459,8 +591,8 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 				// If this is an attribute map, then we know that all elements
 				// have the same maximum size as set in attributeType, regardless
 				// of their name.
-				if currentNode.ElemType == attributeType {
-					currentNode = attributeType
+				if currentNode.ElemType == s.compiler.attributeType {
+					currentNode = s.compiler.attributeType
 					continue
 				}
 				return nil

@@ -136,7 +136,8 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 			}
 
 			// use the json field name, which must be stable
-			dataString := strings.Split(field.Tag.Get("json"), ",")[0]
+			jsonTag, _ := field.Tag.Lookup("json")
+			dataString = strings.Split(jsonTag, ",")[0]
 			if dataString == "-" {
 				// unserialized field, no need to fill it
 				continue

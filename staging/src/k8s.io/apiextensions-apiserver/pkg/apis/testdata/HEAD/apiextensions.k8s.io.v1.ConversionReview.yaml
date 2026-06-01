@@ -36,6 +36,8 @@ response:
       remainingItemCount: 4
       resourceVersion: resourceVersionValue
       selfLink: selfLinkValue
+      shardInfo:
+        selector: selectorValue
     reason: reasonValue
     status: statusValue
   uid: uidValue

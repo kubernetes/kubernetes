@@ -1,50 +1,66 @@
-linters-settings:
-  govet:
-    check-shadowing: true
-  gocyclo:
-    min-complexity: 30
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 4
-  paralleltest:
-    ignore-missing: true
+version: "2"
 linters:
-  enable-all: true
+  default: all
   disable:
-    - maligned
-    - lll
-    - gochecknoglobals
-    - godox
-    - gocognit
-    - whitespace
-    - wsl
+    - depguard
     - funlen
-    - gochecknoglobals
-    - gochecknoinits
-    - scopelint
-    - wrapcheck
-    - exhaustivestruct
-    - exhaustive
-    - nlreturn
-    - testpackage
-    - gci
-    - gofumpt
-    - goerr113
-    - gomnd
-    - tparallel
-    - nestif
-    - godot
-    - errorlint
-    - varcheck
-    - interfacer
-    - deadcode
-    - golint
-    - ifshort
-    - structcheck
-    - nosnakecase
-    - varnamelen
+    - godox
     - exhaustruct
+    - nlreturn
+    - nonamedreturns
+    - noinlineerr
+    - paralleltest
+    - recvcheck
+    - testpackage
+    - tparallel
+    - varnamelen
+    - whitespace
+    - wrapcheck
+    - wsl
+    - wsl_v5
+  settings:
+    dupl:
+      threshold: 200
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    cyclop:
+      max-complexity: 20
+    gocyclo:
+      min-complexity: 20
+    exhaustive:
+      default-signifies-exhaustive: true
+      default-case-required: true
+    lll:
+      line-length: 180
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
+  max-same-issues: 0

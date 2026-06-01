@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
-	schedulingapiv1alpha2 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha2"
+	schedulingapiv1alpha3 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha3"
 	"k8s.io/kubernetes/pkg/features"
 	podgroupstore "k8s.io/kubernetes/pkg/registry/scheduling/podgroup/storage"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
@@ -58,10 +58,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = storageMap
 	}
 
-	if storageMap, err := p.v1alpha2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+	if storageMap, err := p.v1alpha3Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha2.SchemeGroupVersion.Version] = storageMap
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha3.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil
@@ -82,10 +82,10 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	return storage, nil
 }
 
-func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
-	if resource := "workloads"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "workloads"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			workloadStorage, err := workloadstore.NewREST(restOptionsGetter)
 			if err != nil {
@@ -97,7 +97,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		}
 	}
 
-	if resource := "podgroups"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "podgroups"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			podGroupStorage, podGroupStatusStorage, err := podgroupstore.NewREST(restOptionsGetter)
 			if err != nil {

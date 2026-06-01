@@ -40,7 +40,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -697,6 +697,21 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSlice)
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSliceList)
 
+	resourcePoolStatusRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Driver", Type: "string", Description: "The driver to query pools for."},
+		{Name: "Total", Type: "string", Description: "Total number of devices across all pools."},
+		{Name: "Available", Type: "string", Description: "Number of available devices across all pools."},
+		{Name: "Allocated", Type: "string", Description: "Number of allocated devices across all pools."},
+		{Name: "Unavailable", Type: "string", Description: "Number of unavailable devices across all pools."},
+		{Name: "Errors", Type: "string", Description: "Number of pools with validation errors."},
+		{Name: "Pools", Type: "integer", Description: "Total number of matching pools."},
+		{Name: "Status", Type: "string", Description: "Processing status."},
+		{Name: "Completed", Type: "string", Description: "Time since the observation completed."},
+	}
+	_ = h.TableHandler(resourcePoolStatusRequestColumnDefinitions, printResourcePoolStatusRequest)
+	_ = h.TableHandler(resourcePoolStatusRequestColumnDefinitions, printResourcePoolStatusRequestList)
+
 	deviceTaintColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		// The filter criteria are not printed. They could be lengthy (CEL!) and in practice many of them
@@ -747,7 +762,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podGroupColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Policy", Type: "string", Description: schedulingv1alpha2.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
+		{Name: "Policy", Type: "string", Description: schedulingv1alpha3.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
 		{Name: "Workload", Type: "string", Description: "Name of the referenced Workload object"},
 		{Name: "Status", Type: "string", Description: "Status of the PodGroup"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -2655,12 +2670,16 @@ func printNetworkPolicyList(list *networking.NetworkPolicyList, options printers
 }
 
 func printStorageClass(obj *storage.StorageClass, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	return printStorageClassInternal(obj, options, "")
+}
+
+func printStorageClassInternal(obj *storage.StorageClass, options printers.GenerateOptions, effectiveDefault string) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 
 	name := obj.Name
-	if storageutil.IsDefaultAnnotation(obj.ObjectMeta) {
+	if effectiveDefault != "" && obj.Name == effectiveDefault {
 		name += " (default)"
 	}
 	provtype := obj.Provisioner
@@ -2687,14 +2706,40 @@ func printStorageClass(obj *storage.StorageClass, options printers.GenerateOptio
 
 func printStorageClassList(list *storage.StorageClassList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
+
+	// Find the effective default StorageClass (most recently created one with default annotation)
+	effectiveDefault := getEffectiveDefaultStorageClass(list.Items)
+
 	for i := range list.Items {
-		r, err := printStorageClass(&list.Items[i], options)
+		r, err := printStorageClassInternal(&list.Items[i], options, effectiveDefault)
 		if err != nil {
 			return nil, err
 		}
 		rows = append(rows, r...)
 	}
 	return rows, nil
+}
+
+// getEffectiveDefaultStorageClass returns the name of the effective default StorageClass.
+// When multiple StorageClasses have the default annotation, the most recently created one
+// is the effective default. If timestamps are equal, the one with alphabetically first name wins.
+func getEffectiveDefaultStorageClass(items []storage.StorageClass) string {
+	var effectiveDefault *storage.StorageClass
+	for i := range items {
+		if storageutil.IsDefaultAnnotation(items[i].ObjectMeta) {
+			if effectiveDefault == nil {
+				effectiveDefault = &items[i]
+			} else if items[i].CreationTimestamp.After(effectiveDefault.CreationTimestamp.Time) {
+				effectiveDefault = &items[i]
+			} else if items[i].CreationTimestamp.Equal(&effectiveDefault.CreationTimestamp) && items[i].Name < effectiveDefault.Name {
+				effectiveDefault = &items[i]
+			}
+		}
+	}
+	if effectiveDefault != nil {
+		return effectiveDefault.Name
+	}
+	return ""
 }
 
 func printVolumeAttributesClass(obj *storage.VolumeAttributesClass, options printers.GenerateOptions) ([]metav1.TableRow, error) {
@@ -3263,6 +3308,91 @@ func printResourceSliceList(list *resource.ResourceSliceList, options printers.G
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printResourceSlice(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printResourcePoolStatusRequest(obj *resource.ResourcePoolStatusRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	status := "Pending"
+	var poolCount int32
+	var totalDevices, availableDevices, allocatedDevices, unavailableDevices, validationErrors string
+	totalDevices = "-"
+	availableDevices = "-"
+	allocatedDevices = "-"
+	unavailableDevices = "-"
+	validationErrors = "-"
+
+	var completedTime *metav1.Time
+	if obj.Status != nil {
+		isFailed := false
+		for _, cond := range obj.Status.Conditions {
+			if cond.Type == resource.ResourcePoolStatusRequestConditionComplete && cond.Status == metav1.ConditionTrue {
+				status = "Complete"
+				completedTime = &cond.LastTransitionTime
+				break
+			}
+			if cond.Type == resource.ResourcePoolStatusRequestConditionFailed && cond.Status == metav1.ConditionTrue {
+				status = "Failed"
+				isFailed = true
+				break
+			}
+		}
+		if obj.Status.PoolCount != nil {
+			poolCount = *obj.Status.PoolCount
+		}
+		// Show truncation info in status
+		if status == "Complete" && poolCount > int32(len(obj.Status.Pools)) {
+			status = fmt.Sprintf("Complete (%d/%d pools)", len(obj.Status.Pools), poolCount)
+		}
+		// Aggregate device counts if not failed
+		if !isFailed {
+			var sumTotal, sumAvail, sumAlloc, sumUnavail int32
+			var errorCount int32
+			for _, p := range obj.Status.Pools {
+				if p.ValidationError != nil {
+					errorCount++
+				}
+				if p.TotalDevices != nil {
+					sumTotal += *p.TotalDevices
+				}
+				if p.AvailableDevices != nil {
+					sumAvail += *p.AvailableDevices
+				}
+				if p.AllocatedDevices != nil {
+					sumAlloc += *p.AllocatedDevices
+				}
+				if p.UnavailableDevices != nil {
+					sumUnavail += *p.UnavailableDevices
+				}
+			}
+			totalDevices = strconv.Itoa(int(sumTotal))
+			availableDevices = strconv.Itoa(int(sumAvail))
+			allocatedDevices = strconv.Itoa(int(sumAlloc))
+			unavailableDevices = strconv.Itoa(int(sumUnavail))
+			validationErrors = strconv.Itoa(int(errorCount))
+		}
+	}
+	completed := "<none>"
+	if completedTime != nil {
+		completed = translateTimestampSince(*completedTime)
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Driver, totalDevices, availableDevices, allocatedDevices, unavailableDevices, validationErrors, poolCount, status, completed)
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printResourcePoolStatusRequestList(list *resource.ResourcePoolStatusRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printResourcePoolStatusRequest(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

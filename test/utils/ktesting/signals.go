@@ -77,7 +77,14 @@ var _ ginkgoReporter = &progressReporter{}
 // USR1 signal, similar to the corresponding Ginkgo feature.
 //
 // This support is active until the last test terminates.
-func (p *progressReporter) init(tb TB) context.Context {
+//
+// Inside a bubble, signal.Notify fails with "select on synctest channel from
+// outside bubble" if (and only if) it gets called for the first time, so we
+// have to avoid setting up signal handling to be on the safe side.
+func (p *progressReporter) init(tb TB, isSyncTest bool) context.Context {
+	if isSyncTest {
+		return context.Background()
+	}
 	if _, ok := tb.(testing.TB); !ok {
 		// Not in a Go unit test.
 		return context.Background()

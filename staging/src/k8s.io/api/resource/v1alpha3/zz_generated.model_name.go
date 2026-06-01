@@ -60,3 +60,28 @@ func (in DeviceTaintRuleStatus) OpenAPIModelName() string {
 func (in DeviceTaintSelector) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1alpha3.DeviceTaintSelector"
 }
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PoolStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.PoolStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ResourcePoolStatusRequest) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequest"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ResourcePoolStatusRequestList) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ResourcePoolStatusRequestSpec) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ResourcePoolStatusRequestStatus) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestStatus"
+}

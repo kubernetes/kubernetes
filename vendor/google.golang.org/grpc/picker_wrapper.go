@@ -192,7 +192,9 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 			// DoneInfo with default value works.
 			pickResult.Done(balancer.DoneInfo{})
 		}
-		logger.Infof("blockingPicker: the picked transport is not ready, loop back to repick")
+		if logger.V(2) {
+			logger.Infof("blockingPicker: the picked transport is not ready, loop back to repick")
+		}
 		// If ok == false, ac.state is not READY.
 		// A valid picker always returns READY subConn. This means the state of ac
 		// just changed, and picker will be updated shortly.

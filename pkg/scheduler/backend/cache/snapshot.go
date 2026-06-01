@@ -22,8 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -57,12 +59,18 @@ type Snapshot struct {
 	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
 	// This map should be emptied before the next cycle starts.
 	assumedPods map[string]*v1.Pod
-
+	// podGroupStates maps a pod group key to a snapshot of its state, used during a pod group scheduling cycle.
+	podGroupStates map[podGroupKey]*podGroupStateSnapshot
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
 	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
 	// This field should be cleared once the pod group has been checked for the placement.
 	placementNodes *placementNodes
+	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
+	genericWorkloadEnabled bool
+	// hasBackup holds information whether backup was performed and
+	// restore was not performed yet.
+	hasBackup bool
 }
 
 var _ fwk.SharedLister = &Snapshot{}
@@ -70,9 +78,11 @@ var _ fwk.SharedLister = &Snapshot{}
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
-		nodeInfoMap: make(map[string]*framework.NodeInfo),
-		usedPVCSet:  sets.New[string](),
-		assumedPods: make(map[string]*v1.Pod),
+		nodeInfoMap:            make(map[string]*framework.NodeInfo),
+		usedPVCSet:             sets.New[string](),
+		assumedPods:            make(map[string]*v1.Pod),
+		podGroupStates:         make(map[podGroupKey]*podGroupStateSnapshot),
+		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
 }
 
@@ -98,8 +108,84 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	s.havePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 	s.havePodsWithRequiredAntiAffinityNodeInfoList = havePodsWithRequiredAntiAffinityNodeInfoList
 	s.usedPVCSet = createUsedPVCSet(pods)
+	if s.genericWorkloadEnabled {
+		s.podGroupStates = createPodGroupStates(pods)
+	}
 
 	return s
+}
+
+// createPodGroupStates builds the initial pod group state snapshot map from a list of pods.
+func createPodGroupStates(pods []*v1.Pod) map[podGroupKey]*podGroupStateSnapshot {
+	podGroupStates := make(map[podGroupKey]*podGroupStateSnapshot)
+	for _, pod := range pods {
+		if pod.Spec.SchedulingGroup == nil {
+			continue
+		}
+		key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+		pgs, ok := podGroupStates[key]
+		if !ok {
+			pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
+			podGroupStates[key] = pgs
+		}
+		pgs.addPod(pod)
+	}
+	return podGroupStates
+}
+
+// RestoreSnapshot is a function that can be used to restore the snapshot to the state
+// before the backup was taken.
+type RestoreSnapshot func()
+
+// BackupSnapshot provides a way to temporarily backup the snapshot's state
+// and returns a restore function. This is primarily used in workload-aware
+// preemption to simulate pod group preemption by mutating deep copies of NodeInfos.
+// Backups cannot be stacked, i.e., only one backup can be made without restoring
+// the snapshot first.
+// Restoring backup when the placement is set is not supported and can lead to
+// undefined behavior.
+func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
+	if s.hasBackup {
+		return nil, fmt.Errorf("cannot stack backups")
+	}
+	origNodeInfoMap := s.nodeInfoMap
+	origNodeInfoList := s.nodeInfoList
+	origHavePodsWithAffinityNodeInfoList := s.havePodsWithAffinityNodeInfoList
+	origHavePodsWithRequiredAntiAffinityNodeInfoList := s.havePodsWithRequiredAntiAffinityNodeInfoList
+
+	clonedNodeInfoMap := make(map[string]*framework.NodeInfo, len(s.nodeInfoMap))
+	for k, v := range s.nodeInfoMap {
+		clonedNodeInfoMap[k] = v.Snapshot().(*framework.NodeInfo)
+	}
+
+	clonedNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+	clonedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+	clonedHavePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+
+	for _, v := range s.nodeInfoList {
+		clonedNode := clonedNodeInfoMap[v.Node().Name]
+		clonedNodeInfoList = append(clonedNodeInfoList, clonedNode)
+		if len(clonedNode.PodsWithAffinity) > 0 {
+			clonedHavePodsWithAffinityNodeInfoList = append(clonedHavePodsWithAffinityNodeInfoList, clonedNode)
+		}
+		if len(clonedNode.PodsWithRequiredAntiAffinity) > 0 {
+			clonedHavePodsWithRequiredAntiAffinityNodeInfoList = append(clonedHavePodsWithRequiredAntiAffinityNodeInfoList, clonedNode)
+		}
+	}
+
+	s.hasBackup = true
+	s.nodeInfoMap = clonedNodeInfoMap
+	s.nodeInfoList = clonedNodeInfoList
+	s.havePodsWithAffinityNodeInfoList = clonedHavePodsWithAffinityNodeInfoList
+	s.havePodsWithRequiredAntiAffinityNodeInfoList = clonedHavePodsWithRequiredAntiAffinityNodeInfoList
+
+	return func() {
+		s.hasBackup = false
+		s.nodeInfoMap = origNodeInfoMap
+		s.nodeInfoList = origNodeInfoList
+		s.havePodsWithAffinityNodeInfoList = origHavePodsWithAffinityNodeInfoList
+		s.havePodsWithRequiredAntiAffinityNodeInfoList = origHavePodsWithRequiredAntiAffinityNodeInfoList
+	}, nil
 }
 
 // createNodeInfoMap obtains a list of pods and pivots that list into a map
@@ -188,6 +274,27 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 	return s
 }
 
+// PodGroupStates returns a PodGroupStateLister.
+func (s *Snapshot) PodGroupStates() fwk.PodGroupStateLister {
+	return &podGroupStateSnapshotLister{podGroupStates: s.podGroupStates}
+}
+
+var _ fwk.PodGroupStateLister = &podGroupStateSnapshotLister{}
+
+type podGroupStateSnapshotLister struct {
+	podGroupStates map[podGroupKey]*podGroupStateSnapshot
+}
+
+// Get returns the pod group state from the snapshot for the given pod group.
+func (l *podGroupStateSnapshotLister) Get(namespace string, podGroupName string) (fwk.PodGroupState, error) {
+	key := newPodGroupKey(namespace, podGroupName)
+	state, ok := l.podGroupStates[key]
+	if !ok {
+		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+	}
+	return state, nil
+}
+
 // NumNodesInPlacement returns the number of nodes in the snapshot for the current placement.
 // If no placement is set, it returns the number of nodes in the snapshot.
 // This function is not thread safe so it should be executed when no other routines can write to the snapshot.
@@ -247,6 +354,14 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
 	s.assumedPods[key] = pod
+	// Update the pod group state in the snapshot if the pod belongs to a pod group.
+	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	pgKey := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	if pgs, ok := s.podGroupStates[pgKey]; ok {
+		pgs.assumePod(pod)
+	}
 	return nil
 }
 
@@ -276,6 +391,14 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		if len(nodeInfo.Pods) == 0 && nodeInfo.Node() == nil {
 			delete(s.nodeInfoMap, nodeName)
 		}
+	}
+	// Update the pod group state in the snapshot if the pod belongs to a pod group.
+	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	pgKey := newPodGroupKey(assumedPod.Namespace, *assumedPod.Spec.SchedulingGroup.PodGroupName)
+	if pgs, ok := s.podGroupStates[pgKey]; ok {
+		pgs.forgetPod(assumedPod.UID)
 	}
 	return nil
 }

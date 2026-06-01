@@ -79,7 +79,17 @@ func newMemoryManagerCheckpointV2() *MemoryManagerCheckpointV2 {
 func (mp *MemoryManagerCheckpointV1) MarshalCheckpoint() ([]byte, error) {
 	// make sure checksum wasn't set before so it doesn't affect output checksum
 	mp.Checksum = 0
-	mp.Checksum = checksum.New(mp)
+
+	// In order to preserve rollback compatibility when the feature gate is disabled,
+	// we must generate a checksum using the legacy struct name "MemoryManagerCheckpoint"
+	// instead of "MemoryManagerCheckpointV1". Older Kubelets do not have the string
+	// replacement logic and expect the original struct name.
+	object := dump.ForHash(mp)
+	object = strings.Replace(object, "MemoryManagerCheckpointV1", "MemoryManagerCheckpoint", 1)
+	hash := fnv.New32a()
+	_, _ = fmt.Fprintf(hash, "%v", object)
+	mp.Checksum = checksum.Checksum(hash.Sum32())
+
 	return json.Marshal(*mp)
 }
 

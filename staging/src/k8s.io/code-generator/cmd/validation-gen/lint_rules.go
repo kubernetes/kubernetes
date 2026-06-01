@@ -18,7 +18,10 @@ package main
 
 import (
 	"fmt"
+	"path"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -56,21 +59,18 @@ func alphaBetaPrefix() lintRule {
 // checkTagStability recursively checks that a tag and its nested tags
 // satisfy the stability requirements of the context.
 func checkTagStability(tag codetags.Tag, contextLevel validators.TagStabilityLevel) (string, error) {
-	if contextLevel == validators.TagStabilityLevelAlpha {
+	tagStability, err := validators.GetStability(tag.Name)
+	// all DV tags have stability, if a tag doesn't have stability then it is not a valid DV tag.
+	if err != nil {
 		return "", nil
 	}
-
-	stability, err := validators.GetStability(tag.Name)
-	if err == nil {
-		if contextLevel == validators.TagStabilityLevelBeta {
-			if stability != validators.TagStabilityLevelStable && stability != validators.TagStabilityLevelBeta {
-				return fmt.Sprintf("tag %q with stability level %q cannot be used in %s validation", tag.Name, stability, contextLevel), nil
-			}
-		} else if stability != validators.TagStabilityLevelStable {
-			return fmt.Sprintf("tag %q with stability level %q cannot be used in %s validation", tag.Name, stability, contextLevel), nil
-		}
+	cmpOrder, err := tagStability.Compare(contextLevel)
+	if err != nil {
+		return "", err
 	}
-
+	if cmpOrder < 0 {
+		return fmt.Sprintf("tag %q with stability level %q cannot be used in %s validation", tag.Name, tagStability, contextLevel), nil
+	}
 	if tag.ValueTag != nil {
 		return checkTagStability(*tag.ValueTag, contextLevel)
 	}
@@ -80,31 +80,58 @@ func checkTagStability(tag codetags.Tag, contextLevel validators.TagStabilityLev
 // validationStability enforces stability level constraints on tags.
 func validationStability() lintRule {
 	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+		pkgPath := t.Name.Package
+		if container != nil {
+			pkgPath = container.Name.Package
+		}
+
+		// Unprefixed validations are normally required to be Stable.
+		// In Alpha packages, we allow Alpha-level and Beta-level validations
+		// without a prefix. In Beta packages, we allow Beta-level validations
+		// without a prefix.
+		defaultContextLevel := validators.TagStabilityLevelStable
+		// APIVersion is the last element of the package path.
+		apiVersion := path.Base(pkgPath)
+		if strings.Contains(apiVersion, "alpha") {
+			defaultContextLevel = validators.TagStabilityLevelAlpha
+		} else if strings.Contains(apiVersion, "beta") {
+			defaultContextLevel = validators.TagStabilityLevelBeta
+		}
+
 		for _, tag := range tags {
-			contextLevel := validators.TagStabilityLevelStable
-			switch tag.Name {
-			case "k8s:alpha":
-				contextLevel = validators.TagStabilityLevelAlpha
-			case "k8s:beta":
-				contextLevel = validators.TagStabilityLevelBeta
-			default:
-				// Normal tag (implicit Stable context).
-				// Check the root tag itself.
-				stability, err := validators.GetStability(tag.Name)
-				if err == nil && stability != validators.TagStabilityLevelStable {
-					return fmt.Sprintf("tag %q with stability level %q cannot be used in Stable validation", tag.Name, stability), nil
+			contextLevel := defaultContextLevel
+			tagToCheck := tag
+
+			// For stability level tags, set the stability context for the inner validation,
+			// overriding the package-level default.
+			if tag.Name == "k8s:alpha" || tag.Name == "k8s:beta" {
+				if tag.Name == "k8s:alpha" {
+					contextLevel = validators.TagStabilityLevelAlpha
+				} else {
+					contextLevel = validators.TagStabilityLevelBeta
+				}
+				if tag.ValueTag == nil {
+					continue
+				}
+				tagToCheck = *tag.ValueTag
+			}
+
+			// For feature gate tags, we allow developers to use nested beta validation tags
+			// without forcing validation authors to write redundant handwritten code (bypassing the
+			// declarative validation equivalence check), we automatically relax the stability
+			// context to Beta if the current context is Stable.
+			if tagToCheck.Name == "k8s:ifEnabled" || tagToCheck.Name == "k8s:ifDisabled" {
+				if contextLevel == validators.TagStabilityLevelStable {
+					contextLevel = validators.TagStabilityLevelBeta
 				}
 			}
 
-			// Recursively check content.
-			if tag.ValueTag != nil {
-				msg, err := checkTagStability(*tag.ValueTag, contextLevel)
-				if err != nil {
-					return "", err
-				}
-				if msg != "" {
-					return msg, nil
-				}
+			msg, err := checkTagStability(tagToCheck, contextLevel)
+			if err != nil {
+				return "", err
+			}
+			if msg != "" {
+				return msg, nil
 			}
 		}
 		return "", nil
@@ -130,20 +157,20 @@ func hasRequirednessTag(tags []codetags.Tag) bool {
 	return hasTag(tags, "k8s:optional") || hasTag(tags, "k8s:required") || hasTag(tags, "k8s:forbidden")
 }
 
-// hasAnyValidationTag returns true if tags contain any registered validation tag.
-func hasAnyValidationTag(tags []codetags.Tag) bool {
+// hasNonOpaqueValidationTag returns true if tags contain any registered validation tag that is not opaqueType.
+func hasNonOpaqueValidationTag(extractor validators.ValidationExtractor, chainTags sets.Set[string], tags []codetags.Tag) bool {
 	for _, tag := range tags {
-		switch tag.Name {
-		case "k8s:optional":
+		if tag.Name == "k8s:optional" || tag.Name == "k8s:opaqueType" {
 			continue
-		case "k8s:alpha", "k8s:beta":
-			if tag.ValueTag != nil && hasAnyValidationTag([]codetags.Tag{*tag.ValueTag}) {
+		}
+		if chainTags.Has(tag.Name) {
+			if tag.ValueTag != nil && hasNonOpaqueValidationTag(extractor, chainTags, []codetags.Tag{*tag.ValueTag}) {
 				return true
 			}
 			continue
 		}
 		// Check if it's a known validation tag.
-		if _, err := validators.GetStability(tag.Name); err == nil {
+		if extractor.IsKnownTag(tag.Name) {
 			return true
 		}
 	}
@@ -153,70 +180,142 @@ func hasAnyValidationTag(tags []codetags.Tag) bool {
 // requiredAndOptional checks that fields (pointers, slices, maps, arrays) with validation
 // (either direct or transitive) explicitly declare +k8s:optional or +k8s:required.
 func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
-	// Cache for transitive validation check.
-	// Tri-state: key absent = unvisited, value nil = in-progress (cycle), value *bool = computed result.
-	hasValidation := make(map[*types.Type]*bool)
-
-	// checkType recursively checks if a type has any validation (transitively).
-	var checkType func(t *types.Type) (bool, bool)
-	checkType = func(t *types.Type) (bool, bool) {
-		if val, ok := hasValidation[t]; ok {
-			if val == nil {
-				return false, true // Cycle detected, break conservatively
-			}
-			return *val, false
+	chainTags := sets.New[string]()
+	for _, doc := range extractor.Docs() {
+		if doc.PayloadsType == codetags.ValueTypeTag {
+			chainTags.Insert(doc.Tag)
 		}
-		// Mark in-progress
-		hasValidation[t] = nil
-		extractedTags, err := extractor.ExtractTags(validators.Context{}, t.CommentLines)
-		hasVal := err == nil && hasAnyValidationTag(extractedTags)
-		cycleBroken := false
+	}
 
+	type opacity struct {
+		typ, key, val bool
+	}
+
+	filterTags := func(tags []codetags.Tag) []codetags.Tag {
+		var filtered []codetags.Tag
+		for _, tag := range tags {
+			if extractor.IsKnownTag(tag.Name) {
+				filtered = append(filtered, tag)
+			}
+		}
+		return filtered
+	}
+
+	type cacheKey struct {
+		t  *types.Type
+		op opacity
+	}
+	hasValidation := make(map[cacheKey]*bool)
+
+	// returns hasValidation, hasCycle, error
+	var hasTransitiveValidation func(t *types.Type, op opacity) (bool, bool, error)
+	hasTransitiveValidation = func(t *types.Type, op opacity) (bool, bool, error) {
+		if op.typ {
+			return false, false, nil
+		}
+
+		ck := cacheKey{t, op}
+		visitedVal, visited := hasValidation[ck]
+		if visited {
+			if visitedVal == nil {
+				return false, true, nil // cycle detected
+			}
+			return *visitedVal, false, nil
+		}
+		hasValidation[ck] = nil
+
+		tTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeType, Type: t}, t.CommentLines)
+		if err != nil {
+			return false, false, err
+		}
+
+		typeVals, err := extractor.ExtractValidations(
+			validators.Context{Scope: validators.ScopeType, Type: t},
+			filterTags(tTags)...,
+		)
+		if err != nil {
+			return false, false, err
+		}
+
+		op.typ = op.typ || typeVals.OpaqueType
+		op.key = op.key || typeVals.OpaqueKeyType
+		op.val = op.val || typeVals.OpaqueValType
+
+		if op.typ {
+			hasVal := false
+			hasValidation[ck] = &hasVal
+			return false, false, nil
+		}
+
+		if typeVals.HasEmitable() {
+			hasVal := true
+			hasValidation[ck] = &hasVal
+			return true, false, nil
+		}
+
+		var hasVal, cycleBroken bool
 		switch t.Kind {
 		case types.Alias:
-			if hv, cb := checkType(t.Underlying); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
-			}
-		case types.Struct:
-			for _, member := range t.Members {
-				memberTags, err := extractor.ExtractTags(validators.Context{}, member.CommentLines)
-				memberHasVal := err == nil && hasAnyValidationTag(memberTags)
-				if hv, cb := checkType(member.Type); hv {
-					memberHasVal = true
-				} else if cb {
-					cycleBroken = true
-				}
-				if memberHasVal {
-					hasVal = true
-				}
-			}
-		case types.Slice, types.Array, types.Pointer:
-			if hv, cb := checkType(t.Elem); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
-			}
+			hasVal, cycleBroken, err = hasTransitiveValidation(t.Underlying, op)
+		case types.Slice, types.Array:
+			hasVal, cycleBroken, err = hasTransitiveValidation(t.Elem, opacity{typ: op.val})
 		case types.Map:
-			if hv, cb := checkType(t.Key); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
+			kVal, cbKey, err := hasTransitiveValidation(t.Key, opacity{typ: op.key})
+			if err != nil {
+				return false, false, err
 			}
-			if hv, cb := checkType(t.Elem); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
+			eVal, cbVal, err := hasTransitiveValidation(t.Elem, opacity{typ: op.val})
+			if err != nil {
+				return false, false, err
+			}
+			hasVal = kVal || eVal
+			cycleBroken = cbKey || cbVal
+		case types.Pointer:
+			hasVal, cycleBroken, err = hasTransitiveValidation(t.Elem, op)
+		case types.Struct:
+			for _, m := range t.Members {
+				mTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeField, Type: m.Type}, m.CommentLines)
+				if err != nil {
+					return false, false, err
+				}
+				if hasNonOpaqueValidationTag(extractor, chainTags, mTags) {
+					hasVal = true
+					break
+				}
+				fieldVals, err := extractor.ExtractValidations(
+					validators.Context{Scope: validators.ScopeField, Type: m.Type},
+					filterTags(mTags)...,
+				)
+				if err != nil {
+					return false, false, err
+				}
+				mOp := opacity{
+					typ: op.typ || fieldVals.OpaqueType,
+					key: op.key || fieldVals.OpaqueKeyType,
+					val: op.val || fieldVals.OpaqueValType,
+				}
+				hv, cb, err := hasTransitiveValidation(m.Type, mOp)
+				if err != nil {
+					return false, false, err
+				}
+				cycleBroken = cycleBroken || cb
+				if hv {
+					hasVal = true
+					break
+				}
 			}
 		}
 
-		if hasVal || !cycleBroken {
-			hasValidation[t] = &hasVal
-		} else {
-			delete(hasValidation, t)
+		if err != nil {
+			return false, false, err
 		}
-		return hasVal, cycleBroken
+
+		if !cycleBroken {
+			hasValidation[ck] = &hasVal
+		} else {
+			delete(hasValidation, ck)
+		}
+		return hasVal, cycleBroken, nil
 	}
 
 	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
@@ -239,11 +338,31 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 			return "", nil
 		}
 
-		// Check if it has validation (direct or transitive)
-		hasDirectVal := hasAnyValidationTag(tags)
-		hasTransitiveVal, _ := checkType(t)
+		// Check if it has validation (direct or active transitive)
+		if hasNonOpaqueValidationTag(extractor, chainTags, tags) {
+			return "field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden", nil
+		}
 
-		if hasDirectVal || hasTransitiveVal {
+		fieldVals, err := extractor.ExtractValidations(
+			validators.Context{Scope: validators.ScopeField, Type: t},
+			filterTags(tags)...,
+		)
+		if err != nil {
+			return fmt.Sprintf("invalid validation tags: %v", err), nil
+		}
+
+		topOp := opacity{
+			typ: fieldVals.OpaqueType,
+			key: fieldVals.OpaqueKeyType,
+			val: fieldVals.OpaqueValType,
+		}
+
+		hasTransitiveVal, _, err := hasTransitiveValidation(t, topOp)
+		if err != nil {
+			return fmt.Sprintf("invalid validation tags: %v", err), nil
+		}
+
+		if hasTransitiveVal {
 			return "field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden", nil
 		}
 

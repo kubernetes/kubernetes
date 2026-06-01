@@ -111,7 +111,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		if !samePath {
 			// It's already mounted but not what we want, unmount it
 			if err = mounter.Unmount(bindPathTarget); err != nil {
-				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
+				return false, "", fmt.Errorf("error unmounting %s: %w", bindPathTarget, err)
 			}
 		} else {
 			// It's already mounted
@@ -428,7 +428,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		klog.V(4).Infof("Creating %s", dir)
 		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
 		if err != nil {
-			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
+			return fmt.Errorf("cannot create directory %s: %w", currentPath, err)
 		}
 		// Dive into the created directory
 		childFD, err = syscall.Openat(parentFD, dir, nofollowFlags|unix.O_CLOEXEC, 0)

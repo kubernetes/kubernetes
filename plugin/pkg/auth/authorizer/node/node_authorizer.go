@@ -106,6 +106,16 @@ func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace
 	return nil, nil, false, nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (r *NodeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(r.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*NodeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
@@ -146,15 +156,11 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case resourceSlice:
 			return r.authorizeResourceSlice(nodeName, attrs)
 		case nodeResource:
-			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
-				return r.authorizeNode(nodeName, attrs)
-			}
+			return r.authorizeNode(nodeName, attrs)
 		case podResource:
-			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
-				return r.authorizePod(nodeName, attrs)
-			}
+			return r.authorizePod(nodeName, attrs)
 		case pcrResource:
-			if r.features.Enabled(features.PodCertificateRequest) && r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+			if r.features.Enabled(features.PodCertificateRequest) {
 				return r.authorizePodCertificateRequest(nodeName, attrs)
 			}
 			return authorizer.DecisionNoOpinion, "", nil
@@ -359,25 +365,16 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 		// is allowed by recording a graph edge.
 		return r.authorize(nodeName, sliceVertexType, attrs)
 	case "watch", "list", "deletecollection":
-		if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
-			// only allow a scoped fieldSelector
-			reqs, _ := attrs.GetFieldSelector()
-			for _, req := range reqs {
-				if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
-					return authorizer.DecisionAllow, "", nil
-				}
+		// only allow a scoped fieldSelector
+		reqs, _ := attrs.GetFieldSelector()
+		for _, req := range reqs {
+			if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
+				return authorizer.DecisionAllow, "", nil
 			}
-			// deny otherwise
-			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-			return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
-		} else {
-			// Allow broad list/watch access if AuthorizeNodeWithSelectors is not enabled.
-			//
-			// The NodeRestriction admission plugin (plugin/pkg/admission/noderestriction)
-			// ensures that the node is not deleting some ResourceSlice belonging to
-			// some other node.
-			return authorizer.DecisionAllow, "", nil
 		}
+		// deny otherwise
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "only the following verbs are allowed for a ResourceSlice: get, watch, list, create, update, patch, delete, deletecollection", nil

@@ -1404,6 +1404,11 @@ func (f *folder) Parent() Activation {
 	return f.activation
 }
 
+// Unwrap returns the parent activation, thus omitting access to local state
+func (f *folder) Unwrap() Activation {
+	return f.activation
+}
+
 // UnknownAttributePatterns implements the PartialActivation interface returning the unknown patterns
 // if they were provided to the input activation, or an empty set if the proxied activation is not partial.
 func (f *folder) UnknownAttributePatterns() []*AttributePattern {
