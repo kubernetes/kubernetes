@@ -7,6 +7,21 @@ Go API changes are typically not included in the Kubernetes release notes, so
 non-breaking noteworthy Go API changes *may* be documented here if they are
 useful to know about for developers.
 
+### Replace with a short title
+
+Replace this text with a short summary of the change
+and how users of the package can deal with this breaking
+change. If users are not expected to be affected, then
+instead explain why. If the changes are too long,
+you may shorten them by replacing multiple lines
+with three dots (...).
+
+```
+- ./kubernetes.(*Clientset).Discovery: changed from func() k8s.io/client-go/discovery.DiscoveryInterface to func() k8s.io/client-go/discovery.DiscoveryInterfaces
+- ./kubernetes.Interface.Discovery: changed from func() k8s.io/client-go/discovery.DiscoveryInterface to func() k8s.io/client-go/discovery.DiscoveryInterfaces
+- ./kubernetes/fake.(*Clientset).Discovery: changed from func() k8s.io/client-go/discovery.DiscoveryInterface to func() k8s.io/client-go/discovery.DiscoveryInterfaces
+```
+
 ### Embed proper interface in TransformingStore to ensure DeltaFIFO and RealFIFO are implementing it
 
 See [PR #135580](https://github.com/kubernetes/kubernetes/pull/135580).
