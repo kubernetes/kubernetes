@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,9 +34,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	certv1informers "k8s.io/client-go/informers/certificates/v1"
 	certalpha1informers "k8s.io/client-go/informers/certificates/v1alpha1"
 	certbeta1informers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
+	certv1listers "k8s.io/client-go/listers/certificates/v1"
 	certalphav1listers "k8s.io/client-go/listers/certificates/v1alpha1"
 	certbetav1listers "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
@@ -68,7 +71,7 @@ type ClusterTrustBundlePublisher[T clusterTrustBundle] struct {
 
 // clusterTrustBundle is a type constraint grouping all APIs versions of ClusterTrustBundles
 type clusterTrustBundle interface {
-	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle
+	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle | certificatesv1.ClusterTrustBundle
 }
 
 // clusterTrustBundlesClient is an API-version independent client for the ClusterTrustBundles API
@@ -91,8 +94,39 @@ type clusterTrustBundleHandlers[T clusterTrustBundle] interface {
 	getName(ctbObject *T) string
 }
 
+var _ clusterTrustBundleHandlers[certificatesv1.ClusterTrustBundle] = &gaHandlers{}
 var _ clusterTrustBundleHandlers[certificatesv1beta1.ClusterTrustBundle] = &betaHandlers{}
 var _ clusterTrustBundleHandlers[certificatesv1alpha1.ClusterTrustBundle] = &alphaHandlers{}
+
+// betaHandlers groups the `clusterTrustBundleHandlers` for the v1 API of
+// clusterTrustBundles
+type gaHandlers struct{}
+
+func (w *gaHandlers) createClusterTrustBundle(bundleName, signerName, trustBundle string) *certificatesv1.ClusterTrustBundle {
+	return &certificatesv1.ClusterTrustBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: bundleName,
+		},
+		Spec: certificatesv1.ClusterTrustBundleSpec{
+			SignerName:  signerName,
+			TrustBundle: trustBundle,
+		},
+	}
+}
+
+func (w *gaHandlers) updateWithTrustBundle(ctbObject *certificatesv1.ClusterTrustBundle, newBundle string) *certificatesv1.ClusterTrustBundle {
+	newObj := ctbObject.DeepCopy()
+	newObj.Spec.TrustBundle = newBundle
+	return newObj
+}
+
+func (w *gaHandlers) containsTrustBundle(ctbObject *certificatesv1.ClusterTrustBundle, bundle string) bool {
+	return ctbObject.Spec.TrustBundle == bundle
+}
+
+func (w *gaHandlers) getName(ctbObject *certificatesv1.ClusterTrustBundle) string {
+	return ctbObject.Name
+}
 
 // betaHandlers groups the `clusterTrustBundleHandlers` for the v1beta1 API of
 // clusterTrustBundles
@@ -158,6 +192,31 @@ type caContentListener func()
 
 func (f caContentListener) Enqueue() {
 	f()
+}
+
+// NewBetaClusterTrustBundlePublisher sets up a ClusterTrustBundlePublisher for the
+// v1 API
+func NewGAClusterTrustBundlePublisher(
+	signerName string,
+	caProvider dynamiccertificates.CAContentProvider,
+	kubeClient clientset.Interface,
+) (
+	PublisherRunner,
+	error,
+) {
+	ctbInformer := certv1informers.NewFilteredClusterTrustBundleInformer(kubeClient, 0, cache.Indexers{},
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("spec.signerName", signerName).String()
+		})
+
+	return newClusterTrustBundlePublisher(
+		signerName,
+		caProvider,
+		kubeClient.CertificatesV1().ClusterTrustBundles(),
+		ctbInformer,
+		certv1listers.NewClusterTrustBundleLister(ctbInformer.GetIndexer()),
+		&gaHandlers{},
+	)
 }
 
 // NewBetaClusterTrustBundlePublisher sets up a ClusterTrustBundlePublisher for the

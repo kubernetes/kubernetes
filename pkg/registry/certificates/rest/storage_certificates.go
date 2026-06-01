@@ -85,6 +85,18 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource+"/approval"] = csrApprovalStorage
 	}
 
+	if resource := "clustertrustbundles"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+			bundleStorage, err := clustertrustbundlestore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = bundleStorage
+		} else {
+			klog.Warning("ClusterTrustBundle storage is disabled because the ClusterTrustBundle feature gate is disabled")
+		}
+	}
+
 	return storage, nil
 }
 
