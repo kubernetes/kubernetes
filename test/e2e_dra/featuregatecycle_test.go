@@ -61,17 +61,20 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 	subTests := map[string]struct {
 		test                gateOnFunc
 		driverResourcesFunc getResources
-		// gates lists the feature gates to start ON in phase 0, toggle OFF in phase 1, and re-enable in phase 2.
-		gates []string
+		// enabledGates lists the feature gates that are enabled throughout the test.
+		enabledGates []string
+		// toggledGates lists the feature gates to start ON in phase 0, toggle OFF in phase 1, and re-enable in phase 2.
+		toggledGates []string
 		// emulatedVersion, if non-empty, is passed as EMULATED_VERSION to local-up-cluster.sh.
 		// Set this to the last version where the gates were still toggleable so the test
 		// keeps working once those gates become locked in a future release.
-		emulatedVersion string
+		emulatedVersion    string
+		extraRuntimeConfig string
 	}{
 		"extended-resource": {
 			test:                extendedResourceGateCycle,
 			driverResourcesFunc: extendedResourcesDriverResources,
-			gates:               []string{"DRAExtendedResource"},
+			toggledGates:        []string{"DRAExtendedResource"},
 			// Emulate 1.36 so that gates which are locked in the current binary
 			// remain toggleable. DRAExtendedResource is toggleable in 1.36.
 			emulatedVersion: "1.36",
@@ -88,11 +91,14 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			localUpClusterEnv := map[string]string{
 				"RUNTIME_CONFIG": localUpClusterRuntimeConfig,
 			}
+			if def.extraRuntimeConfig != "" {
+				localUpClusterEnv["RUNTIME_CONFIG"] += "," + def.extraRuntimeConfig
+			}
 			if def.emulatedVersion != "" {
 				localUpClusterEnv["EMULATED_VERSION"] = def.emulatedVersion
 			}
 			phase := "phase-0-gate-on"
-			cluster.Start(tCtx, phase, dir, localUpClusterEnv, turnFgOn(def.gates))
+			cluster.Start(tCtx, phase, dir, localUpClusterEnv, turnFgOn(def.enabledGates)+","+turnFgOn(def.toggledGates))
 
 			restConfig := cluster.LoadConfig(tCtx)
 			restConfig.UserAgent = restclient.DefaultKubernetesUserAgent() + " -- dra"
@@ -119,7 +125,7 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 
 			// ---- Phase 1: gate(s) OFF ----
 			phase = "phase-1-gate-off"
-			cluster.ToggleFeatureGates(tCtx, phase, turnFgOff(def.gates))
+			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.enabledGates)+","+turnFgOff(def.toggledGates))
 			waitForSlices(tCtx, name, builder, def.driverResourcesFunc(nodes))
 
 			var gateOnAgainFn gateOnAgainFunc
@@ -129,7 +135,7 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 
 			// ---- Phase 2: gate(s) ON again ----
 			phase = "phase-2-gate-on-again"
-			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.gates))
+			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.enabledGates)+","+turnFgOn(def.toggledGates))
 			waitForSlices(tCtx, name, builder, def.driverResourcesFunc(nodes))
 
 			tCtx.Run(phase, func(tCtx ktesting.TContext) {
