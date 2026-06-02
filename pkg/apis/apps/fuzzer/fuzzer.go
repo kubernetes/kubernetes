@@ -44,9 +44,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(s.Spec.PodManagementPolicy) == 0 {
 				s.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
 			}
-			if len(s.Spec.UpdateStrategy.Type) == 0 {
-				s.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
-			}
+			strategyTypes := []apps.StatefulSetUpdateStrategyType{
+				apps.RollingUpdateStatefulSetStrategyType,
+				apps.OnDeleteStatefulSetStrategyType,
+				apps.RecreateStatefulSetStrategyType}
+
+			s.Spec.UpdateStrategy.Type = strategyTypes[c.Rand.Intn(len(strategyTypes))]
 			if s.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 				s.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{}
 			}
@@ -71,6 +74,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if len(s.Labels) == 0 {
 				s.Labels = s.Spec.Template.Labels
+			}
+			if s.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType || s.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
+				s.Spec.UpdateStrategy.RollingUpdate = nil
 			}
 			if s.Spec.UpdateStrategy.RollingUpdate != nil && s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 				s.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(1))
