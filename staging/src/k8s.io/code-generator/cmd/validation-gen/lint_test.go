@@ -27,22 +27,22 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-func ruleAlwaysPass(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+func ruleAlwaysPass(context validators.Context, tags []codetags.Tag) (string, error) {
 	return "", nil
 }
 
-func ruleAlwaysFail(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+func ruleAlwaysFail(context validators.Context, tags []codetags.Tag) (string, error) {
 	return "lintfail", nil
 }
 
-func ruleAlwaysErr(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+func ruleAlwaysErr(context validators.Context, tags []codetags.Tag) (string, error) {
 	return "", errors.New("linterr")
 }
 
 func mkCountRule(counter *int, realRule lintRule) lintRule {
-	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+	return func(context validators.Context, tags []codetags.Tag) (string, error) {
 		(*counter)++
-		return realRule(container, t, tags)
+		return realRule(context, tags)
 	}
 }
 
@@ -109,7 +109,7 @@ func TestLintCommentsRuleInvocation(t *testing.T) {
 			}
 			l := newLinter(rules...)
 			for _, commentLines := range tt.commentLineGroups {
-				_, err := l.lintComments(nil, nil, commentLines)
+				_, err := l.lintComments(validators.Context{}, commentLines)
 				gotErr := err != nil
 				if gotErr != tt.wantErr {
 					t.Errorf("lintComments() error = %v, wantErr %v", err, tt.wantErr)
@@ -178,7 +178,7 @@ func TestRuleAlphaBetaPrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			msg, err := alphaBetaPrefix()(nil, nil, tags)
+			msg, err := alphaBetaPrefix()(validators.Context{}, tags)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			} else if msg != tt.wantMsg {
@@ -266,7 +266,7 @@ func TestRuleStability(t *testing.T) {
 			dummyType := &types.Type{Name: types.Name{Package: tt.pkg, Name: "Dummy"}}
 			rule := validationStability()
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			msg, err := rule(nil, dummyType, tags)
+			msg, err := rule(validators.Context{Type: dummyType}, tags)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			} else if msg != tt.wantMsg {

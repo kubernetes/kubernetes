@@ -45,7 +45,7 @@ func checkAlphaBetaUsage(tag codetags.Tag, isRoot bool) (string, error) {
 
 // alphaBetaPrefix enforces that +k8s:alpha and +k8s:beta tags are always used as prefix to
 func alphaBetaPrefix() lintRule {
-	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+	return func(context validators.Context, tags []codetags.Tag) (string, error) {
 		for _, tag := range tags {
 			// Only check alpha/beta tags or validation tags.
 			if msg, err := checkAlphaBetaUsage(tag, true); err != nil || msg != "" {
@@ -79,10 +79,10 @@ func checkTagStability(tag codetags.Tag, contextLevel validators.TagStabilityLev
 
 // validationStability enforces stability level constraints on tags.
 func validationStability() lintRule {
-	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
-		pkgPath := t.Name.Package
-		if container != nil {
-			pkgPath = container.Name.Package
+	return func(context validators.Context, tags []codetags.Tag) (string, error) {
+		pkgPath := context.Type.Name.Package
+		if context.ParentType != nil {
+			pkgPath = context.ParentType.Name.Package
 		}
 
 		// Unprefixed validations are normally required to be Stable.
@@ -273,8 +273,9 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		case types.Pointer:
 			hasVal, cycleBroken, err = hasTransitiveValidation(t.Elem, op)
 		case types.Struct:
-			for _, m := range t.Members {
-				mTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeField, Type: m.Type}, m.CommentLines)
+			for i := range t.Members {
+				m := &t.Members[i]
+				mTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeField, Type: m.Type, Member: m, ParentType: t}, m.CommentLines)
 				if err != nil {
 					return false, false, err
 				}
@@ -283,7 +284,12 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 					break
 				}
 				fieldVals, err := extractor.ExtractValidations(
-					validators.Context{Scope: validators.ScopeField, Type: m.Type},
+					validators.Context{
+						Scope:      validators.ScopeField,
+						Type:       m.Type,
+						Member:     m,
+						ParentType: t,
+					},
 					filterTags(mTags)...,
 				)
 				if err != nil {
@@ -318,11 +324,13 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		return hasVal, cycleBroken, nil
 	}
 
-	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+	return func(context validators.Context, tags []codetags.Tag) (string, error) {
 		// We only care about fields in a struct. Skip if linting the struct itself.
-		if container == nil || container.Kind != types.Struct || container == t {
+		if context.Scope != validators.ScopeField {
 			return "", nil
 		}
+
+		t := context.Member.Type
 
 		// Skip non-pointer structs (and aliases to them) as they don't support requiredness tags.
 		underlying := t
@@ -344,7 +352,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		}
 
 		fieldVals, err := extractor.ExtractValidations(
-			validators.Context{Scope: validators.ScopeField, Type: t},
+			context,
 			filterTags(tags)...,
 		)
 		if err != nil {
