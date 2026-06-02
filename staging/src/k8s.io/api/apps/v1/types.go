@@ -112,6 +112,13 @@ const (
 	// When a scale operation is performed with this strategy, new Pods will be
 	// created from the specification version indicated by the StatefulSet's updateRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
+	// RecreateStatefulSetStrategyType indicates that all existing pods will be
+	// deleted and fully terminated before any new-revision pods are created.
+	// This ensures that old and new revision Pods never run at the same time.
+	// This is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	//
+	// +featureGate=StatefulSetRecreateStrategy
+	RecreateStatefulSetStrategyType StatefulSetUpdateStrategyType = "Recreate"
 )
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
@@ -326,6 +333,12 @@ type StatefulSetStatus struct {
 }
 
 type StatefulSetConditionType string
+
+const (
+	// StatefulSetProgressing means the StatefulSet is progressing through an update.
+	// This condition is an alpha type and requires enabling StatefulSetRecreateStrategy feature gate.
+	StatefulSetProgressing StatefulSetConditionType = "Progressing"
+)
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {

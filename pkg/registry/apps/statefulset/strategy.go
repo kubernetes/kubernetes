@@ -92,6 +92,14 @@ func maxUnavailableInUse(statefulset *apps.StatefulSet) bool {
 	return statefulset.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable != nil
 }
 
+// recreateStrategyInUse returns true if StatefulSet's recreate update strategy set(used)
+func recreateStrategyInUse(statefulset *apps.StatefulSet) bool {
+	if statefulset == nil {
+		return false
+	}
+	return statefulset.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType
+}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
@@ -123,13 +131,24 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
+	// Drop Recreate strategy type when the feature gate is disabled and
+	// the old object does not already use it.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) && !recreateStrategyInUse(oldSS) {
+		if newSS.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+			newSS.Spec.UpdateStrategy.Type = ""
+		}
+	}
 }
 
 // Validate validates a new StatefulSet.
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&statefulSet.Spec.Template, nil)
-	return validation.ValidateStatefulSet(statefulSet, opts)
+	setOpts := validation.StatefulSetValidationOptions{
+		AllowInvalidServiceName:          false, // require valid serviceNames in new StatefulSets
+		AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy),
+	}
+	return validation.ValidateStatefulSet(statefulSet, setOpts, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -160,8 +179,14 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 
+	setOpts := validation.StatefulSetValidationOptions{
+		AllowInvalidServiceName:          true, // serviceName is immutable, tolerate existing invalid names on update
+		SkipValidateVolumeClaimTemplates: true, // volumeClaimTemplates are immutable, tolerate previously persisted invalid values on update
+		AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) ||
+			oldStatefulSet.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType,
+	}
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
+	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, setOpts, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
