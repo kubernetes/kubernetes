@@ -1774,7 +1774,7 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.36"
+    version: "1.37"
 - name: StatefulSetRecreateStrategy
   versionedSpecs:
   - default: false
