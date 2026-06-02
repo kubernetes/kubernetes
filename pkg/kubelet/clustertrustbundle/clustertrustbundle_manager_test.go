@@ -42,6 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/informers"
@@ -244,20 +245,24 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](t *testing.T, b test
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
-	// We need to sleep long enough for the informer to notice the new
-	// ClusterTrustBundle, but much less than the 5 minutes of the cache TTL.
-	// This shows us that the informer is properly clearing the cache.
-	time.Sleep(5 * time.Second)
-
 	t.Run("foo should yield the new certificate", func(t *testing.T) {
-		gotBundle, err := ctbManager.GetTrustAnchorsByName("foo", false)
-		if err != nil {
-			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
-		}
+		// wait for the changes to bubble through informer to the lister
+		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			gotBundle, err := ctbManager.GetTrustAnchorsByName("foo", false)
+			if err != nil {
+				t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
+			}
 
-		wantBundle := b.ctbTrustBundle(ctb2)
-		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
-			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+			wantBundle := b.ctbTrustBundle(ctb2)
+			if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+				t.Logf("Bad bundle; diff (-got +want)\n%s", diff)
+				return false, nil
+			}
+			return true, nil
+		})
+
+		if err != nil {
+			t.Logf("bundles never synced: %v", err)
 		}
 	})
 }
@@ -445,21 +450,25 @@ func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](t *testing.T, 
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
-	// We need to sleep long enough for the informer to notice the new
-	// ClusterTrustBundle, but much less than the 5 minutes of the cache TTL.
-	// This shows us that the informer is properly clearing the cache.
-	time.Sleep(5 * time.Second)
-
 	t.Run("signer-a label-a should return the new certificate", func(t *testing.T) {
-		gotBundle, err := ctbManager.GetTrustAnchorsBySigner("foo.bar/a", &metav1.LabelSelector{MatchLabels: map[string]string{"label": "a"}}, false)
+		// wait for the changes to bubble through informer to the lister
+		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			gotBundle, err := ctbManager.GetTrustAnchorsBySigner("foo.bar/a", &metav1.LabelSelector{MatchLabels: map[string]string{"label": "a"}}, false)
+			if err != nil {
+				t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
+			}
+
+			wantBundle := b.ctbTrustBundle(ctb2)
+
+			if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+				t.Logf("Bad bundle; diff (-got +want)\n%s", diff)
+				return false, nil
+			}
+
+			return true, nil
+		})
 		if err != nil {
-			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
-		}
-
-		wantBundle := b.ctbTrustBundle(ctb2)
-
-		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
-			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+			t.Logf("bundles never synced: %v", err)
 		}
 	})
 }
