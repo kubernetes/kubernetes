@@ -32,6 +32,7 @@ import (
 	appconfig "k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
+	nodelifecycleconfig "k8s.io/cloud-provider/controllers/nodelifecycle/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -85,7 +86,6 @@ func TestDefaultFlags(t *testing.T) {
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
-				NodeMonitorWorkers:        1,
 				ClusterName:               "kubernetes",
 				ClusterCIDR:               "",
 				AllocateNodeCIDRs:         false,
@@ -102,6 +102,12 @@ func TestDefaultFlags(t *testing.T) {
 		NodeController: &NodeControllerOptions{
 			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
 				ConcurrentNodeSyncs: 1,
+			},
+		},
+		NodeLifecycleController: &NodeLifecycleControllerOptions{
+			NodeLifecycleControllerConfiguration: &nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				NodeMonitorWorkers: 1,
+				NodeMonitorPeriod:  metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
@@ -249,7 +255,6 @@ func TestAddFlags(t *testing.T) {
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
-				NodeMonitorWorkers:        1,
 				ClusterName:               "k8s",
 				ClusterCIDR:               "1.2.3.4/24",
 				AllocateNodeCIDRs:         true,
@@ -266,6 +271,12 @@ func TestAddFlags(t *testing.T) {
 		NodeController: &NodeControllerOptions{
 			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
 				ConcurrentNodeSyncs: 5,
+			},
+		},
+		NodeLifecycleController: &NodeLifecycleControllerOptions{
+			NodeLifecycleControllerConfiguration: &nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				NodeMonitorWorkers: 1,
+				NodeMonitorPeriod:  metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
@@ -425,7 +436,6 @@ func TestCreateConfig(t *testing.T) {
 			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
-				NodeMonitorWorkers:        1,
 				ClusterName:               "k8s",
 				ClusterCIDR:               "1.2.3.4/24",
 				AllocateNodeCIDRs:         true,
@@ -443,6 +453,10 @@ func TestCreateConfig(t *testing.T) {
 				ConcurrentNodeSyncs: 1,
 				// ConcurrentNodeStatusUpdates should default to the value of ConcurrentNodeSyncs only at the stage of config creation
 				ConcurrentNodeStatusUpdates: 1,
+			},
+			NodeLifecycleController: nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				NodeMonitorWorkers: 1,
+				NodeMonitorPeriod:  metav1.Duration{Duration: 5 * time.Second},
 			},
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook: cpconfig.WebhookConfiguration{
@@ -572,7 +586,6 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
-				NodeMonitorWorkers:        1,
 				ClusterName:               "k8s",
 				ClusterCIDR:               "1.2.3.4/24",
 				AllocateNodeCIDRs:         true,
@@ -589,6 +602,10 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 			NodeController: nodeconfig.NodeControllerConfiguration{
 				ConcurrentNodeSyncs:         1,
 				ConcurrentNodeStatusUpdates: 2,
+			},
+			NodeLifecycleController: nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				NodeMonitorWorkers: 1,
+				NodeMonitorPeriod:  metav1.Duration{Duration: 5 * time.Second},
 			},
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook:                   cpconfig.WebhookConfiguration{},
@@ -650,5 +667,152 @@ func TestCloudControllerManagerAliases(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cfg.Controllers, expectedControllers) {
 		t.Errorf("controller aliases not resolved correctly, expected %+v, got %+v", expectedControllers, cfg.Controllers)
+	}
+}
+
+func TestCreateConfigWithNodeMonitorPeriod(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		cliArgs                    []string
+		initialNodeLifecyclePeriod time.Duration
+		initialLegacySharedPeriod  time.Duration
+		expectedControllerPeriod   time.Duration
+		expectValidationError      bool
+	}{
+		{
+			name:                       "legacy CLI flag set, new config unset",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=10s"},
+			initialNodeLifecyclePeriod: 0,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   10 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "legacy CLI flag set to invalid <= 0s value",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=0s"},
+			initialNodeLifecyclePeriod: 0,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   0,
+			expectValidationError:      true,
+		},
+		{
+			name:                       "new config value set, legacy CLI unset",
+			cliArgs:                    []string{"--cloud-provider=aws"},
+			initialNodeLifecyclePeriod: 8 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   8 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "new config value set to invalid <= 0s value",
+			cliArgs:                    []string{"--cloud-provider=aws"},
+			initialNodeLifecyclePeriod: -2 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   -2 * time.Second,
+			expectValidationError:      true,
+		},
+		{
+			name:                       "both set, new config wins over explicit CLI",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=15s"},
+			initialNodeLifecyclePeriod: 8 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   8 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "both set, new config wins over CLI explicit default",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=5s"},
+			initialNodeLifecyclePeriod: 15 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   15 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "both unset (uses global default)",
+			cliArgs:                    []string{"--cloud-provider=aws"},
+			initialNodeLifecyclePeriod: 5 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   5 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "config file legacy field set, new field unset (backward compatibility)",
+			cliArgs:                    []string{"--cloud-provider=aws"},
+			initialNodeLifecyclePeriod: 0,
+			initialLegacySharedPeriod:  12 * time.Second,
+			expectedControllerPeriod:   12 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "config file both fields set, new field takes precedence",
+			cliArgs:                    []string{"--cloud-provider=aws"},
+			initialNodeLifecyclePeriod: 9 * time.Second,
+			initialLegacySharedPeriod:  12 * time.Second,
+			expectedControllerPeriod:   9 * time.Second,
+			expectValidationError:      false,
+		},
+		{
+			name:                       "legacy CLI invalid, new config valid",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=-5s"},
+			initialNodeLifecyclePeriod: 8 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectValidationError:      true,
+		},
+		{
+			name:                       "legacy CLI valid, new config invalid",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=8s"},
+			initialNodeLifecyclePeriod: -3 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectValidationError:      true,
+		},
+		{
+			name:                       "multi-flag integration smoke test",
+			cliArgs:                    []string{"--cloud-provider=aws", "--node-monitor-period=7s", "--cloud-node-lifecycle-monitor-nodes-workers=4"},
+			initialNodeLifecyclePeriod: 5 * time.Second,
+			initialLegacySharedPeriod:  5 * time.Second,
+			expectedControllerPeriod:   7 * time.Second,
+			expectValidationError:      false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+
+			s, err := NewCloudControllerManagerOptions()
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+
+			for _, f := range s.Flags([]string{""}, []string{""}, nil, []string{""}, []string{""}).FlagSets {
+				fs.AddFlagSet(f)
+			}
+
+			tmpdir, err := os.MkdirTemp("", "options_test")
+			if err != nil {
+				t.Fatalf("%s", err)
+			}
+			defer func() { _ = os.RemoveAll(tmpdir) }()
+
+			// Apply simulated initial configuration (e.g. loaded from config file)
+			s.NodeLifecycleController.NodeMonitorPeriod = metav1.Duration{Duration: tc.initialNodeLifecyclePeriod}
+			//nolint:staticcheck // SA1019: Intentional write to deprecated field for test coverage
+			s.KubeCloudShared.NodeMonitorPeriod = metav1.Duration{Duration: tc.initialLegacySharedPeriod}
+
+			var cliArgs []string
+			cliArgs = append(cliArgs, tc.cliArgs...)
+			cliArgs = append(cliArgs, "--master=192.168.4.20", "--secure-port=0", fmt.Sprintf("--cert-dir=%s/certs", tmpdir))
+			err = fs.Parse(cliArgs)
+			require.NoError(t, err, "unexpected error: %s", err)
+
+			c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
+			if tc.expectValidationError {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err, "unexpected error: %s", err)
+
+			assert.Equal(t, tc.expectedControllerPeriod, c.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration)
+		})
 	}
 }
