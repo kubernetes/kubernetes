@@ -49,9 +49,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
@@ -571,6 +573,8 @@ func dumpProcesses(tCtx ktesting.TContext) {
 
 // ToggleFeatureGates restarts the feature gated components with the specified feature gates.
 // The returned ModifyOptions can be passed to Modify to restore the original state.
+// Gates that are locked in the current release are automatically excluded from kubelet's
+// command line, since kubelet lacks --emulated-version support and would reject toggling a locked gate.
 func (c *Cluster) ToggleFeatureGates(tCtx ktesting.TContext, state string, featureGates string) ModifyOptions {
 	tCtx.Helper()
 
@@ -579,11 +583,29 @@ func (c *Cluster) ToggleFeatureGates(tCtx ktesting.TContext, state string, featu
 		FeatureGatesByComponent: make(map[ClusterComponentName]string),
 	}
 
+	allGates := utilfeature.DefaultMutableFeatureGate.GetAll()
+
 	for _, component := range featureGatedComponents {
-		opts.FeatureGatesByComponent[component] = featureGates
+		gates := featureGates
+		if component == Kubelet {
+			gates = filterLockedFeatureGates(featureGates, allGates)
+		}
+		opts.FeatureGatesByComponent[component] = gates
 	}
 
 	return c.Modify(tCtx, state, opts)
+}
+
+// filterLockedFeatureGates removes gates that are locked to their default value from the
+// feature gates string. Kubelet does not support --emulated-version and would reject
+// toggling a locked gate, so locked gates must be excluded from its command line.
+func filterLockedFeatureGates(featureGates string, allGates map[featuregate.Feature]featuregate.FeatureSpec) string {
+	filtered := slices.DeleteFunc(strings.Split(featureGates, ","), func(gate string) bool {
+		gateName := strings.TrimSpace(strings.SplitN(gate, "=", 2)[0])
+		spec, known := allGates[featuregate.Feature(gateName)]
+		return known && spec.LockToDefault
+	})
+	return strings.Join(filtered, ",")
 }
 
 // mergeFeatureGatesFlags merges the given feature gates (in "fg1=true,fg2=false" format)
