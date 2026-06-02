@@ -34,7 +34,7 @@ const (
 	optionalTagName    = "k8s:optional"
 	forbiddenTagName   = "k8s:forbidden"
 	defaultTagName     = "default" // TODO: this should eventually be +k8s:default
-	setByServerTagName = "setByServer"
+	setByServerTagName = "k8s:setByServer"
 )
 
 func init() {
@@ -338,7 +338,7 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
 		doc.StabilityLevel = TagStabilityLevelStable
-		doc.Description = "Indicates that a field is optional to clients."
+		doc.Description = "Indicates that a field is optional to clients. Fields with +default or +k8s:setByServer are effectively required on the server side."
 	case requirednessForbidden:
 		doc.StabilityLevel = TagStabilityLevelBeta
 		doc.Description = "Indicates that a field may not be specified."

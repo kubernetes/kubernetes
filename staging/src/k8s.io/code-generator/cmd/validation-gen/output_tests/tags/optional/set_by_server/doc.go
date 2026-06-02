@@ -29,39 +29,39 @@ type Struct struct {
 	TypeMeta int
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	StringField string `json:"stringField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	StringPtrField *string `json:"stringPtrField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	IntField int `json:"intField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	IntPtrField *int `json:"intPtrField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	BoolField bool `json:"boolField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	BoolPtrField *bool `json:"boolPtrField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	StructPtrField *Submarker `json:"structPtrField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	SliceField []string `json:"sliceField"`
 
 	// +k8s:optional
-	// +setByServer
+	// +k8s:setByServer
 	MapField map[string]string `json:"mapField"`
 }
 

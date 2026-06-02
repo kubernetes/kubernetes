@@ -53,7 +53,7 @@ type SmallStruct struct {
 }
 
 type SetByServerSmallStruct struct {
-	// +setByServer
+	// +k8s:setByServer
 	SetByServerField string `json:"setByServerField"`
 }
 

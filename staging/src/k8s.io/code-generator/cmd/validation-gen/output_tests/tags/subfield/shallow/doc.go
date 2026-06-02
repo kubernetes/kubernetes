@@ -55,7 +55,7 @@ type OtherStruct struct {
 }
 
 type SetByServerOtherStruct struct {
-	// +setByServer
+	// +k8s:setByServer
 	SetByServerField string `json:"setByServerField"`
 }
 
