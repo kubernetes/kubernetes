@@ -1,5 +1,10 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+runtimeConfig:
+  "resource.k8s.io/v1alpha3": "true"
+  "resource.k8s.io/v1beta1": "true"
+  "resource.k8s.io/v1beta2": "true"
+  "scheduling.k8s.io/v1alpha3": "true"
 containerdConfigPatches:
 # Enable CDI as described in
 # https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
@@ -35,10 +40,6 @@ kubeadmConfigPatches:
             value: "5"
           - name: "vmodule"
             value: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
-    apiServer:
-        extraArgs:
-          - name: "runtime-config"
-            value: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true,scheduling.k8s.io/v1alpha3=true"
   - |
     kind: InitConfiguration
     apiVersion: kubeadm.k8s.io/v1beta4
@@ -64,9 +65,6 @@ kubeadmConfigPatches:
         extraArgs:
           v: "5"
           vmodule: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
-    apiServer:
-        extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true,scheduling.k8s.io/v1alpha3=true"
   - |
     kind: InitConfiguration
     apiVersion: kubeadm.k8s.io/v1beta3
@@ -83,5 +81,5 @@ kubeadmConfigPatches:
 #
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
-  DynamicResourceAllocation: true
-  NodeLogQuery: true
+  DynamicResourceAllocation: true # Still needed for n-3 testing against kubelet 1.33. Can be removed once we only test against 1.34.
+  NodeLogQuery: true # Still needed for n-3/2/1 testing. Can be removed once we only test against >= 1.36.
