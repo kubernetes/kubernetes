@@ -147,7 +147,18 @@ type cgroupCommon struct {
 
 	// useSystemd tells if systemd cgroup manager should be used.
 	useSystemd bool
+
+	// isUnifiedOverride is used to override the default behavior of isUnified() for testing purposes.
+	isUnifiedOverride *bool
 }
+
+func (m *cgroupCommon) isUnified() bool {
+	if m.isUnifiedOverride != nil {
+		return *m.isUnifiedOverride
+	}
+	return libcontainercgroups.IsCgroup2UnifiedMode()
+}
+
 
 // Make sure that cgroupV1impl and cgroupV2impl implement the CgroupManager interface
 var _ CgroupManager = &cgroupV1impl{}
@@ -293,7 +304,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 		resources.Memory = *resourceConfig.Memory
 	}
 	if resourceConfig.CPUShares != nil {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if m.isUnified() {
 			resources.CpuWeight = getCPUWeight(resourceConfig.CPUShares)
 		} else {
 			resources.CpuShares = *resourceConfig.CPUShares
@@ -317,7 +328,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 	// Ideally unified is used for all the resources when running on cgroup v2.
 	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
 	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
-	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+	if resourceConfig.Unified != nil && m.isUnified() {
 		resources.Unified = make(map[string]string)
 		for k, v := range resourceConfig.Unified {
 			resources.Unified[k] = v
@@ -328,7 +339,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 
 func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *ResourceConfig, resources *libcontainercgroups.Resources) {
 	// Check if hugetlb is supported.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if m.isUnified() {
 		if !getSupportedUnifiedControllers().Has("hugetlb") {
 			logger.V(6).Info("Optional subsystem not supported: hugetlb")
 			return
