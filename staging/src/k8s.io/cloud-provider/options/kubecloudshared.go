@@ -30,6 +30,10 @@ import (
 type KubeCloudSharedOptions struct {
 	*cpconfig.KubeCloudSharedConfiguration
 	CloudProvider *CloudProviderOptions
+
+	// flagSet holds the FlagSet used to register CLI flags.
+	// Unexported to avoid exposing CLI details to external packages.
+	flagSet *pflag.FlagSet
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
@@ -52,6 +56,7 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	o.flagSet = fs
 	o.CloudProvider.AddFlags(fs)
 	fs.StringVar(&o.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node-ipam-controller, persistentvolume-binder-controller, persistentvolume-expander-controller and attach-detach-controller to work for in tree cloud providers.")
 	fs.BoolVar(&o.UseServiceAccountCredentials, "use-service-account-credentials", o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
@@ -59,7 +64,7 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
 	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
-		fmt.Sprintf("The period for syncing NodeStatus in %s.", names.CloudNodeLifecycleController))
+		fmt.Sprintf("The period for syncing NodeStatus in %s. Deprecated: Use NodeLifecycleController.NodeMonitorPeriod instead.", names.CloudNodeLifecycleController))
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "The instance prefix for the cluster.")
 	fs.StringVar(&o.ClusterCIDR, "cluster-cidr", o.ClusterCIDR, "CIDR Range for Pods in cluster. Only used when --allocate-node-cidrs=true; if false, this option will be ignored.")
 	fs.BoolVar(&o.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider. Requires --cluster-cidr.")
@@ -70,6 +75,14 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+
 		"route-reconciliation-period for cloud provider's route configuration settings.")
 	fs.MarkDeprecated("node-sync-period", "This flag is currently no-op and will be deleted.")
+}
+
+// IsNodeMonitorPeriodSet returns true if the node-monitor-period flag was explicitly set via CLI.
+func (o *KubeCloudSharedOptions) IsNodeMonitorPeriodSet() bool {
+	if o == nil || o.flagSet == nil {
+		return false
+	}
+	return o.flagSet.Changed("node-monitor-period")
 }
 
 // ApplyTo fills up KubeCloudShared config with options.
@@ -105,6 +118,9 @@ func (o *KubeCloudSharedOptions) Validate() []error {
 
 	errs := []error{}
 	errs = append(errs, o.CloudProvider.Validate()...)
+	if o.NodeMonitorPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("node-monitor-period must be greater than 0"))
+	}
 
 	return errs
 }

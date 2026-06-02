@@ -155,6 +155,7 @@ API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudS
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,ConfigureCloudRoutes
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,ExternalCloudVolumePlugin
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,NodeMonitorPeriod
+API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,NodeMonitorWorkers
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,NodeSyncPeriod
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,RouteReconciliationPeriod
 API rule violation: names_match,k8s.io/cloud-provider/config/v1alpha1,KubeCloudSharedConfiguration,UseServiceAccountCredentials
