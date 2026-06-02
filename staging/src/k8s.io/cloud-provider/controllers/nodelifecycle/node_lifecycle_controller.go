@@ -79,6 +79,8 @@ func NewCloudNodeLifecycleController(
 	nodeMonitorPeriod time.Duration,
 	nodeMonitorWorkers int) (*CloudNodeLifecycleController, error) {
 
+	registerMetrics()
+
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
 	}
@@ -133,6 +135,8 @@ func (c *CloudNodeLifecycleController) Run(ctx context.Context, controllerManage
 // or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
 func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
+	startTime := time.Now()
+
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("error listing nodes from cache: %s", err)
@@ -148,12 +152,15 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 		}
 
 		if status == v1.ConditionTrue {
+			nodesProcessed.WithLabelValues("cache").Inc()
 			// if taint exist remove taint
 			if err := cloudnodeutil.RemoveTaintOffNode(c.kubeClient, node.Name, node, ShutdownTaint); err != nil {
 				klog.Errorf("error patching node taints: %v", err)
 			}
 			return
 		}
+
+		nodesProcessed.WithLabelValues("cloud").Inc()
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node
@@ -204,6 +211,8 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	}
 
 	workqueue.ParallelizeUntil(ctx, c.nodeMonitorWorkers, len(nodes), processNode)
+
+	monitorNodesDuration.Observe(time.Since(startTime).Seconds())
 }
 
 // getProviderID returns the provider ID for the node. If Node CR has no provider ID,
