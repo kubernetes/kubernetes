@@ -70,7 +70,7 @@ type storeMetrics struct {
 }
 
 // SetInformerMetricsProvider sets the metrics provider for all subsequently created
-// FIFOs. Only the first call has an effect.
+// informers. Only the first call has an effect.
 func SetInformerMetricsProvider(metricsProvider InformerMetricsProvider) {
 	setInformerMetricsProviderOnce.Do(func() {
 		globalInformerMetricsProvider = metricsProvider
