@@ -18,6 +18,8 @@ import (
 	"context"
 
 	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
@@ -46,4 +48,8 @@ func (s *kvs2kvc) Txn(ctx context.Context, in *pb.TxnRequest, opts ...grpc.CallO
 
 func (s *kvs2kvc) Compact(ctx context.Context, in *pb.CompactionRequest, opts ...grpc.CallOption) (*pb.CompactionResponse, error) {
 	return s.kvs.Compact(ctx, in)
+}
+
+func (s *kvs2kvc) RangeStream(ctx context.Context, in *pb.RangeRequest, opts ...grpc.CallOption) (pb.KV_RangeStreamClient, error) {
+	return nil, status.Error(codes.Unimplemented, "RangeStream is not supported by the KV client adapter")
 }

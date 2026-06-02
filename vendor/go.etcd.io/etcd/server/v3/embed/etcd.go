@@ -191,8 +191,6 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		MaxWALFiles:                       cfg.MaxWalFiles,
 		InitialPeerURLsMap:                urlsmap,
 		InitialClusterToken:               token,
-		DiscoveryURL:                      cfg.Durl,
-		DiscoveryProxy:                    cfg.Dproxy,
 		DiscoveryCfg:                      cfg.DiscoveryCfg,
 		NewCluster:                        cfg.IsNewCluster(),
 		PeerTLSInfo:                       cfg.PeerTLSInfo,
@@ -234,7 +232,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		BootstrapDefragThresholdMegabytes: cfg.BootstrapDefragThresholdMegabytes,
 		MaxLearners:                       cfg.MaxLearners,
 		V2Deprecation:                     cfg.V2DeprecationEffective(),
-		ExperimentalLocalAddress:          cfg.InferLocalAddr(),
+		LocalAddress:                      cfg.InferLocalAddr(),
 		ServerFeatureGate:                 cfg.ServerFeatureGate,
 		Metrics:                           cfg.Metrics,
 	}
@@ -255,7 +253,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		)
 	}
 
-	srvcfg.PeerTLSInfo.LocalAddr = srvcfg.ExperimentalLocalAddress
+	srvcfg.PeerTLSInfo.LocalAddr = srvcfg.LocalAddress
 
 	print(e.cfg.logger, *cfg, srvcfg, memberInitialized)
 
@@ -348,7 +346,7 @@ func print(lg *zap.Logger, ec Config, sc config.ServerConfig, memberInitialized 
 		zap.Strings("advertise-client-urls", ec.getAdvertiseClientURLs()),
 		zap.Strings("listen-client-urls", ec.getListenClientURLs()),
 		zap.Strings("listen-metrics-urls", ec.getMetricsURLs()),
-		zap.String("experimental-local-address", sc.ExperimentalLocalAddress),
+		zap.String("local-address", sc.LocalAddress),
 		zap.Strings("cors", cors),
 		zap.Strings("host-whitelist", hss),
 		zap.String("initial-cluster", sc.InitialPeerURLsMap.String()),
@@ -366,8 +364,6 @@ func print(lg *zap.Logger, ec Config, sc config.ServerConfig, memberInitialized 
 		zap.String("auto-compaction-mode", sc.AutoCompactionMode),
 		zap.Duration("auto-compaction-retention", sc.AutoCompactionRetention),
 		zap.String("auto-compaction-interval", sc.AutoCompactionRetention.String()),
-		zap.String("discovery-url", sc.DiscoveryURL),
-		zap.String("discovery-proxy", sc.DiscoveryProxy),
 
 		zap.String("discovery-token", sc.DiscoveryCfg.Token),
 		zap.String("discovery-endpoints", strings.Join(sc.DiscoveryCfg.Endpoints, ",")),
@@ -835,13 +831,13 @@ func (e *Etcd) grpcGatewayDial(splitHTTP bool) (grpcDial func(ctx context.Contex
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	return func(ctx context.Context) (*grpc.ClientConn, error) {
-		conn, err := grpc.DialContext(ctx, addr, opts...)
+	return func(_ context.Context) (*grpc.ClientConn, error) {
+		conn, err := grpc.NewClient(addr, opts...)
 		if err != nil {
-			sctx.lg.Error("grpc gateway failed to dial", zap.String("addr", addr), zap.Error(err))
+			sctx.lg.Error("failed to setup grpc-gateway client", zap.String("addr", addr), zap.Error(err))
 			return nil, err
 		}
-		return conn, err
+		return conn, nil
 	}
 }
 

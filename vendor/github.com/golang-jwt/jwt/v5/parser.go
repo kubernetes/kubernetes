@@ -76,13 +76,6 @@ func (p *Parser) ParseWithClaims(tokenString string, claims Claims, keyFunc Keyf
 		}
 	}
 
-	// Decode signature
-	token.Signature, err = p.DecodeSegment(parts[2])
-	if err != nil {
-		return token, newError("could not base64 decode signature", ErrTokenMalformed, err)
-	}
-	text := strings.Join(parts[0:2], ".")
-
 	// Lookup key(s)
 	if keyFunc == nil {
 		// keyFunc was not provided.  short circuiting validation
@@ -94,11 +87,14 @@ func (p *Parser) ParseWithClaims(tokenString string, claims Claims, keyFunc Keyf
 		return token, newError("error while executing keyfunc", ErrTokenUnverifiable, err)
 	}
 
+	// Join together header and claims in order to verify them with the signature
+	text := strings.Join(parts[0:2], ".")
 	switch have := got.(type) {
 	case VerificationKeySet:
 		if len(have.Keys) == 0 {
 			return token, newError("keyfunc returned empty verification key set", ErrTokenUnverifiable)
 		}
+
 		// Iterate through keys and verify signature, skipping the rest when a match is found.
 		// Return the last error if no match is found.
 		for _, key := range have.Keys {
@@ -131,7 +127,7 @@ func (p *Parser) ParseWithClaims(tokenString string, claims Claims, keyFunc Keyf
 	return token, nil
 }
 
-// ParseUnverified parses the token but doesn't validate the signature.
+// ParseUnverified parses the token but does not validate the signature.
 //
 // WARNING: Don't use this method unless you know what you're doing.
 //
@@ -146,7 +142,7 @@ func (p *Parser) ParseUnverified(tokenString string, claims Claims) (token *Toke
 
 	token = &Token{Raw: tokenString}
 
-	// parse Header
+	// Parse Header
 	var headerBytes []byte
 	if headerBytes, err = p.DecodeSegment(parts[0]); err != nil {
 		return token, parts, newError("could not base64 decode header", ErrTokenMalformed, err)
@@ -155,7 +151,7 @@ func (p *Parser) ParseUnverified(tokenString string, claims Claims) (token *Toke
 		return token, parts, newError("could not JSON decode header", ErrTokenMalformed, err)
 	}
 
-	// parse Claims
+	// Parse Claims
 	token.Claims = claims
 
 	claimBytes, err := p.DecodeSegment(parts[1])
@@ -196,6 +192,12 @@ func (p *Parser) ParseUnverified(tokenString string, claims Claims) (token *Toke
 		return token, parts, newError("signing method (alg) is unspecified", ErrTokenUnverifiable)
 	}
 
+	// Parse token signature
+	token.Signature, err = p.DecodeSegment(parts[2])
+	if err != nil {
+		return token, parts, newError("could not base64 decode signature", ErrTokenMalformed, err)
+	}
+
 	return token, parts, nil
 }
 
@@ -216,7 +218,7 @@ func splitToken(token string) ([]string, bool) {
 	parts[1] = claims
 	// One more cut to ensure the signature is the last part of the token and there are no more
 	// delimiters. This avoids an issue where malicious input could contain additional delimiters
-	// causing unecessary overhead parsing tokens.
+	// causing unnecessary overhead parsing tokens.
 	signature, _, unexpected := strings.Cut(remain, tokenDelimiter)
 	if unexpected {
 		return nil, false

@@ -20,6 +20,8 @@ import (
 	"io"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
 	stats "go.etcd.io/etcd/server/v3/etcdserver/api/v2stats"
@@ -90,7 +92,7 @@ func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 		if _, err := enc.w.Write(enc.uint8buf); err != nil {
 			return err
 		}
-	case enc.index == m.Index && enc.term == m.LogTerm && m.LogTerm == m.Term:
+	case enc.index == m.GetIndex() && enc.term == m.GetLogTerm() && m.GetLogTerm() == m.GetTerm():
 		enc.uint8buf[0] = msgTypeAppEntries
 		if _, err := enc.w.Write(enc.uint8buf); err != nil {
 			return err
@@ -100,28 +102,31 @@ func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 		if _, err := enc.w.Write(enc.uint64buf); err != nil {
 			return err
 		}
+		opts := proto.MarshalOptions{}
 		for i := 0; i < len(m.Entries); i++ {
+			size := proto.Size(m.Entries[i])
 			// write length of entry
-			binary.BigEndian.PutUint64(enc.uint64buf, uint64(m.Entries[i].Size()))
+			binary.BigEndian.PutUint64(enc.uint64buf, uint64(size))
 			if _, err := enc.w.Write(enc.uint64buf); err != nil {
 				return err
 			}
-			if n := m.Entries[i].Size(); n < msgAppV2BufSize {
-				if _, err := m.Entries[i].MarshalTo(enc.buf); err != nil {
+			if size < msgAppV2BufSize {
+				b, err := opts.MarshalAppend(enc.buf[:0], m.Entries[i])
+				if err != nil {
 					return err
 				}
-				if _, err := enc.w.Write(enc.buf[:n]); err != nil {
+				if _, err := enc.w.Write(b); err != nil {
 					return err
 				}
 			} else {
-				if _, err := enc.w.Write(pbutil.MustMarshal(&m.Entries[i])); err != nil {
+				if _, err := enc.w.Write(pbutil.MustMarshalMessage(m.Entries[i])); err != nil {
 					return err
 				}
 			}
 			enc.index++
 		}
 		// write commit index
-		binary.BigEndian.PutUint64(enc.uint64buf, m.Commit)
+		binary.BigEndian.PutUint64(enc.uint64buf, m.GetCommit())
 		if _, err := enc.w.Write(enc.uint64buf); err != nil {
 			return err
 		}
@@ -131,18 +136,18 @@ func (enc *msgAppV2Encoder) encode(m *raftpb.Message) error {
 			return err
 		}
 		// write size of message
-		if err := binary.Write(enc.w, binary.BigEndian, uint64(m.Size())); err != nil {
+		if err := binary.Write(enc.w, binary.BigEndian, uint64(proto.Size(m))); err != nil {
 			return err
 		}
 		// write message
-		if _, err := enc.w.Write(pbutil.MustMarshal(m)); err != nil {
+		if _, err := enc.w.Write(pbutil.MustMarshalMessage(m)); err != nil {
 			return err
 		}
 
-		enc.term = m.Term
-		enc.index = m.Index
+		enc.term = m.GetTerm()
+		enc.index = m.GetIndex()
 		if l := len(m.Entries); l > 0 {
-			enc.index = m.Entries[l-1].Index
+			enc.index = m.Entries[l-1].GetIndex()
 		}
 		enc.fs.Succ(time.Since(start))
 	}
@@ -171,78 +176,79 @@ func newMsgAppV2Decoder(r io.Reader, local, remote types.ID) *msgAppV2Decoder {
 	}
 }
 
-func (dec *msgAppV2Decoder) decode() (raftpb.Message, error) {
+func (dec *msgAppV2Decoder) decode() (*raftpb.Message, error) {
 	var (
 		m   raftpb.Message
 		typ uint8
 	)
 	if _, err := io.ReadFull(dec.r, dec.uint8buf); err != nil {
-		return m, err
+		return nil, err
 	}
 	typ = dec.uint8buf[0]
 	switch typ {
 	case msgTypeLinkHeartbeat:
-		return linkHeartbeatMessage, nil
+		return proto.Clone(&linkHeartbeatMessage).(*raftpb.Message), nil
 	case msgTypeAppEntries:
 		m = raftpb.Message{
-			Type:    raftpb.MsgApp,
-			From:    uint64(dec.remote),
-			To:      uint64(dec.local),
-			Term:    dec.term,
-			LogTerm: dec.term,
-			Index:   dec.index,
+			Type:    raftpb.MsgApp.Enum(),
+			From:    new(uint64(dec.remote)),
+			To:      new(uint64(dec.local)),
+			Term:    new(dec.term),
+			LogTerm: new(dec.term),
+			Index:   new(dec.index),
 		}
 
 		// decode entries
 		if _, err := io.ReadFull(dec.r, dec.uint64buf); err != nil {
-			return m, err
+			return nil, err
 		}
 		l := binary.BigEndian.Uint64(dec.uint64buf)
-		m.Entries = make([]raftpb.Entry, int(l))
+		m.Entries = make([]*raftpb.Entry, int(l))
 		for i := 0; i < int(l); i++ {
 			if _, err := io.ReadFull(dec.r, dec.uint64buf); err != nil {
-				return m, err
+				return nil, err
 			}
 			size := binary.BigEndian.Uint64(dec.uint64buf)
 			var buf []byte
 			if size < msgAppV2BufSize {
 				buf = dec.buf[:size]
 				if _, err := io.ReadFull(dec.r, buf); err != nil {
-					return m, err
+					return nil, err
 				}
 			} else {
 				buf = make([]byte, int(size))
 				if _, err := io.ReadFull(dec.r, buf); err != nil {
-					return m, err
+					return nil, err
 				}
 			}
 			dec.index++
 			// 1 alloc
-			pbutil.MustUnmarshal(&m.Entries[i], buf)
+			m.Entries[i] = &raftpb.Entry{}
+			pbutil.MustUnmarshalMessage(m.Entries[i], buf)
 		}
 		// decode commit index
 		if _, err := io.ReadFull(dec.r, dec.uint64buf); err != nil {
-			return m, err
+			return nil, err
 		}
-		m.Commit = binary.BigEndian.Uint64(dec.uint64buf)
+		m.Commit = new(binary.BigEndian.Uint64(dec.uint64buf))
 	case msgTypeApp:
 		var size uint64
 		if err := binary.Read(dec.r, binary.BigEndian, &size); err != nil {
-			return m, err
+			return nil, err
 		}
 		buf := make([]byte, int(size))
 		if _, err := io.ReadFull(dec.r, buf); err != nil {
-			return m, err
+			return nil, err
 		}
-		pbutil.MustUnmarshal(&m, buf)
+		pbutil.MustUnmarshalMessage(&m, buf)
 
-		dec.term = m.Term
-		dec.index = m.Index
+		dec.term = m.GetTerm()
+		dec.index = m.GetIndex()
 		if l := len(m.Entries); l > 0 {
-			dec.index = m.Entries[l-1].Index
+			dec.index = m.Entries[l-1].GetIndex()
 		}
 	default:
-		return m, fmt.Errorf("failed to parse type %d in msgappv2 stream", typ)
+		return nil, fmt.Errorf("failed to parse type %d in msgappv2 stream", typ)
 	}
-	return m, nil
+	return &m, nil
 }
