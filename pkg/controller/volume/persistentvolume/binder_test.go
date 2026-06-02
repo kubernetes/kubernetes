@@ -496,6 +496,26 @@ func TestSync(t *testing.T) {
 			test:            testSyncClaim,
 		},
 		{
+			// syncClaim with a volume populator prime claim. The PV has been
+			// rebound from the prime claim to the original claim (which carries a
+			// dataSourceRef), so the prime claim is intentionally misbound. Check
+			// that it is still marked Lost but the event is downgraded to Normal.
+			name:            "3-7 - bound prime claim rebound by volume populator",
+			initialVolumes:  newVolumeArray("volume3-7", "10Gi", "uid3-7-orig", "claim3-7-orig", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			expectedVolumes: newVolumeArray("volume3-7", "10Gi", "uid3-7-orig", "claim3-7-orig", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			initialClaims: append(
+				newClaimArray("claim3-7", "uid3-7", "10Gi", "volume3-7", v1.ClaimPending, nil, volume.AnnBindCompleted),
+				claimWithDataSourceRef("hello", "Hello", "hello.example.com", newClaimArray("claim3-7-orig", "uid3-7-orig", "10Gi", "volume3-7", v1.ClaimPending, nil, volume.AnnBindCompleted))...,
+			),
+			expectedClaims: append(
+				newClaimArray("claim3-7", "uid3-7", "10Gi", "volume3-7", v1.ClaimLost, nil, volume.AnnBindCompleted),
+				claimWithDataSourceRef("hello", "Hello", "hello.example.com", newClaimArray("claim3-7-orig", "uid3-7-orig", "10Gi", "volume3-7", v1.ClaimPending, nil, volume.AnnBindCompleted))...,
+			),
+			expectedEvents: []string{"Normal ClaimLost"},
+			errors:         noerrors,
+			test:           testSyncClaim,
+		},
+		{
 			// syncClaim with claim bound to unbound volume. Check it's bound
 			// even if the claim's selector doesn't match the volume. Also
 			// check that Pending phase is set to Bound
