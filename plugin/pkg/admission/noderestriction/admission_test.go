@@ -1141,7 +1141,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid update of pod's node allocatable resource claim status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "annot update node allocatable resource claim statuses",
+			err:        "cannot update node allocatable resource claim statuses",
 		},
 
 		// My node object
