@@ -782,6 +782,7 @@ func dropDisabledFields(
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+	dropHTTPProbeProtocol(podSpec, oldPodSpec)
 }
 
 // setHostnameOverrideInUse returns true if any pod's spec defines HostnameOverride field.
@@ -863,6 +864,59 @@ func containerStopSignalsInUse(podSpec *api.PodSpec) bool {
 		if c.Lifecycle.StopSignal != nil {
 			inUse = true
 			return false
+		}
+		return true
+	})
+	return inUse
+}
+
+func dropHTTPProbeProtocol(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) || httpProbeProtocolInUse(oldPodSpec) {
+		return
+	}
+
+	dropProbeProtocol := func(p *api.Probe) {
+		if p != nil && p.HTTPGet != nil {
+			p.HTTPGet.Protocol = nil
+		}
+	}
+	dropHandlerProtocol := func(h *api.LifecycleHandler) {
+		if h != nil && h.HTTPGet != nil {
+			h.HTTPGet.Protocol = nil
+		}
+	}
+
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		dropProbeProtocol(c.LivenessProbe)
+		dropProbeProtocol(c.ReadinessProbe)
+		dropProbeProtocol(c.StartupProbe)
+		if c.Lifecycle != nil {
+			dropHandlerProtocol(c.Lifecycle.PostStart)
+			dropHandlerProtocol(c.Lifecycle.PreStop)
+		}
+		return true
+	})
+}
+
+func httpProbeProtocolInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		for _, probe := range []*api.Probe{c.LivenessProbe, c.ReadinessProbe, c.StartupProbe} {
+			if probe != nil && probe.HTTPGet != nil && probe.HTTPGet.Protocol != nil {
+				inUse = true
+				return false
+			}
+		}
+		if c.Lifecycle != nil {
+			for _, handler := range []*api.LifecycleHandler{c.Lifecycle.PostStart, c.Lifecycle.PreStop} {
+				if handler != nil && handler.HTTPGet != nil && handler.HTTPGet.Protocol != nil {
+					inUse = true
+					return false
+				}
+			}
 		}
 		return true
 	})

@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -3958,6 +3959,80 @@ func TestDropContainerStopSignals(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+
+func TestDropHTTPProbeProtocol(t *testing.T) {
+	h2c := api.HTTPProtocolHTTP2
+
+	makePodSpec := func(proto *api.HTTPProtocol) *api.PodSpec {
+		return &api.PodSpec{
+			Containers: []api.Container{{
+				Name: "test",
+				LivenessProbe: &api.Probe{
+					ProbeHandler: api.ProbeHandler{
+						HTTPGet: &api.HTTPGetAction{
+							Path:     "/",
+							Port:     intstr.FromInt32(80),
+							Scheme:   api.URISchemeHTTP,
+							Protocol: proto,
+						},
+					},
+				},
+			}},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		gate     bool
+		oldProto *api.HTTPProtocol
+		newProto *api.HTTPProtocol
+		wantDrop bool
+	}{
+		{
+			name:     "gate on, protocol set - keep",
+			gate:     true,
+			newProto: &h2c,
+		},
+		{
+			name:     "gate off, old had protocol - keep (in use)",
+			gate:     false,
+			oldProto: &h2c,
+			newProto: &h2c,
+		},
+		{
+			name:     "gate off, old did not have protocol - drop protocol field only",
+			gate:     false,
+			newProto: &h2c,
+			wantDrop: true,
+		},
+		{
+			name: "gate off, both nil - no change",
+			gate: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, tc.gate)
+
+			oldPodSpec := makePodSpec(tc.oldProto)
+			newPodSpec := makePodSpec(tc.newProto)
+
+			var expectedPodSpec *api.PodSpec
+			if tc.wantDrop {
+				expectedPodSpec = makePodSpec(nil)
+			} else {
+				expectedPodSpec = makePodSpec(tc.newProto)
+			}
+
+			dropDisabledFields(newPodSpec, nil, oldPodSpec, nil)
+
+			if diff := cmp.Diff(expectedPodSpec, newPodSpec); diff != "" {
+				t.Fatalf("unexpected result (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
