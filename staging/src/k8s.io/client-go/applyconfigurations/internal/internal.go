@@ -5655,6 +5655,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: port
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
+    - name: protocol
+      type:
+        scalar: string
     - name: scheme
       type:
         scalar: string

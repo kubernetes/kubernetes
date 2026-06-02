@@ -625,7 +625,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -658,7 +659,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -691,7 +693,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -725,7 +728,8 @@
                     "name": "nameValue",
                     "value": "valueValue"
                   }
-                ]
+                ],
+                "protocol": "protocolValue"
               },
               "tcpSocket": {
                 "port": "portValue",
@@ -751,7 +755,8 @@
                     "name": "nameValue",
                     "value": "valueValue"
                   }
-                ]
+                ],
+                "protocol": "protocolValue"
               },
               "tcpSocket": {
                 "port": "portValue",
@@ -939,7 +944,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -972,7 +978,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -1005,7 +1012,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -1039,7 +1047,8 @@
                     "name": "nameValue",
                     "value": "valueValue"
                   }
-                ]
+                ],
+                "protocol": "protocolValue"
               },
               "tcpSocket": {
                 "port": "portValue",
@@ -1065,7 +1074,8 @@
                     "name": "nameValue",
                     "value": "valueValue"
                   }
-                ]
+                ],
+                "protocol": "protocolValue"
               },
               "tcpSocket": {
                 "port": "portValue",
@@ -1253,7 +1263,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -1286,7 +1297,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -1319,7 +1331,8 @@
                   "name": "nameValue",
                   "value": "valueValue"
                 }
-              ]
+              ],
+              "protocol": "protocolValue"
             },
             "tcpSocket": {
               "port": "portValue",
@@ -1353,7 +1366,8 @@
                     "name": "nameValue",
                     "value": "valueValue"
                   }
-                ]
+                ],
+                "protocol": "protocolValue"
               },
               "tcpSocket": {
                 "port": "portValue",
@@ -1379,7 +1393,8 @@
                     "name": "nameValue",
                     "value": "valueValue"
                   }
-                ]
+                ],
+                "protocol": "protocolValue"
               },
               "tcpSocket": {
                 "port": "portValue",

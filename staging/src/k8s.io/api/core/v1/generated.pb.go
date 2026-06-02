@@ -4757,6 +4757,13 @@ func (m *HTTPGetAction) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Protocol != nil {
+		i -= len(*m.Protocol)
+		copy(dAtA[i:], *m.Protocol)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Protocol)))
+		i--
+		dAtA[i] = 0x32
+	}
 	if len(m.HTTPHeaders) > 0 {
 		for iNdEx := len(m.HTTPHeaders) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -16727,6 +16734,10 @@ func (m *HTTPGetAction) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.Protocol != nil {
+		l = len(*m.Protocol)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -21728,6 +21739,7 @@ func (this *HTTPGetAction) String() string {
 		`Host:` + fmt.Sprintf("%v", this.Host) + `,`,
 		`Scheme:` + fmt.Sprintf("%v", this.Scheme) + `,`,
 		`HTTPHeaders:` + repeatedStringForHTTPHeaders + `,`,
+		`Protocol:` + valueToStringGenerated(this.Protocol) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -38168,6 +38180,39 @@ func (m *HTTPGetAction) Unmarshal(dAtA []byte) error {
 			if err := m.HTTPHeaders[len(m.HTTPHeaders)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Protocol", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := HTTPProtocol(dAtA[iNdEx:postIndex])
+			m.Protocol = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
