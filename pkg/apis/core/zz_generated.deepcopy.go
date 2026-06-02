@@ -2006,6 +2006,11 @@ func (in *HTTPGetAction) DeepCopyInto(out *HTTPGetAction) {
 		*out = make([]HTTPHeader, len(*in))
 		copy(*out, *in)
 	}
+	if in.Protocol != nil {
+		in, out := &in.Protocol, &out.Protocol
+		*out = new(HTTPProtocol)
+		**out = **in
+	}
 	return
 }
 
