@@ -322,7 +322,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		}
 	}
 
-	var migratedPlugins = map[string](func() bool){
+	migratedPlugins := map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
 			return true
 		},
@@ -473,8 +473,8 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 
 func (p *csiPlugin) NewMounter(
 	spec *volume.Spec,
-	pod *api.Pod) (volume.Mounter, error) {
-
+	pod *api.Pod,
+) (volume.Mounter, error) {
 	volSrc, pvSrc, err := getSourceFromSpec(spec)
 	if err != nil {
 		return nil, err
@@ -571,7 +571,21 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.Re
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
 	if err != nil {
-		return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
+		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeReconstructionFallback) {
+			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v", mountPath, err))
+		}
+		// Pod-local vol_data.json is missing or corrupt. Fall back to the
+		// global mount data that MountDevice wrote, scanning for a matching
+		// specVolID. Prevents orphaned global mounts on failed reconstruction
+		// (issue #101791).
+		specVolID := filepath.Base(mountPath)
+		pluginDir := p.host.GetPluginDir(p.GetPluginName())
+		_, fallbackData, fallbackErr := findGlobalMountDataBySpecVolID(pluginDir, specVolID)
+		if fallbackErr != nil {
+			return volume.ReconstructedVolume{}, errors.New(log("plugin.ConstructVolumeSpec failed loading volume data using [%s]: %v (global mount fallback also failed: %v)", mountPath, err, fallbackErr))
+		}
+		klog.V(2).Info(log("plugin.ConstructVolumeSpec recovered vol_data from global mount for specVolID %q", specVolID))
+		volData = fallbackData
 	}
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
@@ -759,7 +773,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod) (vo
 	// Save volume info in pod dir
 	dataDir := getVolumeDeviceDataDir(spec.Name(), p.host)
 
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, errors.New(log("failed to create data dir %s:  %v", dataDir, err))
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
