@@ -1914,7 +1914,7 @@ def resolve(host):
   fi
 
   if [[ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]]; then
-    etcd_extra_args+=" --experimental-watch-progress-notify-interval=${ETCD_PROGRESS_NOTIFY_INTERVAL}"
+    etcd_extra_args+=" --watch-progress-notify-interval=${ETCD_PROGRESS_NOTIFY_INTERVAL}"
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
