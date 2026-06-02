@@ -234,6 +234,10 @@ type grpcError interface {
 	GRPCStatus() *grpcstatus.Status
 }
 
+func isUnimplementedErr(err error) bool {
+	return grpcstatus.Code(err) == grpccodes.Unimplemented
+}
+
 func isCancelError(err error) bool {
 	if err == nil {
 		return false
@@ -291,6 +295,20 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
+	if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) {
+		err := wc.syncStream()
+		if err == nil {
+			return nil
+		}
+		if !isUnimplementedErr(err) {
+			return interpretListError(err, true, wc.key, wc.key)
+		}
+		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
+	}
+	return wc.syncPaginated()
+}
+
+func (wc *watchChan) syncPaginated() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
@@ -345,6 +363,36 @@ func (wc *watchChan) sync() error {
 			opts = append(opts, clientv3.WithRev(withRev))
 		}
 	}
+}
+
+func (wc *watchChan) syncStream() error {
+	opts := []clientv3.OpOption{
+		clientv3.WithRange(clientv3.GetPrefixRangeEnd(wc.key)),
+	}
+	startTime := time.Now()
+	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
+	metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
+	if err != nil {
+		return err
+	}
+
+	var streamRev int64
+	for r := range streamResp {
+		if err := r.Err(); err != nil {
+			return err
+		}
+		rangeResp := r.RangeResponse
+		for i, kv := range rangeResp.Kvs {
+			wc.queueEvent(parseKV(kv))
+			rangeResp.Kvs[i] = nil
+		}
+		if streamRev == 0 && rangeResp.Header != nil {
+			streamRev = rangeResp.Header.Revision
+		}
+	}
+
+	wc.initialRev = streamRev
+	return nil
 }
 
 func logWatchChannelErr(err error) {

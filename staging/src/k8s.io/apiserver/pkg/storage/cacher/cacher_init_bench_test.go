@@ -30,8 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 )
 
@@ -61,22 +64,34 @@ func BenchmarkCacherInit(b *testing.B) {
 		Clock:        clock.RealClock{},
 	}
 
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		cacher, err := NewCacherFromConfig(config)
-		if err != nil {
-			b.Fatal(err)
-		}
-		if err := cacher.Wait(ctx); err != nil {
-			b.Fatal(err)
-		}
-		b.StopTimer()
-		cacher.Stop()
-		etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
-		b.StartTimer()
+	for _, m := range []struct {
+		name        string
+		rangeStream bool
+	}{
+		{name: "Paginated", rangeStream: false},
+		{name: "RangeStream", rangeStream: true},
+	} {
+		b.Run(fmt.Sprintf("Mode=%s", m.name), func(b *testing.B) {
+			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, m.rangeStream)
+
+			b.ResetTimer()
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				cacher, err := NewCacherFromConfig(config)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if err := cacher.Wait(ctx); err != nil {
+					b.Fatal(err)
+				}
+				b.StopTimer()
+				cacher.Stop()
+				etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
+				b.StartTimer()
+			}
+			b.ReportMetric(float64(pods), "pods/cache")
+		})
 	}
-	b.ReportMetric(float64(pods), "pods/cache")
 }
 
 func loadExemplarPod(b *testing.B) *corev1.Pod {

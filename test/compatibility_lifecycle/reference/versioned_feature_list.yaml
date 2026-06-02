@@ -611,6 +611,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: EtcdRangeStream
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: EventedPLEG
   versionedSpecs:
   - default: false
