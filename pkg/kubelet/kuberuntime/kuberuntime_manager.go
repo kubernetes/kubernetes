@@ -729,6 +729,17 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	// Proceed only when kubelet has accepted the resize a.k.a v1.Spec.Resources.Requests == v1.Status.AllocatedResources.
 	// Skip if runtime containerID doesn't match pod.Status containerID (container is restarting)
 	if kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
+		// Non-running container being restarted
+		actuatedContainerResources, _ := m.actuatedState.GetContainerResources(pod.UID, container.Name)
+		var actuatedPodResources *v1.ResourceRequirements
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+			actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
+		}
+		desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
+		currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
+		if currentResources != desiredResources {
+			changes.UpdatePodResources = true
+		}
 		return true
 	}
 
@@ -1273,8 +1284,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod)
-	if resizable {
+	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
@@ -1313,17 +1323,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 				// kubelet manages the pod cgroups while CRI manages the container-level cgroups,
 				// so kubelet must explicitly adjust the pod cgroups first
 				// before making the CRI call to start the container
-				if containerStatus != nil && resizable {
-					var actuatedPodResources *v1.ResourceRequirements
-					if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-						actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
-					}
-					actuatedContainerResources, _ := m.actuatedState.GetContainerResources(pod.UID, container.Name)
-					desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
-					currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
-					if currentResources != desiredResources {
-						changes.UpdatePodResources = true
-					}
+				if containerStatus != nil {
+					m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes)
 				}
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
 					// If container is in unknown state, we don't know whether it
