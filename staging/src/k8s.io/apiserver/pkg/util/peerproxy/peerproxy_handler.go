@@ -261,6 +261,10 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 	delegate := &epmetrics.ResponseWriterDelegator{ResponseWriter: rw}
 	w := responsewriter.WrapForHTTP1Or2(delegate)
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, false, &responder{w: w, ctx: req.Context()})
+	// A peer apiserver never needs to redirect a proxied API request; refuse to
+	// forward any 3xx Location response back to the client, matching the behavior
+	// of the aggregator's proxy in kube-aggregator/pkg/apiserver/handler_proxy.go.
+	handler.RejectForwardingRedirects = true
 	klog.Infof("Proxying request for %s from %s to %s", req.URL.Path, req.Host, location.Host)
 	handler.ServeHTTP(w, newReq)
 	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()), gvr.Group, gvr.Version, gvr.Resource)
