@@ -649,13 +649,13 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 // to the updateRevision. status's currentRevision is set to updateRevision and status's
 // currentReplicas is set to updateReplicas.
 func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
-	if (set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType ||
-		set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType) &&
-		status.UpdatedReplicas == *set.Spec.Replicas &&
+	if status.UpdatedReplicas == *set.Spec.Replicas &&
 		status.ReadyReplicas == *set.Spec.Replicas &&
 		status.Replicas == *set.Spec.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
+
+		// Update statefulset progressing condition upon completion
 		if GetStatefulSetCondition(*status, apps.StatefulSetProgressing) != nil {
 			switch set.Spec.UpdateStrategy.Type {
 			case apps.RollingUpdateStatefulSetStrategyType:

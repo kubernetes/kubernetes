@@ -2314,7 +2314,7 @@ func TestStatefulSetControlRecreateUpdatePreservesPVC(t *testing.T) {
 			client := fake.NewSimpleClientset(set)
 			om, _, ssc := setupController(client)
 
-			if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+			if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 				t.Errorf("Failed to turn up StatefulSet : %s", err)
 			}
 			var err error
@@ -2391,7 +2391,7 @@ func TestStatefulSetControlRecreateUpdate(t *testing.T) {
 		client := fake.NewSimpleClientset(set)
 
 		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
