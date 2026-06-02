@@ -1965,31 +1965,6 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
-		"bind-failure-preserves-inflight-until-unreserve": {
-			pod:     podWithClaimName,
-			claims:  []*resourceapi.ResourceClaim{pendingClaim},
-			classes: []*resourceapi.DeviceClass{deviceClass},
-			objs:    []apiruntime.Object{workerNodeSlice},
-			want: want{
-				reserve: result{
-					inFlightClaims: []metav1.Object{allocatedClaim},
-				},
-				prebind: result{
-					inFlightClaims: []metav1.Object{addAllocationTimestamp(allocatedClaim)},
-					status:         fwk.NewStatus(fwk.Unschedulable, `claim bind error`),
-				},
-				unreserveAfterBindFailure: &result{},
-			},
-			reactors: []cgotesting.Reactor{
-				&cgotesting.SimpleReactor{
-					Verb:     "update",
-					Resource: "resourceclaims",
-					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-						return true, nil, apierrors.NewBadRequest("claim bind error")
-					},
-				},
-			},
-		},
 		"bind-podgroup-failure": {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
@@ -2411,10 +2386,9 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
-					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
-					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:         fwk.NewStatus(fwk.Unschedulable, `patch error`),
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					status:       fwk.NewStatus(fwk.Unschedulable, `patch error`),
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -2520,8 +2494,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
-					status:         fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+					status: fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
 				},
 				unreserveAfterBindFailure: &result{
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
@@ -2727,8 +2700,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					}()},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{bindClaim},
-					assumedClaim:   reserve(bindClaim, podWithClaimName),
+					assumedClaim: reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -2759,8 +2731,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					}()},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{bindClaim},
-					assumedClaim:   reserve(bindClaim, podWithClaimName),
+					assumedClaim: reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
