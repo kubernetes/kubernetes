@@ -1,11 +1,8 @@
 This file documents Go API changes in client-go.
 
-Breaking API changes *must* be documented here, together with instructions on
-how to deal with them or why they are expected to have no impact.
-
 Go API changes are typically not included in the Kubernetes release notes, so
-non-breaking noteworthy Go API changes *may* be documented here if they are
-useful to know about for developers.
+noteworthy Go API changes *may* be documented here. This is currently not
+*required*, so consult the git history to see all changes.
 
 ### restmapper + discovery: add context-aware APIs
 

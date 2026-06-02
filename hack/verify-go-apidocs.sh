@@ -35,4 +35,11 @@ for dir in "${dirs[@]}"; do
 done
 
 # Base and target revisions are detected automatically by the script.
-"${KUBE_ROOT}/hack/apidiff.sh" "${dirs[@]}" >&2
+if ! "${KUBE_ROOT}/hack/apidiff.sh" "${dirs[@]}" >&2; then
+    cat >&2 <<EOF
+
+Currently maintaining CHANGELOG.md content is optional, the report above can be ignored.
+EOF
+    # Because the exit code is always 0, "make verify" will not fail
+    # because of this script. This will be changed in the future.
+fi
