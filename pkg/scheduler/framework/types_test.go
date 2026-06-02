@@ -18,10 +18,11 @@ package framework
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -3529,6 +3530,42 @@ func TestNodeInfo_PodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestUnrollWildCardResource_WithGenericWorkload(t *testing.T) {
+	tests := []struct {
+		name                  string
+		enableGenericWorkload bool
+		wantHasPodGroup       bool
+	}{
+		{
+			name:                  "Events should have PodGroup when GenericWorkload is enabled",
+			enableGenericWorkload: true,
+			wantHasPodGroup:       true,
+		},
+		{
+			name:                  "Events should not have PodGroup when GenericWorkload is disabled",
+			enableGenericWorkload: false,
+			wantHasPodGroup:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tt.enableGenericWorkload)
+			events := UnrollWildCardResource()
+			hasPodGroup := false
+			for _, e := range events {
+				if e.Event.Resource == fwk.PodGroup {
+					hasPodGroup = true
+					break
+				}
+			}
+			if hasPodGroup != tt.wantHasPodGroup {
+				t.Errorf("Unexpected events returned from UnrollWildCardResource(): hasPodGroup = %v, want %v", hasPodGroup, tt.wantHasPodGroup)
+			}
+		})
 	}
 }
 
