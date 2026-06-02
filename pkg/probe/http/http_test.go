@@ -32,6 +32,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/probe"
 )
@@ -572,4 +573,84 @@ func TestHTTPProbeChecker_PayloadNormal(t *testing.T) {
 		assert.Equal(t, probe.Success, result)
 		assert.Equal(t, string(normalPayload), body)
 	})
+}
+
+// startH2CServer serves HTTP/2 in cleartext (h2c / prior knowledge) by accepting
+// raw TCP connections and handing them directly to http2.Server.ServeConn.
+func startH2CServer(t *testing.T, handler http.Handler) (addr string, cleanup func()) {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	h2s := &http2.Server{}
+	base := &http.Server{Handler: handler}
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go h2s.ServeConn(c, &http2.ServeConnOpts{
+				Handler:    handler,
+				BaseConfig: base,
+			})
+		}
+	}()
+	return l.Addr().String(), func() { _ = l.Close() }
+}
+
+func TestProbeH2C_H2C_Success(t *testing.T) {
+	addr, cleanup := startH2CServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("h2c ok"))
+	}))
+	defer cleanup()
+	time.Sleep(100 * time.Millisecond)
+
+	prober := New(false)
+	target, err := url.Parse("http://" + addr + "/health")
+	require.NoError(t, err)
+	req, err := NewProbeRequest(target, nil)
+	require.NoError(t, err)
+
+	result, body, err := prober.ProbeH2C(req, wait.ForeverTestTimeout)
+	require.NoError(t, err)
+	assert.Equal(t, probe.Success, result)
+	assert.Equal(t, "h2c ok", body)
+}
+
+func TestProbeH2C_H2C_Failure(t *testing.T) {
+	addr, cleanup := startH2CServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("h2c error"))
+	}))
+	defer cleanup()
+	time.Sleep(100 * time.Millisecond)
+
+	prober := New(false)
+	target, err := url.Parse("http://" + addr + "/health")
+	require.NoError(t, err)
+	req, err := NewProbeRequest(target, nil)
+	require.NoError(t, err)
+
+	result, _, err := prober.ProbeH2C(req, wait.ForeverTestTimeout)
+	require.NoError(t, err)
+	assert.Equal(t, probe.Failure, result)
+}
+
+func TestProbeH2C_H2C_Timeout(t *testing.T) {
+	addr, cleanup := startH2CServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(5 * time.Second)
+	}))
+	defer cleanup()
+	time.Sleep(100 * time.Millisecond)
+
+	prober := New(false)
+	target, err := url.Parse("http://" + addr + "/health")
+	require.NoError(t, err)
+	req, err := NewProbeRequest(target, nil)
+	require.NoError(t, err)
+
+	result, _, err := prober.ProbeH2C(req, 1*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, probe.Failure, result)
 }
