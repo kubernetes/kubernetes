@@ -23,7 +23,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -171,6 +173,10 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			scheme := req.URL.Scheme
 			headers := p.HTTPGet.HTTPHeaders
 			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
+		}
+		if p.HTTPGet.Protocol != nil && *p.HTTPGet.Protocol == v1.HTTPProtocolHTTP2 &&
+			utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+			return pb.http.ProbeH2C(req, timeout)
 		}
 		return pb.http.Probe(req, timeout)
 
