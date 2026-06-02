@@ -170,15 +170,6 @@ func (c checkEquals) doCheck(output string, err error) error {
 	return nil
 }
 
-type checkNotContains string
-
-func (c checkNotContains) doCheck(output string, err error) error {
-	if strings.Contains(output, string(c)) {
-		return fmt.Errorf("expected output not to contain '%v' but it did:\n%v", string(c), output)
-	}
-	return nil
-}
-
 func MapDict[K comparable, V any, N any](accum map[K]V, mapper func(V) N) map[K]N {
 	res := make(map[K]N, len(accum))
 	for k, v := range accum {
