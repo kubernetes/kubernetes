@@ -772,6 +772,102 @@ func TestAddPod(t *testing.T) {
 	}
 }
 
+func TestGangScheduling_MoveUnschedulablePodsToActiveOrBackoffQueueOnAddPod(t *testing.T) {
+	unschedulablePods := []*v1.Pod{
+		st.MakePod().Name("unsched-pod-1").SchedulerName("supported-scheduler").Namespace("ns1").UID("unsched-pod-1").Obj(),
+		st.MakePod().Name("unsched-pod-2").SchedulerName("supported-scheduler").Namespace("ns1").UID("unsched-pod-2").Obj(),
+	}
+
+	tests := []struct {
+		name                         string
+		gangSchedulingEnabled        bool
+		expectInActiveOrBackOffQueue bool
+	}{
+		{
+			name:                         "move unschedulable pods to active/backoff queue when GangScheduling is disabled",
+			gangSchedulingEnabled:        false,
+			expectInActiveOrBackOffQueue: false,
+		},
+		{
+			name:                         "move unschedulable pods to active/backoff queue when GangScheduling is enabled",
+			gangSchedulingEnabled:        true,
+			expectInActiveOrBackOffQueue: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tt.gangSchedulingEnabled,
+				features.GangScheduling:  tt.gangSchedulingEnabled,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+				"supported-scheduler": {
+					framework.EventUnscheduledPodAdd: {
+						{
+							PluginName: "fooPlugin1",
+							QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+								return fwk.Queue, nil
+							},
+						},
+					},
+				},
+			}
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, tt.gangSchedulingEnabled),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, newDefaultQueueSort(), internalqueue.WithQueueingHintMapPerProfile(queueingHintMap)),
+				logger:          logger,
+				Profiles: profile.Map{
+					"supported-scheduler": nil,
+				},
+			}
+
+			// Put test pod(s) into unschedulable queue.
+			for _, pod := range unschedulablePods {
+				sched.SchedulingQueue.Add(ctx, pod)
+				entity, err := sched.SchedulingQueue.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				poppedPod := entity.(*framework.QueuedPodInfo)
+				poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+				if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, poppedPod, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+					t.Fatalf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+				}
+			}
+
+			// Add a new pod to trigger the event handler.
+			newPod := st.MakePod().Name("pod1").SchedulerName("supported-scheduler").Namespace("ns1").UID("pod1").Obj()
+			sched.addPod(newPod)
+
+			// Check if the unschedulable pod(s) were moved to active queue or backoff queue.
+			podsInActiveOrBackoff := append(sched.SchedulingQueue.PodsInActiveQ(), sched.SchedulingQueue.PodsInBackoffQ()...)
+			var movedPods []string
+			for _, p := range podsInActiveOrBackoff {
+				for _, expectedPod := range unschedulablePods {
+					if p.Name == expectedPod.Name {
+						movedPods = append(movedPods, p.Name)
+						break
+					}
+				}
+			}
+			if tt.expectInActiveOrBackOffQueue {
+				if len(movedPods) != len(unschedulablePods) {
+					t.Errorf("Expected all unschedulable pods to be moved, want %d, got %d (%v)", len(unschedulablePods), len(movedPods), movedPods)
+				}
+			} else {
+				if len(movedPods) != 0 {
+					t.Errorf("Expected no unschedulable pods to be moved, got %v", movedPods)
+				}
+			}
+		})
+	}
+}
+
 func TestUpdatePod(t *testing.T) {
 	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("supported-scheduler").Obj()
 	updatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").SchedulerName("supported-scheduler").Obj()
