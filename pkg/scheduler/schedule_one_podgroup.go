@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -191,12 +192,33 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	result = completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupCycleState, runAllPostFilters, result)
 	metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 
+	// Detect if this is a subsequent scheduling attempt.
+	isSubsequent := false
+	if pgState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.Namespace, podGroupInfo.Name); err == nil {
+		isSubsequent = pgState.ScheduledPodsCount() > 0
+	}
+
+	triggerPreemption := result.status.Code() == fwk.Unschedulable
+	if !triggerPreemption && isSubsequent {
+		// For subsequent scheduling, we also trigger preemption if any pod is unschedulable.
+		triggerPreemption = slices.ContainsFunc(result.podResults, func(podRes algorithmResult) bool {
+			return podRes.status.Code() == fwk.Unschedulable
+		})
+	}
+
 	// Run workload aware preemption if required. If the preemption is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
-	if sched.workloadAwarePreemptionEnabled && result.status.Code() == fwk.Unschedulable {
+	if sched.workloadAwarePreemptionEnabled && triggerPreemption {
 		pgPostFilterResult, status := sched.runWorkloadAwarePreemption(ctx, schedFwk, podGroupCycleState, podGroupInfo)
 		if status.IsSuccess() {
 			result.waitingOnPreemption = true
+			if !result.status.IsRejected() {
+				// We set the status to Unschedulable to trigger preemption instead of the binding cycle.
+				// If preemption is successful (can accommodate more pods), it is actuated and all pods are
+				// returned to the queue. Otherwise, if preemption fails or cannot help, schedulable pods
+				// will be moved to binding, similar to the initial scheduling attempt.
+				result.status = fwk.NewStatus(fwk.Unschedulable, "pod group is waiting for preemption to complete").WithError(errPodGroupUnschedulable)
+			}
 			for i := range result.podResults {
 				if nodeNameInfo, ok := pgPostFilterResult.NominatedNodeNames[result.podResults[i].pod]; ok {
 					result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
@@ -205,7 +227,9 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		} else if status.IsError() {
 			result.status = status
 		} else {
-			result.status.AppendReason(status.String())
+			if result.status.Code() == fwk.Unschedulable {
+				result.status.AppendReason(status.String())
+			}
 		}
 	}
 
