@@ -345,6 +345,41 @@ func TestExtractNodeFeaturesChange(t *testing.T) {
 	}
 }
 
+func TestNodeSchedulingPropertiesChange_NodeDeclaredFeatures(t *testing.T) {
+	tests := []struct {
+		name                        string
+		nodeDeclaredFeaturesEnabled bool
+		oldNode                     *v1.Node
+		newNode                     *v1.Node
+		wantEvents                  []fwk.ClusterEvent
+	}{
+		{
+			name:                        "scheduling properties changed with NodeDeclaredFeatures enabled",
+			nodeDeclaredFeaturesEnabled: true,
+			oldNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			wantEvents:                  []fwk.ClusterEvent{{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature}},
+		},
+		{
+			name:                        "scheduling properties changed with NodeDeclaredFeatures disabled",
+			nodeDeclaredFeaturesEnabled: false,
+			oldNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA"}}},
+			newNode:                     &v1.Node{Status: v1.NodeStatus{DeclaredFeatures: []string{"featA", "featB"}}},
+			wantEvents:                  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.nodeDeclaredFeaturesEnabled)
+			gotEvents := NodeSchedulingPropertiesChange(tt.newNode, tt.oldNode)
+			if diff := cmp.Diff(tt.wantEvents, gotEvents, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
+				t.Errorf("unexpected events (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func Test_podSchedulingPropertiesChange(t *testing.T) {
 	podWithBigRequest := &v1.Pod{
 		Spec: v1.PodSpec{
