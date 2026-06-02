@@ -338,6 +338,27 @@ type ListOptions struct {
 	SendInitialEvents *bool
 }
 
+// NamespaceNameResourceVersion is the minimal object identity used by cache
+// consistency checks.
+type NamespaceNameResourceVersion struct {
+	Namespace       string
+	Name            string
+	ResourceVersion string
+}
+
+// MetadataList contains a paginated list of minimal object metadata.
+type MetadataList struct {
+	ResourceVersion string
+	Continue        string
+	Items           []NamespaceNameResourceVersion
+}
+
+// MetadataLister returns the minimal object metadata needed by internal callers
+// that only compare namespace/name/resourceVersion tuples.
+type MetadataLister interface {
+	GetListMetadata(ctx context.Context, key string, opts ListOptions) (*MetadataList, error)
+}
+
 // DeleteOptions provides the options that may be provided for storage delete operations.
 type DeleteOptions struct {
 	// ExpectTransformOrDecodeError, if enabled, will return an error if the object can be

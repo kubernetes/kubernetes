@@ -24,6 +24,7 @@ import (
 	"iter"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -730,6 +731,64 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 	return uint64(getResp.Revision), nil
 }
 
+func (s *store) GetListMetadata(ctx context.Context, key string, opts storage.ListOptions) (*storage.MetadataList, error) {
+	keyPrefix, err := s.prepareKey(key, opts.Recursive)
+	if err != nil {
+		return nil, err
+	}
+	resourcePrefix, err := s.prepareKey(s.resourcePrefix, true)
+	if err != nil {
+		return nil, err
+	}
+
+	withRev, continueKey, err := storage.ValidateListOptions(keyPrefix, s.versioner, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	items := []storage.NamespaceNameResourceVersion{}
+	var lastKey []byte
+	var count int64
+	var hasMore bool
+	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, opts.Predicate.Limit, continueKey, true) {
+		if chunkErr != nil {
+			return nil, chunkErr
+		}
+		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(chunk.revision)); err != nil {
+			return nil, err
+		}
+		if len(chunk.kvs) == 0 && chunk.hasMore {
+			return nil, fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+		}
+		if withRev == 0 {
+			withRev = chunk.revision
+		}
+		count = chunk.count
+		hasMore = chunk.hasMore
+		items = make([]storage.NamespaceNameResourceVersion, 0, len(chunk.kvs))
+		for _, kv := range chunk.kvs {
+			item, err := keyValueToMetadata(resourcePrefix, kv)
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+			lastKey = kv.Key
+		}
+		break
+	}
+
+	continueValue, _, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, count, hasMore, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &storage.MetadataList{
+		ResourceVersion: strconv.FormatInt(withRev, 10),
+		Continue:        continueValue,
+		Items:           items,
+	}, nil
+}
+
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	keyPrefix, err := s.prepareKey(key, opts.Recursive)
@@ -778,7 +837,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	aggregator := s.listErrAggrFactory()
 
-	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey) {
+	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey, false) {
 		if chunkErr != nil {
 			return chunkErr
 		}
@@ -830,14 +889,21 @@ type listChunk struct {
 	hasMore  bool
 }
 
-func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.ListOptions, withRev, limit int64, continueKey string) iter.Seq2[listChunk, error] {
+func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.ListOptions, withRev, limit int64, continueKey string, keysOnly bool) iter.Seq2[listChunk, error] {
 	return func(yield func(listChunk, error) bool) {
 		for {
-			getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+			listOpts := kubernetes.ListOptions{
 				Revision: withRev,
 				Limit:    limit,
 				Continue: continueKey,
-			})
+			}
+			var getResp kubernetes.ListResponse
+			var err error
+			if keysOnly {
+				getResp, err = s.getListKeysOnly(ctx, keyPrefix, opts.Recursive, listOpts)
+			} else {
+				getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, listOpts)
+			}
 			if err != nil {
 				if errors.Is(err, etcdrpc.ErrFutureRev) {
 					currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
@@ -954,6 +1020,34 @@ func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred st
 		kvs[i] = nil
 	}
 	return lastKey, evaluated, false, nil
+}
+
+func (s *store) getListKeysOnly(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
+	rangeStart := keyPrefix
+	if options.Continue != "" {
+		rangeStart = options.Continue
+	}
+	getOpts := []clientv3.OpOption{clientv3.WithKeysOnly()}
+	if options.Revision > 0 {
+		getOpts = append(getOpts, clientv3.WithRev(options.Revision))
+	}
+	if options.Limit > 0 {
+		getOpts = append(getOpts, clientv3.WithLimit(options.Limit))
+	}
+	if recursive {
+		getOpts = append(getOpts, clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix)))
+	}
+
+	startTime := time.Now()
+	getResp, err := s.client.KV.Get(ctx, rangeStart, getOpts...)
+	metrics.RecordEtcdRequest("listMetadata", s.groupResource, err, startTime)
+	if err != nil {
+		return resp, err
+	}
+	resp.Kvs = getResp.Kvs
+	resp.Count = getResp.Count
+	resp.Revision = getResp.Header.Revision
+	return resp, nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
@@ -1186,6 +1280,34 @@ func (s *store) prepareKey(key string, recursive bool) (string, error) {
 		startIndex = 1
 	}
 	return s.pathPrefix + key[startIndex:], nil
+}
+
+func keyValueToMetadata(resourcePrefix string, kv *mvccpb.KeyValue) (storage.NamespaceNameResourceVersion, error) {
+	key := string(kv.Key)
+	relativeKey, found := strings.CutPrefix(key, resourcePrefix)
+	if !found {
+		return storage.NamespaceNameResourceVersion{}, fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+	}
+	if relativeKey == "" {
+		return storage.NamespaceNameResourceVersion{}, fmt.Errorf("key %q has empty name under resource prefix %q", key, resourcePrefix)
+	}
+
+	parts := strings.Split(relativeKey, "/")
+	switch len(parts) {
+	case 1:
+		return storage.NamespaceNameResourceVersion{
+			Name:            parts[0],
+			ResourceVersion: strconv.FormatInt(kv.ModRevision, 10),
+		}, nil
+	case 2:
+		return storage.NamespaceNameResourceVersion{
+			Namespace:       parts[0],
+			Name:            parts[1],
+			ResourceVersion: strconv.FormatInt(kv.ModRevision, 10),
+		}, nil
+	default:
+		return storage.NamespaceNameResourceVersion{}, fmt.Errorf("unexpected key format %q under resource prefix %q", key, resourcePrefix)
+	}
 }
 
 // recordDecodeError record decode error split by object type.

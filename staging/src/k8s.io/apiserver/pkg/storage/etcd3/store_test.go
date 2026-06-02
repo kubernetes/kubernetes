@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,6 +33,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -1088,6 +1090,195 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
+func TestGetListMetadataUsesMinimalEtcdFields(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+
+	var out example.Pod
+	for i := range 3 {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: fmt.Sprintf("pod-%d", i)}}
+		if err := store.Create(ctx, computePodKey(pod), pod, &out, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	originalDecoder := store.decoder
+	defer func() {
+		store.decoder = originalDecoder
+	}()
+	store.decoder = &panicDecoder{t: t}
+
+	firstPage, err := store.GetListMetadata(ctx, "/pods/", storage.ListOptions{
+		ResourceVersion:      out.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		Recursive:            true,
+		Predicate: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.Everything(),
+			Limit: 2,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(firstPage.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(firstPage.Items))
+	}
+	if firstPage.Continue == "" {
+		t.Fatal("expected continue token for paginated metadata list")
+	}
+	if firstPage.ResourceVersion != out.ResourceVersion {
+		t.Fatalf("expected resourceVersion %q, got %q", out.ResourceVersion, firstPage.ResourceVersion)
+	}
+
+	secondPage, err := store.GetListMetadata(ctx, "/pods/", storage.ListOptions{
+		Recursive: true,
+		Predicate: storage.SelectionPredicate{
+			Label:    labels.Everything(),
+			Field:    fields.Everything(),
+			Limit:    2,
+			Continue: firstPage.Continue,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(secondPage.Items) != 1 {
+		t.Fatalf("expected 1 item on second page, got %d", len(secondPage.Items))
+	}
+	if secondPage.Continue != "" {
+		t.Fatalf("expected empty continue token on last page, got %q", secondPage.Continue)
+	}
+	if secondPage.ResourceVersion != out.ResourceVersion {
+		t.Fatalf("expected paginated resourceVersion %q, got %q", out.ResourceVersion, secondPage.ResourceVersion)
+	}
+
+	allItems := append(append([]storage.NamespaceNameResourceVersion{}, firstPage.Items...), secondPage.Items...)
+	for _, item := range allItems {
+		if item.Namespace != "default" {
+			t.Fatalf("expected namespace default, got %q", item.Namespace)
+		}
+		if item.Name == "" {
+			t.Fatal("expected name to be populated")
+		}
+		if _, err := strconv.ParseUint(item.ResourceVersion, 10, 64); err != nil {
+			t.Fatalf("expected numeric resourceVersion, got %q: %v", item.ResourceVersion, err)
+		}
+	}
+}
+
+func TestGetListMetadataMatchesGetList(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+
+	keys := []string{
+		"/pods/default/pod-a",
+		"/pods/default/pod-b",
+		"/pods/kube-system/pod-c",
+		"/pods/cluster-scoped",
+	}
+	pods := []*example.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-a"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-b"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "pod-c"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "cluster-scoped"}},
+	}
+	var lastRV string
+	for i, key := range keys {
+		out := &example.Pod{}
+		if err := store.Create(ctx, key, pods[i], out, 0); err != nil {
+			t.Fatalf("create %q: %v", key, err)
+		}
+		lastRV = out.ResourceVersion
+	}
+
+	opts := storage.ListOptions{
+		ResourceVersion:      lastRV,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		Recursive:            true,
+		Predicate:            storage.Everything,
+	}
+
+	listObj := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/", opts, listObj); err != nil {
+		t.Fatalf("GetList: %v", err)
+	}
+	want := make([]storage.NamespaceNameResourceVersion, 0, len(listObj.Items))
+	for _, item := range listObj.Items {
+		want = append(want, storage.NamespaceNameResourceVersion{
+			Namespace:       item.Namespace,
+			Name:            item.Name,
+			ResourceVersion: item.ResourceVersion,
+		})
+	}
+
+	metaList, err := store.GetListMetadata(ctx, "/pods/", opts)
+	if err != nil {
+		t.Fatalf("GetListMetadata: %v", err)
+	}
+
+	if len(want) != len(keys) {
+		t.Fatalf("expected %d decoded items, got %d", len(keys), len(want))
+	}
+	if diff := cmp.Diff(want, metaList.Items); diff != "" {
+		t.Errorf("metadata list differs from decoded list (-getList +getListMetadata):\n%s", diff)
+	}
+}
+
+func TestKeyValueToMetadata(t *testing.T) {
+	const resourcePrefix = "/registry/pods/"
+	cases := []struct {
+		name    string
+		key     string
+		modRev  int64
+		want    storage.NamespaceNameResourceVersion
+		wantErr bool
+	}{
+		{
+			name:   "namespaced",
+			key:    "/registry/pods/default/pod-a",
+			modRev: 7,
+			want:   storage.NamespaceNameResourceVersion{Namespace: "default", Name: "pod-a", ResourceVersion: "7"},
+		},
+		{
+			name:   "cluster scoped",
+			key:    "/registry/pods/node-0",
+			modRev: 9,
+			want:   storage.NamespaceNameResourceVersion{Name: "node-0", ResourceVersion: "9"},
+		},
+		{
+			name:    "missing prefix",
+			key:     "/registry/services/default/svc-a",
+			modRev:  1,
+			wantErr: true,
+		},
+		{
+			name:    "more than two segments",
+			key:     "/registry/pods/default/pod-a/extra",
+			modRev:  1,
+			wantErr: true,
+		},
+		{
+			name:    "empty relative key",
+			key:     "/registry/pods/",
+			modRev:  1,
+			wantErr: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := keyValueToMetadata(resourcePrefix, &mvccpb.KeyValue{Key: []byte(tc.key), ModRevision: tc.modRev})
+			if tc.wantErr != (err != nil) {
+				t.Fatalf("wantErr=%v, got err=%v", tc.wantErr, err)
+			}
+			if tc.wantErr {
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("want %+v, got %+v", tc.want, got)
+			}
+		})
+	}
+}
+
 func TestGetCurrentResourceVersion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 
@@ -1132,6 +1323,20 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 	currentPodRV, err := store.versioner.ParseResourceVersion(currentPod.ResourceVersion)
 	require.NoError(t, err)
 	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
+}
+
+type panicDecoder struct {
+	t *testing.T
+}
+
+func (d *panicDecoder) Decode(_ []byte, _ runtime.Object, _ int64) error {
+	d.t.Fatal("unexpected decoder.Decode call")
+	return nil
+}
+
+func (d *panicDecoder) DecodeListItem(_ context.Context, _ []byte, _ uint64, _ func() runtime.Object) (runtime.Object, error) {
+	d.t.Fatal("unexpected decoder.DecodeListItem call")
+	return nil, nil
 }
 
 func BenchmarkStoreStats(b *testing.B) {
