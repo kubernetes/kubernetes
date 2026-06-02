@@ -1024,6 +1024,14 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
 	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo)
 
+	// Done has to be called before requeueing the pod. Otherwise, a race can happen
+	// when the pod is re-added to activeQ/backoffQ and a concurrent Pop picks it up
+	// before Done is called: Pop finds the UID still in inFlightPods and silently
+	// discards the pod, causing it to be permanently lost from the queue.
+	// The same reasoning applies to pod group members above.
+	p.Done(pInfo.Pod.UID)
+	calledDone = true
+
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
 	queue := p.requeueEntityWithQueueingStrategy(logger, pInfo, schedulingHint, framework.ScheduleAttemptFailure)
 	logger.V(3).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle, "hint", schedulingHint, "unschedulable plugins", rejectorPlugins)
