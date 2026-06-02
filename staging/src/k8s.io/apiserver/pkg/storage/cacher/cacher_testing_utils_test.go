@@ -61,7 +61,7 @@ func init() {
 	utilruntime.Must(metav1.AddMetaToScheme(scheme))
 	scheme.AddUnversionedTypes(corev1.SchemeGroupVersion, &metav1.Status{})
 	pb := protobuf.NewSerializer(scheme, scheme)
-	corev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, nil)
+	corev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, schema.GroupVersions{corev1.SchemeGroupVersion})
 	examplev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{examplev1.SchemeGroupVersion}, nil)
 }
 
@@ -110,9 +110,9 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func newCorev1EtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func newCorev1EtcdTestStorage(t testing.TB, resourcePrefix string, gr schema.GroupResource, newFunc, newListFunc func() runtime.Object) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	cfg := testserver.NewTestConfig(t)
-	cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
+	cfg.QuotaBackendBytes = 4 << 30 // 4 GiB
 	server := &etcd3testing.EtcdTestServer{V3Client: testserver.RunEtcd(t, cfg)}
 	versioner := storage.APIObjectVersioner{}
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
@@ -121,11 +121,11 @@ func newCorev1EtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 		server.V3Client,
 		compactor,
 		corev1ProtoCodec,
-		func() runtime.Object { return &corev1.Pod{} },
-		func() runtime.Object { return &corev1.PodList{} },
+		newFunc,
+		newListFunc,
 		etcd3testing.PathPrefix(),
-		"/pods/",
-		schema.GroupResource{Resource: "pods"},
+		resourcePrefix,
+		gr,
 		identity.NewEncryptCheckTransformer(),
 		etcd3.NewDefaultLeaseManagerConfig(),
 		etcd3.NewDefaultDecoder(corev1ProtoCodec, versioner),
@@ -150,6 +150,19 @@ func getCorev1PodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 		"status.phase":       string(pod.Status.Phase),
 	}
 	return labels.Set(pod.Labels), fs, nil
+}
+
+func getCorev1SecretAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a secret")
+	}
+	fs := fields.Set{
+		"metadata.name":      secret.Name,
+		"metadata.namespace": secret.Namespace,
+		"type":               string(secret.Type),
+	}
+	return labels.Set(secret.Labels), fs, nil
 }
 
 func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
