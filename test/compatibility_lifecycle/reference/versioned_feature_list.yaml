@@ -1065,6 +1065,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: MemoryQoS
   versionedSpecs:
   - default: false
