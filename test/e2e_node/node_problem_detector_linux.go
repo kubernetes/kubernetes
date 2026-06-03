@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -296,9 +297,7 @@ current-context: local-context
 					},
 				},
 			})
-			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
-			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
+			hostLogFile = filepath.Join(framework.TestContext.KubeletRootDir, "pods", string(pod.UID), "volumes/kubernetes.io~empty-dir") + logFile
 		})
 
 		ginkgo.It("should generate node condition and events for corresponding errors", func(ctx context.Context) {

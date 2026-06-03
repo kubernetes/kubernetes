@@ -48,10 +48,8 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	sizeLimit := resource.MustParse("100Mi")
 	useOverLimit := 101 /* Mb */
 	useUnderLimit := 99 /* Mb */
-	// TODO: remove hardcoded kubelet volume directory path
-	// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 	// As for why we do this: see comment below at isXfs.
-	if isXfs("/var/lib/kubelet") {
+	if isXfs(framework.TestContext.KubeletRootDir) {
 		useUnderLimit = 50 /* Mb */
 	}
 	priority := 0
@@ -61,12 +59,10 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v, userNamespacesEnabled: %v)", quotasRequested, userNamespacesEnabled)), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
-			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			if !supportsUserNS(ctx, f) {
 				e2eskipper.Skipf("runtime does not support user namespaces")
 			}
-			if quotasRequested && !supportsQuotas("/var/lib/kubelet", userNamespacesEnabled) {
+			if quotasRequested && !supportsQuotas(framework.TestContext.KubeletRootDir, userNamespacesEnabled) {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.
 				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationFSQuotaMonitoring on filesystem without project quota enabled")
