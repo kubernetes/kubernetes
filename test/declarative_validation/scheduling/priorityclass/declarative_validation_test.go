@@ -39,9 +39,9 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func setValue(v int32) func(obj *scheduling.PriorityClass) {
-    return func(obj *scheduling.PriorityClass) {
-        obj.Value = v
-    }
+	return func(obj *scheduling.PriorityClass) {
+		obj.Value = v
+	}
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
