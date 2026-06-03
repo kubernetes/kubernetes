@@ -66,6 +66,10 @@ func TestWatch(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		storagetesting.RunTestWatchFromNonZero(ctx, t, store)
 	})
+	t.Run("WatchWithoutPrevKV", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store)
+	})
 	t.Run("DelayedWatchDelivery", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
 		storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
@@ -290,6 +294,7 @@ func TestWatchChanSync(t *testing.T) {
 				0,
 				true,
 				false,
+				true,
 				storage.Everything)
 
 			err = w.sync()
