@@ -115,7 +115,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(TweakAttacher("different.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}
