@@ -1047,6 +1047,21 @@ func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStat
 	return false
 }
 
+// markInitContainerForRestart appends the init container at index to
+// InitContainersToStart and, when the container has a pending in-place resize,
+// calls computePodResizeAction so the pod-level cgroup is updated before the
+// container is restarted.
+// markInitContainerForRestart returns the keepContainer value from computePodResizeAction,
+// or true when the resize call is skipped.
+func (m *kubeGenericRuntimeManager) markInitContainerForRestart(ctx context.Context, pod *v1.Pod, index int, container *v1.Container, status *kubecontainer.Status, changes *podActions) bool {
+	changes.InitContainersToStart = append(changes.InitContainersToStart, index)
+	if podutil.IsRestartableInitContainer(container) ||
+		utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
+		return m.computePodResizeAction(ctx, pod, index, true, status, changes)
+	}
+	return true
+}
+
 // computeInitContainerActions sets the actions on the given changes that need
 // to be taken for the init containers. This includes actions to initialize the
 // init containers and actions to keep restartable init containers running.
@@ -1135,10 +1150,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 			// it is likely that the container runtime failed to start it. To
 			// prevent the container from getting stuck in the 'created' state,
 			// restart it.
-			changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-			if podutil.IsRestartableInitContainer(container) || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
-				m.computePodResizeAction(ctx, pod, i, true, status, changes)
-			}
+			m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
@@ -1164,8 +1176,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 								message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
 								reason:    reasonStartupProbe,
 							}
-							changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-							m.computePodResizeAction(ctx, pod, i, true, status, changes)
+							m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 						}
 						break
 					}
@@ -1224,8 +1235,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 		// Otherwise, restart the init container.
 		case kubecontainer.ContainerStateExited:
 			if podutil.IsRestartableInitContainer(container) {
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-				m.computePodResizeAction(ctx, pod, i, true, status, changes)
+				m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 			} else { // init container
 				if isInitContainerFailed(status) {
 					restartOnFailure := restartOnFailure
@@ -1237,10 +1247,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 						changes.InitContainersToStart = nil
 						return false
 					}
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-					if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
-						m.computePodResizeAction(ctx, pod, i, true, status, changes)
-					}
+					m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 					break
 				}
 
@@ -1263,8 +1270,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 						status.State),
 					reason: reasonUnknown,
 				}
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-				m.computePodResizeAction(ctx, pod, i, true, status, changes)
+				m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 			} else { // init container
 				if !isInitContainerFailed(status) {
 					logger.V(4).Info("This should not happen, init container is in unknown state but not failed", "pod", klog.KObj(pod), "containerStatus", status)
@@ -1293,10 +1299,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 						status.State),
 					reason: reasonUnknown,
 				}
-				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
-					m.computePodResizeAction(ctx, pod, i, true, status, changes)
-				}
+				m.markInitContainerForRestart(ctx, pod, i, container, status, changes)
 			}
 		}
 
