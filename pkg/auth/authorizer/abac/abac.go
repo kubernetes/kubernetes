@@ -241,6 +241,16 @@ func (pl PolicyList) Authorize(ctx context.Context, a authorizer.Attributes) (au
 	// Then, add Caching only if needed.
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (pl PolicyList) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(pl.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (PolicyList) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 // RulesFor returns rules for the given user and namespace.
 func (pl PolicyList) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -1965,6 +1966,31 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		"bind-failure-preserves-inflight-until-unreserve": {
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{addAllocationTimestamp(allocatedClaim)},
+					status:         fwk.NewStatus(fwk.Unschedulable, `claim bind error`),
+				},
+				unreserveAfterBindFailure: &result{},
+			},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						return true, nil, apierrors.NewBadRequest("claim bind error")
+					},
+				},
+			},
+		},
 		"bind-podgroup-failure": {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
@@ -2386,9 +2412,10 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
-					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:       fwk.NewStatus(fwk.Unschedulable, `patch error`),
+					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
+					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
+					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					status:         fwk.NewStatus(fwk.Unschedulable, `patch error`),
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -2494,7 +2521,8 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+					status:         fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
 				},
 				unreserveAfterBindFailure: &result{
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
@@ -2700,7 +2728,8 @@ func testPlugin(tCtx ktesting.TContext) {
 					}()},
 				},
 				prebind: result{
-					assumedClaim: reserve(bindClaim, podWithClaimName),
+					inFlightClaims: []metav1.Object{bindClaim},
+					assumedClaim:   reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -2731,7 +2760,8 @@ func testPlugin(tCtx ktesting.TContext) {
 					}()},
 				},
 				prebind: result{
-					assumedClaim: reserve(bindClaim, podWithClaimName),
+					inFlightClaims: []metav1.Object{bindClaim},
+					assumedClaim:   reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -3500,7 +3530,9 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDRAConsumableCapacity:        tc.enableDRAConsumableCapacity,
 				EnableDRAWorkloadResourceClaims:    tc.enableDRAWorkloadResourceClaims,
 			}
-
+			if !tc.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 			if tc.disableDRAAdminAccess {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
@@ -4390,14 +4422,25 @@ func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) *
 // k8s.io/dynamic-resource-allocation/structured because that code has no access
 // to feature gate definitions.
 func TestAllocatorSelection(t *testing.T) {
+	// We want to be sure that each feature as identified by the fields in structured.Features
+	// is covered by a dedicated test cases.
+	allFeatures := sets.New[string]()
+	coveredFeatures := sets.New[string]()
+	featureType := reflect.TypeFor[structured.Features]()
+	for field := range featureType.Fields() {
+		allFeatures.Insert(field.Name)
+	}
+
 	for name, tc := range map[string]struct {
 		features             string
+		usingFeatureGroup    bool
 		expectImplementation string
 	}{
 		// The most conservative implementation: only used when explicitly asking
 		// for the most stable Kubernetes (no alpha or beta features).
 		"only-GA": {
 			features:             "AllAlpha=false,AllBeta=false",
+			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},
 
@@ -4405,13 +4448,47 @@ func TestAllocatorSelection(t *testing.T) {
 		// is used.
 		"default": {
 			features:             "",
+			usingFeatureGroup:    true,
 			expectImplementation: "incubating",
 		},
 
-		// Alpha features need the experimental implementation.
+		// Alpha features may need the experimental implementation, if there are any
+		// and if those influence allocation.
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
+			usingFeatureGroup:    true,
+			expectImplementation: "experimental",
+		},
+
+		// Let's also determine which allocator is picked for each of the
+		// individual features which influence that decision.
+		"AdminAccess": {
+			features:             "AllAlpha=false,AllBeta=false,DRAAdminAccess=true",
+			expectImplementation: "stable",
+		},
+		"ConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true",
 			expectImplementation: "incubating",
+		},
+		"DeviceBindingAndStatus": {
+			features:             "AllAlpha=false,AllBeta=false,DRAResourceClaimDeviceStatus=true,DRADeviceBindingConditions=true",
+			expectImplementation: "incubating",
+		},
+		"DeviceTaints": {
+			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true",
+			expectImplementation: "stable",
+		},
+		"ListTypeAttributes": {
+			features:             "AllAlpha=false,AllBeta=false,DRAListTypeAttributes=true",
+			expectImplementation: "experimental",
+		},
+		"PartitionableDevices": {
+			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true",
+			expectImplementation: "stable",
+		},
+		"PrioritizedList": {
+			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true",
+			expectImplementation: "stable",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -4429,7 +4506,20 @@ func TestAllocatorSelection(t *testing.T) {
 			if !strings.Contains(allocatorType, tc.expectImplementation) {
 				tCtx.Fatalf("Expected allocator implementation %q, got %s", tc.expectImplementation, allocatorType)
 			}
+
+			if !tc.usingFeatureGroup {
+				for field := range featureType.Fields() {
+					if !reflect.ValueOf(features).FieldByName(field.Name).IsZero() {
+						coveredFeatures.Insert(field.Name)
+					}
+				}
+			}
 		})
+	}
+
+	notCovered := allFeatures.Difference(coveredFeatures)
+	if len(notCovered) > 0 {
+		t.Errorf("Some feature fields in %T were never set by any of the dedicated sub-tests: %s\nA test case for a new feature is missing and/or AllocatorFeatures was not updated to set the field.", structured.Features{}, strings.Join(sets.List(notCovered), ", "))
 	}
 }
 
@@ -4455,6 +4545,19 @@ func Test_computesScore(t *testing.T) {
 			},
 			allocations: nodeAllocation{},
 			expectErr:   true,
+		},
+		"mix-of-allocated-and-unallocated-claims": {
+			claims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+				pendingClaim2,
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					*allocationResult2,
+				},
+			},
+			expectedScore: 0,
+			expectErr:     false,
 		},
 		"single-request-only-subrequest-allocated": {
 			claims: []*resourceapi.ResourceClaim{

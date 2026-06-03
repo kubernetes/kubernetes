@@ -22,6 +22,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/klog/v2"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
@@ -29,7 +30,7 @@ type Interface interface {
 	Start() error
 	ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
-	MachineInfo() (*cadvisorapi.MachineInfo, error)
+	MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error)
 
 	VersionInfo() (*cadvisorapi.VersionInfo, error)
 

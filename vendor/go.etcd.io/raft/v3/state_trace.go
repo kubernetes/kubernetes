@@ -125,9 +125,9 @@ type TracingConfChange struct {
 func makeTracingState(r *raft) TracingState {
 	hs := r.hardState()
 	return TracingState{
-		Term:   hs.Term,
-		Vote:   strconv.FormatUint(hs.Vote, 10),
-		Commit: hs.Commit,
+		Term:   hs.GetTerm(),
+		Vote:   strconv.FormatUint(hs.GetVote(), 10),
+		Commit: hs.GetCommit(),
 	}
 }
 
@@ -136,26 +136,26 @@ func makeTracingMessage(m *raftpb.Message) *TracingMessage {
 		return nil
 	}
 
-	logTerm := m.LogTerm
-	entries := len(m.Entries)
-	index := m.Index
-	if m.Type == raftpb.MsgSnap {
+	logTerm := m.GetLogTerm()
+	entries := len(m.GetEntries())
+	index := m.GetIndex()
+	if m.GetType() == raftpb.MsgSnap {
 		index = 0
 		logTerm = 0
-		entries = int(m.Snapshot.Metadata.Index)
+		entries = int(m.GetSnapshot().GetMetadata().GetIndex())
 	}
 	return &TracingMessage{
-		Type:        m.Type.String(),
-		Term:        m.Term,
-		From:        strconv.FormatUint(m.From, 10),
-		To:          strconv.FormatUint(m.To, 10),
+		Type:        m.GetType().String(),
+		Term:        m.GetTerm(),
+		From:        strconv.FormatUint(m.GetFrom(), 10),
+		To:          strconv.FormatUint(m.GetTo(), 10),
 		EntryLength: entries,
 		LogTerm:     logTerm,
 		Index:       index,
-		Commit:      m.Commit,
-		Vote:        strconv.FormatUint(m.Vote, 10),
-		Reject:      m.Reject,
-		RejectHint:  m.RejectHint,
+		Commit:      m.GetCommit(),
+		Vote:        strconv.FormatUint(m.GetVote(), 10),
+		Reject:      m.GetReject(),
+		RejectHint:  m.GetRejectHint(),
 	}
 }
 
@@ -214,9 +214,9 @@ func traceCommit(r *raft) {
 	traceNodeEvent(rsmCommit, r)
 }
 
-func traceReplicate(r *raft, es ...raftpb.Entry) {
+func traceReplicate(r *raft, es ...*raftpb.Entry) {
 	for i := range es {
-		if es[i].Type == raftpb.EntryNormal {
+		if es[i].GetType() == raftpb.EntryNormal {
 			traceNodeEvent(rsmReplicate, r)
 		}
 	}
@@ -241,20 +241,20 @@ func traceChangeConfEvent(cci raftpb.ConfChangeI, r *raft) {
 		NewConf: []string{},
 	}
 	for _, c := range cc2.Changes {
-		switch c.Type {
+		switch c.GetType() {
 		case raftpb.ConfChangeAddNode:
 			cc.Changes = append(cc.Changes, SingleConfChange{
-				NodeID: strconv.FormatUint(c.NodeID, 10),
+				NodeID: strconv.FormatUint(c.GetNodeId(), 10),
 				Action: ConfChangeAddNewServer,
 			})
 		case raftpb.ConfChangeRemoveNode:
 			cc.Changes = append(cc.Changes, SingleConfChange{
-				NodeID: strconv.FormatUint(c.NodeID, 10),
+				NodeID: strconv.FormatUint(c.GetNodeId(), 10),
 				Action: ConfChangeRemoveServer,
 			})
 		case raftpb.ConfChangeAddLearnerNode:
 			cc.Changes = append(cc.Changes, SingleConfChange{
-				NodeID: strconv.FormatUint(c.NodeID, 10),
+				NodeID: strconv.FormatUint(c.GetNodeId(), 10),
 				Action: ConfChangeAddLearner,
 			})
 		}
@@ -292,10 +292,10 @@ func traceSendMessage(r *raft, m *raftpb.Message) {
 	prop := map[string]any{}
 
 	var evt stateMachineEventType
-	switch m.Type {
+	switch m.GetType() {
 	case raftpb.MsgApp:
 		evt = rsmSendAppendEntriesRequest
-		if p, exist := r.trk.Progress[m.From]; exist {
+		if p, exist := r.trk.Progress[m.GetFrom()]; exist {
 			prop["match"] = p.Match
 			prop["next"] = p.Next
 		}
@@ -321,7 +321,7 @@ func traceReceiveMessage(r *raft, m *raftpb.Message) {
 	}
 
 	var evt stateMachineEventType
-	switch m.Type {
+	switch m.GetType() {
 	case raftpb.MsgApp, raftpb.MsgHeartbeat, raftpb.MsgSnap:
 		evt = rsmReceiveAppendEntriesRequest
 	case raftpb.MsgAppResp, raftpb.MsgHeartbeatResp:

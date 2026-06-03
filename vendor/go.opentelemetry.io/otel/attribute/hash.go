@@ -27,6 +27,8 @@ const (
 	int64SliceID   uint64 = 3762322556277578591 // "_[]int64" (little endian)
 	float64SliceID uint64 = 7308324551835016539 // "[]double" (little endian)
 	stringSliceID  uint64 = 7453010373645655387 // "[]string" (little endian)
+	byteSliceID    uint64 = 6874028470941080415 // "_[]byte_" (little endian)
+	sliceID        uint64 = 7883494272577650031 // "__slice_" (little endian)
 	emptyID        uint64 = 7305809155345288421 // "__empty_" (little endian)
 )
 
@@ -42,53 +44,87 @@ func hashKVs(kvs []KeyValue) uint64 {
 // hashKV returns the xxHash64 hash of kv with h as the base.
 func hashKV(h xxhash.Hash, kv KeyValue) xxhash.Hash {
 	h = h.String(string(kv.Key))
+	return hashValue(h, kv.Value)
+}
 
-	switch kv.Value.Type() {
+func hashValue(h xxhash.Hash, v Value) xxhash.Hash {
+	switch v.Type() {
 	case BOOL:
 		h = h.Uint64(boolID)
-		h = h.Uint64(kv.Value.numeric)
+		h = h.Uint64(v.numeric)
 	case INT64:
 		h = h.Uint64(int64ID)
-		h = h.Uint64(kv.Value.numeric)
+		h = h.Uint64(v.numeric)
 	case FLOAT64:
 		h = h.Uint64(float64ID)
 		// Assumes numeric stored with math.Float64bits.
-		h = h.Uint64(kv.Value.numeric)
+		h = h.Uint64(v.numeric)
 	case STRING:
 		h = h.Uint64(stringID)
-		h = h.String(kv.Value.stringly)
+		h = h.String(v.stringly)
 	case BOOLSLICE:
 		h = h.Uint64(boolSliceID)
-		rv := reflect.ValueOf(kv.Value.slice)
+		rv := reflect.ValueOf(v.slice)
 		for i := 0; i < rv.Len(); i++ {
 			h = h.Bool(rv.Index(i).Bool())
 		}
 	case INT64SLICE:
 		h = h.Uint64(int64SliceID)
-		rv := reflect.ValueOf(kv.Value.slice)
+		rv := reflect.ValueOf(v.slice)
 		for i := 0; i < rv.Len(); i++ {
 			h = h.Int64(rv.Index(i).Int())
 		}
 	case FLOAT64SLICE:
 		h = h.Uint64(float64SliceID)
-		rv := reflect.ValueOf(kv.Value.slice)
+		rv := reflect.ValueOf(v.slice)
 		for i := 0; i < rv.Len(); i++ {
 			h = h.Float64(rv.Index(i).Float())
 		}
 	case STRINGSLICE:
 		h = h.Uint64(stringSliceID)
-		rv := reflect.ValueOf(kv.Value.slice)
+		rv := reflect.ValueOf(v.slice)
 		for i := 0; i < rv.Len(); i++ {
 			h = h.String(rv.Index(i).String())
+		}
+	case BYTESLICE:
+		h = h.Uint64(byteSliceID)
+		h = h.String(v.stringly)
+	case SLICE:
+		h = h.Uint64(sliceID)
+		switch vals := v.slice.(type) {
+		case [0]Value:
+			// No values to hash, but the type identifier is still hashed above.
+		case [1]Value:
+			h = hashValueSlice(h, vals[:])
+		case [2]Value:
+			h = hashValueSlice(h, vals[:])
+		case [3]Value:
+			h = hashValueSlice(h, vals[:])
+		case [4]Value:
+			h = hashValueSlice(h, vals[:])
+		case [5]Value:
+			h = hashValueSlice(h, vals[:])
+		default:
+			rv := reflect.ValueOf(v.slice)
+			for i := 0; i < rv.Len(); i++ {
+				h = hashValue(h, rv.Index(i).Interface().(Value))
+			}
 		}
 	case EMPTY:
 		h = h.Uint64(emptyID)
 	default:
 		// Logging is an alternative, but using the internal logger here
 		// causes an import cycle so it is not done.
-		v := kv.Value.AsInterface()
-		msg := fmt.Sprintf("unknown value type: %[1]v (%[1]T)", v)
+		val := v.AsInterface()
+		msg := fmt.Sprintf("unknown value type: %[1]v (%[1]T)", val)
 		panic(msg)
+	}
+	return h
+}
+
+func hashValueSlice(h xxhash.Hash, vals []Value) xxhash.Hash {
+	for _, v := range vals {
+		h = hashValue(h, v)
 	}
 	return h
 }

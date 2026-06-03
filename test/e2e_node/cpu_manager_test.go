@@ -1576,9 +1576,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               reservedCPUs,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs,
 			}))
 		})
 
@@ -1729,112 +1728,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "max"))
-		})
-	})
-
-	ginkgo.When("checking the CFS quota management can be disabled", ginkgo.Label("cfs-quota"), func() {
-		// NOTE: these tests check only cases on which the quota is set to "max", so we intentionally
-		// don't duplicate the all the tests
-
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			requireCGroupV2()
-			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
-			//          this means on more-than-2-way SMT systems this test will prove nothing
-			reservedCPUs = cpuset.New(0)
-			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               reservedCPUs,
-				disableCPUQuotaWithExclusiveCPUs: false,
-			}))
-		})
-
-		ginkgo.It("should enforce for a guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
-			cpuCount := 1
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-disabled"
-			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "1",
-					cpuLimit:   "1",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("100000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "100000"))
-		})
-
-		ginkgo.It("should enforce for a guaranteed pod with multiple exclusive CPUs assigned", func(ctx context.Context) {
-			cpuCount := 4
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-disabled"
-			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "3",
-					cpuLimit:   "3",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("300000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "300000"))
-
-			gomega.Expect(pod).To(HaveContainerCPUsCount(ctnName, 3))
-			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(ctnName, onlineCPUs))
-			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(ctnName, reservedCPUs))
-		})
-
-		ginkgo.It("should enforce for guaranteed pod not requiring exclusive CPUs", func(ctx context.Context) {
-			cpuCount := 1 // overshoot, minimum request is 1
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-enabled"
-			pod := makeCPUManagerPod("gu-pod-cfs-quota-on", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "500m",
-					cpuLimit:   "500m",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
-		})
-
-		ginkgo.It("should enforce with multiple containers regardless if they require exclusive CPUs or not", func(ctx context.Context) {
-			cpuCount := 2
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			pod := makeCPUManagerPod("gu-pod-multicontainer-mixed", []ctnAttribute{
-				{
-					ctnName:    "gu-container-non-int-values",
-					cpuRequest: "500m",
-					cpuLimit:   "500m",
-				},
-				{
-					ctnName:    "gu-container-int-values",
-					cpuRequest: "1",
-					cpuLimit:   "1",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("150000"))
-			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
-			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "100000"))
 		})
 	})
 
@@ -2675,13 +2568,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should not maintain CPU quota for a pod with pod-level resources and guaranteed containers in Pod scope, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.PodTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.PodTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -2711,13 +2603,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should maintain CPU quota for a pod with pod-level resources and non-guaranteed containers in Pod scope, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.PodTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.PodTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -3061,13 +2952,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should not maintain CPU quota for a pod with pod-level resources and guaranteed containers in Container scope, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.ContainerTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.ContainerTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -3097,13 +2987,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should maintain CPU quota for a pod with pod-level resources and non-guaranteed containers in Container scope, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.ContainerTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.ContainerTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -4011,16 +3900,15 @@ func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribut
 }
 
 type cpuManagerKubeletArguments struct {
-	policyName                       string
-	topologyManagerPolicy            string
-	topologyManagerScope             string
-	enableCPUManagerOptions          bool
-	disableCPUQuotaWithExclusiveCPUs bool
-	enablePodLevelResources          bool
-	customCPUCFSQuotaPeriod          time.Duration
-	enablePodLevelResourceManagers   bool
-	reservedSystemCPUs               cpuset.CPUSet
-	options                          map[string]string
+	policyName                     string
+	topologyManagerPolicy          string
+	topologyManagerScope           string
+	enableCPUManagerOptions        bool
+	enablePodLevelResources        bool
+	customCPUCFSQuotaPeriod        time.Duration
+	enablePodLevelResourceManagers bool
+	reservedSystemCPUs             cpuset.CPUSet
+	options                        map[string]string
 }
 
 func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
@@ -4031,7 +3919,6 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
-	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
 	// InPlacePodLevelResourcesVerticalScaling is only supported when PodLevelResources is enabled
 	if !kubeletArguments.enablePodLevelResources {

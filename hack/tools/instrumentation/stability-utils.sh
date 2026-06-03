@@ -28,7 +28,7 @@ stability_check_setup() {
   kube::golang::setup_env
   export GOBIN="${KUBE_OUTPUT_BIN}"
   echo "Building instrumentation tools..."
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/instrumentation" install . ./sort ./documentation
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/instrumentation" install . ./documentation
 }
 
 # shellcheck disable=SC2120

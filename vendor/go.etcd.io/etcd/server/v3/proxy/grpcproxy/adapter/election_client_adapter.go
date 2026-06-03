@@ -58,24 +58,24 @@ type es2ecClientStream struct{ chanClientStream }
 type es2ecServerStream struct{ chanServerStream }
 
 func (s *es2ecClientStream) Send(rr *v3electionpb.LeaderRequest) error {
-	return s.SendMsg(rr)
+	return s.SendMsg(rr) //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (s *es2ecClientStream) Recv() (*v3electionpb.LeaderResponse, error) {
 	var v any
-	if err := s.RecvMsg(&v); err != nil {
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*v3electionpb.LeaderResponse), nil
 }
 
 func (s *es2ecServerStream) Send(rr *v3electionpb.LeaderResponse) error {
-	return s.SendMsg(rr)
+	return s.SendMsg(rr) //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (s *es2ecServerStream) Recv() (*v3electionpb.LeaderRequest, error) {
 	var v any
-	if err := s.RecvMsg(&v); err != nil {
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*v3electionpb.LeaderRequest), nil

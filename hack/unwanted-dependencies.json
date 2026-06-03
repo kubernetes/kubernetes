@@ -24,6 +24,7 @@
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
+      "github.com/envoyproxy/protoc-gen-validate": "unmaintained, archive mode, refer to #139389",
       "github.com/evanphx/json-patch/v5": "refer to https://github.com/kubernetes/kubernetes/pull/91622#issuecomment-637087847",
       "github.com/flynn/go-shlex": "unmaintained, archive mode",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
@@ -139,6 +140,9 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+      "github.com/envoyproxy/protoc-gen-validate": [
+        "google.golang.org/grpc"
+      ],
       "github.com/flynn/go-shlex": [
         "github.com/coredns/caddy"
       ],
@@ -148,14 +152,7 @@
         "github.com/containerd/ttrpc",
         "github.com/containerd/typeurl/v2",
         "github.com/google/cadvisor",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
         "k8s.io/code-generator"
-      ],
-      "github.com/golang/groupcache": [
-        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/golang/protobuf": [
         "github.com/container-storage-interface/spec",
@@ -164,13 +161,9 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
-        "go.etcd.io/raft/v3",
         "google.golang.org/grpc",
         "google.golang.org/protobuf",
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
-      ],
-      "github.com/google/btree": [
-        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
@@ -180,9 +173,7 @@
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/klauspost/compress": [
-        "github.com/prometheus/client_golang",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/mailru/easyjson": [
         "sigs.k8s.io/kustomize/api",
@@ -217,6 +208,7 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/prometheus/common",
+        "github.com/sirupsen/logrus",
         "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",

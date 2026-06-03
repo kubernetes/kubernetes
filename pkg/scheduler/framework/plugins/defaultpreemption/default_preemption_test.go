@@ -2669,3 +2669,58 @@ func TestPreEnqueue(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Create a node and a pod with an empty UID to induce a raw cache failure during preemption.
+	node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
+	invalidPod := st.MakePod().Name("pod-empty-uid").UID("").Node("node1").Priority(lowPriority).Obj()
+
+	testPods := []*v1.Pod{invalidPod}
+	nodes := []*v1.Node{node}
+
+	client := clientsetfake.NewClientset(invalidPod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+	f, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	features := feature.Features{
+		EnableWorkloadAwarePreemption: true,
+	}
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preemptorPG := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()
+	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		return nil, fwk.NewStatus(fwk.Unschedulable)
+	}
+
+	_, gotStatus := pl.PodGroupPostFilter(ctx, preemptorPG, preemptorPods, mockSchedulingFunc)
+
+	if gotStatus == nil || gotStatus.Code() != fwk.Error {
+		t.Fatalf("Expected status code %v, got status: %v", fwk.Error, gotStatus)
+	}
+
+	expectedMsg := "pod group preemption: cannot get cache key for pod with empty UID"
+	gotMsg := gotStatus.Message()
+	if gotMsg != expectedMsg {
+		t.Errorf("Expected wrapped error message %q, got %q", expectedMsg, gotMsg)
+	}
+}

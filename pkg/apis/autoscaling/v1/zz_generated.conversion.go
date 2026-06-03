@@ -373,6 +373,7 @@ func autoConvert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPo
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
 	return nil
 }
 
@@ -387,6 +388,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v1_HorizontalPo
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
 	return nil
 }
 

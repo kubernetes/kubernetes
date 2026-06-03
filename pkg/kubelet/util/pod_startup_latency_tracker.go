@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -31,12 +30,12 @@ import (
 // PodStartupLatencyTracker records key moments for startup latency calculation,
 // e.g. image pulling or pod observed running on watch.
 type PodStartupLatencyTracker interface {
-	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
+	ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time)
 	RecordImageStartedPulling(podUID types.UID)
 	RecordImageFinishedPulling(podUID types.UID)
 	RecordInitContainerStarted(podUID types.UID, startedAt time.Time)
 	RecordInitContainerFinished(podUID types.UID, finishedAt time.Time)
-	RecordStatusUpdated(pod *v1.Pod)
+	RecordStatusUpdated(logger klog.Logger, pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
 
@@ -79,7 +78,7 @@ func NewPodStartupLatencyTracker() PodStartupLatencyTracker {
 	}
 }
 
-func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when time.Time) {
+func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -128,9 +127,6 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 	}
 
 	if hasPodStartedSLO(pod) {
-		// TODO: it needs to be replaced by a proper context in the future
-		ctx := context.TODO()
-		logger := klog.FromContext(ctx)
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
 		podStartSLOduration := podStartingDuration
 
@@ -269,7 +265,7 @@ func (p *basicPodStartupLatencyTracker) RecordInitContainerFinished(podUID types
 	}
 }
 
-func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
+func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -288,9 +284,6 @@ func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 		return
 	}
 
-	// TODO: it needs to be replaced by a proper context in the future
-	ctx := context.TODO()
-	logger := klog.FromContext(ctx)
 	if hasPodStartedSLO(pod) {
 		logger.V(3).Info("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
 		state.observedRunningTime = p.clock.Now()

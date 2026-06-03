@@ -94,15 +94,23 @@ func safeOpenSubPath(mounter mount.Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := mount.IsNotMountPoint(mounter, bindPathTarget)
+	isMount, err := mounter.IsMountPoint(bindPathTarget)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
+		if os.IsNotExist(err) {
+			// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
+			isMount = false
+		} else if mount.IsCorruptedMnt(err) {
+			// The mount point is corrupted, attempt to recover by re-creating it.
+			klog.Warningf("Detected corrupted mount at %s (error: %v), unmounting", bindPathTarget, err)
+			if unmountErr := mounter.Unmount(bindPathTarget); unmountErr != nil {
+				return false, "", fmt.Errorf("error unmounting corrupted mount %s: %w", bindPathTarget, unmountErr)
+			}
+			isMount = false
+		} else {
+			return false, "", fmt.Errorf("error checking path %s for mount: %w", bindPathTarget, err)
 		}
-		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
-		notMount = true
 	}
-	if !notMount {
+	if isMount {
 		// It's already mounted, so check if it's bind-mounted to the same path
 		samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
 		if err != nil {
@@ -428,7 +436,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		klog.V(4).Infof("Creating %s", dir)
 		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
 		if err != nil {
-			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
+			return fmt.Errorf("cannot create directory %s: %w", currentPath, err)
 		}
 		// Dive into the created directory
 		childFD, err = syscall.Openat(parentFD, dir, nofollowFlags|unix.O_CLOEXEC, 0)

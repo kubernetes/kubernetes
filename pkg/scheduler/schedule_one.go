@@ -66,32 +66,26 @@ const (
 // It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	podInfo, err := sched.NextPod(logger)
+	entity, err := sched.NextEntity(logger)
 	if err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Error while retrieving next pod from scheduling queue")
+		utilruntime.HandleErrorWithLogger(logger, err, "Error while retrieving next scheduling entity from scheduling queue")
 		return
 	}
-	// pod could be nil when schedulerQueue is closed
-	if podInfo == nil || podInfo.Pod == nil {
+	// entity could be nil when schedulerQueue is closed
+	if entity == nil {
 		return
 	}
-	if sched.genericWorkloadEnabled && podInfo.Pod.Spec.SchedulingGroup != nil {
-		podGroupInfo, err := sched.podGroupInfoForPod(ctx, podInfo)
-		if err != nil {
-			podFwk, err := sched.frameworkForPod(podInfo.Pod)
-			if err != nil {
-				// This shouldn't happen, because we only accept for scheduling the pods
-				// which specify a scheduler name that matches one of the profiles.
-				klog.FromContext(ctx).Error(err, "Error occurred")
-				sched.SchedulingQueue.Done(podInfo.Pod.UID)
-				return
-			}
-			sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), nil, time.Now())
+
+	switch specificEntity := entity.(type) {
+	case *framework.QueuedPodGroupInfo:
+		sched.scheduleOnePodGroup(ctx, specificEntity)
+	case *framework.QueuedPodInfo:
+		if specificEntity.Pod == nil {
 			return
 		}
-		sched.scheduleOnePodGroup(ctx, podGroupInfo)
-	} else {
-		sched.scheduleOnePod(ctx, podInfo)
+		sched.scheduleOnePod(ctx, specificEntity)
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected entity", "type", fmt.Sprintf("%T", specificEntity))
 	}
 }
 
@@ -111,12 +105,12 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
 		logger.Error(err, "Error occurred")
-		sched.SchedulingQueue.Done(pod.UID)
+		sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		return
 	}
 	if sched.skipPodSchedule(ctx, fwk, pod) {
 		// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
-		sched.SchedulingQueue.Done(pod.UID)
+		sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		return
 	}
 
@@ -484,9 +478,9 @@ func (sched *Scheduler) bindingCycle(
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
 		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 	}
-	// Count pods scheduled after being flushed from unschedulablePods
+	// Count pods scheduled after being flushed from unschedulableEntities
 	if assumedPodInfo.WasFlushedFromUnschedulable {
-		logger.V(4).Info("Pod scheduled after flush from unschedulablePods", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins, "pendingPlugins", assumedPodInfo.PendingPlugins)
+		logger.V(4).Info("Pod scheduled after flush from unschedulableEntities", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins, "pendingPlugins", assumedPodInfo.PendingPlugins)
 		metrics.PodScheduledAfterFlush.Inc()
 	}
 	// Run "postbind" plugins.
@@ -1201,8 +1195,8 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	calledDone := false
 	defer func() {
 		if !calledDone {
-			// Basically, AddUnschedulableIfNotPresent calls DonePod internally.
-			// But, AddUnschedulableIfNotPresent isn't called in some corner cases.
+			// Basically, AddUnschedulablePodIfNotPresent calls DonePod internally.
+			// But, AddUnschedulablePodIfNotPresent isn't called in some corner cases.
 			// Here, we call DonePod explicitly to avoid leaking the pod.
 			sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		}
@@ -1248,13 +1242,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
 	if e != nil {
 		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
-		// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
+		// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
-			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
+			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 		} else {
 			if cachedPod.UID != podInfo.Pod.UID {
 				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
@@ -1265,7 +1259,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			// and we can't fix the validation for backwards compatibility.
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
-			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
 			calledDone = true

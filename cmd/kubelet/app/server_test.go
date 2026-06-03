@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	yaml "go.yaml.in/yaml/v2"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -70,6 +71,37 @@ func TestValueOfAllocatableResources(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v, %v", test.name, err1, err2)
 			}
 		}
+	}
+}
+
+func TestParseResourceList(t *testing.T) {
+	testCases := []struct {
+		input    map[string]string
+		expected string
+		name     string
+	}{
+		{
+			input:    map[string]string{"cpu": "200m"},
+			expected: "200m",
+			name:     "whole millicores",
+		},
+		{
+			input:    map[string]string{"cpu": "200.5m"},
+			expected: "201m",
+			name:     "decimal millicores rounded up",
+		},
+		{
+			input:    map[string]string{"cpu": "200.4m"},
+			expected: "200m",
+			name:     "decimal millicores rounded down",
+		},
+	}
+
+	for _, test := range testCases {
+		rl, err := parseResourceList(test.input)
+		require.NoError(t, err, test.name)
+		q := rl[v1.ResourceCPU]
+		require.Equal(t, test.expected, q.String(), test.name)
 	}
 }
 

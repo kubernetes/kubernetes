@@ -201,7 +201,7 @@ type appArmorAdmitHandler struct {
 	apparmor.Validator
 }
 
-func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (a *appArmorAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	// If the pod is already running or terminated, no need to recheck AppArmor.
 	if attrs.Pod.Status.Phase != v1.PodPending {
 		return PodAdmitResult{Admit: true}
@@ -237,7 +237,7 @@ func NewPodFeaturesAdmitHandler() PodAdmitHandler {
 
 type podFeaturesAdmitHandler struct{}
 
-func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (h *podFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	return isPodLevelResourcesSupported(attrs.Pod)
 }
 
@@ -258,7 +258,7 @@ func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, 
 }
 
 // Admit checks if a pod's feature requirements are met by the node.
-func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	pod := attrs.Pod
 
 	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}

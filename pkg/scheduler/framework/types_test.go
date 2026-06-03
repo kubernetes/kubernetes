@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -81,6 +82,277 @@ func TestNewResource(t *testing.T) {
 			r := NewResource(test.resourceList)
 			if diff := cmp.Diff(test.expected, r); diff != "" {
 				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+var (
+	midPriority  = int32(100)
+	highPriority = int32(1000)
+)
+
+func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
+	timestamp := time.Now()
+	timestampNewer := timestamp.Add(time.Second)
+
+	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
+	pInfo1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").UID("uid2").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestampNewer,
+		},
+	}
+	pInfo3 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").UID("uid3").Priority(highPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo4 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod4").UID("uid4").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo5 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod5").UID("uid5").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  2,
+			Timestamp: timestamp,
+		},
+	}
+
+	tests := []struct {
+		name     string
+		a        *QueuedPodInfo
+		b        *QueuedPodInfo
+		expected int
+	}{
+		{
+			name:     "higher priority comes first",
+			a:        pInfo3,
+			b:        pInfo1,
+			expected: -1,
+		},
+		{
+			name:     "lower priority comes second",
+			a:        pInfo1,
+			b:        pInfo3,
+			expected: 1,
+		},
+		{
+			name:     "higher attempts comes first",
+			a:        pInfo5,
+			b:        pInfo1,
+			expected: -1,
+		},
+		{
+			name:     "lower attempts comes second",
+			a:        pInfo1,
+			b:        pInfo5,
+			expected: 1,
+		},
+		{
+			name:     "older timestamp comes first",
+			a:        pInfo1,
+			b:        pInfo2,
+			expected: -1,
+		},
+		{
+			name:     "newer timestamp comes second",
+			a:        pInfo2,
+			b:        pInfo1,
+			expected: 1,
+		},
+		{
+			name:     "same priority, same attempts, same timestamp",
+			a:        pInfo1,
+			b:        pInfo4,
+			expected: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := PodGroupMemberPodsOrderingFunc(test.a, test.b)
+			if got != test.expected {
+				t.Errorf("Unexpected result, want %v, got %v", test.expected, got)
+			}
+		})
+	}
+}
+
+func TestQueuedPodGroupInfoOrdering(t *testing.T) {
+	timestamp := time.Now()
+	timestampNewer := timestamp.Add(time.Minute)
+
+	opts := []cmp.Option{
+		cmp.AllowUnexported(QueuedPodInfo{}, PodInfo{}, fwk.PodResource{}),
+	}
+
+	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
+	pInfo1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").UID("uid2").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestampNewer,
+		},
+	}
+	pInfo3 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").UID("uid3").Priority(highPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo4 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod4").UID("uid4").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo5 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod5").UID("uid5").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  2,
+			Timestamp: timestamp,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		initialPods   []*QueuedPodInfo
+		podsToSet     []*QueuedPodInfo
+		podToAdd      *QueuedPodInfo
+		podToRemove   *QueuedPodInfo
+		expectedOrder []*QueuedPodInfo
+	}{
+		{
+			name:          "Add high priority pod to empty group",
+			podToAdd:      pInfo3,
+			expectedOrder: []*QueuedPodInfo{pInfo3},
+		},
+		{
+			name:          "Add lower priority pod, goes to end",
+			initialPods:   []*QueuedPodInfo{pInfo3},
+			podToAdd:      pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
+		},
+		{
+			name:          "Add pod with higher priority to front",
+			initialPods:   []*QueuedPodInfo{pInfo1, pInfo2},
+			podToAdd:      pInfo3,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
+		},
+		{
+			name:          "Add pod with same priority but lower attempts, goes to end",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5},
+			podToAdd:      pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+		},
+		{
+			name:          "Add pod with same priority but higher attempts, goes before",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo1},
+			podToAdd:      pInfo5,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+		},
+		{
+			name:          "Add pod with same priority but later timestamp, goes to end",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5},
+			podToAdd:      pInfo2,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
+		},
+		{
+			name:          "Add pod with same priority but earlier timestamp, goes before",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo2},
+			podToAdd:      pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
+		},
+		{
+			name:          "Add pod with same priority and timestamp, maintains relative order",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToAdd:      pInfo4,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo4, pInfo1, pInfo2},
+		},
+		{
+			name:          "Set pods out of order, gets sorted",
+			podsToSet:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4, pInfo5},
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
+		},
+		{
+			name:          "Remove pod from middle",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToRemove:   pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
+		},
+		{
+			name:          "Remove first pod",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToRemove:   pInfo3,
+			expectedOrder: []*QueuedPodInfo{pInfo5, pInfo1, pInfo2},
+		},
+		{
+			name:          "Remove last pod",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToRemove:   pInfo2,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+		},
+		{
+			name:          "Remove non-existent pod",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo1},
+			podToRemove:   pInfo2,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pgqi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{Namespace: "default", Name: "pg1"},
+			}
+			if tt.initialPods != nil {
+				pgqi.SetPods(tt.initialPods)
+			}
+
+			if tt.podsToSet != nil {
+				pgqi.SetPods(tt.podsToSet)
+			}
+			if tt.podToAdd != nil {
+				pgqi.AddPod(tt.podToAdd)
+			}
+			if tt.podToRemove != nil {
+				pgqi.RemovePod(tt.podToRemove.Pod)
+			}
+
+			if diff := cmp.Diff(tt.expectedOrder, pgqi.QueuedPodInfos, opts...); diff != "" {
+				t.Errorf("Unexpected order in QueuedPodInfos (-want, +got):\n%s", diff)
+			}
+
+			expectedUnscheduled := make([]*v1.Pod, len(tt.expectedOrder))
+			for i, qpi := range tt.expectedOrder {
+				expectedUnscheduled[i] = qpi.Pod
+			}
+			if diff := cmp.Diff(expectedUnscheduled, pgqi.UnscheduledPods); diff != "" {
+				t.Errorf("Unexpected order in UnscheduledPods (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2913,7 +3185,7 @@ func TestQueuedPodInfo_UpdateInvalidatesSignature(t *testing.T) {
 		PodSignature: fwk.PodSignature("sig-1"),
 	}
 
-	err := queuedPodInfo.Update(pod2)
+	_, err := queuedPodInfo.Update(pod2)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}

@@ -372,6 +372,13 @@ func updateTestContext(ctx context.Context) error {
 	setExtraEnvs()
 	updateImageAllowList(ctx)
 
+	// Set KubeletRootDir to match the kubelet configuration used in node e2e tests.
+	// This ensures tests that use framework.TestContext.KubeletRootDir (e.g., for HostPath volumes)
+	// use the correct path.
+	if framework.TestContext.KubeletRootDir == "" {
+		framework.TestContext.KubeletRootDir = services.KubeletRootDirectory
+	}
+
 	client, err := getAPIServerClient()
 	if err != nil {
 		return fmt.Errorf("failed to get apiserver client: %w", err)

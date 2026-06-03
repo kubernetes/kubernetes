@@ -427,6 +427,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.37"
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
   - default: false
@@ -509,6 +513,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: DRAListTypeAttributes
   versionedSpecs:
   - default: false
@@ -1477,20 +1485,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
-- name: RelaxedDNSSearchValidation
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.32"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.33"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: RelaxedEnvironmentVariableValidation
   versionedSpecs:
   - default: false
@@ -2015,6 +2009,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: WatchList
   versionedSpecs:
   - default: false

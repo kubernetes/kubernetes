@@ -58,8 +58,9 @@ func cleanup(t *testing.T) {
 	os.MkdirAll(socketDir, 0755)
 }
 
-func runReconciler(reconciler Reconciler) {
-	go reconciler.Run(wait.NeverStop)
+func runReconciler(t *testing.T, reconciler Reconciler) {
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 }
 
 func waitForRegistration(
@@ -154,7 +155,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		asw,
 	)
 	// Act
-	runReconciler(reconciler)
+	runReconciler(t, reconciler)
 
 	// Get dsw and asw plugins; they should both be empty
 	if len(asw.GetRegisteredPlugins()) != 0 {
@@ -188,9 +189,9 @@ func Test_Run_Positive_Register(t *testing.T) {
 	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go reconciler.Run(stopChan)
+	reconcilerCtx := tCtx.WithCancel()
+	defer reconcilerCtx.Cancel("stop reconciler")
+	go reconciler.Run(reconcilerCtx)
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
@@ -238,9 +239,9 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go reconciler.Run(stopChan)
+	reconcilerCtx := tCtx.WithCancel()
+	defer reconcilerCtx.Cancel("stop reconciler")
+	go reconciler.Run(reconcilerCtx)
 
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
@@ -295,9 +296,9 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go reconciler.Run(stopChan)
+	reconcilerCtx := tCtx.WithCancel()
+	defer reconcilerCtx.Cancel("stop reconciler")
+	go reconciler.Run(reconcilerCtx)
 
 	socketPath := filepath.Join(socketDir, "plugin2.sock")
 	pluginName := fmt.Sprintf("example-plugin2")

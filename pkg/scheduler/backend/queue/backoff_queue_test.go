@@ -43,41 +43,68 @@ func TestBackoffQueue_getBackoffTime(t *testing.T) {
 			name:                   "no backoff",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 0, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Time{},
+			podInfo: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulableCount: 0,
+					Timestamp:          time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			want: time.Time{},
 		},
 		{
 			name:                   "backoff is returned from the cache",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 1, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC), BackoffExpiration: time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC)},
-			want:                   time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC),
+			podInfo: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulableCount: 1,
+					Timestamp:          time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+					BackoffExpiration:  time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC),
+				},
+			},
+			want: time.Date(2023, 10, 1, 0, 0, 0, 1, time.UTC),
 		},
 		{
 			name:                   "backoff by UnschedulableCount",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
+			podInfo: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulableCount: 16,
+					Timestamp:          time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			want: time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
 		},
 		{
 			name:                   "backoff is calculated with ConsecutiveErrorsCount",
 			initialBackoffDuration: 1 * time.Second,
 			maxBackoffDuration:     32 * time.Second,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 5, ConsecutiveErrorsCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
+			podInfo: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulableCount:     5,
+					ConsecutiveErrorsCount: 16,
+					Timestamp:              time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			want: time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
 		},
 		{
 			name:                   "zero maxBackoffDuration means no backoff",
 			initialBackoffDuration: 0,
 			maxBackoffDuration:     0,
-			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
-			want:                   time.Time{},
+			podInfo: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulableCount: 16,
+					Timestamp:          time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			want: time.Time{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bq := newBackoffQueue(clock.RealClock{}, tt.initialBackoffDuration, tt.maxBackoffDuration, newDefaultQueueSort(), true)
+			bq := newBackoffQueue(clock.RealClock{}, tt.initialBackoffDuration, tt.maxBackoffDuration, convertLessFn(newDefaultQueueSort()), true)
 			if got := bq.getBackoffTime(tt.podInfo); got != tt.want {
 				t.Errorf("backoffQueue.getBackoffTime() = %v, want %v", got, tt.want)
 			}
@@ -91,6 +118,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 		initialBackoffDuration time.Duration
 		maxBackoffDuration     time.Duration
 		count                  int
+		entitySize             int
 		want                   time.Duration
 	}{
 		{
@@ -98,6 +126,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     32 * time.Nanosecond,
 			count:                  0,
+			entitySize:             1,
 			want:                   0,
 		},
 		{
@@ -105,6 +134,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 			initialBackoffDuration: 3 * time.Nanosecond,
 			maxBackoffDuration:     1000 * time.Nanosecond,
 			count:                  5,
+			entitySize:             1,
 			want:                   48 * time.Nanosecond, // 3 * 2^4 = 48
 		},
 		{
@@ -112,6 +142,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     32 * time.Nanosecond,
 			count:                  16,
+			entitySize:             1,
 			want:                   32 * time.Nanosecond,
 		},
 		{
@@ -119,6 +150,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     math.MaxInt32 * time.Nanosecond,
 			count:                  32,
+			entitySize:             1,
 			want:                   math.MaxInt32 * time.Nanosecond,
 		},
 		{
@@ -126,13 +158,30 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     math.MaxInt64 * time.Nanosecond,
 			count:                  64,
+			entitySize:             1,
 			want:                   math.MaxInt64 * time.Nanosecond,
+		},
+		{
+			name:                   "larger entity size",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     32 * time.Nanosecond,
+			count:                  7,
+			entitySize:             10,
+			want:                   64 * time.Nanosecond,
+		},
+		{
+			name:                   "hitting max backoff duration with larger entity size",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     32 * time.Nanosecond,
+			count:                  16,
+			entitySize:             10,
+			want:                   101 * time.Nanosecond,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bq := newBackoffQueue(clock.RealClock{}, tt.initialBackoffDuration, tt.maxBackoffDuration, newDefaultQueueSort(), true)
-			if got := bq.calculateBackoffDuration(tt.count); got != tt.want {
+			bq := newBackoffQueue(clock.RealClock{}, tt.initialBackoffDuration, tt.maxBackoffDuration, convertLessFn(newDefaultQueueSort()), true)
+			if got := bq.calculateBackoffDuration(tt.count, tt.entitySize); got != tt.want {
 				t.Errorf("backoffQueue.calculateBackoffDuration() = %v, want %v", got, tt.want)
 			}
 		})
@@ -146,31 +195,39 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		"pod1": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod1").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(time.Second),
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(time.Second),
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		"pod2": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Obj(),
 			},
-			Timestamp:              fakeClock.Now().Add(-2 * time.Second),
-			ConsecutiveErrorsCount: 1,
+			QueueingParams: framework.QueueingParams{
+				Timestamp:              fakeClock.Now().Add(-2 * time.Second),
+				ConsecutiveErrorsCount: 1,
+			},
 		},
 		"pod3": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Obj(),
 			},
-			Timestamp:              fakeClock.Now().Add(time.Second),
-			ConsecutiveErrorsCount: 1,
+			QueueingParams: framework.QueueingParams{
+				Timestamp:              fakeClock.Now().Add(time.Second),
+				ConsecutiveErrorsCount: 1,
+			},
 		},
 	}
 	tests := []struct {
@@ -213,14 +270,14 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 		for _, popFromBackoffQEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s popFromBackoffQEnabled(%v)", tt.name, popFromBackoffQEnabled), func(t *testing.T) {
 				logger, _ := ktesting.NewTestContext(t)
-				bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, newDefaultQueueSort(), popFromBackoffQEnabled)
+				bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, convertLessFn(newDefaultQueueSort()), popFromBackoffQEnabled)
 				for _, podName := range tt.podsInBackoff {
 					bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label())
 				}
 				gotPodInfos := bq.popAllBackoffCompleted(logger)
 				var gotPods []string
 				for _, pInfo := range gotPodInfos {
-					gotPods = append(gotPods, pInfo.Pod.Name)
+					gotPods = append(gotPods, pInfo.(*framework.QueuedPodInfo).Pod.Name)
 				}
 				if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
 					t.Errorf("Unexpected pods moved (-want, +got):\n%s", diff)
@@ -242,55 +299,67 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now(),
-			Attempts:             1,
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now(),
+				Attempts:             1,
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		{
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod1").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-time.Second),
-			Attempts:             1,
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(-time.Second),
+				Attempts:             1,
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		{
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Priority(2).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
-			Attempts:             1,
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
+				Attempts:             1,
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		{
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
-			Attempts:             1,
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+				Attempts:             1,
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		{
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod4").Priority(2).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
-			Attempts:             1,
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+				Attempts:             1,
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 		{
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod5").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-3 * time.Second),
-			Attempts:             1,
-			UnschedulableCount:   1,
-			UnschedulablePlugins: sets.New("plugin"),
+			QueueingParams: framework.QueueingParams{
+				Timestamp:            fakeClock.Now().Add(-3 * time.Second),
+				Attempts:             1,
+				UnschedulableCount:   1,
+				UnschedulablePlugins: sets.New("plugin"),
+			},
 		},
 	}
 	tests := []struct {
@@ -312,14 +381,14 @@ func TestBackoffQueueOrdering(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, newDefaultQueueSort(), tt.popFromBackoffQEnabled)
+			bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, convertLessFn(newDefaultQueueSort()), tt.popFromBackoffQEnabled)
 			for _, podInfo := range podInfos {
 				bq.add(logger, podInfo, framework.EventUnscheduledPodAdd.Label())
 			}
 			gotPodInfos := bq.popAllBackoffCompleted(logger)
 			var gotPods []string
 			for _, pInfo := range gotPodInfos {
-				gotPods = append(gotPods, pInfo.Pod.Name)
+				gotPods = append(gotPods, pInfo.(*framework.QueuedPodInfo).Pod.Name)
 			}
 			if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
 				t.Errorf("Unexpected pods moved (-want, +got):\n%s", diff)

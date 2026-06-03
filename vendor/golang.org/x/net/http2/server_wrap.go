@@ -10,9 +10,11 @@ package http2
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 )
@@ -44,6 +46,20 @@ func configureServer(s *http.Server, conf *Server) error {
 			h2.IdleTimeout = h1.ReadTimeout
 		}
 	}
+
+	// Register h2 and http/1.1 ALPN protocols on s.TLSConfig, matching
+	// the pre-wrapping implementation in server.go, so that TLS listeners
+	// built from s.TLSConfig still negotiate HTTP/2.
+	if s.TLSConfig == nil {
+		s.TLSConfig = new(tls.Config)
+	}
+	if !slices.Contains(s.TLSConfig.NextProtos, NextProtoTLS) {
+		s.TLSConfig.NextProtos = append(s.TLSConfig.NextProtos, NextProtoTLS)
+	}
+	if !slices.Contains(s.TLSConfig.NextProtos, "http/1.1") {
+		s.TLSConfig.NextProtos = append(s.TLSConfig.NextProtos, "http/1.1")
+	}
+
 	conf.state = &serverInternalState{
 		s1: s,
 	}

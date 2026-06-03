@@ -72,16 +72,16 @@ func (mw *MutexWrap) Disable() {
 	mw.disabled = true
 }
 
-// Creates a new logger. Configuration should be set by changing `Formatter`,
-// `Out` and `Hooks` directly on the default logger instance. You can also just
+// New Creates a new logger. Configuration should be set by changing [Formatter],
+// Out and Hooks directly on the default Logger instance. You can also just
 // instantiate your own:
 //
-//    var log = &logrus.Logger{
-//      Out: os.Stderr,
-//      Formatter: new(logrus.TextFormatter),
-//      Hooks: make(logrus.LevelHooks),
-//      Level: logrus.DebugLevel,
-//    }
+//	var log = &logrus.Logger{
+//	  Out:       os.Stderr,
+//	  Formatter: new(logrus.TextFormatter),
+//	  Hooks:     make(logrus.LevelHooks),
+//	  Level:     logrus.DebugLevel,
+//	}
 //
 // It's recommended to make this a global instance called `log`.
 func New() *Logger {
@@ -118,30 +118,30 @@ func (logger *Logger) WithField(key string, value interface{}) *Entry {
 	return entry.WithField(key, value)
 }
 
-// Adds a struct of fields to the log entry. All it does is call `WithField` for
-// each `Field`.
+// WithFields adds a struct of fields to the log entry. It calls [Entry.WithField]
+// for each Field.
 func (logger *Logger) WithFields(fields Fields) *Entry {
 	entry := logger.newEntry()
 	defer logger.releaseEntry(entry)
 	return entry.WithFields(fields)
 }
 
-// Add an error as single field to the log entry.  All it does is call
-// `WithError` for the given `error`.
+// WithError adds an error as single field to the log entry.  It calls
+// [Entry.WithError] for the given error.
 func (logger *Logger) WithError(err error) *Entry {
 	entry := logger.newEntry()
 	defer logger.releaseEntry(entry)
 	return entry.WithError(err)
 }
 
-// Add a context to the log entry.
+// WithContext add a context to the log entry.
 func (logger *Logger) WithContext(ctx context.Context) *Entry {
 	entry := logger.newEntry()
 	defer logger.releaseEntry(entry)
 	return entry.WithContext(ctx)
 }
 
-// Overrides the time of the log entry.
+// WithTime overrides the time of the log entry.
 func (logger *Logger) WithTime(t time.Time) *Entry {
 	entry := logger.newEntry()
 	defer logger.releaseEntry(entry)
@@ -347,9 +347,9 @@ func (logger *Logger) Exit(code int) {
 	logger.ExitFunc(code)
 }
 
-//When file is opened with appending mode, it's safe to
-//write concurrently to a file (within 4k message on Linux).
-//In these cases user can choose to disable the lock.
+// SetNoLock disables the lock for situations where a file is opened with
+// appending mode, and safe for concurrent writes to the file (within 4k
+// message on Linux). In these cases user can choose to disable the lock.
 func (logger *Logger) SetNoLock() {
 	logger.mu.Disable()
 }

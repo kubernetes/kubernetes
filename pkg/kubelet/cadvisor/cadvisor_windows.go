@@ -35,8 +35,8 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(_ klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
-	client, err := winstats.NewPerfCounterClient(klog.TODO())
+func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+	client, err := winstats.NewPerfCounterClient(logger)
 	return &cadvisorClient{
 		rootPath:       rootPath,
 		winStatsClient: client,
@@ -56,8 +56,8 @@ func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, optio
 	return nil, nil
 }
 
-func (cu *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return cu.winStatsClient.WinMachineInfo(klog.TODO())
+func (cu *cadvisorClient) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
+	return cu.winStatsClient.WinMachineInfo(logger)
 }
 
 func (cu *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {

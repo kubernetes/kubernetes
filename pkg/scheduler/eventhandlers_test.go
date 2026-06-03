@@ -182,13 +182,14 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 			// Put test pods into unschedulable queue
 			for _, pod := range unschedulablePods {
 				queue.Add(ctx, pod)
-				poppedPod, err := queue.Pop(logger)
+				entity, err := queue.Pop(logger)
 				if err != nil {
 					t.Fatalf("Pop failed: %v", err)
 				}
+				poppedPod := entity.(*framework.QueuedPodInfo)
 				poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
-				if err := queue.AddUnschedulableIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
-					t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+					t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
 			}
 
@@ -464,6 +465,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			if !tt.enableDRA {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			} else {
+				if !tt.enableDRAExtendedResource {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				}
 				// Making this depend on the emulated version avoids "cannot set feature gate DRADeviceTaintRules to false, feature is PreAlpha at emulated version 1.34".
 				overrides[features.DRADeviceTaintRules] = tt.enableDRADeviceTaintRules
 				overrides[features.GenericWorkload] = tt.enableGenericWorkload
@@ -646,6 +650,9 @@ func TestAdmissionCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAExtendedResource:         tt.enableDRAExtendedResource,
 				features.DRANodeAllocatableResources: tt.enableDRANodeAllocatableResources,
@@ -730,7 +737,7 @@ func TestAddPod(t *testing.T) {
 
 			sched.addPod(tt.pod)
 
-			_, ok := sched.SchedulingQueue.GetPod(tt.pod.Name, tt.pod.Namespace)
+			_, ok := sched.SchedulingQueue.GetPod(tt.pod.Name, tt.pod.Namespace, tt.pod.Spec.SchedulingGroup)
 			if tt.expectInQueue && !ok {
 				t.Errorf("Expected pod to be in scheduling queue")
 			} else if !tt.expectInQueue && ok {
@@ -969,11 +976,11 @@ func TestUpdatePod(t *testing.T) {
 
 			sched.updatePod(tt.oldPod, tt.newPod)
 
-			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace)
+			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
 			if tt.expectInQueue != nil {
 				if !ok {
 					t.Errorf("Expected pod to be in scheduling queue")
-				} else if diff := cmp.Diff(tt.expectInQueue, qPod.Pod); diff != "" {
+				} else if diff := cmp.Diff(tt.expectInQueue, qPod.GetPod()); diff != "" {
 					t.Errorf("Unexpected pod after update (-want,+got):\n%s", diff)
 				}
 			} else if ok {
@@ -1139,7 +1146,7 @@ func TestDeletePod(t *testing.T) {
 			if err == nil {
 				t.Errorf("Unexpected pod in cache after removal")
 			}
-			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace)
+			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
 			if ok {
 				t.Errorf("Unexpected pod in scheduling queue after removal")
 			}

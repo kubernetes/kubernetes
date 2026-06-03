@@ -809,7 +809,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			s.CgroupRoot = "/"
 		}
 
-		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
+		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo(logger)
 		if err != nil {
 			return err
 		}
@@ -1368,6 +1368,9 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 			}
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+			}
+			if v1.ResourceName(k) == v1.ResourceCPU {
+				q.SetMilli((q.ScaledValue(resource.Micro) + 500) / 1000)
 			}
 			rl[v1.ResourceName(k)] = q
 		default:

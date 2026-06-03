@@ -193,3 +193,94 @@ func TestCycleStateClone(t *testing.T) {
 		})
 	}
 }
+
+func TestPlacementCycleState(t *testing.T) {
+	t.Run("nil by default", func(t *testing.T) {
+		state := NewCycleState()
+		if state.GetPlacementCycleState() != nil {
+			t.Errorf("expected nil PlacementCycleState on fresh CycleState")
+		}
+	})
+
+	t.Run("set and get", func(t *testing.T) {
+		state := NewCycleState()
+		podGroupState := NewCycleState()
+		placementState := NewCycleState()
+		placementState.SetPodGroupSchedulingCycle(podGroupState)
+		placementState.Write("testkey", &fakeData{data: "placementdata"})
+
+		state.SetPlacementCycleState(placementState)
+
+		got := state.GetPlacementCycleState()
+		if got == nil {
+			t.Fatal("expected non-nil PlacementCycleState after Set")
+		}
+
+		data, err := got.Read("testkey")
+		if err != nil {
+			t.Fatalf("unexpected error reading from PlacementCycleState: %v", err)
+		}
+		if data.(*fakeData).data != "placementdata" {
+			t.Errorf("expected 'placementdata', got %q", data.(*fakeData).data)
+		}
+		if got.GetPodGroupSchedulingCycle() != podGroupState {
+			t.Errorf("expected PlacementCycleState to expose its PodGroupCycleState")
+		}
+	})
+
+	t.Run("set to nil clears", func(t *testing.T) {
+		state := NewCycleState()
+		state.SetPlacementCycleState(NewCycleState())
+		state.SetPlacementCycleState(nil)
+
+		if state.GetPlacementCycleState() != nil {
+			t.Errorf("expected nil PlacementCycleState after setting to nil")
+		}
+	})
+
+	t.Run("clone preserves reference", func(t *testing.T) {
+		state := NewCycleState()
+		state.Write(key, &fakeData{data: "pod-data"})
+
+		placementState := NewCycleState()
+		placementState.Write("pkey", &fakeData{data: "placement-data"})
+		state.SetPlacementCycleState(placementState)
+
+		cloned := state.Clone().(*CycleState)
+
+		// The cloned state should reference the same PlacementCycleState.
+		if cloned.GetPlacementCycleState() == nil {
+			t.Fatal("cloned state should have non-nil PlacementCycleState")
+		}
+
+		data, err := cloned.GetPlacementCycleState().Read("pkey")
+		if err != nil {
+			t.Fatalf("unexpected error reading from cloned PlacementCycleState: %v", err)
+		}
+		if data.(*fakeData).data != "placement-data" {
+			t.Errorf("expected 'placement-data', got %q", data.(*fakeData).data)
+		}
+
+		// Writes to the PlacementCycleState via the clone should be visible from the original,
+		// since it's a shared reference (same as podGroupCycleState behavior).
+		cloned.GetPlacementCycleState().Write("newkey", &fakeData{data: "new"})
+		newData, err := state.GetPlacementCycleState().Read("newkey")
+		if err != nil {
+			t.Fatalf("write via clone's PlacementCycleState should be visible from original: %v", err)
+		}
+		if newData.(*fakeData).data != "new" {
+			t.Errorf("expected 'new', got %q", newData.(*fakeData).data)
+		}
+	})
+
+	t.Run("clone with nil placement state", func(t *testing.T) {
+		state := NewCycleState()
+		state.Write(key, &fakeData{data: "data"})
+		// Do not set PlacementCycleState — leave nil.
+
+		cloned := state.Clone().(*CycleState)
+		if cloned.GetPlacementCycleState() != nil {
+			t.Errorf("cloned state should have nil PlacementCycleState when original has nil")
+		}
+	})
+}

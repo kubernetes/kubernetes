@@ -104,7 +104,7 @@ type Manager interface {
 	HasPendingResizes() bool
 
 	// RetryPendingResizes retries all pending resizes.
-	RetryPendingResizes(trigger string)
+	RetryPendingResizes(ctx context.Context, trigger string)
 }
 
 type manager struct {
@@ -115,7 +115,7 @@ type manager struct {
 	sourcesReady  config.SourcesReady
 
 	ticker         *time.Ticker
-	triggerPodSync func(pod *v1.Pod)
+	triggerPodSync func(context.Context, *v1.Pod)
 	getActivePods  func() []*v1.Pod
 	getPodByUID    func(types.UID) (*v1.Pod, bool)
 
@@ -127,7 +127,7 @@ type manager struct {
 
 func NewManager(checkpointDirectory string,
 	statusManager status.Manager,
-	triggerPodSync func(pod *v1.Pod),
+	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
@@ -171,7 +171,7 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 // For testing purposes only!
 func NewInMemoryManager(
 	statusManager status.Manager,
-	triggerPodSync func(pod *v1.Pod),
+	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
@@ -199,7 +199,7 @@ func (m *manager) Run(ctx context.Context) {
 		for {
 			select {
 			case <-m.ticker.C:
-				successfulResizes := m.retryPendingResizes(logger, triggerReasonPeriodic)
+				successfulResizes := m.retryPendingResizes(ctx, triggerReasonPeriodic)
 				for _, po := range successfulResizes {
 					logger.Info("Successfully retried resize after timeout", "pod", klog.KObj(po))
 				}
@@ -211,14 +211,12 @@ func (m *manager) Run(ctx context.Context) {
 	}()
 }
 
-func (m *manager) RetryPendingResizes(trigger string) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-	m.retryPendingResizes(logger, trigger)
+func (m *manager) RetryPendingResizes(ctx context.Context, trigger string) {
+	m.retryPendingResizes(ctx, trigger)
 }
 
-func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.Pod {
+func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1.Pod {
+	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -244,7 +242,7 @@ func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.
 		oldResizeStatus := m.statusManager.GetPodResizeConditions(uid)
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
 
-		resizeAllocated, err := m.handlePodResourcesResize(logger, pod)
+		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)
 		switch {
 		case err != nil:
 			logger.Error(err, "Failed to handle pod resources resize", "pod", klog.KObj(pod))
@@ -265,7 +263,7 @@ func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.
 		// If the pod resize status has changed, we need to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
 		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
-			m.triggerPodSync(pod)
+			m.triggerPodSync(ctx, pod)
 		}
 	}
 
@@ -509,9 +507,10 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 }
 
 func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -523,7 +522,7 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(logger, allocatedPods, pod, lifecycle.AddOperation)
+	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
@@ -550,7 +549,8 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	m.allocated.RemoveOrphanedPods(remainingPods)
 }
 
-func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (bool, error) {
+func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bool, error) {
+	logger := klog.FromContext(ctx)
 	_, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
@@ -559,7 +559,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canAdmitPod(logger, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {
@@ -598,14 +598,15 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 // the pod cannot be admitted.
 // allocatedPods should represent the pods that have already been admitted, along with their
 // admitted (allocated) resources.
-func (m *manager) canAdmitPod(logger klog.Logger, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
+func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
+	logger := klog.FromContext(ctx)
 	// Filter out the pod being evaluated.
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 	// If any handler rejects, the pod is rejected.
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
 	for _, podAdmitHandler := range m.admitHandlers {
-		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
 			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
 			return false, result.Reason, result.Message
 		}

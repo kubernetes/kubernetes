@@ -357,13 +357,15 @@ func (tx *Tx) close() {
 		tx.db.rwlock.Unlock()
 
 		// Merge statistics.
-		tx.db.statlock.Lock()
-		tx.db.stats.FreePageN = freelistFreeN
-		tx.db.stats.PendingPageN = freelistPendingN
-		tx.db.stats.FreeAlloc = (freelistFreeN + freelistPendingN) * tx.db.pageSize
-		tx.db.stats.FreelistInuse = freelistAlloc
-		tx.db.stats.TxStats.add(&tx.stats)
-		tx.db.statlock.Unlock()
+		if tx.db.stats != nil {
+			tx.db.statlock.Lock()
+			tx.db.stats.FreePageN = freelistFreeN
+			tx.db.stats.PendingPageN = freelistPendingN
+			tx.db.stats.FreeAlloc = (freelistFreeN + freelistPendingN) * tx.db.pageSize
+			tx.db.stats.FreelistInuse = freelistAlloc
+			tx.db.stats.TxStats.add(&tx.stats)
+			tx.db.statlock.Unlock()
+		}
 	} else {
 		tx.db.removeTx(tx)
 	}
@@ -396,7 +398,7 @@ func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 	// the transaction was based on.
 	//
 	// To overcome this, we reuse the already opened file handle when
-	// WritFlag not set. When the WriteFlag is set, we reopen the file
+	// WriteFlag not set. When the WriteFlag is set, we reopen the file
 	// but verify that it still refers to the same underlying file
 	// (by device and inode). If it does not, we fall back to
 	// reusing the existing already opened file handle.

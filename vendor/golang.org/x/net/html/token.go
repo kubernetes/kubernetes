@@ -704,7 +704,11 @@ func (z *Tokenizer) readMarkupDeclaration() TokenType {
 	for i := 0; i < 2; i++ {
 		c[i] = z.readByte()
 		if z.err != nil {
+			// bogus comment
 			z.data.end = z.raw.end
+			if i == 1 && c[0] == '>' {
+				z.data.end--
+			}
 			return CommentToken
 		}
 	}
@@ -732,6 +736,13 @@ func (z *Tokenizer) readDoctype() bool {
 	for i := 0; i < len(s); i++ {
 		c := z.readByte()
 		if z.err != nil {
+			if z.err == io.EOF {
+				// Back up to read the fragment of "DOCTYPE" again, reset
+				// z.err to signal EOF on the next call
+				z.raw.end = z.data.start
+				z.err = nil
+				return false
+			}
 			z.data.end = z.raw.end
 			return false
 		}
@@ -757,6 +768,13 @@ func (z *Tokenizer) readCDATA() bool {
 	for i := 0; i < len(s); i++ {
 		c := z.readByte()
 		if z.err != nil {
+			if z.err == io.EOF {
+				// Back up to read the fragment of "[CDATA[" again, reset
+				// z.err to signal EOF on the next call
+				z.raw.end = z.data.start
+				z.err = nil
+				return false
+			}
 			z.data.end = z.raw.end
 			return false
 		}
@@ -883,7 +901,7 @@ func (z *Tokenizer) readTag(saveAttr bool) {
 		z.readTagAttrKey()
 		z.readTagAttrVal()
 		// Save pendingAttr if saveAttr and that attribute has a non-empty key, and the key hasn't been seen before.
-		key := strings.ToLower(string(z.buf[z.pendingAttr[0].start:z.pendingAttr[0].end]))
+		key := string(lower(bytes.Clone(z.buf[z.pendingAttr[0].start:z.pendingAttr[0].end])))
 		if saveAttr && z.pendingAttr[0].start != z.pendingAttr[0].end && !z.attrNames[key] {
 			z.attr = append(z.attr, z.pendingAttr)
 			z.attrNames[key] = true
@@ -1206,7 +1224,7 @@ func (z *Tokenizer) TagName() (name []byte, hasAttr bool) {
 	if z.data.start < z.data.end {
 		switch z.tt {
 		case StartTagToken, EndTagToken, SelfClosingTagToken:
-			s := z.buf[z.data.start:z.data.end]
+			s := bytes.ReplaceAll(z.buf[z.data.start:z.data.end], nul, replacement)
 			z.data.start = z.raw.end
 			z.data.end = z.raw.end
 			return lower(s), z.nAttrReturned < len(z.attr)
@@ -1224,8 +1242,8 @@ func (z *Tokenizer) TagAttr() (key, val []byte, moreAttr bool) {
 		case StartTagToken, SelfClosingTagToken:
 			x := z.attr[z.nAttrReturned]
 			z.nAttrReturned++
-			key = z.buf[x[0].start:x[0].end]
-			val = z.buf[x[1].start:x[1].end]
+			key = bytes.ReplaceAll(z.buf[x[0].start:x[0].end], nul, replacement)
+			val = bytes.ReplaceAll(z.buf[x[1].start:x[1].end], nul, replacement)
 			return lower(key), unescape(convertNewlines(val), true), z.nAttrReturned < len(z.attr)
 		}
 	}

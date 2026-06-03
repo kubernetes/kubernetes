@@ -3703,6 +3703,12 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
+		if len(ps.Spec.ServiceName) > 0 {
+			w.Write(LEVEL_0, "Service Name:\t%s\n", ps.Spec.ServiceName)
+		}
+		if len(ps.Spec.PodManagementPolicy) > 0 {
+			w.Write(LEVEL_0, "Pod Management Policy:\t%s\n", ps.Spec.PodManagementPolicy)
+		}
 		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", *ps.Spec.Replicas, ps.Status.Replicas)
 		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
 		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
@@ -3714,7 +3720,11 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 				}
 			}
 		}
-
+		if ps.Spec.PersistentVolumeClaimRetentionPolicy != nil {
+			w.Write(LEVEL_0, "Persistent Volume Claim Retention Policy:\n")
+			w.Write(LEVEL_1, "WhenDeleted:\t%s\n", ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted)
+			w.Write(LEVEL_1, "WhenScaled:\t%s\n", ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled)
+		}
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		DescribePodTemplate(&ps.Spec.Template, w)
 		describeVolumeClaimTemplates(ps.Spec.VolumeClaimTemplates, w)

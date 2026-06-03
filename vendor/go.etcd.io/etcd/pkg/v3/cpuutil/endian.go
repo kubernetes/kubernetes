@@ -16,21 +16,14 @@ package cpuutil
 
 import (
 	"encoding/binary"
-	"unsafe"
+
+	"golang.org/x/sys/cpu"
 )
 
-const intWidth = int(unsafe.Sizeof(0))
-
-var byteOrder binary.ByteOrder
-
 // ByteOrder returns the byte order for the CPU's native endianness.
-func ByteOrder() binary.ByteOrder { return byteOrder }
-
-func init() {
-	i := 0x1
-	if v := (*[intWidth]byte)(unsafe.Pointer(&i)); v[0] == 0 {
-		byteOrder = binary.BigEndian
-	} else {
-		byteOrder = binary.LittleEndian
+func ByteOrder() binary.ByteOrder {
+	if cpu.IsBigEndian {
+		return binary.BigEndian
 	}
+	return binary.LittleEndian
 }

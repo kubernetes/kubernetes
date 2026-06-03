@@ -6,6 +6,7 @@ package otlptracegrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlptra
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal"
@@ -26,11 +28,12 @@ import (
 )
 
 type client struct {
-	endpoint      string
-	dialOpts      []grpc.DialOption
-	metadata      metadata.MD
-	exportTimeout time.Duration
-	requestFunc   retry.RequestFunc
+	endpoint       string
+	dialOpts       []grpc.DialOption
+	metadata       metadata.MD
+	exportTimeout  time.Duration
+	maxRequestSize int
+	requestFunc    retry.RequestFunc
 
 	// stopCtx is used as a parent context for all exports. Therefore, when it
 	// is canceled with the stopFunc all exports are canceled.
@@ -65,14 +68,15 @@ func newClient(opts ...Option) *client {
 	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec  // cancel called in client shutdown.
 
 	c := &client{
-		endpoint:      cfg.Traces.Endpoint,
-		exportTimeout: cfg.Traces.Timeout,
-		requestFunc:   cfg.RetryConfig.RequestFunc(retryable),
-		dialOpts:      cfg.DialOptions,
-		stopCtx:       ctx,
-		stopFunc:      cancel,
-		conn:          cfg.GRPCConn,
-		instID:        counter.NextExporterID(),
+		endpoint:       cfg.Traces.Endpoint,
+		exportTimeout:  cfg.Traces.Timeout,
+		maxRequestSize: cfg.Traces.MaxRequestSize,
+		requestFunc:    cfg.RetryConfig.RequestFunc(retryable),
+		dialOpts:       cfg.DialOptions,
+		stopCtx:        ctx,
+		stopFunc:       cancel,
+		conn:           cfg.GRPCConn,
+		instID:         counter.NextExporterID(),
 	}
 
 	if len(cfg.Traces.Headers) > 0 {
@@ -205,16 +209,28 @@ func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 	ctx, cancel := c.exportContext(ctx)
 	defer cancel()
 
-	var code codes.Code
+	pbRequest := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: protoSpans,
+	}
+
+	code := codes.Unknown
 	if c.inst != nil {
-		op := c.inst.ExportSpans(ctx, len(protoSpans))
+		var spanCount int
+		for _, rs := range protoSpans {
+			for _, ss := range rs.ScopeSpans {
+				spanCount += len(ss.Spans)
+			}
+		}
+		op := c.inst.ExportSpans(ctx, spanCount)
 		defer func() { op.End(uploadErr, code) }()
 	}
 
+	if maxSize := c.maxRequestSize; maxSize > 0 && proto.Size(pbRequest) > maxSize {
+		return fmt.Errorf("request message too large: exceeded %d bytes", maxSize)
+	}
+
 	return c.requestFunc(ctx, func(iCtx context.Context) error {
-		resp, err := c.tsc.Export(iCtx, &coltracepb.ExportTraceServiceRequest{
-			ResourceSpans: protoSpans,
-		})
+		resp, err := c.tsc.Export(iCtx, pbRequest)
 		if resp != nil && resp.PartialSuccess != nil {
 			msg := resp.PartialSuccess.GetErrorMessage()
 			n := resp.PartialSuccess.GetRejectedSpans()

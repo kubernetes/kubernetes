@@ -19,6 +19,7 @@ package preemption
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,15 +28,23 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/utils/ptr"
 )
 
 // TestPodGroupPreemption tests preemption scenarios involving pod groups.
@@ -45,7 +54,6 @@ func TestPodGroupPreemption(t *testing.T) {
 		features.GangScheduling:          true,
 		features.WorkloadAwarePreemption: true,
 	})
-
 	tests := []struct {
 		name                       string
 		nodes                      []*v1.Node
@@ -56,6 +64,7 @@ func TestPodGroupPreemption(t *testing.T) {
 		expectedScheduled          []string
 		expectedPreempted          []string
 		expectedUnschedulable      []string
+		expectedToHaveNNNInfo      []string
 		expectedPodsPreemptedByWAP int
 	}{
 		{
@@ -78,6 +87,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1", "high-2", "high-3"},
 			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -100,6 +110,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1", "high-2", "high-3"},
 			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -126,6 +137,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			// high-1 and high-2 will fit on node1 if low-1 is preempted.
 			expectedScheduled:          []string{"high-1", "high-2", "high-3", "low-2"},
 			expectedPreempted:          []string{"low-1"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
 			expectedPodsPreemptedByWAP: 1,
 		},
 		{
@@ -150,8 +162,10 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			// high-1 will fit on node1 (it has 1 CPU free).
 			// high-2 and high-3 will fit on node2 if very-low-1 is preempted.
+			// high-2 will preempt very-low-1 and high-3 will schedule in next cycle to free space.
 			expectedScheduled:          []string{"high-1", "high-2", "high-3", "low-1"},
 			expectedPreempted:          []string{"very-low-1"},
+			expectedToHaveNNNInfo:      []string{"high-2"},
 			expectedPodsPreemptedByWAP: 1,
 		},
 		{
@@ -180,6 +194,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1", "high-2"},
 			expectedPreempted:          []string{"low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
 			expectedPodsPreemptedByWAP: 1,
 		},
 		{
@@ -205,6 +220,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1", "high-2", "high-3", "high-4"},
 			expectedPreempted:          []string{"low-1", "low-2", "low-3", "low-4"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3", "high-4"},
 			expectedPodsPreemptedByWAP: 4,
 		},
 		{
@@ -228,6 +244,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedScheduled:          []string{"mid-1", "low-1", "low-2"},
 			expectedPreempted:          []string{},
 			expectedUnschedulable:      []string{"high-1", "high-2", "high-3"},
+			expectedToHaveNNNInfo:      []string{},
 			expectedPodsPreemptedByWAP: 0,
 		},
 		{
@@ -249,6 +266,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1", "high-2", "mid-1"},
 			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
 			expectedPodsPreemptedByWAP: 2,
 		},
 		{
@@ -270,6 +288,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1"},
 			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -291,6 +310,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1"},
 			expectedPreempted:          []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -312,6 +332,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"low-1"},
 			expectedPreempted:          []string{"high-1", "high-2", "high-3"},
+			expectedToHaveNNNInfo:      []string{"low-1"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -334,6 +355,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedScheduled:          []string{"low-1", "low-2", "low-3"},
 			expectedPreempted:          []string{},
 			expectedUnschedulable:      []string{"high-1"},
+			expectedToHaveNNNInfo:      []string{},
 			expectedPodsPreemptedByWAP: 0,
 		},
 		{
@@ -354,6 +376,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"high-1", "low-1", "low-2"},
 			expectedPreempted:          []string{"low-3"},
+			expectedToHaveNNNInfo:      []string{"high-1"},
 			expectedPodsPreemptedByWAP: 0,
 		},
 		{
@@ -378,6 +401,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"p-a", "p-b", "p-c"},
 			expectedPreempted:          []string{"p1", "p2", "p3"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -404,6 +428,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"p-a", "p-b", "p-c", "p4"},
 			expectedPreempted:          []string{"p1", "p2", "p3"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -431,6 +456,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedScheduled:          []string{"p-a", "p-b", "p3", "p4"},
 			expectedPreempted:          []string{"p1", "p2"},
 			expectedUnschedulable:      []string{"p-c"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b"},
 			expectedPodsPreemptedByWAP: 2,
 		},
 		{
@@ -456,6 +482,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"p-a", "p-b", "p-c"},
 			expectedPreempted:          []string{"v1", "v2", "v3"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -482,9 +509,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(101).Obj(),
 				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
+			// p-a will preempt victim-pg, p-b will schedule to empty space, so only p-a will have NNN info.
 			expectedScheduled:          []string{"p-a", "p-b", "v3", "v4"},
 			expectedPreempted:          []string{"v1", "v2"},
 			expectedUnschedulable:      []string{"p-c"},
+			expectedToHaveNNNInfo:      []string{"p-a"},
 			expectedPodsPreemptedByWAP: 2,
 		},
 		{
@@ -509,6 +538,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"p-a", "p-b", "p-c"},
 			expectedPreempted:          []string{"p1", "p2", "p3"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -535,6 +565,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"p-a", "p-b", "p-c", "p4"},
 			expectedPreempted:          []string{"p1", "p2", "p3"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -562,6 +593,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedScheduled:          []string{"p-a", "p-b", "p3", "p4"},
 			expectedPreempted:          []string{"p1", "p2"},
 			expectedUnschedulable:      []string{"p-c"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b"},
 			expectedPodsPreemptedByWAP: 2,
 		},
 		{
@@ -587,6 +619,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			expectedScheduled:          []string{"p-a", "p-b", "p-c"},
 			expectedPreempted:          []string{"v1", "v2", "v3"},
+			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
 			expectedPodsPreemptedByWAP: 3,
 		},
 		{
@@ -613,9 +646,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(101).Obj(),
 				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
+			// p-a will preempt "victim-pg" and p-b will schedule to empty space, so only p-a will have NNN info.
 			expectedScheduled:          []string{"p-a", "p-b", "v3", "v4"},
 			expectedPreempted:          []string{"v1", "v2"},
 			expectedUnschedulable:      []string{"p-c"},
+			expectedToHaveNNNInfo:      []string{"p-a"},
 			expectedPodsPreemptedByWAP: 2,
 		},
 		{
@@ -702,8 +737,49 @@ func TestPodGroupPreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			registry := make(frameworkruntime.Registry)
+
+			// Register mock bind plugin that will register NNN information during binding.
+			mockBindPluginName := "mockBindPlugin"
+			var bindPlugin = mockBindPlugin{
+				name:       mockBindPluginName,
+				realPlugin: nil,
+				nnnInfo:    sync.Map{},
+			}
+			err := registry.Register(mockBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				db, err := defaultbinder.New(ctx, o, fh)
+				if err != nil {
+					t.Fatalf("Error creating a default binder plugin: %v", err)
+				}
+				bindPlugin.realPlugin = db.(fwk.BindPlugin)
+				return &bindPlugin, nil
+			})
+			if err != nil {
+				t.Fatalf("Error registering a bind plugin: %v", err)
+			}
+
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
+					SchedulerName: ptr.To(v1.DefaultSchedulerName),
+					Plugins: &configv1.Plugins{
+						MultiPoint: configv1.PluginSet{
+							Enabled: []configv1.Plugin{
+								{Name: mockBindPluginName},
+							},
+							Disabled: []configv1.Plugin{
+								{Name: names.DefaultBinder},
+							},
+						},
+					},
+				}},
+			})
+
+			// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
+			// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
 			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption",
-				scheduler.WithPodMaxBackoffSeconds(0),
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+				scheduler.WithPodMaxBackoffSeconds(1),
 				scheduler.WithPodInitialBackoffSeconds(0))
 			cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
@@ -738,7 +814,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// Wait for initial pods to be scheduled
+			// 3. Wait for initial pods to be scheduled
 			for _, p := range tt.initialPods {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
 					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
@@ -746,7 +822,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 3. Create preemptor pods
+			// 4. Create preemptor pods
 			for _, p := range tt.preemptorPods {
 				p.Namespace = ns
 				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
@@ -754,7 +830,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 4. Wait for preemption to complete if WAP calls are expected
+			// 5. Wait for preemption to complete if WAP calls are expected
 			if tt.expectedPodsPreemptedByWAP > 0 {
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls := 0
@@ -783,7 +859,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			for _, podName := range tt.expectedUnschedulable {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
 					testutils.PodUnschedulable(cs, ns, podName)); err != nil {
-					t.Errorf("Pod %s was expected to be unschedulableso  but wasn't: %v", podName, err)
+					t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
 				}
 			}
 
@@ -812,6 +888,33 @@ func TestPodGroupPreemption(t *testing.T) {
 					t.Errorf("Pod %s was expected to be preempted but wasn't", podName)
 				}
 			}
+
+			// 9. Verify preemptor pods have nominated node name
+			for _, podName := range tt.expectedToHaveNNNInfo {
+				if node, ok := bindPlugin.nnnInfo.Load(podName); !ok || node.(string) == "" {
+					t.Errorf("Pod %s was expected to have nominated node name but didn't", podName)
+				}
+			}
 		})
 	}
 }
+
+// mockBindPlugin is a fake plugin that registers NNN information during binding.
+type mockBindPlugin struct {
+	name       string
+	realPlugin fwk.BindPlugin
+	nnnInfo    sync.Map
+}
+
+func (bp *mockBindPlugin) Name() string {
+	return bp.name
+}
+
+func (bp *mockBindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	if p.Status.NominatedNodeName != "" {
+		bp.nnnInfo.Store(p.Name, p.Status.NominatedNodeName)
+	}
+	return bp.realPlugin.Bind(ctx, state, p, nodeName)
+}
+
+var _ fwk.BindPlugin = &mockBindPlugin{}
