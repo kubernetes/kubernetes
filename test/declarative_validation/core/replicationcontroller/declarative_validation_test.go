@@ -18,6 +18,7 @@ package replicationcontroller
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"strings"
 	"testing"
 
@@ -33,8 +34,10 @@ import (
 
 func TestDeclarativeValidate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "replicationcontrollers",
+		IsResourceRequest: true,
 	})
 	testCases := map[string]struct {
 		input        api.ReplicationController
@@ -193,12 +196,16 @@ func TestDeclarativeValidate(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidReplicationController()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy)
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "replicationcontrollers",
+		IsResourceRequest: true,
 	})
 	testCases := map[string]struct {
 		old          api.ReplicationController
@@ -278,6 +285,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidReplicationController()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy)
 }
 
 // mkValidReplicationController produces a ReplicationController which passes
