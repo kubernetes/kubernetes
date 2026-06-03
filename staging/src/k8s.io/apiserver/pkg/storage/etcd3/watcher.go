@@ -296,10 +296,7 @@ func (wc *watchChan) RequestWatchProgress() error {
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
 	if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) {
-		err := wc.syncStream()
-		if err == nil {
-			return nil
-		}
+		err := wc.syncStreamRecursive()
 		if !isUnimplementedErr(err) {
 			return interpretListError(err, true, wc.key, wc.key)
 		}
@@ -365,10 +362,14 @@ func (wc *watchChan) syncPaginated() error {
 	}
 }
 
-func (wc *watchChan) syncStream() error {
+func (wc *watchChan) syncStreamRecursive() error {
+	if !wc.recursive {
+		return fmt.Errorf("syncStreamRecursive called on a non-recursive watch")
+	}
 	opts := []clientv3.OpOption{
 		clientv3.WithRange(clientv3.GetPrefixRangeEnd(wc.key)),
 	}
+
 	startTime := time.Now()
 	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
 	metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
@@ -376,7 +377,7 @@ func (wc *watchChan) syncStream() error {
 		return err
 	}
 
-	var streamRev int64
+	var initialRev int64
 	for r := range streamResp {
 		if err := r.Err(); err != nil {
 			return err
@@ -384,14 +385,18 @@ func (wc *watchChan) syncStream() error {
 		rangeResp := r.RangeResponse
 		for i, kv := range rangeResp.Kvs {
 			wc.queueEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
 			rangeResp.Kvs[i] = nil
 		}
-		if streamRev == 0 && rangeResp.Header != nil {
-			streamRev = rangeResp.Header.Revision
+		if initialRev == 0 && rangeResp.Header != nil {
+			initialRev = rangeResp.Header.Revision
 		}
 	}
+	if initialRev == 0 {
+		return fmt.Errorf("rangeStream for %q completed without a revision", wc.key)
+	}
 
-	wc.initialRev = streamRev
+	wc.initialRev = initialRev
 	return nil
 }
 

@@ -232,7 +232,15 @@ func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
 	}
 }
 
-func TestWatchChanSyncPaginated(t *testing.T) {
+func TestWatchChanSync(t *testing.T) {
+	modes := []struct {
+		name        string
+		rangeStream bool
+	}{
+		{name: "Paginated"},
+		{name: "RangeStream", rangeStream: true},
+	}
+
 	testCases := []struct {
 		name             string
 		watchKey         string
@@ -262,103 +270,79 @@ func TestWatchChanSyncPaginated(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			orig := defaultWatcherMaxLimit
-			defer func() { defaultWatcherMaxLimit = orig }()
-			defaultWatcherMaxLimit = testCase.watcherMaxLimit
+	for _, mode := range modes {
+		for _, testCase := range testCases {
+			t.Run(mode.name+"/"+testCase.name, func(t *testing.T) {
+				orig := defaultWatcherMaxLimit
+				defer func() { defaultWatcherMaxLimit = orig }()
+				defaultWatcherMaxLimit = testCase.watcherMaxLimit
 
-			origCtx, store, _ := testSetup(t)
-			initList, err := initStoreData(origCtx, store)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			kvWrapper := newEtcdClientKVWrapper(store.client.KV)
-			kvWrapper.getReactors = append(kvWrapper.getReactors, func() {
-				barThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "bar"}}
-				podKey := fmt.Sprintf("/pods/%s/%s", barThird.Namespace, barThird.Name)
-				storedObj := &example.Pod{}
-
-				err := store.Create(context.Background(), podKey, barThird, storedObj, 0)
+				origCtx, store, _ := testSetup(t)
+				initList, err := initStoreData(origCtx, store)
 				if err != nil {
-					t.Errorf("failed to create object: %v", err)
+					t.Fatal(err)
+				}
+
+				kvWrapper := newEtcdClientKVWrapper(store.client.KV)
+				kvWrapper.getReactors = append(kvWrapper.getReactors, func() {
+					barThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "bar"}}
+					podKey := fmt.Sprintf("/pods/%s/%s", barThird.Namespace, barThird.Name)
+					storedObj := &example.Pod{}
+
+					err := store.Create(context.Background(), podKey, barThird, storedObj, 0)
+					if err != nil {
+						t.Errorf("failed to create object: %v", err)
+					}
+				})
+
+				store.client.KV = kvWrapper
+
+				w := store.watcher.createWatchChan(
+					origCtx,
+					testCase.watchKey,
+					0,
+					true,
+					false,
+					storage.Everything)
+
+				sync := w.syncPaginated
+				if mode.rangeStream {
+					sync = w.syncStreamRecursive
+				}
+				if err := sync(); err != nil {
+					t.Fatal(err)
+				}
+
+				if w.initialRev <= 0 {
+					t.Errorf("expected initialRev to be set, got %d", w.initialRev)
+				}
+
+				// close incomingEventChan so we can read incomingEventChan non-blocking
+				close(w.incomingEventChan)
+
+				eventsReceived := 0
+				for event := range w.incomingEventChan {
+					eventsReceived++
+					storagetesting.ExpectContains(t, "incorrect list pods", initList, event.key)
+				}
+
+				if eventsReceived != testCase.expectEventCount {
+					t.Errorf("Unexpected number of events: %v, expected: %v", eventsReceived, testCase.expectEventCount)
+				}
+
+				if mode.rangeStream {
+					if kvWrapper.getStreamCallCounter != 1 {
+						t.Errorf("Unexpected called times of client.KV.GetStream() : %v, expected: 1", kvWrapper.getStreamCallCounter)
+					}
+				} else if kvWrapper.getCallCounter != testCase.expectGetCount {
+					t.Errorf("Unexpected called times of client.KV.Get() : %v, expected: %v", kvWrapper.getCallCounter, testCase.expectGetCount)
 				}
 			})
-
-			store.client.KV = kvWrapper
-
-			w := store.watcher.createWatchChan(
-				origCtx,
-				testCase.watchKey,
-				0,
-				true,
-				false,
-				storage.Everything)
-
-			err = w.syncPaginated()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// close incomingEventChan so we can read incomingEventChan non-blocking
-			close(w.incomingEventChan)
-
-			eventsReceived := 0
-			for event := range w.incomingEventChan {
-				eventsReceived++
-				storagetesting.ExpectContains(t, "incorrect list pods", initList, event.key)
-			}
-
-			if eventsReceived != testCase.expectEventCount {
-				t.Errorf("Unexpected number of events: %v, expected: %v", eventsReceived, testCase.expectEventCount)
-			}
-
-			if kvWrapper.getCallCounter != testCase.expectGetCount {
-				t.Errorf("Unexpected called times of client.KV.Get() : %v, expected: %v", kvWrapper.getCallCounter, testCase.expectGetCount)
-			}
-		})
+		}
 	}
 }
 
-func TestWatchChanSyncStream(t *testing.T) {
-	origCtx, store, _ := testSetup(t)
-	initList, err := initStoreData(origCtx, store)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w := store.watcher.createWatchChan(
-		origCtx,
-		"/pods/",
-		0,
-		true,
-		false,
-		storage.Everything)
-
-	if err := w.syncStream(); err != nil {
-		t.Fatalf("syncStream failed: %v", err)
-	}
-
-	if w.initialRev <= 0 {
-		t.Errorf("expected initialRev to be set from the stream header, got %d", w.initialRev)
-	}
-
-	// close incomingEventChan so we can read it non-blocking
-	close(w.incomingEventChan)
-
-	eventsReceived := 0
-	for event := range w.incomingEventChan {
-		eventsReceived++
-		storagetesting.ExpectContains(t, "incorrect list pods", initList, event.key)
-	}
-
-	if eventsReceived != len(initList) {
-		t.Errorf("Unexpected number of events: %v, expected: %v", eventsReceived, len(initList))
-	}
-}
-
-// TestWatchChanSyncStreamMatchesPaginated verifies syncStream queues the same
+// TestWatchChanSyncStreamMatchesPaginated verifies syncStreamRecursive queues the same
 // key/value/revision set as syncPaginated for the same etcd state.
 func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 	origCtx, store, _ := testSetup(t)
@@ -373,14 +357,14 @@ func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 		want[key] = struct{}{}
 	}
 
-	stream := drainSync(t, store, origCtx, func(wc *watchChan) error { return wc.syncStream() })
+	stream := drainSync(t, store, origCtx, func(wc *watchChan) error { return wc.syncStreamRecursive() })
 	paginated := drainSync(t, store, origCtx, func(wc *watchChan) error { return wc.syncPaginated() })
 
 	if len(stream) != len(want) {
-		t.Errorf("syncStream queued %d events, expected %d", len(stream), len(want))
+		t.Errorf("syncStreamRecursive queued %d events, expected %d", len(stream), len(want))
 	}
 	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{})); diff != "" {
-		t.Errorf("syncStream and syncPaginated queued different events (-paginated +stream):\n%s", diff)
+		t.Errorf("syncStreamRecursive and syncPaginated queued different events (-paginated +stream):\n%s", diff)
 	}
 }
 
