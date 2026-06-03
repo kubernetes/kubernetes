@@ -145,7 +145,7 @@ func (r *RuntimeClass) prepareObjects(ctx context.Context, attributes admission.
 		return nil, nil, apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
-	if pod.Spec.RuntimeClassName == nil {
+	if pod.Spec.RuntimeClassName == nil || *pod.Spec.RuntimeClassName == "" {
 		return pod, nil, nil
 	}
 

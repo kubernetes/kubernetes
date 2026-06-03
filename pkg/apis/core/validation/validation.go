@@ -352,6 +352,10 @@ var ValidatePodGroupName = apimachineryvalidation.NameIsDNSSubdomain
 // trailing dashes are allowed.
 func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+	if len(name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "runtimeClassName must not be empty"))
+		return allErrs
+	}
 	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(name, false) {
 		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
 	}

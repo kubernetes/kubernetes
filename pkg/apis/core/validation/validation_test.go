@@ -10665,6 +10665,14 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad RuntimeClassName": {pod: *podtest.MakePod("",
 			podtest.SetRuntimeClassName("invalid/sandbox"),
 		)},
+		"empty string RuntimeClassName": {
+    			pod: *podtest.MakePod("",
+        			podtest.SetRuntimeClassName(""),
+    			),
+			expectedErrors: field.ErrorList{        			
+				field.Required(field.NewPath("field").Child("runtimeClassName"), "runtimeClassName must not be empty"					),
+    				},
+		},
 		"bad empty fsGroupchangepolicy": {pod: *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy2,
