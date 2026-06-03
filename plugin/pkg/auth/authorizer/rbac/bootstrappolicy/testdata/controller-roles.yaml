@@ -410,6 +410,21 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - devicetaintrules/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - devicetaintrules
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

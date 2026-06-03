@@ -333,6 +333,57 @@ func (DeviceTaint) SwaggerDoc() map[string]string {
 	return map_DeviceTaint
 }
 
+var map_DeviceTaintRule = map[string]string{
+	"":         "DeviceTaintRule adds one taint to all devices which match the selector. This has the same effect as if the taint was specified directly in the ResourceSlice by the DRA driver.",
+	"metadata": "Standard object metadata",
+	"spec":     "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
+	"status":   "Status provides information about what was requested in the spec.",
+}
+
+func (DeviceTaintRule) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRule
+}
+
+var map_DeviceTaintRuleList = map[string]string{
+	"":         "DeviceTaintRuleList is a collection of DeviceTaintRules.",
+	"metadata": "Standard list metadata",
+	"items":    "Items is the list of DeviceTaintRules.",
+}
+
+func (DeviceTaintRuleList) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRuleList
+}
+
+var map_DeviceTaintRuleSpec = map[string]string{
+	"":               "DeviceTaintRuleSpec specifies the selector and one taint.",
+	"deviceSelector": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
+	"taint":          "The taint that gets applied to matching devices.",
+}
+
+func (DeviceTaintRuleSpec) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRuleSpec
+}
+
+var map_DeviceTaintRuleStatus = map[string]string{
+	"":           "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+	"conditions": "Conditions provide information about the state of the DeviceTaintRule and the cluster at some point in time, in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or fewer entries.",
+}
+
+func (DeviceTaintRuleStatus) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRuleStatus
+}
+
+var map_DeviceTaintSelector = map[string]string{
+	"":       "DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to. The empty selector matches all devices. Without a selector, no devices are matched.",
+	"driver": "If driver is set, only devices from that driver are selected. This fields corresponds to slice.spec.driver.",
+	"pool":   "If pool is set, only devices in that pool are selected.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+	"device": "If device is set, only devices with that name are selected. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+}
+
+func (DeviceTaintSelector) SwaggerDoc() map[string]string {
+	return map_DeviceTaintSelector
+}
+
 var map_DeviceToleration = map[string]string{
 	"":                  "The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
 	"key":               "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",

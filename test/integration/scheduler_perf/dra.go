@@ -29,7 +29,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcebeta "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -291,7 +290,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
 		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
@@ -313,7 +312,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
-		expectSyncResult.Synced[reflect.TypeFor[*resourcebeta.DeviceTaintRule]()] = true
+		expectSyncResult.Synced[reflect.TypeFor[*resourceapi.DeviceTaintRule]()] = true
 	}
 	if diff := cmp.Diff(expectSyncResult, syncResult,
 		cmp.Transformer("TypeOf", func(t reflect.Type) string {

@@ -160,6 +160,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceClaimTemplateList"}:                          {},
 		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceSlice"}:                                      {},
 		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceSliceList"}:                                  {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "DeviceTaintRule"}:                                         {},
+		{Group: "resource.k8s.io", Version: "v1", Kind: "DeviceTaintRuleList"}:                                     {},
 		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaim"}:                                           {},
 		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaimList"}:                                       {},
 		{Group: "resource.k8s.io", Version: "v1", Kind: "ResourceClaimTemplate"}:                                   {},

@@ -1,1 +1,11 @@
 ---
+# https://github.com/kubernetes/kubernetes/issues/138814
+- createResourceV1DeviceTaintRule
+- deleteResourceV1CollectionDeviceTaintRule
+- deleteResourceV1DeviceTaintRule
+- patchResourceV1DeviceTaintRule
+- patchResourceV1DeviceTaintRuleStatus
+- readResourceV1DeviceTaintRule
+- readResourceV1DeviceTaintRuleStatus
+- replaceResourceV1DeviceTaintRule
+- replaceResourceV1DeviceTaintRuleStatus

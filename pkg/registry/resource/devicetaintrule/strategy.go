@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -56,6 +57,9 @@ func (*deviceTaintRuleStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 			fieldpath.MakePathOrDie("status"),
 		),
 		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"resource.k8s.io/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -123,6 +127,12 @@ func (*deviceTaintRuleStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 }
 
 func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+	reqInfo, _ := request.RequestInfoFrom(ctx)
+	if reqInfo != nil && reqInfo.APIVersion == "v1" {
+		// Should have done that already earlier. Better late than never...
+		return false
+	}
+	// Historic behavior for v1beta2 and older, cannot change that anymore.
 	return true
 }
 
@@ -139,6 +149,10 @@ func (*deviceTaintRuleStatusStrategy) GetResetFields() map[fieldpath.APIVersion]
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"resource.k8s.io/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

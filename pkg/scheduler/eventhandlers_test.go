@@ -28,7 +28,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcebetaapi "k8s.io/api/resource/v1beta2"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -278,74 +277,86 @@ func withPodName(pod *v1.Pod, name string) *v1.Pod {
 // test for informers of resources we care about is registered
 func TestAddAllEventHandlers(t *testing.T) {
 	tests := []struct {
-		name                      string
-		gvkMap                    map[fwk.EventResource]fwk.ActionType
-		enableDRA                 bool
-		enableDRADeviceTaints     bool
-		enableDRADeviceTaintRules bool
-		enableDRAExtendedResource bool
-		enableGenericWorkload     bool
-		expectStaticInformers     map[reflect.Type]bool
-		expectDynamicInformers    map[schema.GroupVersionResource]bool
+		name                   string
+		gvkMap                 map[fwk.EventResource]fwk.ActionType
+		emulatedVersion        string
+		overrides              featuregatetesting.FeatureOverrides
+		expectStaticInformers  map[reflect.Type]bool
+		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
 		{
 			name:   "default handlers in framework",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):       true,
-				reflect.TypeOf(&v1.Node{}):      true,
-				reflect.TypeOf(&v1.Namespace{}): true,
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "DRA events disabled",
+			name:            "DRA events disabled",
+			emulatedVersion: "1.34",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.DynamicResourceAllocation: false,
+			},
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
 				fwk.ResourceClaim: fwk.Add,
 				fwk.ResourceSlice: fwk.Add,
 				fwk.DeviceClass:   fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):       true,
-				reflect.TypeOf(&v1.Node{}):      true,
-				reflect.TypeOf(&v1.Namespace{}): true,
+				reflect.TypeFor[*v1.Pod]():       true,
+				reflect.TypeFor[*v1.Node]():      true,
+				reflect.TypeFor[*v1.Namespace](): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "core DRA events enabled",
+			name:            "core DRA events enabled",
+			emulatedVersion: "1.35",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.DRADeviceTaints:     false,
+				features.DRADeviceTaintRules: false,
+				features.DRAExtendedResource: false,
+			},
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
 				fwk.ResourceClaim: fwk.Add,
 				fwk.ResourceSlice: fwk.Add,
 				fwk.DeviceClass:   fwk.Add,
 			},
-			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                    true,
-				reflect.TypeOf(&v1.Node{}):                   true,
-				reflect.TypeOf(&v1.Namespace{}):              true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+				reflect.TypeFor[*v1.Pod]():                    true,
+				reflect.TypeFor[*v1.Node]():                   true,
+				reflect.TypeFor[*v1.Namespace]():              true,
+				reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+				reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "device taints partially enabled",
+			name:            "DRA device taints partially enabled",
+			emulatedVersion: "1.35",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.DRADeviceTaintRules: false,
+			},
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
 				fwk.ResourceClaim: fwk.Add,
 				fwk.ResourceSlice: fwk.Add,
 				fwk.DeviceClass:   fwk.Add,
 			},
-			enableDRA:             true,
-			enableDRADeviceTaints: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                    true,
-				reflect.TypeOf(&v1.Node{}):                   true,
-				reflect.TypeOf(&v1.Namespace{}):              true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+				reflect.TypeFor[*v1.Pod]():                    true,
+				reflect.TypeFor[*v1.Node]():                   true,
+				reflect.TypeFor[*v1.Namespace]():              true,
+				reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+				reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -356,17 +367,14 @@ func TestAddAllEventHandlers(t *testing.T) {
 				fwk.ResourceSlice: fwk.Add,
 				fwk.DeviceClass:   fwk.Add,
 			},
-			enableDRA:                 true,
-			enableDRADeviceTaints:     true,
-			enableDRADeviceTaintRules: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                          true,
-				reflect.TypeOf(&v1.Node{}):                         true,
-				reflect.TypeOf(&v1.Namespace{}):                    true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}):       true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):       true,
-				reflect.TypeOf(&resourcebetaapi.DeviceTaintRule{}): true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):         true,
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -376,26 +384,33 @@ func TestAddAllEventHandlers(t *testing.T) {
 				fwk.PodGroup: fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):       true,
-				reflect.TypeOf(&v1.Node{}):      true,
-				reflect.TypeOf(&v1.Namespace{}): true,
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
 			name: "PodGroup events enabled",
+			overrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: true,
+			},
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
 				fwk.PodGroup: fwk.Add,
 			},
-			enableDRA:             true,
-			enableGenericWorkload: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                    true,
-				reflect.TypeOf(&v1.Node{}):                   true,
-				reflect.TypeOf(&v1.Namespace{}):              true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&schedulingapi.PodGroup{}):    true,
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
+				reflect.TypeFor[*schedulingapi.PodGroup]():      true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -407,11 +422,15 @@ func TestAddAllEventHandlers(t *testing.T) {
 				"storage.k8s.io/CSIStorageCapacity": fwk.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                       true,
-				reflect.TypeOf(&v1.Node{}):                      true,
-				reflect.TypeOf(&v1.Namespace{}):                 true,
-				reflect.TypeOf(&v1.PersistentVolume{}):          true,
-				reflect.TypeOf(&storagev1.CSIStorageCapacity{}): true,
+				reflect.TypeFor[*v1.Pod]():                       true,
+				reflect.TypeFor[*v1.Node]():                      true,
+				reflect.TypeFor[*v1.Namespace]():                 true,
+				reflect.TypeFor[*v1.PersistentVolume]():          true,
+				reflect.TypeFor[*storagev1.CSIStorageCapacity](): true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():    true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():    true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule]():  true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():      true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -422,9 +441,13 @@ func TestAddAllEventHandlers(t *testing.T) {
 				"cronjobs.v1.batch":  fwk.Delete,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):       true,
-				reflect.TypeOf(&v1.Node{}):      true,
-				reflect.TypeOf(&v1.Namespace{}): true,
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{
 				{Group: "apps", Version: "v1", Resource: "daemonsets"}: true,
@@ -438,9 +461,13 @@ func TestAddAllEventHandlers(t *testing.T) {
 				"custommetrics.v1beta1": fwk.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):       true,
-				reflect.TypeOf(&v1.Node{}):      true,
-				reflect.TypeOf(&v1.Namespace{}): true,
+				reflect.TypeFor[*v1.Pod]():                      true,
+				reflect.TypeFor[*v1.Node]():                     true,
+				reflect.TypeFor[*v1.Namespace]():                true,
+				reflect.TypeFor[*resourceapi.ResourceClaim]():   true,
+				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
+				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
+				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{
 				{Group: "apps", Version: "v1", Resource: "daemonsets"}: true,
@@ -457,19 +484,12 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			overrides := featuregatetesting.FeatureOverrides{
-				features.DynamicResourceAllocation: tt.enableDRA,
-				features.DRADeviceTaints:           tt.enableDRADeviceTaints,
-				features.DRAExtendedResource:       tt.enableDRAExtendedResource,
+			if tt.emulatedVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tt.emulatedVersion))
 			}
-			if !tt.enableDRA {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			} else {
-				// Making this depend on the emulated version avoids "cannot set feature gate DRADeviceTaintRules to false, feature is PreAlpha at emulated version 1.34".
-				overrides[features.DRADeviceTaintRules] = tt.enableDRADeviceTaintRules
-				overrides[features.GenericWorkload] = tt.enableGenericWorkload
+			if len(tt.overrides) > 0 {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tt.overrides)
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -497,7 +517,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 					SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 				}
 				if opts.EnableDeviceTaintRules {
-					opts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
+					opts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
 					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
@@ -506,7 +526,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 					t.Fatalf("couldn't start resource slice tracker: %v", err)
 				}
 
-				if tt.enableDRAExtendedResource {
+				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 					draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 				}
 			}

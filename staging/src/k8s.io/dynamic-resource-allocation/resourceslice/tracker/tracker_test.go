@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -116,7 +115,7 @@ func applyEventPair(tCtx *testContext, event any) {
 			require.NoError(tCtx, err)
 			tCtx.resourceSliceAdd(tCtx.Context)(pair[1])
 		}
-	case [2]*resourcealphaapi.DeviceTaintRule:
+	case [2]*resourceapi.DeviceTaintRule:
 		store := tCtx.deviceTaints.GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
@@ -279,39 +278,39 @@ var (
 	slice2               = sliceWithDevices(slice2NoDevices, devices2)
 	slice2Tainted        = sliceWithDevices(slice2, taintedDevices2)
 
-	alphaDeviceTaint = func(taint resourceapi.DeviceTaint) resourcealphaapi.DeviceTaint {
-		return resourcealphaapi.DeviceTaint{
+	alphaDeviceTaint = func(taint resourceapi.DeviceTaint) resourceapi.DeviceTaint {
+		return resourceapi.DeviceTaint{
 			Key:       taint.Key,
 			Value:     taint.Value,
-			Effect:    resourcealphaapi.DeviceTaintEffect(taint.Effect),
+			Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
 			TimeAdded: taint.TimeAdded,
 		}
 	}
-	taintAllDevicesRule = &resourcealphaapi.DeviceTaintRule{
+	taintAllDevicesRule = &resourceapi.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "rule",
 		},
-		Spec: resourcealphaapi.DeviceTaintRuleSpec{
+		Spec: resourceapi.DeviceTaintRuleSpec{
 			Taint: alphaDeviceTaint(deviceTaint1),
 		},
 	}
-	taintPoolDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, pool string) *resourcealphaapi.DeviceTaintRule {
+	taintPoolDevicesRule = func(rule *resourceapi.DeviceTaintRule, pool string) *resourceapi.DeviceTaintRule {
 		rule = rule.DeepCopy()
-		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
+		rule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
 			Pool: &pool,
 		}
 		return rule
 	}
-	taintDriverDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, driver string) *resourcealphaapi.DeviceTaintRule {
+	taintDriverDevicesRule = func(rule *resourceapi.DeviceTaintRule, driver string) *resourceapi.DeviceTaintRule {
 		rule = rule.DeepCopy()
-		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
+		rule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
 			Driver: &driver,
 		}
 		return rule
 	}
-	taintNamedDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, name string) *resourcealphaapi.DeviceTaintRule {
+	taintNamedDevicesRule = func(rule *resourceapi.DeviceTaintRule, name string) *resourceapi.DeviceTaintRule {
 		rule = rule.DeepCopy()
-		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
+		rule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
 			Device: &name,
 		}
 		return rule
@@ -553,7 +552,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		opts := Options{
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
-			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
+			TaintInformer:          informerFactory.Resource().V1().DeviceTaintRules(),
 			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}
@@ -720,8 +719,8 @@ func BenchmarkEventHandlers(b *testing.B) {
 	now := time.Now()
 	benchmarks := map[string]struct {
 		resourceSlices []*resourceapi.ResourceSlice
-		taintRules     []*resourcealphaapi.DeviceTaintRule
-		loop           func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int)
+		taintRules     []*resourceapi.DeviceTaintRule
+		loop           func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourceapi.DeviceTaintRule, i int)
 	}{
 		"resource-slice-add-no-taint-rules": {
 			resourceSlices: func() []*resourceapi.ResourceSlice {
@@ -738,7 +737,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return resourceSlices
 			}(),
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourceapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
 			},
 		},
@@ -757,23 +756,23 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return resourceSlices
 			}(),
-			taintRules: []*resourcealphaapi.DeviceTaintRule{
+			taintRules: []*resourceapi.DeviceTaintRule{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "taintRule",
 					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
+					Spec: resourceapi.DeviceTaintRuleSpec{
 						DeviceSelector: nil, // all slices
-						Taint: resourcealphaapi.DeviceTaint{
+						Taint: resourceapi.DeviceTaint{
 							Key:       "example.com/taint",
 							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
 							TimeAdded: &metav1.Time{Time: now},
 						},
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourceapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
@@ -792,23 +791,23 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return resourceSlices
 			}(),
-			taintRules: []*resourcealphaapi.DeviceTaintRule{
+			taintRules: []*resourceapi.DeviceTaintRule{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "taintRule",
 					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
+					Spec: resourceapi.DeviceTaintRuleSpec{
 						DeviceSelector: nil, // all slices
-						Taint: resourcealphaapi.DeviceTaint{
+						Taint: resourceapi.DeviceTaint{
 							Key:       "example.com/taint",
 							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
 							TimeAdded: &metav1.Time{Time: now},
 						},
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourceapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
 			},
 		},
@@ -841,25 +840,25 @@ func BenchmarkEventHandlers(b *testing.B) {
 				resourceSlices[nSlices/2].Spec.Devices[nDevices/2].Name = "patchme"
 				return resourceSlices
 			}(),
-			taintRules: []*resourcealphaapi.DeviceTaintRule{
+			taintRules: []*resourceapi.DeviceTaintRule{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "taintRule",
 					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
+					Spec: resourceapi.DeviceTaintRuleSpec{
+						DeviceSelector: &resourceapi.DeviceTaintSelector{
 							Device: ptr.To("patchme"),
 						},
-						Taint: resourcealphaapi.DeviceTaint{
+						Taint: resourceapi.DeviceTaint{
 							Key:       "example.com/taint",
 							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
 							TimeAdded: &metav1.Time{Time: now},
 						},
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourceapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
@@ -886,26 +885,26 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return resourceSlices
 			}(),
-			taintRules: []*resourcealphaapi.DeviceTaintRule{
+			taintRules: []*resourceapi.DeviceTaintRule{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "patch",
 					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
+					Spec: resourceapi.DeviceTaintRuleSpec{
+						DeviceSelector: &resourceapi.DeviceTaintSelector{
 							Pool:   ptr.To("pool-250"),
 							Device: ptr.To("patchme"),
 						},
-						Taint: resourcealphaapi.DeviceTaint{
+						Taint: resourceapi.DeviceTaint{
 							Key:       "example.com/taint",
 							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
 							TimeAdded: &metav1.Time{Time: now},
 						},
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, patches []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, patches []*resourceapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[250]) // the slice affected by the patch
 			},
 		},
@@ -927,21 +926,21 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return resourceSlices
 			}(),
-			taintRules: func() []*resourcealphaapi.DeviceTaintRule {
-				patches := make([]*resourcealphaapi.DeviceTaintRule, 500)
+			taintRules: func() []*resourceapi.DeviceTaintRule {
+				patches := make([]*resourceapi.DeviceTaintRule, 500)
 				for i := range patches {
-					patches[i] = &resourcealphaapi.DeviceTaintRule{
+					patches[i] = &resourceapi.DeviceTaintRule{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "taint-rule-" + strconv.Itoa(i),
 						},
-						Spec: resourcealphaapi.DeviceTaintRuleSpec{
-							DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
+						Spec: resourceapi.DeviceTaintRuleSpec{
+							DeviceSelector: &resourceapi.DeviceTaintSelector{
 								Pool: ptr.To("pool-" + strconv.Itoa(i)),
 							},
-							Taint: resourcealphaapi.DeviceTaint{
+							Taint: resourceapi.DeviceTaint{
 								Key:       "example.com/taint",
 								Value:     "tainted",
-								Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
 								TimeAdded: &metav1.Time{Time: now},
 							},
 						},
@@ -949,7 +948,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return patches
 			}(),
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourceapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
@@ -961,7 +960,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 		opts := Options{
 			EnableDeviceTaintRules: true,
 			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
-			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
+			TaintInformer:          informerFactory.Resource().V1().DeviceTaintRules(),
 			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:             kubeClient,
 		}

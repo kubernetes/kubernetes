@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -379,6 +380,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		"keep-fields-node-allocatable-dra-claims": {
 			obj:                         sliceWithNodeAllocatableResources,
 			draNodeAllocatableResources: true,
+			deviceTaints:                true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithNodeAllocatableResources.DeepCopy()
 				obj.Generation = 1
@@ -388,6 +390,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		"drop-fields-node-allocatable-dra-claims-disabled-feature": {
 			obj:                         sliceWithNodeAllocatableResources,
 			draNodeAllocatableResources: false,
+			deviceTaints:                true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := slice.DeepCopy()
 				obj.Generation = 1
@@ -397,6 +400,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		"keep-fields-list-type-attributes": {
 			obj:                sliceWithListTypeAttributes,
 			listTypeAttributes: true,
+			deviceTaints:       true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
 				obj.Generation = 1
@@ -406,21 +410,29 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		"drop-fields-list-type-attributes": {
 			obj:                     sliceWithListTypeAttributes,
 			listTypeAttributes:      false,
+			deviceTaints:            true,
 			expectedValidationError: true,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DRADeviceTaints:              tc.deviceTaints,
+				features.DRADeviceTaintRules:          tc.deviceTaints,
 				features.DRAPartitionableDevices:      tc.partitionableDevices,
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
-				features.DRANodeAllocatableResources:  tc.draNodeAllocatableResources,
-				features.DRAListTypeAttributes:        tc.listTypeAttributes,
-			})
+			}
+			if !tc.deviceTaints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			} else {
+				// Can only be set when not emulating some older release.
+				overrides[features.DRANodeAllocatableResources] = tc.draNodeAllocatableResources
+				overrides[features.DRAListTypeAttributes] = tc.listTypeAttributes
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			obj := tc.obj.DeepCopy()
 
@@ -766,8 +778,8 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			bindingConditions: false,
 			deviceStatus:      true,
 		},
-		"keep-existing-fields-consumable-capacity": {
-			oldObj: sliceWithCapacity,
+		"keep-consumable-capacity": {
+			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
 				obj := sliceWithConsumableCapacity.DeepCopy()
 				obj.ResourceVersion = "4"
@@ -811,26 +823,29 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			}(),
 		},
 		"drop-list-type-attributes": {
-			oldObj: slice.DeepCopy(),
+			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
 			listTypeAttributes:    false,
+			deviceTaints:          true,
 			expectValidationError: true,
 		},
 		"keep-list-type-attributes": {
-			oldObj: sliceWithListTypeAttributes,
+			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
 			listTypeAttributes: true,
+			deviceTaints:       true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
 				obj.ResourceVersion = "4"
+				obj.Generation = 1
 				return obj
 			}(),
 		},
@@ -842,6 +857,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			listTypeAttributes: false,
+			deviceTaints:       true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
 				obj.ResourceVersion = "4"
@@ -852,13 +868,21 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DRADeviceTaints:              tc.deviceTaints,
+				features.DRADeviceTaintRules:          tc.deviceTaints,
 				features.DRAPartitionableDevices:      tc.partitionableDevices,
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
-			})
+			}
+			if !tc.deviceTaints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			} else {
+				// Can only be set when not emulating some older release.
+				overrides[features.DRAListTypeAttributes] = tc.listTypeAttributes
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()

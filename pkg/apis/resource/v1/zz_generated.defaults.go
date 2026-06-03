@@ -30,6 +30,8 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&resourcev1.DeviceTaintRule{}, func(obj interface{}) { SetObjectDefaults_DeviceTaintRule(obj.(*resourcev1.DeviceTaintRule)) })
+	scheme.AddTypeDefaultingFunc(&resourcev1.DeviceTaintRuleList{}, func(obj interface{}) { SetObjectDefaults_DeviceTaintRuleList(obj.(*resourcev1.DeviceTaintRuleList)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*resourcev1.ResourceClaim)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*resourcev1.ResourceClaimList)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1.ResourceClaimTemplate{}, func(obj interface{}) {
@@ -41,6 +43,17 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&resourcev1.ResourceSlice{}, func(obj interface{}) { SetObjectDefaults_ResourceSlice(obj.(*resourcev1.ResourceSlice)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1.ResourceSliceList{}, func(obj interface{}) { SetObjectDefaults_ResourceSliceList(obj.(*resourcev1.ResourceSliceList)) })
 	return nil
+}
+
+func SetObjectDefaults_DeviceTaintRule(in *resourcev1.DeviceTaintRule) {
+	SetDefaults_DeviceTaint(&in.Spec.Taint)
+}
+
+func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1.DeviceTaintRuleList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_DeviceTaintRule(a)
+	}
 }
 
 func SetObjectDefaults_ResourceClaim(in *resourcev1.ResourceClaim) {
