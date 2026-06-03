@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/internal/parse"
 	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 )
 
@@ -43,6 +44,39 @@ func sortConflicts(conflicts []Conflict) {
 	sort.Slice(conflicts, func(i, j int) bool {
 		return conflicts[i].Pod.String() < conflicts[j].Pod.String()
 	})
+}
+
+// verifyReverseIndexConsistency checks that forward and reverse indexes are symmetric
+func verifyReverseIndexConsistency(t *testing.T, c *volumeCache) {
+	t.Helper()
+
+	// For every (pod, volume) in reverse index, verify it exists in forward index.
+	for podKey, volumes := range c.podToVolumes {
+		for volumeName := range volumes {
+			volume, found := c.volumes[volumeName]
+			if !found {
+				t.Errorf("Reverse index has pod %s -> volume %s, but volume not in forward index", podKey, volumeName)
+				continue
+			}
+			if _, found := volume.pods[podKey]; !found {
+				t.Errorf("Reverse index has pod %s -> volume %s, but pod not in volume's pod list", podKey, volumeName)
+			}
+		}
+	}
+
+	// For every (volume, pod) in forward index, verify it exists in reverse index.
+	for volumeName, volume := range c.volumes {
+		for podKey := range volume.pods {
+			podVolumes, found := c.podToVolumes[podKey]
+			if !found {
+				t.Errorf("Forward index has volume %s -> pod %s, but pod not in reverse index", volumeName, podKey)
+				continue
+			}
+			if _, found := podVolumes[volumeName]; !found {
+				t.Errorf("Forward index has volume %s -> pod %s, but volume not in pod's volume list", volumeName, podKey)
+			}
+		}
+	}
 }
 
 // Delete all items in a bigger cache and check it's empty
@@ -69,6 +103,8 @@ func TestVolumeCache_DeleteAll(t *testing.T) {
 	t.Log("Before deleting all pods:")
 	c.dump(dumpLogger)
 
+	verifyReverseIndexConsistency(t, c)
+
 	// Act: delete all pods
 	for _, podKey := range podsToDelete {
 		c.DeletePod(logger, podKey)
@@ -79,6 +115,12 @@ func TestVolumeCache_DeleteAll(t *testing.T) {
 		t.Errorf("Expected cache to be empty, got %d volumes", len(c.volumes))
 		c.dump(dumpLogger)
 	}
+
+	// Assert: the reverse index is also empty
+	if len(c.podToVolumes) != 0 {
+		t.Errorf("Expected reverse index to be empty, got %d pods", len(c.podToVolumes))
+	}
+	verifyReverseIndexConsistency(t, c)
 }
 
 type podWithVolume struct {
@@ -105,8 +147,8 @@ func addReverseConflict(conflicts []Conflict) []Conflict {
 	return newConflicts
 }
 
-// Test AddVolume and SendConflicts together, they both provide []conflict with the same data
-func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
+// Test that AddVolume and GetConflicts return the same []conflict data
+func TestVolumeCache_AddVolumeGetConflicts(t *testing.T) {
 	existingPods := []podWithVolume{
 		{
 			podNamespace: "ns1",
@@ -436,29 +478,228 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			}
 			expectedPodInfo := podInfo{
 				seLinuxLabel: tt.podToAdd.label,
+				seLinuxParts: parse.ParseSELinuxLabel(tt.podToAdd.label),
 				changePolicy: tt.podToAdd.changePolicy,
 			}
 			if !reflect.DeepEqual(existingInfo, expectedPodInfo) {
 				t.Errorf("pod %s has unexpected info: %+v", podKey, existingInfo)
 			}
 
-			// Act again: get the conflicts via SendConflicts
-			ch := make(chan Conflict)
-			go func() {
-				c.SendConflicts(logger, ch)
-				close(ch)
-			}()
+			// Verify reverse index consistency
+			verifyReverseIndexConsistency(t, c)
 
-			// Assert
-			receivedConflicts := []Conflict{}
-			for c := range ch {
-				receivedConflicts = append(receivedConflicts, c)
-			}
+			// Verify that GetConflicts returns the same conflicts
+			receivedConflicts := c.GetConflicts(logger)
 			sortConflicts(receivedConflicts)
 			if !reflect.DeepEqual(receivedConflicts, expectedConflicts) {
-				t.Errorf("SendConflicts returned unexpected conflicts: %+v", receivedConflicts)
+				t.Errorf("GetConflicts returned unexpected conflicts: %+v", receivedConflicts)
 				c.dump(dumpLogger)
 			}
+		})
+	}
+}
+
+// Test that conflicts are tracked per-volume: a pod with conflicts on
+// multiple volumes retains all of them after successive AddVolume calls.
+func TestVolumeCache_MultiVolumeConflicts(t *testing.T) {
+	logger, _ := getTestLoggers(t)
+	seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+	c := NewVolumeLabelCache(seLinuxTranslator).(*volumeCache)
+
+	podA := cache.ObjectName{Namespace: "ns", Name: "podA"}
+	podB := cache.ObjectName{Namespace: "ns", Name: "podB"}
+	podC := cache.ObjectName{Namespace: "ns", Name: "podC"}
+
+	// podB uses vol1 with label1
+	c.AddVolume(logger, "vol1", podB, "system_u:system_r:labelB", v1.SELinuxChangePolicyMountOption, "driver1")
+	// podC uses vol2 with label2
+	c.AddVolume(logger, "vol2", podC, "system_u:system_r:labelC", v1.SELinuxChangePolicyMountOption, "driver1")
+
+	// podA uses vol1 with a different label (conflict with podB)
+	conflicts1 := c.AddVolume(logger, "vol1", podA, "system_u:system_r:labelA", v1.SELinuxChangePolicyMountOption, "driver1")
+	if len(conflicts1) == 0 {
+		t.Fatal("Expected conflicts on vol1 between podA and podB")
+	}
+
+	// podA also uses vol2 with a different label (conflict with podC)
+	conflicts2 := c.AddVolume(logger, "vol2", podA, "system_u:system_r:labelA", v1.SELinuxChangePolicyMountOption, "driver1")
+	if len(conflicts2) == 0 {
+		t.Fatal("Expected conflicts on vol2 between podA and podC")
+	}
+
+	// GetConflicts must return conflicts from BOTH volumes
+	allConflicts := c.GetConflicts(logger)
+	expectedCount := len(conflicts1) + len(conflicts2)
+	if len(allConflicts) != expectedCount {
+		t.Errorf("GetConflicts returned %d conflicts, expected %d (vol1: %d + vol2: %d)",
+			len(allConflicts), expectedCount, len(conflicts1), len(conflicts2))
+	}
+
+	// After deleting podA, all conflicts should be gone
+	c.DeletePod(logger, podA)
+	remaining := c.GetConflicts(logger)
+	if len(remaining) != 0 {
+		t.Errorf("Expected no conflicts after deleting podA, got %d: %+v", len(remaining), remaining)
+	}
+
+	// Verify deduplication: podD and podE conflict on two volumes with the same labels.
+	// Identical Conflict entries from different volumes must be deduplicated by GetConflicts.
+	podD := cache.ObjectName{Namespace: "ns", Name: "podD"}
+	podE := cache.ObjectName{Namespace: "ns", Name: "podE"}
+
+	c.AddVolume(logger, "vol3", podD, "system_u:system_r:labelD", v1.SELinuxChangePolicyMountOption, "driver1")
+	c.AddVolume(logger, "vol4", podD, "system_u:system_r:labelD", v1.SELinuxChangePolicyMountOption, "driver1")
+
+	conflictsVol3 := c.AddVolume(logger, "vol3", podE, "system_u:system_r:labelE", v1.SELinuxChangePolicyMountOption, "driver1")
+	conflictsVol4 := c.AddVolume(logger, "vol4", podE, "system_u:system_r:labelE", v1.SELinuxChangePolicyMountOption, "driver1")
+
+	if len(conflictsVol3) != len(conflictsVol4) {
+		t.Fatalf("Expected same number of conflicts from vol3 and vol4 (%d vs %d)", len(conflictsVol3), len(conflictsVol4))
+	}
+	if len(conflictsVol3) == 0 {
+		t.Fatal("Expected conflicts between podD and podE")
+	}
+
+	allConflicts = c.GetConflicts(logger)
+	deCount := 0
+	for _, conflict := range allConflicts {
+		if conflict.Pod == podD || conflict.Pod == podE || conflict.OtherPod == podD || conflict.OtherPod == podE {
+			deCount++
+		}
+	}
+	if deCount != len(conflictsVol3) {
+		t.Errorf("Expected %d deduplicated conflicts for podD/podE (from 2 volumes), got %d", len(conflictsVol3), deCount)
+	}
+}
+
+func TestVolumeCache_DeletePodConflicts(t *testing.T) {
+	podA := cache.ObjectName{Namespace: "ns", Name: "podA"}
+	podB := cache.ObjectName{Namespace: "ns", Name: "podB"}
+	podC := cache.ObjectName{Namespace: "ns", Name: "podC"}
+	podD := cache.ObjectName{Namespace: "ns", Name: "podD"}
+
+	tests := []struct {
+		name string
+		// Pods to add before deletion.
+		initialPods []podWithVolume
+		// Pod to delete.
+		podToDelete cache.ObjectName
+		// If true, delete the pod a second time to verify idempotency.
+		deleteTwice bool
+		// Pod pairs that must still have symmetric conflicts after deletion.
+		// Each pair [2]cache.ObjectName expects both (A→B) and (B→A) to be present.
+		expectedSurvivingPairs [][2]cache.ObjectName
+	}{
+		{
+			name: "delete one of two conflicting pods clears all conflicts",
+			initialPods: []podWithVolume{
+				{podNamespace: "ns", podName: "podA", volumeName: "vol1", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podB", volumeName: "vol1", label: "system_u:system_r:labelB", changePolicy: v1.SELinuxChangePolicyMountOption},
+			},
+			podToDelete:            podA,
+			expectedSurvivingPairs: nil,
+		},
+		{
+			name: "delete non-conflicting pod preserves existing conflicts",
+			initialPods: []podWithVolume{
+				{podNamespace: "ns", podName: "podA", volumeName: "vol1", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podB", volumeName: "vol1", label: "system_u:system_r:labelB", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podC", volumeName: "vol2", label: "system_u:system_r:labelC", changePolicy: v1.SELinuxChangePolicyMountOption},
+			},
+			podToDelete:            podC,
+			expectedSurvivingPairs: [][2]cache.ObjectName{{podA, podB}},
+		},
+		{
+			name: "three pods on same volume delete one leaves remaining pair conflict",
+			initialPods: []podWithVolume{
+				{podNamespace: "ns", podName: "podA", volumeName: "vol1", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podB", volumeName: "vol1", label: "system_u:system_r:labelB", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podC", volumeName: "vol1", label: "system_u:system_r:labelC", changePolicy: v1.SELinuxChangePolicyMountOption},
+			},
+			podToDelete:            podA,
+			expectedSurvivingPairs: [][2]cache.ObjectName{{podB, podC}},
+		},
+		{
+			name: "delete pod with conflicts on multiple volumes",
+			initialPods: []podWithVolume{
+				{podNamespace: "ns", podName: "podB", volumeName: "vol1", label: "system_u:system_r:labelB", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podC", volumeName: "vol2", label: "system_u:system_r:labelC", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podA", volumeName: "vol1", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podA", volumeName: "vol2", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+			},
+			podToDelete:            podA,
+			expectedSurvivingPairs: nil,
+		},
+		{
+			name: "delete pod preserves conflicts on unrelated volumes",
+			initialPods: []podWithVolume{
+				{podNamespace: "ns", podName: "podA", volumeName: "vol1", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podB", volumeName: "vol1", label: "system_u:system_r:labelB", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podC", volumeName: "vol2", label: "system_u:system_r:labelC", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podD", volumeName: "vol2", label: "system_u:system_r:labelD", changePolicy: v1.SELinuxChangePolicyMountOption},
+			},
+			podToDelete:            podA,
+			expectedSurvivingPairs: [][2]cache.ObjectName{{podC, podD}},
+		},
+		{
+			name: "delete pod that was already deleted is a no-op",
+			initialPods: []podWithVolume{
+				{podNamespace: "ns", podName: "podA", volumeName: "vol1", label: "system_u:system_r:labelA", changePolicy: v1.SELinuxChangePolicyMountOption},
+				{podNamespace: "ns", podName: "podB", volumeName: "vol1", label: "system_u:system_r:labelB", changePolicy: v1.SELinuxChangePolicyMountOption},
+			},
+			podToDelete:            podA,
+			deleteTwice:            true,
+			expectedSurvivingPairs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := getTestLoggers(t)
+			seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+			c := NewVolumeLabelCache(seLinuxTranslator).(*volumeCache)
+
+			for _, pod := range tt.initialPods {
+				c.AddVolume(logger, pod.volumeName, cache.ObjectName{Namespace: pod.podNamespace, Name: pod.podName}, pod.label, pod.changePolicy, "driver1")
+			}
+
+			c.DeletePod(logger, tt.podToDelete)
+			if tt.deleteTwice {
+				c.DeletePod(logger, tt.podToDelete)
+			}
+
+			remaining := c.GetConflicts(logger)
+
+			// Deleted pod must not appear in any conflict
+			for _, conflict := range remaining {
+				if conflict.Pod == tt.podToDelete || conflict.OtherPod == tt.podToDelete {
+					t.Errorf("found conflict involving deleted pod %s: %+v", tt.podToDelete, conflict)
+				}
+			}
+
+			// Verify each expected surviving pair exists in both directions
+			for _, pair := range tt.expectedSurvivingPairs {
+				hasForward := false
+				hasReverse := false
+				for _, conflict := range remaining {
+					if conflict.Pod == pair[0] && conflict.OtherPod == pair[1] {
+						hasForward = true
+					}
+					if conflict.Pod == pair[1] && conflict.OtherPod == pair[0] {
+						hasReverse = true
+					}
+				}
+				if !hasForward || !hasReverse {
+					t.Errorf("expected symmetric conflict between %s and %s, got %+v", pair[0], pair[1], remaining)
+				}
+			}
+
+			// If no pairs are expected, there should be no conflicts at all
+			if len(tt.expectedSurvivingPairs) == 0 && len(remaining) != 0 {
+				t.Errorf("expected no conflicts, got %+v", remaining)
+			}
+
+			verifyReverseIndexConsistency(t, c)
 		})
 	}
 }
