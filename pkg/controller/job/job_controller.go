@@ -1822,7 +1822,12 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		if remainingTime > 0 {
 			jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
-			return 0, metrics.JobSyncActionPodsCreated, nil
+			// No pods were created or deleted, so return the current active
+			// count rather than 0. Returning 0 here would cause the status
+			// update to set Active=0 while Ready still reflects the running
+			// pods, which the API server rejects ("cannot set more ready pods
+			// than active"), blocking finalizer removal and status flushing.
+			return active, metrics.JobSyncActionPodsCreated, nil
 		}
 		if diff > int32(MaxPodCreateDeletePerSync) {
 			diff = int32(MaxPodCreateDeletePerSync)
@@ -1835,7 +1840,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 				indexesToAdd, remainingTime = jm.getPodCreationInfoForIndependentIndexes(logger, indexesToAdd, jobCtx.podsWithDelayedDeletionPerIndex)
 				if remainingTime > 0 {
 					jm.enqueueSyncJobWithDelay(logger, job, remainingTime)
-					return 0, metrics.JobSyncActionPodsCreated, nil
+					// No pods were created or deleted, so return the current
+					// active count rather than 0 (see comment above).
+					return active, metrics.JobSyncActionPodsCreated, nil
 				}
 			}
 			diff = int32(len(indexesToAdd))

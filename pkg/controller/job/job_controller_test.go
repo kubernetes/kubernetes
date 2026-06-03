@@ -455,6 +455,37 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedTerminating: ptr.To[int32](0),
 			controllerTime:      &referenceTime,
 		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/139428.
+		// When replacement pods are needed but pod creation is deferred due to an
+		// active backoff, manageJob must report the actual active count rather than
+		// 0. Reporting 0 while Ready still reflects the running pods makes the status
+		// update fail apiserver validation ("cannot set more ready pods than active"),
+		// blocking finalizer removal and status flushing.
+		"too few active pods and active back-off with running pods": {
+			parallelism:  2,
+			completions:  2,
+			backoffLimit: 6,
+			backoffRecord: &backoffRecord{
+				failuresAfterLastSuccess: 1,
+				lastFailureTime:          &referenceTime,
+			},
+			initialStatus: &jobInitialStatus{
+				startTime: func() *time.Time {
+					now := time.Now()
+					return &now
+				}(),
+			},
+			activePods:          1,
+			readyPods:           1,
+			succeededPods:       0,
+			expectedCreations:   0,
+			expectedActive:      1,
+			expectedSucceeded:   0,
+			expectedPodPatches:  0,
+			expectedReady:       ptr.To[int32](1),
+			expectedTerminating: ptr.To[int32](0),
+			controllerTime:      &referenceTime,
+		},
 		"too few active pods and no back-offs": {
 			parallelism:  1,
 			completions:  1,
@@ -5219,6 +5250,50 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Terminating:             ptr.To[int32](0),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				FailedIndexes:           ptr.To(""),
+			},
+		},
+		// Regression test for https://github.com/kubernetes/kubernetes/issues/139428.
+		// One index has a running pod while another index's replacement pod
+		// creation is deferred because its per-index backoff is still active.
+		// manageJob must report the actual active count (1) rather than 0; a
+		// status with active=0 while pods are still running is rejected by the
+		// apiserver ("cannot set more ready pods than active"), blocking
+		// finalizer removal and status flushing.
+		"replacement pod creation delayed by per-index backoff while another index runs": {
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validTemplate,
+					Parallelism:          ptr.To[int32](2),
+					Completions:          ptr.To[int32](2),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+				},
+			},
+			pods: []v1.Pod{
+				*buildPod().uid("a").index("0").phase(v1.PodRunning).indexFailureCount("0").trackingFinalizer().Pod,
+				*buildPod().uid("b").index("1").status(v1.PodStatus{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "x",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									FinishedAt: metav1.NewTime(now),
+								},
+							},
+						},
+					},
+				}).indexFailureCount("0").trackingFinalizer().Pod,
+			},
+			wantStatus: batch.JobStatus{
+				Active:                  1,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				FailedIndexes:           new(string),
 			},
 		},
 		"single failed index due to exceeding the backoff limit per index, the job continues": {
