@@ -370,6 +370,8 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// Preserve the incoming pod-level resource from the new pod object.
 	newPodResources := newPod.Spec.Resources
 
+	newVolumes := dropNonResizeUpdatesForVolumes(newPod.Spec.Volumes, oldPod.Spec.Volumes)
+
 	containers := dropNonResizeUpdatesForContainers(newPod.Spec.Containers, oldPod.Spec.Containers)
 	initContainers := dropNonResizeUpdatesForContainers(newPod.Spec.InitContainers, oldPod.Spec.InitContainers)
 
@@ -385,6 +387,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 
 	newPod.Spec.Containers = containers
 	newPod.Spec.InitContainers = initContainers
+	newPod.Spec.Volumes = newVolumes
 
 	return newPod
 }
@@ -408,6 +411,13 @@ func dropNonResizeUpdatesForContainers(new, old []api.Container) []api.Container
 	}
 
 	return oldCopyWithMergedResources
+}
+
+func dropNonResizeUpdatesForVolumes(new, old []api.Volume) []api.Volume {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		return old
+	}
+	return new
 }
 
 func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
