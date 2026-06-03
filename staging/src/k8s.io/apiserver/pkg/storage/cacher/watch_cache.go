@@ -122,7 +122,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store store.Indexer
+	store store.OrderedIndexer
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -332,13 +332,11 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 			return err
 		}
 		if w.snapshots != nil && w.snapshottingEnabled.Load() {
-			if orderedLister, ordered := w.store.(store.OrderedLister); ordered {
-				if w.isCacheFullLocked() {
-					oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
-					w.snapshots.RemoveLess(oldestRV)
-				}
-				w.snapshots.Add(w.resourceVersion, orderedLister)
+			if w.isCacheFullLocked() {
+				oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
+				w.snapshots.RemoveLess(oldestRV)
 			}
+			w.snapshots.Add(w.resourceVersion, w.store)
 		}
 		return err
 	}(); err != nil {
@@ -609,7 +607,7 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	if !ok {
 		return listResp{}, "", errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
 	}
-	items := store.ListPrefix(key, continueKey)
+	items := store.OrderedListPrefix(key, continueKey)
 	return listResp{
 		Items:           items,
 		ResourceVersion: resourceVersion,
@@ -653,19 +651,11 @@ func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage
 			}, matchValue.IndexName, err
 		}
 	}
-	if store, ok := w.store.(store.OrderedLister); ok {
-		result := store.ListPrefix(key, continueKey)
-		return listResp{
-			Items:           result,
-			ResourceVersion: w.resourceVersion,
-		}, "", nil
-	}
-	result := w.store.List()
-	result, err = filterPrefixAndOrder(key, result)
+	result := w.store.OrderedListPrefix(key, continueKey)
 	return listResp{
 		Items:           result,
 		ResourceVersion: w.resourceVersion,
-	}, "", err
+	}, "", nil
 }
 
 func filterPrefixAndOrder(prefix string, items []interface{}) ([]interface{}, error) {
@@ -778,8 +768,8 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 	if w.snapshots != nil {
 		w.snapshots.Reset()
-		if orderedLister, ordered := w.store.(store.OrderedLister); ordered && w.snapshottingEnabled.Load() {
-			w.snapshots.Add(version, orderedLister)
+		if w.snapshottingEnabled.Load() {
+			w.snapshots.Add(version, w.store)
 		}
 	}
 	w.listResourceVersion = version

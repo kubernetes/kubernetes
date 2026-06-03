@@ -3155,7 +3155,7 @@ func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
 func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Clone() store.OrderedLister   { return f }
-func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface{} {
+func (f fakeOrderedLister) OrderedListPrefix(prefixKey, continueKey string) []interface{} {
 	return nil
 }
 func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }

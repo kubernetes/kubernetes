@@ -435,9 +435,8 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
 	cases := []struct {
 		name    string
-		indexer store.Indexer
+		indexer store.OrderedIndexer
 	}{
-		{"legacy", cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))},
 		{"btree", store.NewIndexer(nil)},
 	}
 	for _, tc := range cases {
