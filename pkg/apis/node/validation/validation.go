@@ -39,10 +39,10 @@ var NodeNormalizationRules = []field.NormalizationRule{
 func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	if rc.Handler == "" {
-		allErrs = append(allErrs, field.Required(field.NewPath("handler"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(field.NewPath("handler"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range apivalidation.NameIsDNSLabel(rc.Handler, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg)).MarkCoveredByDeclarative().WithOrigin("format=k8s-short-name")
+			allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg).MarkCoveredByDeclarative().WithOrigin("format=k8s-short-name"))
 		}
 	}
 
@@ -60,7 +60,7 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...).MarkCoveredByDeclarative().WithOrigin("immutable")
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 
 	return allErrs
 }
