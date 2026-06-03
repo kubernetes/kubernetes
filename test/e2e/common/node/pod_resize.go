@@ -1060,14 +1060,14 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 
 func doPodResizeOOMKilledTest(f *framework.Framework) {
 	// doPodResizeOOMKilledTest verifies that an in-place memory resize applied while a container
-	// is in OOMKilled state correctly updates both the container-level and pod-level cgroups, so
-	// that the restarted container is no longer OOM-killed. Steps below:
-	// 1. Pod created with 128Mi memory limit.
-	// 2. watching for OOMKilled state.
-	// 3. OOMKill detected after ~15s, restarts=1.
-	// 4. apply resize: 128Mi to 256Mi while container is OOMKilled.
+	// is in CrashLoopBackOff correctly updates both the container-level and pod-level cgroups.
+	// Steps below:
+	// 1. pod created with 128Mi memory limit.
+	// 2. container OOMKills immediately, kubelet restarts it.
+	// 3. wait until RestartCount >= 2 so the container is sitting in a >=20s backoff window.
+	// 4. apply resize 128Mi to 256Mi while container is in CrashLoopBackOff.
 	// 5. patch accepted, old actuated value still in status as expected.
-	// 6. test waits for pod to become Ready with new limits actuated.
+	// 6. test waits for pod to become ready with new limits actuated.
 	const (
 		initialMemLimit = "128Mi"
 		allocateMem     = "200M"
@@ -1084,8 +1084,6 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 			initialResources := &cgroups.ContainerResources{
 				MemReq: initialMemLimit,
 				MemLim: initialMemLimit,
-				CPUReq: "100m",
-				CPULim: "200m",
 			}
 			containerInfo := podresize.ResizableContainerInfo{
 				Name:      containerName,
@@ -1155,8 +1153,6 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 			resizedResources := &cgroups.ContainerResources{
 				MemReq: resizedMemLimit,
 				MemLim: resizedMemLimit,
-				CPUReq: "100m",
-				CPULim: "200m",
 			}
 			resizedContainerInfo := podresize.ResizableContainerInfo{
 				Name:      containerName,
@@ -1173,9 +1169,6 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 				ctx, oomPod.Name,
 				types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
 			framework.ExpectNoError(pErr, "failed to patch pod for resize while OOMKilled")
-			if patchedCS := e2epod.FindContainerStatusInPod(patchedPod, containerName); patchedCS != nil {
-				framework.Logf("Resize patch applied; allocatedResources.memory=%s", patchedCS.AllocatedResources.Memory())
-			}
 
 			// the container restarts successfully with new 256Mi limit and the pod becomes Ready.
 			ginkgo.By("Waiting for pod to become Ready after resize (verifies pod-level cgroup was updated)")
