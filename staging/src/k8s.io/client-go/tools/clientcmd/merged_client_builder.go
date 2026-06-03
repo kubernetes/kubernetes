@@ -111,7 +111,7 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 	case mergedConfig != nil:
 		// the configuration is valid, but if this is equal to the defaults we should try
 		// in-cluster configuration
-		if !config.loader.IsDefaultConfig(mergedConfig) {
+		if !config.isDefaultConfigForInClusterFallback(mergedConfig) {
 			return mergedConfig, nil
 		}
 	}
@@ -125,6 +125,34 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 
 	// return the result of the merged client config
 	return mergedConfig, err
+}
+
+func (config *DeferredLoadingClientConfig) isDefaultConfigForInClusterFallback(restConfig *restclient.Config) bool {
+	if config.loader.IsDefaultConfig(restConfig) {
+		return true
+	}
+	if restConfig == nil || config.overrides == nil {
+		return false
+	}
+
+	// The legacy default rest.Config is used here as a source-selection sentinel:
+	// if the resolved config is still the default server/auth source, try
+	// in-cluster config before returning localhost:8080. Request/transport
+	// behavior overrides must not turn that sentinel into an explicit
+	// kubeconfig/source selection.
+	withoutFallbackNeutralOverrides := *restConfig
+	changed := false
+
+	if len(config.overrides.Timeout) > 0 {
+		withoutFallbackNeutralOverrides.Timeout = 0
+		changed = true
+	}
+	if config.overrides.ClusterInfo.DisableCompression {
+		withoutFallbackNeutralOverrides.DisableCompression = false
+		changed = true
+	}
+
+	return changed && config.loader.IsDefaultConfig(&withoutFallbackNeutralOverrides)
 }
 
 // Namespace implements KubeConfig
