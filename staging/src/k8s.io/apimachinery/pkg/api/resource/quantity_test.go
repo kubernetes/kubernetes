@@ -801,6 +801,13 @@ func TestQuantityParseEmit(t *testing.T) {
 		{".000001Ki", "1024u"},
 		{".000000001Ki", "1024n"},
 		{".000000000001Ki", "2n"},
+		// DecimalSI only has suffixes up to "E" (10^18). Values whose canonical
+		// exponent exceeds that range must fall back to DecimalExponent rather
+		// than silently dropping the suffix (and thus the magnitude). See
+		// CanonicalizeBytes.
+		{"1000000000000000000000", "1e21"},
+		{"1234000000000000000000", "1234E"},
+		{"5000000000000000000000000", "5e24"},
 	}
 
 	for _, item := range table {
@@ -811,6 +818,13 @@ func TestQuantityParseEmit(t *testing.T) {
 		}
 		if e, a := item.expect, q.String(); e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
+		}
+		// The emitted canonical string must round-trip back to the same value.
+		r, err := ParseQuantity(q.String())
+		if err != nil {
+			t.Errorf("%#v: couldn't re-parse emitted %q: %v", item.in, q.String(), err)
+		} else if q.Cmp(r) != 0 {
+			t.Errorf("%#v: value changed across String/Parse: %v != %v", item.in, q.AsDec(), r.AsDec())
 		}
 	}
 	for _, item := range table {

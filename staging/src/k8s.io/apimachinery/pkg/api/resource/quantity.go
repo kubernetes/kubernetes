@@ -451,7 +451,14 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		number, exponent := q.AsCanonicalBytes(out)
-		suffix, _ := quantitySuffixer.constructBytes(10, exponent, format)
+		suffix, ok := quantitySuffixer.constructBytes(10, exponent, format)
+		if !ok {
+			// DecimalSI only has suffixes for exponents in the range [-9, 18]
+			// (n through E). Larger or smaller exponents have no SI suffix, so
+			// fall back to DecimalExponent, which can represent any exponent and
+			// thus avoids silently dropping the magnitude of the value.
+			suffix, _ = quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+		}
 		return number, suffix
 	default:
 		// format must be BinarySI
