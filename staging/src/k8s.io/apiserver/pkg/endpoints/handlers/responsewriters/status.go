@@ -73,7 +73,7 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
 		if !errors.Is(err, context.Canceled) {
-			runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %v", err, err))
+			runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %w", err, err))
 		}
 		return &metav1.Status{
 			TypeMeta: metav1.TypeMeta{
