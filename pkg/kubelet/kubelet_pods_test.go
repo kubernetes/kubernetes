@@ -5747,8 +5747,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 }
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	if goruntime.GOOS != "linux" {
+		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
@@ -6570,8 +6570,8 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	if goruntime.GOOS == "windows" {
-		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	if goruntime.GOOS != "linux" {
+		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
