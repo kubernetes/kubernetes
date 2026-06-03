@@ -183,7 +183,7 @@ message IngressClass {
 
   // spec is the desired state of the IngressClass.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional IngressClassSpec spec = 2;
 }
 
@@ -236,7 +236,7 @@ message IngressClassSpec {
   // same implementing controller. This should be specified as a
   // domain-prefixed path no more than 250 characters in length, e.g.
   // "acme.io/ingress-controller". This field is immutable.
-  // +optional
+  // +required
   optional string controller = 1;
 
   // parameters is a link to a custom resource containing additional
@@ -689,3 +689,4 @@ message ServiceCIDRStatus {
   // +listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
+
