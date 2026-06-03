@@ -36,7 +36,7 @@ func TestNewAtomicWriter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating tmp dir: %v", err)
 	}
-	defer os.RemoveAll(targetDir)
+	defer func() { _ = os.RemoveAll(targetDir) }()
 
 	_, err = NewAtomicWriter(targetDir, "-test-")
 	if err != nil {
@@ -55,6 +55,53 @@ func TestNewAtomicWriter(t *testing.T) {
 	_, err = NewAtomicWriter(nonExistentDir, "-test-")
 	if err == nil {
 		t.Fatalf("unexpected success creating writer for nonexistent target dir: %v", err)
+	}
+}
+
+func TestIsTargetPopulated(t *testing.T) {
+	targetDir, err := utiltesting.MkTmpdir("atomic-write")
+	if err != nil {
+		t.Fatalf("unexpected error creating tmp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(targetDir) }()
+
+	// A freshly created target directory has never been written to, so the
+	// data directory symlink does not exist yet.
+	if IsTargetPopulated(targetDir) {
+		t.Fatalf("expected target dir to be reported as not populated before any write")
+	}
+
+	// After a successful Write the "..data" symlink exists and the target is
+	// considered populated. This is the signal volume plugins rely on to avoid
+	// tearing down an already-mounted volume on a later failed resync (#113242).
+	writer, err := NewAtomicWriter(targetDir, "-test-")
+	if err != nil {
+		t.Fatalf("unexpected error creating writer: %v", err)
+	}
+	payload := map[string]FileProjection{
+		"foo": {Data: []byte("foo"), Mode: 0644},
+	}
+	if err := writer.Write(payload, nil); err != nil {
+		t.Fatalf("unexpected error writing payload: %v", err)
+	}
+	if !IsTargetPopulated(targetDir) {
+		t.Fatalf("expected target dir to be reported as populated after a successful write")
+	}
+
+	// A non-existent target directory is trivially not populated.
+	if IsTargetPopulated(filepath.Join(targetDir, "does-not-exist")) {
+		t.Fatalf("expected non-existent dir to be reported as not populated")
+	}
+
+	// On an inconclusive Lstat error (here ENOTDIR, because the "target dir" is a
+	// regular file) the check must conservatively report the target as populated,
+	// so a possibly bind-mounted volume is not torn down on an inconclusive result.
+	regularFile := filepath.Join(targetDir, "not-a-dir")
+	if err := os.WriteFile(regularFile, []byte("x"), 0644); err != nil {
+		t.Fatalf("unexpected error creating file: %v", err)
+	}
+	if !IsTargetPopulated(regularFile) {
+		t.Fatalf("expected target to be reported as populated on a non-ENOENT Lstat error")
 	}
 }
 
@@ -225,7 +272,7 @@ func TestPathsToRemove(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
-		defer os.RemoveAll(targetDir)
+		defer func() { _ = os.RemoveAll(targetDir) }()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 		err = writer.Write(tc.payload1, nil)
@@ -393,7 +440,7 @@ IAAAAAAAsDyZDwU=`
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
-		defer os.RemoveAll(targetDir)
+		defer func() { _ = os.RemoveAll(targetDir) }()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 		err = writer.Write(tc.payload, nil)
@@ -569,7 +616,7 @@ func TestUpdate(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
-		defer os.RemoveAll(targetDir)
+		defer func() { _ = os.RemoveAll(targetDir) }()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
@@ -737,7 +784,7 @@ func TestMultipleUpdates(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
-		defer os.RemoveAll(targetDir)
+		defer func() { _ = os.RemoveAll(targetDir) }()
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
@@ -950,7 +997,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
 			continue
 		}
-		defer os.RemoveAll(targetDir)
+		defer func() { _ = os.RemoveAll(targetDir) }()
 
 		dataDirPath := filepath.Join(targetDir, dataDirName)
 		err = os.MkdirAll(dataDirPath, 0755)
@@ -989,7 +1036,7 @@ func TestSetPerms(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating tmp dir: %v", err)
 	}
-	defer os.RemoveAll(targetDir)
+	defer func() { _ = os.RemoveAll(targetDir) }()
 
 	// Test that setPerms() is called once and with valid timestamp directory.
 	payload1 := map[string]FileProjection{

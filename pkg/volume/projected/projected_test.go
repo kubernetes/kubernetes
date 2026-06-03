@@ -1184,8 +1184,10 @@ func TestPlugin(t *testing.T) {
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
-	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -1249,8 +1251,10 @@ func TestInvalidPathProjected(t *testing.T) {
 		{Key: "missing", Path: "missing"},
 	}
 
-	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -1299,8 +1303,10 @@ func TestPluginReboot(t *testing.T) {
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
-	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -1353,8 +1359,10 @@ func TestPluginOptional(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 	volumeSpec.VolumeSource.Projected.Sources[0].Secret.Optional = &trueVal
-	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -1451,8 +1459,10 @@ func TestPluginOptionalKeys(t *testing.T) {
 		{Key: "missing", Path: "missing"},
 	}
 	volumeSpec.VolumeSource.Projected.Sources[0].Secret.Optional = &trueVal
-	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
@@ -1497,6 +1507,126 @@ func TestPluginOptionalKeys(t *testing.T) {
 	}
 	doTestSecretDataInVolume(volumePath, secret, t)
 	defer doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+}
+
+// TestSetUpWriteFailureDoesNotTearDownPopulatedVolume is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/113242. Once a volume has been
+// successfully populated, its directory is bind-mounted into the running
+// container; a subsequent SetUp that fails to write (e.g. a resync that cannot
+// write because the disk is full) must NOT tear that directory down, because
+// removing it breaks the bind mount and leaves the volume permanently empty with
+// no automatic recovery. The write failure is simulated deterministically by
+// projecting an invalid payload key ("..evil"), which the atomic writer rejects
+// inside Write, i.e. after the cleanup defer has been registered.
+func TestSetUpWriteFailureDoesNotTearDownPopulatedVolume(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid_113242")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_projected_namespace"
+		goodName       = "good_secret_name"
+		badName        = "bad_secret_name"
+
+		good = makeSecret(testNamespace, goodName)
+		bad  = v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: badName},
+			Data:       map[string][]byte{"..evil": []byte("boom")},
+		}
+		client        = fake.NewSimpleClientset(&good, &bad)
+		pluginMgr     = volume.VolumePluginMgr{}
+		rootDir, host = newTestHost(t, client)
+	)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
+
+	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
+	if err != nil {
+		t.Fatal("Can't find the plugin by name")
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+
+	// Populate the volume successfully so it becomes "already populated" (..data exists).
+	goodMounter, err := plugin.NewMounter(volume.NewSpecFromVolume(makeVolumeSpec(testVolumeName, goodName, 0644)), pod)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+	volumePath := goodMounter.GetPath()
+	if err := goodMounter.SetUp(volume.MounterArgs{}); err != nil {
+		t.Fatalf("initial SetUp failed: %v", err)
+	}
+	if !util.IsTargetPopulated(volumePath) {
+		t.Fatalf("expected volume %q to be populated after initial SetUp", volumePath)
+	}
+
+	// A mounter for the same volume name targets the same directory; projecting the
+	// invalid payload forces writer.Write to fail on this already-populated volume.
+	badMounter, err := plugin.NewMounter(volume.NewSpecFromVolume(makeVolumeSpec(testVolumeName, badName, 0644)), pod)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+	if badMounter.GetPath() != volumePath {
+		t.Fatalf("expected same target dir, got %q vs %q", badMounter.GetPath(), volumePath)
+	}
+	if err := badMounter.SetUp(volume.MounterArgs{}); err == nil {
+		t.Fatal("expected SetUp to fail on invalid payload, but it succeeded")
+	}
+
+	// The failed resync must not have torn the volume down.
+	if _, err := os.Stat(volumePath); err != nil {
+		t.Fatalf("volume dir was removed after a failed resync (regression of #113242): %v", err)
+	}
+	if !util.IsTargetPopulated(volumePath) {
+		t.Fatal("volume data dir (..data) was removed after a failed resync (regression of #113242)")
+	}
+	// The original, valid content must still be present.
+	doTestSecretDataInVolume(volumePath, good, t)
+}
+
+// TestSetUpFirstTimeWriteFailureCleansUp is the complement of the test above: it
+// pins the original cleanup behavior that must be preserved. When the *first* setup
+// of a volume fails (the volume was never populated, so nothing is bind-mounted into
+// a container yet), the half-created directory MUST be torn down. This guards against
+// an over-broad fix that suppresses cleanup unconditionally.
+func TestSetUpFirstTimeWriteFailureCleansUp(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid_firsttime")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_projected_namespace"
+		badName        = "bad_secret_name"
+
+		bad = v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: badName},
+			Data:       map[string][]byte{"..evil": []byte("boom")},
+		}
+		client        = fake.NewSimpleClientset(&bad)
+		pluginMgr     = volume.VolumePluginMgr{}
+		rootDir, host = newTestHost(t, client)
+	)
+	defer func() { _ = os.RemoveAll(rootDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
+
+	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
+	if err != nil {
+		t.Fatal("Can't find the plugin by name")
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(makeVolumeSpec(testVolumeName, badName, 0644)), pod)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+	volumePath := mounter.GetPath()
+	if err := mounter.SetUp(volume.MounterArgs{}); err == nil {
+		t.Fatal("expected first-time SetUp to fail on invalid payload, but it succeeded")
+	}
+
+	// Never populated, so the failed first-time setup must have been cleaned up.
+	if _, err := os.Stat(volumePath); !os.IsNotExist(err) {
+		t.Fatalf("expected volume dir to be torn down after a failed first-time setup, stat err = %v", err)
+	}
 }
 
 func makeVolumeSpec(volumeName, name string, defaultMode int32) *v1.Volume {
