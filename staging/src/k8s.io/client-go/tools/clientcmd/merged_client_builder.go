@@ -151,6 +151,10 @@ func (config *DeferredLoadingClientConfig) isDefaultConfigForInClusterFallback(r
 		withoutFallbackNeutralOverrides.DisableCompression = false
 		changed = true
 	}
+	if len(config.overrides.ClusterInfo.ProxyURL) > 0 {
+		withoutFallbackNeutralOverrides.Proxy = nil
+		changed = true
+	}
 
 	return changed && config.loader.IsDefaultConfig(&withoutFallbackNeutralOverrides)
 }

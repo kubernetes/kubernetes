@@ -849,6 +849,7 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		overrides                  *ConfigOverrides
 		expectedTimeout            time.Duration
 		expectedDisableCompression bool
+		expectedProxyURL           string
 	}{
 		{
 			overrides: &ConfigOverrides{
@@ -951,6 +952,14 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			},
 			expectedDisableCompression: true,
 		},
+		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					ProxyURL: "http://proxy.example",
+				},
+			},
+			expectedProxyURL: "http://proxy.example",
+		},
 	}
 
 	for _, tc := range tt {
@@ -1006,6 +1015,22 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.DisableCompression != tc.expectedDisableCompression {
 			t.Errorf("Expected DisableCompression %v, got %v", tc.expectedDisableCompression, clientConfig.DisableCompression)
+		}
+		if tc.expectedProxyURL == "" {
+			if clientConfig.Proxy != nil {
+				t.Errorf("Expected no proxy, got non-nil proxy")
+			}
+		} else {
+			if clientConfig.Proxy == nil {
+				t.Fatalf("Expected proxy %v, got nil", tc.expectedProxyURL)
+			}
+			proxyURL, err := clientConfig.Proxy(nil)
+			if err != nil {
+				t.Fatalf("Unexpected proxy error: %v", err)
+			}
+			if proxyURL.String() != tc.expectedProxyURL {
+				t.Errorf("Expected proxy %v, got %v", tc.expectedProxyURL, proxyURL.String())
+			}
 		}
 	}
 }

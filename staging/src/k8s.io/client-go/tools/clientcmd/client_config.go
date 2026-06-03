@@ -652,6 +652,13 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		if config.overrides.ClusterInfo.DisableCompression {
 			icc.DisableCompression = true
 		}
+		if len(config.overrides.ClusterInfo.ProxyURL) > 0 {
+			proxyURL, err := parseProxyURL(config.overrides.ClusterInfo.ProxyURL)
+			if err != nil {
+				return nil, err
+			}
+			icc.Proxy = http.ProxyURL(proxyURL)
+		}
 	}
 
 	return icc, nil
