@@ -17,6 +17,7 @@ limitations under the License.
 package podresources
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"testing"
@@ -1055,7 +1056,7 @@ func TestGetPodResourcesV1(t *testing.T) {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				}
 			} else {
-				if err != tc.err {
+				if !errors.Is(err, tc.err) {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				} else {
 					if tc.expectedResponse.String() != resp.String() {
