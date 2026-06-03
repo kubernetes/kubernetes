@@ -17,13 +17,13 @@ limitations under the License.
 package state
 
 import (
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2/ktesting"
@@ -197,4 +197,35 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	actualPodResourceAllocation = sc.cache.GetPodResourceInfoMap()
 
 	require.Equal(t, expectedPodResourceAllocation, actualPodResourceAllocation, "pod resource allocation info is not equal")
+}
+
+func TestRestoreState_CheckpointNotFound(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr error
+	}{
+		{
+			name:    "return nil when wrapped ErrCheckpointNotFound",
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc := newTestStateCheckpoint(t)
+			logger, _ := ktesting.NewTestContext(t)
+
+			info, checksum, gotErr := restoreState(logger, sc.checkpointManager, "test-checkpoint")
+			if info != nil {
+				t.Errorf("expected nil PodResourceInfoMap, got %v", info)
+			}
+			if checksum != 0 {
+				t.Errorf("expected checksum 0, got %d", checksum)
+			}
+			if !goerrors.Is(gotErr, tt.wantErr) {
+				t.Errorf("restoreState() error = %v, want %v", gotErr, tt.wantErr)
+			}
+
+		})
+	}
 }
