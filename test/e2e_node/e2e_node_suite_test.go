@@ -26,6 +26,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"os"
 	"os/exec"
@@ -39,6 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
+	mounter "k8s.io/kubernetes/cluster/gce/gci/mounter/pkg"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -48,6 +51,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
+	gcpcredentialprovider "k8s.io/kubernetes/test/e2e_node/plugins/gcp-credential-provider/pkg"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
@@ -120,6 +124,20 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	// e2e_node.test can behave like several other commands which are required
+	// when doing node testing on a remote virtual machine.
+	cmdName := filepath.Base(os.Args[0])
+	switch {
+	case strings.HasPrefix(cmdName, "gcp-credential-provider"):
+		gcpcredentialprovider.Main()
+	case strings.HasPrefix(cmdName, "mounter"):
+		mounter.Main()
+	default:
+		testMain(m)
+	}
+}
+
+func testMain(m *testing.M) {
 	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
