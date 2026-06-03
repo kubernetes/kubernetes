@@ -38,6 +38,12 @@ func TestDeclarativeValidate(t *testing.T) {
 	}
 }
 
+func setValue(v int32) func(obj *scheduling.PriorityClass) {
+    return func(obj *scheduling.PriorityClass) {
+        obj.Value = v
+    }
+}
+
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
@@ -82,23 +88,23 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"value changed": {
 			oldObj:    mkValidPriorityClass(),
-			updateObj: mkValidPriorityClass(func(pc *scheduling.PriorityClass) { pc.Value = 20 }),
+			updateObj: mkValidPriorityClass(setValue(20)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"value set to unset": {
 			oldObj:    mkValidPriorityClass(),
 			updateObj: mkValidPriorityClass(func(pc *scheduling.PriorityClass) { pc.Value = 0 }),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"value unset to set": {
 			oldObj:    mkValidPriorityClass(func(pc *scheduling.PriorityClass) { pc.Value = 0 }),
 			updateObj: mkValidPriorityClass(),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable"),
 			},
 		},
 	}
