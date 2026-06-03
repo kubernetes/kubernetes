@@ -692,6 +692,11 @@ const (
 	// Enables opportunistic batching in the scheduler.
 	OpportunisticBatching featuregate.Feature = "OpportunisticBatching"
 
+	// Enables signature-based scheduling failure cache for same-spec Pods.
+	// When a Pod fails scheduling, subsequent Pods with the same scheduling
+	// signature skip the full scheduling cycle and fail immediately.
+	SchedulerFailureCache featuregate.Feature = "SchedulerFailureCache"
+
 	// owner: @tallclair
 	//
 	// Enables relisting individual pods on-demand.
@@ -1663,6 +1668,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	SchedulerFailureCache: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PLEGOnDemandRelist: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2423,6 +2432,10 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	NominatedNodeNameForExpectation: {},
 
 	OpportunisticBatching: {},
+
+	SchedulerFailureCache: {
+		OpportunisticBatching,
+	},
 
 	PLEGOnDemandRelist: {},
 

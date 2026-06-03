@@ -7207,3 +7207,351 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckFailureCache(t *testing.T) {
+	sig := fwk.PodSignature("test-signature")
+
+	tests := []struct {
+		name            string
+		enableFG        bool
+		podSignature    fwk.PodSignature
+		nominatedNode   string
+		cacheEntry      *failureCacheEntry
+		expectFitError  bool
+	}{
+		{
+			name:         "feature gate disabled",
+			enableFG:     false,
+			podSignature: sig,
+			cacheEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+			},
+		},
+		{
+			name:         "nil signature (unsignable pod)",
+			enableFG:     true,
+			podSignature: nil,
+			cacheEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+			},
+		},
+		{
+			name:          "pod has nominated node",
+			enableFG:      true,
+			podSignature:  sig,
+			nominatedNode: "node-1",
+			cacheEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+			},
+		},
+		{
+			name:         "no cache entry for signature",
+			enableFG:     true,
+			podSignature: sig,
+		},
+		{
+			name:         "cache hit returns FitError",
+			enableFG:     true,
+			podSignature: sig,
+			cacheEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+				message:              "node(s) didn't satisfy resource requirements",
+				numAllNodes:          10,
+			},
+			expectFitError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerFailureCache, tt.enableFG)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpportunisticBatching, true)
+
+			clientset := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory)
+
+			if tt.cacheEntry != nil {
+				q.failureCache[string(sig)] = tt.cacheEntry
+			}
+
+			pod := st.MakePod().Name("pod2").Obj()
+			if tt.nominatedNode != "" {
+				pod.Status.NominatedNodeName = tt.nominatedNode
+			}
+			podInfo := &framework.QueuedPodInfo{
+				PodInfo:     &framework.PodInfo{Pod: pod},
+				PodSignature: tt.podSignature,
+			}
+
+			err := q.CheckFailureCache(podInfo)
+			if tt.expectFitError {
+				if err == nil {
+					t.Fatal("Expected FitError, got nil")
+				}
+				fitErr, ok := err.(*framework.FitError)
+				if !ok {
+					t.Fatalf("Expected *framework.FitError, got %T", err)
+				}
+				if fitErr.NumAllNodes != tt.cacheEntry.numAllNodes {
+					t.Errorf("Expected NumAllNodes %d, got %d", tt.cacheEntry.numAllNodes, fitErr.NumAllNodes)
+				}
+				if fitErr.Diagnosis.PreFilterMsg != tt.cacheEntry.message {
+					t.Errorf("Expected PreFilterMsg %q, got %q", tt.cacheEntry.message, fitErr.Diagnosis.PreFilterMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected nil error, got %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestCacheFailure(t *testing.T) {
+	tests := []struct {
+		name          string
+		enableFG      bool
+		signature     fwk.PodSignature
+		fitError      *framework.FitError
+		expectCached  bool
+	}{
+		{
+			name:      "feature gate disabled",
+			enableFG:  false,
+			signature: fwk.PodSignature("sig"),
+			fitError: &framework.FitError{
+				NumAllNodes: 5,
+				Diagnosis: framework.Diagnosis{
+					UnschedulablePlugins: sets.New("NodeResourcesFit"),
+				},
+			},
+		},
+		{
+			name:      "empty signature",
+			enableFG:  true,
+			signature: nil,
+			fitError: &framework.FitError{
+				NumAllNodes: 5,
+				Diagnosis: framework.Diagnosis{
+					UnschedulablePlugins: sets.New("NodeResourcesFit"),
+				},
+			},
+		},
+		{
+			name:      "caches failure entry",
+			enableFG:  true,
+			signature: fwk.PodSignature("sig-1"),
+			fitError: &framework.FitError{
+				NumAllNodes: 10,
+				Diagnosis: framework.Diagnosis{
+					UnschedulablePlugins: sets.New("NodeResourcesFit", "TaintToleration"),
+					PreFilterMsg:         "pod failed prefilter",
+				},
+			},
+			expectCached: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerFailureCache, tt.enableFG)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpportunisticBatching, true)
+
+			clientset := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory)
+
+			q.CacheFailure(tt.signature, tt.fitError)
+
+			if tt.expectCached {
+				entry, ok := q.failureCache[string(tt.signature)]
+				if !ok {
+					t.Fatal("Expected cache entry to exist")
+				}
+				if !entry.unschedulablePlugins.Equal(tt.fitError.Diagnosis.UnschedulablePlugins) {
+					t.Errorf("Expected UnschedulablePlugins %v, got %v", tt.fitError.Diagnosis.UnschedulablePlugins, entry.unschedulablePlugins)
+				}
+				if entry.message != tt.fitError.Diagnosis.PreFilterMsg {
+					t.Errorf("Expected message %q, got %q", tt.fitError.Diagnosis.PreFilterMsg, entry.message)
+				}
+				if entry.numAllNodes != tt.fitError.NumAllNodes {
+					t.Errorf("Expected NumAllNodes %d, got %d", tt.fitError.NumAllNodes, entry.numAllNodes)
+				}
+			} else {
+				if len(q.failureCache) > 0 {
+					t.Errorf("Expected empty cache, got %d entries", len(q.failureCache))
+				}
+			}
+		})
+	}
+}
+
+func TestInvalidateFailureCache(t *testing.T) {
+	tests := []struct {
+		name                      string
+		event                     fwk.ClusterEvent
+		setupEntry                *failureCacheEntry
+		setupPluginToEvents       map[string][]fwk.ClusterEvent
+		expectCacheCleared        bool
+		expectSpecificEvicted     bool
+	}{
+		{
+			name: "wildcard event clears entire cache",
+			event: fwk.ClusterEvent{
+				Resource:  fwk.WildCard,
+				ActionType: fwk.All,
+			},
+			setupEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+			},
+			expectCacheCleared: true,
+		},
+		{
+			name: "matching plugin event evicts entry",
+			event: fwk.ClusterEvent{
+				Resource:  fwk.Node,
+				ActionType: fwk.Add,
+			},
+			setupEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+			},
+			setupPluginToEvents: map[string][]fwk.ClusterEvent{
+				"NodeResourcesFit": {
+					{Resource: fwk.Node, ActionType: fwk.Add},
+				},
+			},
+			expectSpecificEvicted: true,
+		},
+		{
+			name: "non-matching plugin event keeps entry",
+			event: fwk.ClusterEvent{
+				Resource:  fwk.AssignedPod,
+				ActionType: fwk.Delete,
+			},
+			setupEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit"),
+			},
+			setupPluginToEvents: map[string][]fwk.ClusterEvent{
+				"NodeResourcesFit": {
+					{Resource: fwk.Node, ActionType: fwk.Add},
+				},
+			},
+		},
+		{
+			name: "event matches one plugin, entry with multiple plugins evicted",
+			event: fwk.ClusterEvent{
+				Resource:  fwk.Node,
+				ActionType: fwk.Add,
+			},
+			setupEntry: &failureCacheEntry{
+				unschedulablePlugins: sets.New("NodeResourcesFit", "TaintToleration"),
+			},
+			setupPluginToEvents: map[string][]fwk.ClusterEvent{
+				"NodeResourcesFit": {
+					{Resource: fwk.Node, ActionType: fwk.Add},
+				},
+				"TaintToleration": {
+					{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint},
+				},
+			},
+			expectSpecificEvicted: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerFailureCache, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpportunisticBatching, true)
+
+			clientset := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory)
+
+			if tt.setupPluginToEvents != nil {
+				q.pluginToEventsMap = tt.setupPluginToEvents
+			}
+
+			sig := fwk.PodSignature("sig")
+			q.failureCache[string(sig)] = tt.setupEntry
+
+			q.invalidateFailureCache(tt.event)
+
+			if tt.expectCacheCleared {
+				if len(q.failureCache) != 0 {
+					t.Errorf("Expected empty cache, got %d entries", len(q.failureCache))
+				}
+			} else if tt.expectSpecificEvicted {
+				if len(q.failureCache) != 0 {
+					t.Errorf("Expected entry to be evicted, but cache has %d entries", len(q.failureCache))
+				}
+			} else {
+				if len(q.failureCache) != 1 {
+					t.Errorf("Expected entry to remain, but cache has %d entries", len(q.failureCache))
+				}
+			}
+		})
+	}
+}
+
+func TestFailureCacheIntegration(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerFailureCache, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpportunisticBatching, true)
+
+	clientset := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+	q := NewPriorityQueue(newDefaultQueueSort(), informerFactory)
+
+	// Set up plugin event mapping for invalidation
+	q.pluginToEventsMap = map[string][]fwk.ClusterEvent{
+		"NodeResourcesFit": {
+			{Resource: fwk.Node, ActionType: fwk.Add},
+		},
+	}
+
+	sig := fwk.PodSignature("integration-sig")
+	fitErr := &framework.FitError{
+		Pod:         st.MakePod().Name("pod1").Obj(),
+		NumAllNodes: 5,
+		Diagnosis: framework.Diagnosis{
+			UnschedulablePlugins: sets.New("NodeResourcesFit"),
+			PreFilterMsg:         "node(s) didn't satisfy resource requirements",
+		},
+	}
+
+	// Step 1: Cache the failure
+	q.CacheFailure(sig, fitErr)
+	if len(q.failureCache) != 1 {
+		t.Fatalf("Expected 1 cache entry after CacheFailure, got %d", len(q.failureCache))
+	}
+
+	// Step 2: Check cache hit
+	pod := st.MakePod().Name("pod2").Obj()
+	podInfo := &framework.QueuedPodInfo{
+		PodInfo:      &framework.PodInfo{Pod: pod},
+		PodSignature: sig,
+	}
+	err := q.CheckFailureCache(podInfo)
+	if err == nil {
+		t.Fatal("Expected cached FitError, got nil")
+	}
+	cachedErr, ok := err.(*framework.FitError)
+	if !ok {
+		t.Fatalf("Expected *framework.FitError, got %T", err)
+	}
+	if cachedErr.NumAllNodes != 5 {
+		t.Errorf("Expected NumAllNodes=5, got %d", cachedErr.NumAllNodes)
+	}
+
+	// Step 3: Invalidate with matching event (Node Add)
+	q.invalidateFailureCache(fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add})
+	if len(q.failureCache) != 0 {
+		t.Errorf("Expected cache to be invalidated, got %d entries", len(q.failureCache))
+	}
+
+	// Step 4: Verify cache miss after invalidation
+	err = q.CheckFailureCache(podInfo)
+	if err != nil {
+		t.Errorf("Expected nil after invalidation, got %v", err)
+	}
+}

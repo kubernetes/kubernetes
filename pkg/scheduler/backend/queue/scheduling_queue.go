@@ -148,6 +148,14 @@ type SchedulingQueue interface {
 	UnschedulablePods() []*v1.Pod
 	// PendingPodGroupPods returns all the pending pods waiting for their pod groups.
 	PendingPodGroupPods() []*v1.Pod
+
+	// CheckFailureCache returns a cached scheduling failure if a pod with the same
+	// scheduling signature previously failed and the cache is still valid.
+	// Returns nil if no cached failure exists or the pod should not fast-fail.
+	CheckFailureCache(podInfo *framework.QueuedPodInfo) error
+	// CacheFailure stores a scheduling failure keyed by pod scheduling signature
+	// for future fast-fail of same-signature pods.
+	CacheFailure(signature fwk.PodSignature, fitError *framework.FitError)
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -214,6 +222,10 @@ type PriorityQueue struct {
 	isGenericWorkloadEnabled bool
 	// isOpportunisticBatchingEnabled indicates whether the OpportunisticBatching feature gate is enabled.
 	isOpportunisticBatchingEnabled bool
+	// isFailureCacheEnabled indicates whether the SchedulerFailureCache feature gate is enabled.
+	isFailureCacheEnabled bool
+	// failureCache caches scheduling failures keyed by PodSignature for fast-failing same-spec Pods.
+	failureCache map[string]*failureCacheEntry
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -229,6 +241,13 @@ type clusterEvent struct {
 	oldObj interface{}
 	// newObj is the object that involved this event.
 	newObj interface{}
+}
+
+// failureCacheEntry holds information about a scheduling failure for a specific PodSignature.
+type failureCacheEntry struct {
+	unschedulablePlugins sets.Set[string]
+	message              string
+	numAllNodes          int
 }
 
 type priorityQueueOptions struct {
@@ -385,6 +404,7 @@ func NewPriorityQueue(
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
 	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
 	isOpportunisticBatchingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
+	isFailureCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerFailureCache)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
@@ -405,6 +425,8 @@ func NewPriorityQueue(
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
 		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 		isOpportunisticBatchingEnabled:    isOpportunisticBatchingEnabled,
+		isFailureCacheEnabled:             isFailureCacheEnabled,
+		failureCache:                      make(map[string]*failureCacheEntry),
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -1404,6 +1426,8 @@ func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v
 // if Pop() is waiting for an entity, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
 func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+	p.invalidateFailureCache(event)
+
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		// Return early before iterating all entities in unschedulableEntities for preCheck.
@@ -1779,4 +1803,84 @@ func (p *PriorityQueue) newQueuedPodGroupInfo(podInfo *framework.QueuedPodInfo) 
 // queuedEntityKeyFunc returns a unique key for a queued entity based on its type, namespace, and name.
 func queuedEntityKeyFunc(obj framework.QueuedEntityInfo) string {
 	return fmt.Sprintf("%s/%s/%s", obj.Type(), obj.GetNamespace(), obj.GetName())
+}
+
+// CheckFailureCache returns a cached FitError if a pod with the same scheduling
+// signature previously failed scheduling and no relevant cluster events have
+// invalidated the cache entry since then.
+func (p *PriorityQueue) CheckFailureCache(podInfo *framework.QueuedPodInfo) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	if !p.isFailureCacheEnabled {
+		return nil
+	}
+	if podInfo.PodSignature == nil {
+		return nil
+	}
+	if len(podInfo.Pod.Status.NominatedNodeName) > 0 {
+		return nil
+	}
+
+	entry, ok := p.failureCache[string(podInfo.PodSignature)]
+	if !ok {
+		return nil
+	}
+
+	return &framework.FitError{
+		Pod:         podInfo.Pod,
+		NumAllNodes: entry.numAllNodes,
+		Diagnosis: framework.Diagnosis{
+			UnschedulablePlugins: entry.unschedulablePlugins,
+			PreFilterMsg:         entry.message,
+		},
+	}
+}
+
+// CacheFailure stores a scheduling failure keyed by pod scheduling signature.
+// Subsequent pods with the same signature will fast-fail without running the
+// full scheduling cycle, until a relevant cluster event invalidates the cache.
+func (p *PriorityQueue) CacheFailure(signature fwk.PodSignature, fitError *framework.FitError) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if !p.isFailureCacheEnabled || len(signature) == 0 {
+		return
+	}
+
+	key := string(signature)
+	if _, ok := p.failureCache[key]; ok {
+		return
+	}
+
+	p.failureCache[key] = &failureCacheEntry{
+		unschedulablePlugins: fitError.Diagnosis.UnschedulablePlugins,
+		message:              fitError.Diagnosis.PreFilterMsg,
+		numAllNodes:          fitError.NumAllNodes,
+	}
+}
+
+// invalidateFailureCache removes cached failures whose rejecting plugins are
+// interested in the given cluster event. Wildcard events clear the entire cache.
+func (p *PriorityQueue) invalidateFailureCache(event fwk.ClusterEvent) {
+	if !p.isFailureCacheEnabled || len(p.failureCache) == 0 {
+		return
+	}
+
+	if framework.ClusterEventIsWildCard(event) {
+		p.failureCache = make(map[string]*failureCacheEntry)
+		return
+	}
+
+	for sig, entry := range p.failureCache {
+		for pluginName := range entry.unschedulablePlugins {
+			for _, pluginEvent := range p.pluginToEventsMap[pluginName] {
+				if framework.MatchClusterEvents(pluginEvent, event) {
+					delete(p.failureCache, sig)
+					goto nextEntry
+				}
+			}
+		}
+	nextEntry:
+	}
 }
