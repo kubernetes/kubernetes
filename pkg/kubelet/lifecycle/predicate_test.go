@@ -152,6 +152,9 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
+			if !test.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableDRAExtendedResource)
 			nodeInfo := schedulerframework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
