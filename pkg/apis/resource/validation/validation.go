@@ -794,7 +794,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	if counterSet.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name")).MarkCoveredByDeclarative()...)
 	}
 	if len(counterSet.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
@@ -951,7 +951,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 	if len(deviceCounterConsumption.CounterSet) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet")).MarkCoveredByDeclarative()...)
 	}
 	if len(deviceCounterConsumption.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
