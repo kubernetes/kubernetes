@@ -76,7 +76,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(provisioner) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, provisioner)).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath, provisioner).MarkCoveredByDeclarative())
 	}
 	if len(provisioner) > 0 {
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
