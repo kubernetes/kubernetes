@@ -68,4 +68,8 @@ type SetByServerStruct struct {
 
 	// +k8s:subfield(setByServerField)=+k8s:optional
 	StructField SetByServerOtherStruct `json:"structField"`
+
+	// +k8s:subfield(setByServerField)=+k8s:optional
+	// +k8s:opaqueType
+	OpaqueStructField SetByServerOtherStruct `json:"opaqueStructField"`
 }

@@ -30,14 +30,21 @@ func Test(t *testing.T) {
 		StructField: SetByServerOtherStruct{
 			SetByServerField: "xyz",
 		},
+		OpaqueStructField: SetByServerOtherStruct{
+			SetByServerField: "xyz",
+		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
 
 	st.Value(&SetByServerStruct{
 		StructField: SetByServerOtherStruct{
 			SetByServerField: "",
 		},
+		OpaqueStructField: SetByServerOtherStruct{
+			SetByServerField: "",
+		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{
 		field.Required(field.NewPath("structField", "setByServerField"), ""),
+		field.Required(field.NewPath("opaqueStructField", "setByServerField"), ""),
 	})
 
 	st.Value(&Struct{

@@ -112,6 +112,39 @@ func Validate_SetByServerStruct(
 		errs = append(errs, fn(fldPath.Child("structField"), &obj.StructField, oldVal, oldObj != nil)...)
 	}
 
+	{ // field SetByServerStruct.OpaqueStructField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *SetByServerOtherStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "setByServerField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "setByServerField",
+					func(o *SetByServerOtherStruct) *string { return &o.SetByServerField }, validate.DirectEqualPtr, // optional fields set by the server are effectively required
+					validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *SetByServerOtherStruct {
+				return &oldObj.OpaqueStructField
+			})
+		errs = append(errs, fn(fldPath.Child("opaqueStructField"), &obj.OpaqueStructField, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
