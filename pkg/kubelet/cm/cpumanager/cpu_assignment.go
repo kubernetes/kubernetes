@@ -890,7 +890,7 @@ func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, av
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
-func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, minNUMAHint int) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
@@ -916,6 +916,18 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
 	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize)
+
+	// If the TopologyManager selected a specific NUMA affinity, honor it by
+	// ensuring we distribute across at least that many NUMA nodes. This
+	// prevents CPUManager from shrinking a multi-NUMA affinity back to fewer
+	// nodes than what TopologyManager intended (e.g., for GPU/NIC alignment).
+	if minNUMAHint > 0 {
+		if minNUMAHint > minNUMAs && minNUMAHint <= maxNUMAs {
+			minNUMAs = minNUMAHint
+		} else if minNUMAHint > maxNUMAs {
+			logger.V(4).Info("NUMA affinity hint exceeds maximum feasible NUMA count, ignoring", "minNUMAHint", minNUMAHint, "maxNUMAs", maxNUMAs)
+		}
+	}
 
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
 	// where we can evenly distribute CPUs across them. To optimize things, we

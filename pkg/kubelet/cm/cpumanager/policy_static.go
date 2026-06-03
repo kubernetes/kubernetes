@@ -167,7 +167,7 @@ func NewStaticPolicy(logger logr.Logger, topology *topology.CPUTopology, numRese
 		//
 		// For example: Given a system with 8 CPUs available and HT enabled,
 		// if numReservedCPUs=2, then reserved={0,4}
-		reserved, _ = policy.takeByTopology(logger, allCPUs, numReservedCPUs)
+		reserved, _ = policy.takeByTopology(logger, allCPUs, numReservedCPUs, 0)
 	}
 
 	if reserved.Size() != numReservedCPUs {
@@ -444,7 +444,7 @@ func (p *staticPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Po
 			// The pool available for this init container is the entire pod allocation
 			// minus what's already taken by sidecars.
 			runnablePool := podAllocation.CPUs.Difference(sidecarCPUs)
-			cset, err := p.takeByTopology(logger, runnablePool, numCPUs)
+			cset, err := p.takeByTopology(logger, runnablePool, numCPUs, 0)
 			if err != nil {
 				return err
 			}
@@ -477,7 +477,7 @@ func (p *staticPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Po
 	for _, c := range pod.Spec.Containers {
 		if numCPUs := p.guaranteedCPUs(logger, pod, &c); numCPUs > 0 {
 			metrics.CPUManagerPinningRequestsTotal.Inc()
-			cset, err := p.takeByTopology(logger, podSharedPool, numCPUs)
+			cset, err := p.takeByTopology(logger, podSharedPool, numCPUs, 0)
 			if err != nil {
 				return err
 			}
@@ -687,7 +687,7 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 			numAlignedToAlloc = numCPUs
 		}
 
-		allocatedCPUs, err := p.takeByTopology(logger, alignedCPUs, numAlignedToAlloc)
+		allocatedCPUs, err := p.takeByTopology(logger, alignedCPUs, numAlignedToAlloc, numaAffinity.Count())
 		if err != nil {
 			return topology.EmptyAllocation(), err
 		}
@@ -696,7 +696,7 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-	remainingCPUs, err := p.takeByTopology(logger, allocatableCPUs.Difference(result.CPUs), numCPUs-result.CPUs.Size())
+	remainingCPUs, err := p.takeByTopology(logger, allocatableCPUs.Difference(result.CPUs), numCPUs-result.CPUs.Size(), 0)
 	if err != nil {
 		return topology.EmptyAllocation(), err
 	}
@@ -794,7 +794,7 @@ func (p *staticPolicy) podGuaranteedCPUs(logger logr.Logger, pod *v1.Pod) int {
 	return requestedByLongRunningContainers
 }
 
-func (p *staticPolicy) takeByTopology(logger logr.Logger, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+func (p *staticPolicy) takeByTopology(logger logr.Logger, availableCPUs cpuset.CPUSet, numCPUs int, minNUMAHint int) (cpuset.CPUSet, error) {
 	cpuSortingStrategy := CPUSortingStrategyPacked
 	if p.options.DistributeCPUsAcrossCores {
 		cpuSortingStrategy = CPUSortingStrategySpread
@@ -805,7 +805,7 @@ func (p *staticPolicy) takeByTopology(logger logr.Logger, availableCPUs cpuset.C
 		if p.options.FullPhysicalCPUsOnly {
 			cpuGroupSize = p.cpuGroupSize
 		}
-		return takeByTopologyNUMADistributed(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy)
+		return takeByTopologyNUMADistributed(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy, minNUMAHint)
 	}
 
 	return takeByTopologyNUMAPacked(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption)
