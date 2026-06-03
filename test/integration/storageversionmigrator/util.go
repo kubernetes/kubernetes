@@ -257,7 +257,7 @@ type svmTest struct {
 	filePathForEncryptionConfig string
 }
 
-func svmSetup(ctx context.Context, t *testing.T) *svmTest {
+func svmSetup(ctx context.Context, t *testing.T, allowedCodes ...int32) *svmTest {
 	t.Helper()
 
 	filePathForEncryptionConfig, err := createEncryptionConfig(t, resources["initialEncryptionConfig"])
@@ -315,18 +315,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 	}
 
 	t.Cleanup(func() {
-		var validCodes = sets.New[int32](http.StatusOK, http.StatusConflict) // make sure SVM controller never creates
-		_ = svmTest.countMatchingAuditEvents(t, func(event utils.AuditEvent) bool {
-			if event.User != "system:serviceaccount:kube-system:storage-version-migrator-controller" {
-				return false
-			}
-			if !validCodes.Has(event.Code) {
-				t.Errorf("svm controller had invalid response code for event: %#v", event)
-				return true
-			}
-			return false
-		})
-
+		svmTest.assertNoInvalidSVMControllerResponses(t, allowedCodes...)
 		kcm.TearDownFn()
 		server.TearDownFn()
 		utiltesting.CloseAndRemove(t, svmTest.logFile)
@@ -350,6 +339,26 @@ func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) st
 		t.Fatal(err)
 	}
 	return kubeConfigFile
+}
+
+// assertNoInvalidSVMControllerResponses checks that the SVM controller only received
+// expected HTTP response codes. Pass allowedCodes to permit codes beyond OK and Conflict.
+func (svm *svmTest) assertNoInvalidSVMControllerResponses(t *testing.T, allowedCodes ...int32) {
+	t.Helper()
+	validCodes := sets.New[int32](http.StatusOK, http.StatusConflict)
+	for _, code := range allowedCodes {
+		validCodes.Insert(code)
+	}
+	_ = svm.countMatchingAuditEvents(t, func(event utils.AuditEvent) bool {
+		if event.User != "system:serviceaccount:kube-system:storage-version-migrator-controller" {
+			return false
+		}
+		if !validCodes.Has(event.Code) {
+			t.Errorf("svm controller had invalid response code for event: %#v", event)
+			return true
+		}
+		return false
+	})
 }
 
 func createEncryptionConfig(t *testing.T, encryptionConfig string) (
