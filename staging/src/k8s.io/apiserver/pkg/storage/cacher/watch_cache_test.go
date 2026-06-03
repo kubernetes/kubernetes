@@ -1314,7 +1314,7 @@ func TestCacheSnapshots(t *testing.T) {
 	assert.False(t, found, "Expected store to not include rev 99")
 	lister, found := s.snapshots.GetLessOrEqual(100)
 	assert.True(t, found, "Expected store to not include rev 100")
-	elements := lister.ListPrefix("", "")
+	elements := lister.OrderedListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 100), elements[0].(*store.Element).Object)
 
@@ -1326,20 +1326,20 @@ func TestCacheSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 200")
 	lister, found = s.snapshots.GetLessOrEqual(200)
 	assert.True(t, found, "Expected store to still keep rev 200")
-	elements = lister.ListPrefix("", "")
+	elements = lister.OrderedListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 200), elements[0].(*store.Element).Object)
 
 	t.Log("Test cache on rev 300")
 	lister, found = s.snapshots.GetLessOrEqual(300)
 	assert.True(t, found, "Expected store to still keep rev 300")
-	elements = lister.ListPrefix("", "")
+	elements = lister.OrderedListPrefix("", "")
 	assert.Empty(t, elements)
 
 	t.Log("Test cache on rev 400")
 	lister, found = s.snapshots.GetLessOrEqual(400)
 	assert.True(t, found, "Expected store to still keep rev 400")
-	elements = lister.ListPrefix("", "")
+	elements = lister.OrderedListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 400), elements[0].(*store.Element).Object)
 
@@ -1355,7 +1355,7 @@ func TestCacheSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 500")
 	lister, found = s.snapshots.GetLessOrEqual(500)
 	assert.True(t, found, "Expected store to still keep rev 500")
-	elements = lister.ListPrefix("", "")
+	elements = lister.OrderedListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 500), elements[0].(*store.Element).Object)
 
@@ -1367,7 +1367,7 @@ func TestCacheSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 600")
 	lister, found = s.snapshots.GetLessOrEqual(600)
 	assert.True(t, found, "Expected replace to be snapshotted")
-	elements = lister.ListPrefix("", "")
+	elements = lister.OrderedListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
 
@@ -1384,7 +1384,7 @@ func TestCacheSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 700")
 	lister, found = s.snapshots.GetLessOrEqual(700)
 	assert.True(t, found, "Expected replace to be snapshotted")
-	elements = lister.ListPrefix("", "")
+	elements = lister.OrderedListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
 }

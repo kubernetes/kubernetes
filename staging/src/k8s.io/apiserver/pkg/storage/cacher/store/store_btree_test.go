@@ -41,30 +41,30 @@ func TestStoreListPrefix(t *testing.T) {
 	assert.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
 	assert.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
 
-	items := store.ListPrefix("foo", "")
+	items := store.OrderedListPrefix("foo", "")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items = store.ListPrefix("foo2", "")
+	items = store.OrderedListPrefix("foo2", "")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 	}, items)
 
-	items = store.ListPrefix("foo", "foo1\x00")
+	items = store.OrderedListPrefix("foo", "foo1\x00")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items = store.ListPrefix("foo", "foo2\x00")
+	items = store.OrderedListPrefix("foo", "foo2\x00")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items = store.ListPrefix("bar", "")
+	items = store.OrderedListPrefix("bar", "")
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
 	}, items)
@@ -133,7 +133,7 @@ func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
 func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Clone() OrderedLister         { return f }
-func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface{} {
+func (f fakeOrderedLister) OrderedListPrefix(prefixKey, continueKey string) []interface{} {
 	return nil
 }
 func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }

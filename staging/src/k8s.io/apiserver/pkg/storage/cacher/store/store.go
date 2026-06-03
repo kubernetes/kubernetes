@@ -58,6 +58,11 @@ const (
 	btreeDegree = 16
 )
 
+type OrderedIndexer interface {
+	Indexer
+	OrderedLister
+}
+
 type Indexer interface {
 	Add(obj interface{}) error
 	Update(obj interface{}) error
@@ -71,12 +76,12 @@ type Indexer interface {
 }
 
 type OrderedLister interface {
-	ListPrefix(prefix, continueKey string) []interface{}
+	OrderedListPrefix(prefix, continueKey string) []interface{}
 	Count(prefix, continueKey string) (count int)
 	Clone() OrderedLister
 }
 
-func NewIndexer(indexers *cache.Indexers) Indexer {
+func NewIndexer(indexers *cache.Indexers) OrderedIndexer {
 	return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
 }
 
