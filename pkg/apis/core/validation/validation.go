@@ -6452,6 +6452,50 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 	newPodSpecCopy.InitContainers = newInitContainers
 
+	// Part 5: Validate that the changes between oldPod.Spec.Volumes and
+	// newPod.Spec.Volumes are allowed. Only sizeLimit of memory-backed emptyDir volumes is mutable on resize.
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		if len(newPod.Spec.Volumes) != len(oldPod.Spec.Volumes) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("volumes"), "volumes may not be added or removed on resize"))
+		} else {
+			for i, newVol := range newPod.Spec.Volumes {
+				oldVol := oldPod.Spec.Volumes[i]
+				volPath := field.NewPath("spec").Child("volumes").Index(i)
+				if newVol.Name != oldVol.Name {
+					allErrs = append(allErrs, field.Forbidden(volPath.Child("name"), "volumes may not be renamed or reordered on resize"))
+					continue
+				}
+				// We need to compare everything except EmptyDir.SizeLimit
+				newVolCopy := newVol.DeepCopy()
+				oldVolCopy := oldVol.DeepCopy()
+				if newVolCopy.EmptyDir != nil && oldVolCopy.EmptyDir != nil {
+					newVolCopy.EmptyDir.SizeLimit = oldVolCopy.EmptyDir.SizeLimit // +k8s:verify-mutation:reason=clone
+				}
+				if !apiequality.Semantic.DeepEqual(newVolCopy, oldVolCopy) {
+					allErrs = append(allErrs, field.Forbidden(volPath, "only sizeLimit of memory-backed emptyDir volumes is mutable on resize"))
+					continue
+				}
+				// If it is emptyDir, check mutable constraints
+				if newVol.EmptyDir != nil && oldVol.EmptyDir != nil {
+					hasOldLimit := oldVol.EmptyDir.SizeLimit != nil && !oldVol.EmptyDir.SizeLimit.IsZero()
+					hasNewLimit := newVol.EmptyDir.SizeLimit != nil && !newVol.EmptyDir.SizeLimit.IsZero()
+					if hasOldLimit != hasNewLimit {
+						allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "adding or removing sizeLimit on an existing volume is not allowed"))
+					} else if oldVol.EmptyDir.SizeLimit != nil && newVol.EmptyDir.SizeLimit != nil {
+						if oldVol.EmptyDir.SizeLimit.Cmp(*newVol.EmptyDir.SizeLimit) != 0 {
+							if newVol.EmptyDir.Medium != core.StorageMediumMemory {
+								allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "sizeLimit is only mutable for memory-backed emptyDir volumes"))
+							}
+						}
+					}
+				}
+			}
+		}
+		newPodSpecCopy.Volumes = oldPod.Spec.Volumes // +k8s:verify-mutation:reason=clone
+	} else if !apiequality.Semantic.DeepEqual(newPod.Spec.Volumes, oldPod.Spec.Volumes) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("volumes"), "volumes are immutable on resize when InPlacePodVerticalScalingMemoryBackedVolumes feature gate is disabled"))
+	}
+
 	if len(allErrs) > 0 {
 		return allErrs
 	}

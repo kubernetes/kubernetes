@@ -3032,10 +3032,11 @@ func (w *warningRecorder) AddWarning(_, text string) {
 func TestPodResizePrepareForUpdate(t *testing.T) {
 	containerRestartPolicyAlways := api.ContainerRestartPolicyAlways
 	tests := []struct {
-		name     string
-		oldPod   *api.Pod
-		newPod   *api.Pod
-		expected *api.Pod
+		name         string
+		oldPod       *api.Pod
+		newPod       *api.Pod
+		expected     *api.Pod
+		featureGates map[featuregate.Feature]bool
 	}{
 		{
 			name: "no resize",
@@ -3659,13 +3660,271 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 				)),
 			),
 		},
+		{
+			name: "InPlacePodVerticalScalingMemoryBackedVolumes disabled: sizeLimit updates are dropped/reverted",
+			featureGates: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScalingMemoryBackedVolumes: false,
+			},
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+				podtest.SetGeneration(1),
+			),
+		},
+		{
+			name: "InPlacePodVerticalScalingMemoryBackedVolumes enabled: valid sizeLimit updates are preserved",
+			featureGates: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+			},
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+				podtest.SetGeneration(2),
+			),
+		},
+		{
+			name: "InPlacePodVerticalScalingMemoryBackedVolumes enabled: other volume changes are dropped/reverted",
+			featureGates: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+			},
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumDefault,
+									SizeLimit: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+				podtest.SetGeneration(2),
+			),
+		},
+		{
+			name: "InPlacePodVerticalScalingMemoryBackedVolumes enabled: count mismatch (add/remove) is not dropNonResize but left as-is for validation to catch",
+			featureGates: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+			},
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetGeneration(1),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "vol-2",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1")),
+				func(pod *api.Pod) {
+					pod.Spec.Volumes = []api.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "vol-2",
+							VolumeSource: api.VolumeSource{
+								EmptyDir: &api.EmptyDirVolumeSource{
+									Medium:    api.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+								},
+							},
+						},
+					}
+				},
+				podtest.SetGeneration(2),
+			),
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.InPlacePodVerticalScaling: true,
-			})
+			for gate, val := range tc.featureGates {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, map[featuregate.Feature]bool{gate: val})
+			}
 			ctx := context.Background()
 			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {

@@ -1015,15 +1015,43 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus.ExtendedResourceClaimStatus = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
-		for i := range podStatus.ContainerStatuses {
-			podStatus.ContainerStatuses[i].VolumeMounts = nil
+	dropRRO := !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec)
+	dropImageVolume := !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && !imageVolumeWithDigestInUse(oldPodStatus)
+	dropEmptyDirResize := !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && !memoryBackedVolumesResizeInUse(oldPodStatus)
+
+	allContainerStatuses := [][]api.ContainerStatus{
+		podStatus.ContainerStatuses,
+		podStatus.InitContainerStatuses,
+		podStatus.EphemeralContainerStatuses,
+	}
+
+	if dropRRO && dropImageVolume && dropEmptyDirResize {
+		for _, cs := range allContainerStatuses {
+			for i := range cs {
+				cs[i].VolumeMounts = nil
+			}
 		}
-		for i := range podStatus.InitContainerStatuses {
-			podStatus.InitContainerStatuses[i].VolumeMounts = nil
-		}
-		for i := range podStatus.EphemeralContainerStatuses {
-			podStatus.EphemeralContainerStatuses[i].VolumeMounts = nil
+	} else if dropRRO || dropImageVolume || dropEmptyDirResize {
+		for _, cs := range allContainerStatuses {
+			for i := range cs {
+				vms := cs[i].VolumeMounts
+				for j := range vms {
+					if dropRRO {
+						vms[j].RecursiveReadOnly = nil
+					}
+					if vms[j].VolumeStatus != nil {
+						if dropImageVolume {
+							vms[j].VolumeStatus.Image = nil
+						}
+						if dropEmptyDirResize {
+							vms[j].VolumeStatus.EmptyDir = nil
+						}
+						if vms[j].VolumeStatus.Image == nil && vms[j].VolumeStatus.EmptyDir == nil {
+							vms[j].VolumeStatus = nil
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -1072,12 +1100,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && !imageVolumeWithDigestInUse(oldPodStatus) {
-		dropImageVolumeWithDigest(podStatus)
-	}
-
 	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
-
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1934,60 +1957,37 @@ func restartAllContainersActionInUse(oldPodSpec *api.PodSpec) bool {
 	return false
 }
 
-func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
+func volumeStatusFieldInUse(oldPodStatus *api.PodStatus, check func(*api.VolumeStatus) bool) bool {
 	if oldPodStatus == nil {
 		return false
 	}
-
-	for _, containerStatus := range oldPodStatus.ContainerStatuses {
-		for _, volumeMount := range containerStatus.VolumeMounts {
-			if volumeMount.VolumeStatus != nil {
-				return true
+	allStatuses := [][]api.ContainerStatus{
+		oldPodStatus.ContainerStatuses,
+		oldPodStatus.InitContainerStatuses,
+		oldPodStatus.EphemeralContainerStatuses,
+	}
+	for _, csl := range allStatuses {
+		for i := range csl {
+			for j := range csl[i].VolumeMounts {
+				if status := csl[i].VolumeMounts[j].VolumeStatus; status != nil && check(status) {
+					return true
+				}
 			}
 		}
 	}
-
-	for _, containerStatus := range oldPodStatus.InitContainerStatuses {
-		for _, volumeMount := range containerStatus.VolumeMounts {
-			if volumeMount.VolumeStatus != nil {
-				return true
-			}
-		}
-	}
-
-	for _, containerStatus := range oldPodStatus.EphemeralContainerStatuses {
-		for _, volumeMount := range containerStatus.VolumeMounts {
-			if volumeMount.VolumeStatus != nil {
-				return true
-			}
-		}
-	}
-
 	return false
 }
 
-func dropImageVolumeWithDigest(podStatus *api.PodStatus) {
-	if podStatus == nil {
-		return
-	}
+func imageVolumeWithDigestInUse(oldPodStatus *api.PodStatus) bool {
+	return volumeStatusFieldInUse(oldPodStatus, func(status *api.VolumeStatus) bool {
+		return status.Image != nil
+	})
+}
 
-	for i := range podStatus.ContainerStatuses {
-		for j := range podStatus.ContainerStatuses[i].VolumeMounts {
-			podStatus.ContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
-		}
-	}
-
-	for i := range podStatus.InitContainerStatuses {
-		for j := range podStatus.InitContainerStatuses[i].VolumeMounts {
-			podStatus.InitContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
-		}
-	}
-
-	for i := range podStatus.EphemeralContainerStatuses {
-		for j := range podStatus.EphemeralContainerStatuses[i].VolumeMounts {
-			podStatus.EphemeralContainerStatuses[i].VolumeMounts[j].VolumeStatus = nil
-		}
-	}
+func memoryBackedVolumesResizeInUse(oldPodStatus *api.PodStatus) bool {
+	return volumeStatusFieldInUse(oldPodStatus, func(status *api.VolumeStatus) bool {
+		return status.EmptyDir != nil
+	})
 }
 
 // hasRestartContainerForNonSidecarInitContainer returns true if any non-sidecar init container

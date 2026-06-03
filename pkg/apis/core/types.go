@@ -3225,6 +3225,21 @@ type VolumeStatus struct {
 	// +featureGate=ImageVolumeWithDigest
 	// +optional
 	Image *ImageVolumeStatus
+
+	// emptyDir represents the status of an emptyDir volume.
+	// This is only populated for memory-backed emptyDir volumes.
+	// +featureGate=InPlacePodVerticalScalingMemoryBackedVolumes
+	// +optional
+	EmptyDir *EmptyDirVolumeStatus
+}
+
+// EmptyDirVolumeStatus represents the status of an emptyDir volume.
+type EmptyDirVolumeStatus struct {
+	// sizeLimit represents the actual mounted capacity of the emptyDir volume.
+	// This is only populated for memory-backed emptyDir volumes.
+	// +featureGate=InPlacePodVerticalScalingMemoryBackedVolumes
+	// +optional
+	SizeLimit *resource.Quantity
 }
 
 type ImageVolumeStatus struct {
