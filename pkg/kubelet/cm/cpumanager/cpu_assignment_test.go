@@ -1063,7 +1063,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false, 0)
 			if err != nil {
 				if tc.expErr == "" {
 					t.Errorf("unexpected error [%v]", err)
@@ -1086,4 +1086,169 @@ func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
 		t.Errorf("parsing %q: %v", s, err)
 	}
 	return cpus
+}
+
+func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
+	// This test verifies the fix for https://github.com/kubernetes/kubernetes/issues/139430
+	// When TopologyManager selects a 4-NUMA affinity (e.g., for GPU alignment),
+	// CPUManager should not shrink the allocation to fewer NUMA nodes even if
+	// fewer nodes could satisfy the CPU count.
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		description      string
+		topo             *topology.CPUTopology
+		availableCPUs    cpuset.CPUSet
+		numCPUs          int
+		cpuGroupSize     int
+		alignBySocket    bool
+		minNUMAsFromHint int
+		expNUMAs         int // expected number of NUMA nodes in result
+	}{
+		{
+			// 4 NUMA nodes, 20 CPUs each (80 total). Request 30 CPUs.
+			// Without hint: minNUMAs=2 (30 fits in 2 NUMAs of 20 each)
+			// With hint=4: must use all 4 NUMAs
+			description:      "30 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 4,
+			expNUMAs:         4,
+		},
+		{
+			// Same topology, no hint (0) → should use minimum NUMAs (2)
+			description:      "30 CPUs without hint should pack into minimum NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 0,
+			expNUMAs:         2,
+		},
+		{
+			// 4 NUMA hint but only need 10 CPUs (fits in 1 NUMA)
+			// hint=4 should still force 4-NUMA distribution
+			description:      "10 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          10,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 4,
+			expNUMAs:         4,
+		},
+		{
+			// Regression guard: hint exceeds available NUMA nodes (8 > 4).
+			// Should gracefully fall back to the original algorithm behavior
+			// (minimum NUMAs needed) without panicking or erroring.
+			description:      "hint exceeds max NUMAs should fallback to minimum (regression guard)",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 8,
+			expNUMAs:         2,
+		},
+		{
+			// Regression guard: hint smaller than computed minNUMAs.
+			// 30 CPUs on 4x20 topology → minNUMAs=2. hint=1 is below that.
+			// Should NOT reduce below the computed minimum; keeps original behavior.
+			description:      "hint smaller than minNUMAs should not reduce distribution (regression guard)",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 1,
+			expNUMAs:         2,
+		},
+		{
+			// cpuGroupSize=2 with 4-NUMA hint: verifies that CPU grouping
+			// constraint is compatible with NUMA hint enforcement.
+			// 20 CPUs with groups of 2 across 4 NUMAs → 5 CPUs per NUMA (valid).
+			description:      "cpuGroupSize=2 with 4-NUMA hint should distribute respecting group size",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          20,
+			cpuGroupSize:     2,
+			minNUMAsFromHint: 4,
+			expNUMAs:         4,
+		},
+		{
+			// cpuGroupSize=2 without hint: should use minimum NUMAs.
+			// 20 CPUs with groups of 2 on 4x20 topology → fits in 1 NUMA.
+			description:      "cpuGroupSize=2 without hint should pack into minimum NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          20,
+			cpuGroupSize:     2,
+			minNUMAsFromHint: 0,
+			expNUMAs:         1,
+		},
+		{
+			// alignBySocket=true with 4-NUMA hint: verifies that socket alignment
+			// is compatible with NUMA hint enforcement. Topology has 2 sockets
+			// with 2 NUMAs each; hint=4 means all NUMAs across both sockets.
+			description:      "alignBySocket=true with 4-NUMA hint should distribute across all NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          40,
+			cpuGroupSize:     1,
+			alignBySocket:    true,
+			minNUMAsFromHint: 4,
+			expNUMAs:         4,
+		},
+		{
+			// NUMA subset constraint: availableCPUs only contains CPUs from
+			// NUMA 1,2,3 (not NUMA 0). This simulates the real scenario where
+			// TopologyManager's alignedCPUs pre-filters the input pool to only
+			// the NUMA nodes selected by device affinity. With hint=3, the
+			// allocation should distribute across exactly 3 NUMAs (1,2,3) and
+			// must NOT allocate any CPU from NUMA 0 (which is not in the pool).
+			// This proves the NUMA-subset constraint is enforced by input
+			// filtering (alignedCPUs) rather than needing the full bitmask.
+			// Actual NUMA-CPU mapping for topoDualSocketMultiNumaPerSocketHT:
+			// NUMA 0: CPU 0-9, 40-49 (Socket 0)
+			// NUMA 1: CPU 10-19, 50-59 (Socket 0)
+			// NUMA 2: CPU 20-29, 60-69 (Socket 1)
+			// NUMA 3: CPU 30-39, 70-79 (Socket 1)
+			description:      "NUMA subset - hint=3 with CPUs only from NUMA 1,2,3 should not use NUMA 0",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "10-39,50-79"), // NUMA 1(10-19,50-59) + NUMA 2(20-29,60-69) + NUMA 3(30-39,70-79)
+			numCPUs:          15,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 3,
+			expNUMAs:         3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.alignBySocket, tc.minNUMAsFromHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Count how many distinct NUMA nodes are represented in the result
+			numaNodes := make(map[int]bool)
+			for _, cpuID := range result.UnsortedList() {
+				numaNodes[tc.topo.CPUDetails[cpuID].NUMANodeID] = true
+			}
+
+			if len(numaNodes) != tc.expNUMAs {
+				t.Errorf("expected CPUs distributed across %d NUMA nodes, got %d (NUMAs: %v, result: %s)",
+					tc.expNUMAs, len(numaNodes), numaNodes, result)
+			}
+
+			// Additional assertion for NUMA subset test: verify no NUMA 0 CPUs which is filtered by getAlignedCPUsFilters
+			if tc.description == "NUMA subset - hint=3 with CPUs only from NUMA 1,2,3 should not use NUMA 0" {
+				for _, cpuID := range result.UnsortedList() {
+					if tc.topo.CPUDetails[cpuID].NUMANodeID == 0 {
+						t.Errorf("CPU %d belongs to NUMA 0 but should not be allocated (NUMA 0 is not in availableCPUs), result: %s",
+							cpuID, result)
+					}
+				}
+			}
+		})
+	}
 }
