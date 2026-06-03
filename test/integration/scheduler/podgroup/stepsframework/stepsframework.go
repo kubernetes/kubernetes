@@ -135,6 +135,15 @@ type Step struct {
 	DeletePods []string
 	// UpdatePod is used to mutate any field of the pod.
 	UpdatePod *UpdatePod
+	// UpdatePodStatus is used to mutate the status subresource of the pod,
+	// such as NominatedNodeName, which UpdatePod cannot touch.
+	UpdatePodStatus *UpdatePod
+	// WaitForPodsNominated waits until the named pods, while pending for their
+	// pod group, carry the expected NominatedNodeName in the scheduling queue.
+	// Keyed by pod name -> expected NominatedNodeName. This is a queue-level
+	// barrier (not just informer cache) so a following step can rely on the
+	// scheduler reading the nominated node during the placement cycle.
+	WaitForPodsNominated map[string]string
 	// WaitForPodsInActiveQ is used to check if the pods are present in ActiveQ.
 	WaitForPodsInActiveQ []string
 	// WaitForPodsInUnschedulableEntities is use to wait for pods to be in unschedulableEntities.
@@ -277,6 +286,41 @@ func updatePod(testCtx *testutils.TestContext, ns string, update *UpdatePod) err
 	_, err = cs.CoreV1().Pods(ns).Update(testCtx.Ctx, p, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update pod %s: %w", update.PodName, err)
+	}
+	return nil
+}
+
+func updatePodStatus(testCtx *testutils.TestContext, ns string, update *UpdatePod) error {
+	cs := testCtx.ClientSet
+	p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, update.PodName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get pod %s for status update: %w", update.PodName, err)
+	}
+	update.ModifyFn(p)
+	_, err = cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, p, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update status of pod %s: %w", update.PodName, err)
+	}
+	return nil
+}
+
+func waitForPodsNominated(testCtx *testutils.TestContext, nominated map[string]string) error {
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			pods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			got := make(map[string]string)
+			for _, p := range pods {
+				got[p.Name] = p.Status.NominatedNodeName
+			}
+			for name, want := range nominated {
+				if got[name] != want {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err != nil {
+		return fmt.Errorf("failed to wait for pods %v to be nominated in the scheduling queue: %w", nominated, err)
 	}
 	return nil
 }
@@ -461,6 +505,10 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = deletePods(testCtx, ns, step.DeletePods)
 		case step.UpdatePod != nil:
 			err = updatePod(testCtx, ns, step.UpdatePod)
+		case step.UpdatePodStatus != nil:
+			err = updatePodStatus(testCtx, ns, step.UpdatePodStatus)
+		case step.WaitForPodsNominated != nil:
+			err = waitForPodsNominated(testCtx, step.WaitForPodsNominated)
 		case step.WaitForPodsInActiveQ != nil:
 			err = waitForPodsInActiveQ(testCtx, step.WaitForPodsInActiveQ)
 		case step.WaitForPodsInUnschedulableEntities != nil:

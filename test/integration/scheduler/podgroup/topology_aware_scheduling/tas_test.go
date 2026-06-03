@@ -1327,6 +1327,70 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	}
 }
 
+// TestTopologyAwareSchedulingRespectsNominatedNode verifies that when two
+// placements (racks) tie on PodGroupPodsCount, the gang lands on the rack that
+// matches the pods' NominatedNodeName. The core scheduler breaks the score tie in
+// favor of the placement honoring the most nominated nodes, so the nominated rack
+// wins; the random tiebreak only applies among equally-honored placements.
+func TestTopologyAwareSchedulingRespectsNominatedNode(t *testing.T) {
+	tt := scenario{
+		name: "gang prefers the rack matching the pods' nominated node",
+		steps: []stepsframework.Step{
+			{
+				Name: "Create one node per rack; each rack fits the whole gang, so both placements tie on pods count",
+				CreateNodes: []*v1.Node{
+					makeNode("node-rack1", "rack-1", "zone-1"),
+					makeNode("node-rack2", "rack-2", "zone-1"),
+				},
+			},
+			{
+				Name: "Create the gang pods before the PodGroup, so they wait gated in the queue",
+				CreatePods: []*v1.Pod{
+					makePod("p1", "pg1"),
+					makePod("p2", "pg1"),
+				},
+			},
+			{
+				Name: "Nominate rack-2 for p1 via its status",
+				UpdatePodStatus: &stepsframework.UpdatePod{
+					PodName:  "p1",
+					ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+				},
+			},
+			{
+				Name: "Nominate rack-2 for p2 via its status",
+				UpdatePodStatus: &stepsframework.UpdatePod{
+					PodName:  "p2",
+					ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+				},
+			},
+			{
+				Name: "Wait until the queued pods carry the nominated node before opening the gate",
+				WaitForPodsNominated: map[string]string{
+					"p1": "node-rack2",
+					"p2": "node-rack2",
+				},
+			},
+			{
+				Name:           "Create the PodGroup (gang, minCount=2), opening the gate",
+				CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+			},
+			{
+				Name:                 "Verify the gang is scheduled",
+				WaitForPodsScheduled: []string{"p1", "p2"},
+			},
+			{
+				Name: "Verify the gang landed on rack-2, the nominated rack",
+				VerifyAssignments: &stepsframework.VerifyAssignments{
+					Pods:  []string{"p1", "p2"},
+					Nodes: sets.New("node-rack2"),
+				},
+			},
+		},
+	}
+	runTestScenario(t, tt, true)
+}
+
 func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload:                 true,

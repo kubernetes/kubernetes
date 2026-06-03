@@ -723,15 +723,52 @@ func (sched *Scheduler) findBestPlacement(ctx context.Context, schedFwk framewor
 		}
 	}
 
-	bestScore := &scores[0]
-	for _, score := range scores[1:] {
-		if score.TotalScore > bestScore.TotalScore ||
-			score.TotalScore == bestScore.TotalScore &&
-				score.Randomizer > bestScore.Randomizer {
-			bestScore = &score
+	// Respect NominatedNodeName as a tiebreak: among placements that score equally, prefer
+	// the one that lands the most pods on their nominated nodes. A gang fits every feasible
+	// placement, so its pod counts tie and this decides. Pod count still dominates, so
+	// honoring NNN never costs scheduled pods.
+	honoredNNN := make(map[*fwk.Placement]int, len(successfulResults))
+	for placement, result := range successfulResults {
+		honoredNNN[placement] = nominatedNodesHonored(result)
+	}
+
+	best := 0
+	for i := 1; i < len(scores); i++ {
+		if morePreferredPlacement(scores[i], scores[best], honoredNNN) {
+			best = i
 		}
 	}
-	return bestScore.Placement, nil
+	return scores[best].Placement, nil
+}
+
+// morePreferredPlacement reports whether candidate should be chosen over current.
+// Total score dominates; NominatedNodeName matches break ties, then the randomizer.
+func morePreferredPlacement(candidate, current fwk.PlacementPluginScores, honoredNNN map[*fwk.Placement]int) bool {
+	if candidate.TotalScore != current.TotalScore {
+		return candidate.TotalScore > current.TotalScore
+	}
+	if cn, bn := honoredNNN[candidate.Placement], honoredNNN[current.Placement]; cn != bn {
+		return cn > bn
+	}
+	return candidate.Randomizer > current.Randomizer
+}
+
+// nominatedNodesHonored counts how many of a placement's pods are actually scheduled on
+// their NominatedNodeName. Pods that only reach their nominated node via preemption are
+// not counted: like pod-by-pod scheduling, NNN is honored only when the pod is feasible
+// there now, so a placement that must preempt to use the NNN doesn't outrank a feasible one.
+func nominatedNodesHonored(result *podGroupAlgorithmResult) int {
+	honored := 0
+	for i := range result.podResults {
+		pr := &result.podResults[i]
+		if pr.requiresPreemption {
+			continue
+		}
+		if nnn := pr.pod.Status.NominatedNodeName; nnn != "" && pr.GetNodeName() == nnn {
+			honored++
+		}
+	}
+	return honored
 }
 
 func makePodGroupAssignments(successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) ([]*fwk.PodGroupAssignments, []fwk.PlacementCycleState) {
