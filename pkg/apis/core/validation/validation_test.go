@@ -28511,12 +28511,18 @@ func TestValidatePodResize(t *testing.T) {
 			}))
 	}
 
+	quantityPtr := func(val string) *resource.Quantity {
+		q := resource.MustParse(val)
+		return &q
+	}
+
 	tests := []struct {
-		test                 string
-		old                  *core.Pod
-		new                  *core.Pod
-		disableInitCtrResize bool
-		err                  string
+		test                            string
+		old                             *core.Pod
+		new                             *core.Pod
+		disableInitCtrResize            bool
+		enableMemoryBackedVolumesResize bool
+		err                             string
 	}{
 		{
 			test: "pod-level resources resize with nil resources in old pod",
@@ -29254,11 +29260,352 @@ func TestValidatePodResize(t *testing.T) {
 			}(),
 			err: "spec: Forbidden: pods with node allocatable resource claims cannot be resized",
 		},
+		{
+			test: "volumes immutable on resize when FG disabled",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("200Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: false,
+			err:                             "spec.volumes: Forbidden: volumes are immutable on resize when InPlacePodVerticalScalingMemoryBackedVolumes feature gate is disabled",
+		},
+		{
+			test: "valid emptyDir memory-backed sizeLimit mutation when FG enabled",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("200Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "",
+		},
+		{
+			test: "invalid emptyDir default-medium sizeLimit mutation",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumDefault,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumDefault,
+								SizeLimit: quantityPtr("200Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0].emptyDir.sizeLimit: Forbidden: sizeLimit is only mutable for memory-backed emptyDir volumes",
+		},
+		{
+			test: "invalid volume addition on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+					{
+						Name: "vol-2",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes: Forbidden: volumes may not be added or removed on resize",
+		},
+		{
+			test: "invalid volume removal on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes: Forbidden: volumes may not be added or removed on resize",
+		},
+		{
+			test: "invalid volume rename on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-2",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0].name: Forbidden: volumes may not be renamed or reordered on resize",
+		},
+		{
+			test: "invalid field mutation other than sizeLimit",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumDefault,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0]: Forbidden: only sizeLimit of memory-backed emptyDir volumes is mutable on resize",
+		},
+		{
+			test: "invalid addition of sizeLimit on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: nil,
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0].emptyDir.sizeLimit: Forbidden: adding or removing sizeLimit on an existing volume is not allowed",
+		},
+		{
+			test: "invalid removal of sizeLimit on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: nil,
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0].emptyDir.sizeLimit: Forbidden: adding or removing sizeLimit on an existing volume is not allowed",
+		},
+		{
+			test: "invalid transition from non-zero to zero limit on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("0"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0].emptyDir.sizeLimit: Forbidden: adding or removing sizeLimit on an existing volume is not allowed",
+		},
+		{
+			test: "invalid transition from zero to non-zero limit on resize",
+			old: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("0"),
+							},
+						},
+					},
+				}
+			}),
+			new: mkPod(core.ResourceList{}, core.ResourceList{}, func(pod *core.Pod) {
+				pod.Spec.Volumes = []core.Volume{
+					{
+						Name: "vol-1",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium:    core.StorageMediumMemory,
+								SizeLimit: quantityPtr("100Mi"),
+							},
+						},
+					},
+				}
+			}),
+			enableMemoryBackedVolumesResize: true,
+			err:                             "spec.volumes[0].emptyDir.sizeLimit: Forbidden: adding or removing sizeLimit on an existing volume is not allowed",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, !test.disableInitCtrResize)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.enableMemoryBackedVolumesResize)
 
 			test.new.ObjectMeta.ResourceVersion = "1"
 			test.old.ObjectMeta.ResourceVersion = "1"
