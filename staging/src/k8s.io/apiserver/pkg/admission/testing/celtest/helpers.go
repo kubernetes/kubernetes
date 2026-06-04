@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/google/cel-go/cel"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -33,46 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
-
-// expressionAccessor implements admissioncel.ExpressionAccessor and
-// admissioncel.NamedExpressionAccessor for use with the CEL compiler.
-type expressionAccessor struct {
-	name        string
-	expression  string
-	returnTypes []*cel.Type
-}
-
-func (a expressionAccessor) GetExpression() string {
-	return a.expression
-}
-
-func (a expressionAccessor) ReturnTypes() []*cel.Type {
-	return a.returnTypes
-}
-
-func (a expressionAccessor) GetName() string {
-	return a.name
-}
-
-func anyExpressionAccessor(expression string) expressionAccessor {
-	return expressionAccessor{expression: expression, returnTypes: []*cel.Type{cel.AnyType}}
-}
-
-func namedAnyExpressionAccessor(name, expression string) expressionAccessor {
-	return expressionAccessor{name: name, expression: expression, returnTypes: []*cel.Type{cel.AnyType}}
-}
-
-func boolExpressionAccessor(expression string) expressionAccessor {
-	return expressionAccessor{expression: expression, returnTypes: []*cel.Type{cel.BoolType}}
-}
-
-func stringExpressionAccessor(expression string) expressionAccessor {
-	return expressionAccessor{expression: expression, returnTypes: []*cel.Type{cel.StringType}}
-}
-
-func stringOrNullExpressionAccessor(expression string) expressionAccessor {
-	return expressionAccessor{expression: expression, returnTypes: []*cel.Type{cel.StringType, cel.NullType}}
-}
 
 // evaluationInputs holds the converted runtime values needed by ForInput.
 type evaluationInputs struct {

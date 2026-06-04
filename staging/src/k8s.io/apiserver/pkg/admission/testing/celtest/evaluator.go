@@ -43,6 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	admissioncel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	mutatingpatch "k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
+	validatingpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -356,7 +358,7 @@ func (e *Evaluator) CompileCheck(expr string) error {
 	if err != nil {
 		return err
 	}
-	evaluator := compiler.CompileMutatingEvaluator(anyExpressionAccessor(expr), decls, e.compileCheckMode())
+	evaluator := compiler.CompileMutatingEvaluator(&validatingpolicy.Variable{Expression: expr}, decls, e.compileCheckMode())
 	return compilationErrors(evaluator.CompilationErrors())
 }
 
@@ -372,7 +374,7 @@ func (e *Evaluator) EvalExpression(expr string, input *AdmissionInput) (interfac
 	if err != nil {
 		return nil, err
 	}
-	value, _, err := e.evaluateMutatingWithInputs(compiler, decls, anyExpressionAccessor(expr), evalInputs, e.runtimeCELCostBudget())
+	value, _, err := e.evaluateMutatingWithInputs(compiler, decls, &validatingpolicy.Variable{Expression: expr}, evalInputs, e.runtimeCELCostBudget())
 	return value, err
 }
 
@@ -387,7 +389,7 @@ func (e *Evaluator) EvalValidations(policy *AdmissionPolicy, input *AdmissionInp
 	result := &AdmissionResult{Allowed: true}
 	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.validations))
 	for _, validation := range policy.validations {
-		accessors = append(accessors, boolExpressionAccessor(validation.Expression))
+		accessors = append(accessors, &validatingpolicy.ValidationCondition{Expression: validation.Expression, Message: validation.Message})
 	}
 	conditionEvaluator := state.compiler.CompileCondition(accessors, state.decls, e.evaluationMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
@@ -502,7 +504,7 @@ func (e *Evaluator) EvalVariable(policy *AdmissionPolicy, variableName string, i
 
 	found := false
 	for _, variable := range policy.variables {
-		result := compiler.CompileAndStoreVariable(namedAnyExpressionAccessor(variable.Name, variable.Expression), decls, e.evaluationMode())
+		result := compiler.CompileAndStoreVariable(&validatingpolicy.Variable{Name: variable.Name, Expression: variable.Expression}, decls, e.evaluationMode())
 		if result.Error != nil {
 			return nil, fmt.Errorf("variable %q: %w", variable.Name, result.Error)
 		}
@@ -519,7 +521,7 @@ func (e *Evaluator) EvalVariable(policy *AdmissionPolicy, variableName string, i
 	if err != nil {
 		return nil, err
 	}
-	value, _, err := e.evaluateMutatingWithInputs(compiler, decls, anyExpressionAccessor("variables."+variableName), evalInputs, e.runtimeCELCostBudget())
+	value, _, err := e.evaluateMutatingWithInputs(compiler, decls, &validatingpolicy.Variable{Expression: "variables." + variableName}, evalInputs, e.runtimeCELCostBudget())
 	return value, err
 }
 
@@ -549,7 +551,7 @@ func (e *Evaluator) evalMatchConditionsWithInputs(compiler *admissioncel.Composi
 
 	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.matchConditions))
 	for _, condition := range policy.matchConditions {
-		accessors = append(accessors, boolExpressionAccessor(condition.Expression))
+		accessors = append(accessors, &matchconditions.MatchCondition{Name: condition.Name, Expression: condition.Expression})
 	}
 	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.evaluationMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
@@ -592,7 +594,7 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 
 	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.auditAnnotations))
 	for _, annotation := range policy.auditAnnotations {
-		accessors = append(accessors, stringOrNullExpressionAccessor(annotation.ValueExpression))
+		accessors = append(accessors, &validatingpolicy.AuditAnnotationCondition{Key: annotation.Key, ValueExpression: annotation.ValueExpression})
 	}
 	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.evaluationMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
@@ -642,7 +644,7 @@ func (e *Evaluator) evalMessageExpressions(state *policyEvaluationState, validat
 			continue
 		}
 		hasMessageExpression = true
-		accessors[index] = stringExpressionAccessor(validation.MessageExpression)
+		accessors[index] = &validatingpolicy.MessageExpressionCondition{MessageExpression: validation.MessageExpression}
 	}
 	if !hasMessageExpression {
 		return nil, nil, remainingBudget
@@ -701,7 +703,7 @@ func (e *Evaluator) newCompilerWithMode(policy *AdmissionPolicy, envType environ
 
 func (e *Evaluator) compileVariableList(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, variables []variable, label string, envType environment.Type) error {
 	for _, variable := range variables {
-		result := compiler.CompileAndStoreVariable(namedAnyExpressionAccessor(variable.Name, variable.Expression), decls, envType)
+		result := compiler.CompileAndStoreVariable(&validatingpolicy.Variable{Name: variable.Name, Expression: variable.Expression}, decls, envType)
 		if result.Error != nil {
 			return fmt.Errorf("%s %q: %w", label, variable.Name, result.Error)
 		}
