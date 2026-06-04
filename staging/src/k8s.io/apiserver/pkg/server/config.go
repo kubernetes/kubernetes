@@ -377,6 +377,15 @@ type SecureServingInfo struct {
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
 
+	// HTTP2WriteByteTimeout specifies the timeout after which a connection will be closed
+	// if no bytes can be written to it. A value of 0 disables the timeout.
+	HTTP2WriteByteTimeout time.Duration
+
+	// HTTP2ReadIdleTimeout specifies the timeout after which a health check using a ping
+	// frame will be carried out if no frame is received on the connection.
+	// A value of 0 disables the keepalive ping.
+	HTTP2ReadIdleTimeout time.Duration
+
 	// DisableHTTP2 indicates that http2 should not be enabled.
 	DisableHTTP2 bool
 }

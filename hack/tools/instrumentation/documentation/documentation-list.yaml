@@ -1408,6 +1408,16 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: http2_server_errors_total
+  subsystem: apiserver
+  help: Number of HTTP/2 server errors by error type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - type
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: attempts_duration_seconds
   subsystem: impersonation
   namespace: apiserver
