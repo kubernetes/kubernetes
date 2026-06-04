@@ -274,7 +274,7 @@ webhooks:
 					"namespace": "default",
 				},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Create,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -452,7 +452,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 					},
 				},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Create,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -485,7 +485,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 					},
 				},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Create,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -532,7 +532,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "privileged-pod"},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Update,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -568,7 +568,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 					},
 				},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Create,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -599,7 +599,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 					},
 				},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Create,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},

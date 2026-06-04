@@ -157,7 +157,7 @@ func TestEvalAuditAnnotations_StripsAuthorizerBinding(t *testing.T) {
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "audit-pod"},
 		},
-		Authorizer: allowAll,
+		authorizer: allowAll,
 	}
 
 	bulkResult, err := e.EvalAuditAnnotations(policy, input)

@@ -35,12 +35,12 @@ func TestResolveEquivalentGVK(t *testing.T) {
 	}{
 		{
 			name:  "from Request.Kind",
-			input: &AdmissionInput{Request: &admissionv1.AdmissionRequest{Kind: metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}}},
+			input: &AdmissionInput{request: &admissionv1.AdmissionRequest{Kind: metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}}},
 			want:  schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 		},
 		{
 			name:  "from Request.RequestKind when Kind is empty",
-			input: &AdmissionInput{Request: &admissionv1.AdmissionRequest{RequestKind: &metav1.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}}},
+			input: &AdmissionInput{request: &admissionv1.AdmissionRequest{RequestKind: &metav1.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}}},
 			want:  schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
 		},
 		{

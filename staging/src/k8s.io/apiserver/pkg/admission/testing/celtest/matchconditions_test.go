@@ -155,7 +155,7 @@ func TestEvalMatchConditions(t *testing.T) {
 			},
 		}
 		inputWithNamespace := *input
-		inputWithNamespace.Namespace = &corev1.Namespace{}
+		inputWithNamespace.namespace = &corev1.Namespace{}
 
 		result, err := e.EvalMatchConditions(policy, &inputWithNamespace)
 		if err != nil {

@@ -92,9 +92,9 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 	}
 
 	equivalentGVK := resolveEquivalentGVK(input)
-	requestGVK := resolveRequestGVK(input.Request, equivalentGVK)
-	equivalentGVR := resolveEquivalentGVR(input.Request, equivalentGVK)
-	requestGVR := resolveRequestGVR(input.Request, equivalentGVR)
+	requestGVK := resolveRequestGVK(input.request, equivalentGVK)
+	equivalentGVR := resolveEquivalentGVR(input.request, equivalentGVK)
+	requestGVR := resolveRequestGVR(input.request, equivalentGVR)
 
 	object, err := convertInputObject(input.object, equivalentGVK)
 	if err != nil {
@@ -122,7 +122,7 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 		paramsRuntime = params
 	}
 
-	name, namespace := resolveNameAndNamespace(input.Request, object, oldObject)
+	name, namespace := resolveNameAndNamespace(input.request, object, oldObject)
 	attr := admission.NewAttributesRecord(
 		objectRuntime,
 		oldObjectRuntime,
@@ -130,11 +130,11 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 		namespace,
 		name,
 		requestGVR,
-		resolveSubresource(input.Request),
-		resolveOperation(input.Request, object, oldObject),
-		resolveOperationOptions(input.Request),
-		resolveDryRun(input.Request),
-		resolveUserInfo(input.Request),
+		resolveSubresource(input.request),
+		resolveOperation(input.request, object, oldObject),
+		resolveOperationOptions(input.request),
+		resolveDryRun(input.request),
+		resolveUserInfo(input.request),
 	)
 
 	versionedAttr, err := admission.NewVersionedAttributes(attr, equivalentGVK, admission.NewObjectInterfacesFromScheme(runtime.NewScheme()))
@@ -149,9 +149,9 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 		request:       request,
 		optionalVars: admissioncel.OptionalVariableBindings{
 			VersionedParams: paramsRuntime,
-			Authorizer:      input.Authorizer,
+			Authorizer:      input.authorizer,
 		},
-		namespace: admissioncel.CreateNamespaceObject(input.Namespace),
+		namespace: admissioncel.CreateNamespaceObject(input.namespace),
 	}, nil
 }
 
@@ -204,12 +204,12 @@ func resolveEquivalentGVK(input *AdmissionInput) schema.GroupVersionKind {
 	if input == nil {
 		return defaultObjectGVK()
 	}
-	if input.Request != nil {
-		if gvk := schemaGVKFromMeta(input.Request.Kind); !gvk.Empty() {
+	if input.request != nil {
+		if gvk := schemaGVKFromMeta(input.request.Kind); !gvk.Empty() {
 			return gvk
 		}
-		if input.Request.RequestKind != nil {
-			if gvk := schemaGVKFromMeta(*input.Request.RequestKind); !gvk.Empty() {
+		if input.request.RequestKind != nil {
+			if gvk := schemaGVKFromMeta(*input.request.RequestKind); !gvk.Empty() {
 				return gvk
 			}
 		}
@@ -363,7 +363,7 @@ func gvkFromRuntimeObject(object runtime.Object) (schema.GroupVersionKind, bool)
 	if gvk := object.GetObjectKind().GroupVersionKind(); !gvk.Empty() {
 		return gvk, true
 	}
-	// Custom types should set TypeMeta or provide AdmissionInput.Request.Kind,
+	// Custom types should set TypeMeta or provide AdmissionInput request kind,
 	// since they are not registered in the built-in client-go scheme.
 	gvks, _, err := clientgoscheme.Scheme.ObjectKinds(object)
 	if err != nil || len(gvks) == 0 || gvks[0].Empty() {

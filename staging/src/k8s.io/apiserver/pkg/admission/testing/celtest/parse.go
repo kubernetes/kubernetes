@@ -156,20 +156,20 @@ func parseMutatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 
 // NewFromMutatingAdmissionPolicy converts a typed MutatingAdmissionPolicy into
 // an AdmissionPolicy that can be evaluated by this package.
-func NewFromMutatingAdmissionPolicy(map_ *admissionregistrationv1.MutatingAdmissionPolicy) (*AdmissionPolicy, error) {
-	if map_ == nil {
+func NewFromMutatingAdmissionPolicy(mutatingPolicy *admissionregistrationv1.MutatingAdmissionPolicy) (*AdmissionPolicy, error) {
+	if mutatingPolicy == nil {
 		return nil, fmt.Errorf("MutatingAdmissionPolicy is nil")
 	}
 	policy := &AdmissionPolicy{}
-	policy.hasParams = map_.Spec.ParamKind != nil
+	policy.hasParams = mutatingPolicy.Spec.ParamKind != nil
 	policy.hasParamsSet = true
-	if err := appendVariables(policy, map_.Spec.Variables); err != nil {
+	if err := appendVariables(policy, mutatingPolicy.Spec.Variables); err != nil {
 		return nil, err
 	}
-	if err := appendMatchConditions(policy, "spec.matchConditions", map_.Spec.MatchConditions); err != nil {
+	if err := appendMatchConditions(policy, "spec.matchConditions", mutatingPolicy.Spec.MatchConditions); err != nil {
 		return nil, err
 	}
-	if err := appendMutations(policy, "spec.mutations", map_.Spec.Mutations); err != nil {
+	if err := appendMutations(policy, "spec.mutations", mutatingPolicy.Spec.Mutations); err != nil {
 		return nil, err
 	}
 	if len(policy.variables) == 0 && len(policy.mutations) == 0 && len(policy.matchConditions) == 0 {
@@ -331,8 +331,8 @@ func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
 		object:    file.Object,
 		oldObject: file.OldObject,
 		params:    file.Params,
-		Request:   file.Request,
-		Namespace: namespace,
+		request:   file.Request,
+		namespace: namespace,
 	}, nil
 }
 

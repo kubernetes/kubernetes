@@ -279,6 +279,54 @@ func TestEvalValidations_MessageExpression(t *testing.T) {
 	}
 }
 
+func TestEvalValidations_MessageExpressionFallback(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	tests := []struct {
+		name              string
+		messageExpression string
+		want              string
+	}{
+		{name: "trimmed", messageExpression: "'  denied  '", want: "denied"},
+		{name: "empty falls back", messageExpression: "'   '", want: "static fallback"},
+		{name: "multiline falls back", messageExpression: "'hello\\nthere'", want: "static fallback"},
+		{name: "oversized falls back", messageExpression: "'" + strings.Repeat("x", 5*1024+1) + "'", want: "static fallback"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := &AdmissionPolicy{
+				validations: []validation{{
+					Path:              "validations[0]",
+					Expression:        "false",
+					Message:           "static fallback",
+					MessageExpression: tt.messageExpression,
+				}},
+			}
+			input := &AdmissionInput{
+				object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata":   map[string]interface{}{"name": "my-pod"},
+				},
+			}
+
+			result, err := e.EvalValidations(policy, input)
+			if err != nil {
+				t.Fatalf("EvalValidations() error: %v", err)
+			}
+			if len(result.Violations) != 1 {
+				t.Fatalf("got %d violations, want 1", len(result.Violations))
+			}
+			if result.Violations[0].Message != tt.want {
+				t.Errorf("violation message = %q, want %q", result.Violations[0].Message, tt.want)
+			}
+		})
+	}
+}
+
 func TestEvalValidations_MessageExpressionError(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -509,7 +557,7 @@ func TestEvalValidations_RequestFields(t *testing.T) {
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
-		Request: &admissionv1.AdmissionRequest{
+		request: &admissionv1.AdmissionRequest{
 			Operation: admissionv1.Create,
 			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 			Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -753,7 +801,7 @@ func TestEvalValidations_OldObject(t *testing.T) {
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "old-name"},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Update,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
@@ -781,7 +829,7 @@ func TestEvalValidations_OldObject(t *testing.T) {
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "same-name"},
 			},
-			Request: &admissionv1.AdmissionRequest{
+			request: &admissionv1.AdmissionRequest{
 				Operation: admissionv1.Update,
 				Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},

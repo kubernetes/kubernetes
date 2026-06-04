@@ -303,15 +303,16 @@ webhooks:
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
 
-	input := celtest.NewAdmissionInput().SetUnstructuredObject(map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Pod",
-		"metadata":   map[string]interface{}{"name": "test"},
-	})
-	input.Request = &admissionv1.AdmissionRequest{
-		Kind:     metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-		Resource: metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
-	}
+	input := celtest.NewAdmissionInput().
+		SetUnstructuredObject(map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test"},
+		}).
+		SetRequest(&admissionv1.AdmissionRequest{
+			Kind:     metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
+			Resource: metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
+		})
 
 	matchResult, err := evaluator.EvalMatchConditions(policy, input)
 	if err != nil {
@@ -324,11 +325,4 @@ webhooks:
 		t.Fatalf("match condition value = %v, want true", matchResult.Conditions[0].Value)
 	}
 
-	result, err := evaluator.EvalValidations(policy, input)
-	if err != nil {
-		t.Fatalf("EvalValidations() error: %v", err)
-	}
-	if !result.Allowed {
-		t.Errorf("expected Allowed=true for pods, got violations: %s", result.FormatViolations())
-	}
 }

@@ -20,11 +20,12 @@ limitations under the License.
 // matchConditions. The evaluator uses the same CEL environment and compiler
 // that the API server uses at runtime, ensuring compilation parity.
 //
-// EvalValidations and EvalMutation evaluate validations and mutations
-// regardless of any MatchConditions on the policy; gating is not enforced
-// implicitly. Call EvalMatchConditions separately to assert that a request
-// would have been admitted by the policy's match conditions before its rules
-// ran.
+// EvalValidations and EvalMutation evaluate validation and mutation CEL
+// expressions regardless of any MatchConditions on the policy; gating is not
+// enforced implicitly. Call EvalMatchConditions separately to assert that a
+// request would have been admitted by the policy's match conditions before its
+// rules ran. EvalMutation returns evaluated patch values; it does not apply
+// patches to objects or run the full apiserver patch application path.
 package celtest
 
 import (
@@ -44,6 +45,7 @@ import (
 	mutatingpatch "k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 )
 
@@ -181,7 +183,8 @@ type MutationResult struct {
 	Cost    int64
 }
 
-// PatchResult is the result of evaluating a single mutation expression.
+// PatchResult is the raw result of evaluating a single mutation expression.
+// EvalMutation does not apply the patch to the input object.
 type PatchResult struct {
 	Path      string
 	PatchType string
@@ -192,15 +195,15 @@ type PatchResult struct {
 // AdmissionInput provides the runtime values for CEL evaluation.
 // Use SetObject, SetOldObject, SetParams, or their unstructured variants to set
 // CEL object values. Typed values are converted to unstructured objects
-// internally. GVK is inferred from the object, oldObject, or Request.Kind when
-// provided.
+// internally. GVK is inferred from the object, oldObject, or request kind when
+// provided via SetRequest.
 type AdmissionInput struct {
 	object     interface{}
 	oldObject  interface{}
 	params     interface{}
-	Request    *admissionv1.AdmissionRequest
-	Namespace  *corev1.Namespace
-	Authorizer authorizer.Authorizer
+	request    *admissionv1.AdmissionRequest
+	namespace  *corev1.Namespace
+	authorizer authorizer.Authorizer
 }
 
 // NewAdmissionInput returns an empty AdmissionInput for use with setter methods.
@@ -241,6 +244,24 @@ func (i *AdmissionInput) SetParams(params runtime.Object) *AdmissionInput {
 // SetUnstructuredParams sets the CEL params variable from an unstructured map.
 func (i *AdmissionInput) SetUnstructuredParams(params map[string]interface{}) *AdmissionInput {
 	i.params = params
+	return i
+}
+
+// SetRequest sets the admission request metadata exposed to CEL request variables.
+func (i *AdmissionInput) SetRequest(request *admissionv1.AdmissionRequest) *AdmissionInput {
+	i.request = request
+	return i
+}
+
+// SetNamespace sets the namespace object exposed to CEL namespaceObject variables.
+func (i *AdmissionInput) SetNamespace(namespace *corev1.Namespace) *AdmissionInput {
+	i.namespace = namespace
+	return i
+}
+
+// SetAuthorizer sets the authorizer exposed to CEL authorizer variables.
+func (i *AdmissionInput) SetAuthorizer(authz authorizer.Authorizer) *AdmissionInput {
+	i.authorizer = authz
 	return i
 }
 
@@ -327,8 +348,9 @@ func (e *Evaluator) preparePolicyEvaluation(policy *AdmissionPolicy, input *Admi
 	return &policyEvaluationState{compiler: compiler, decls: decls, inputs: evalInputs}, nil
 }
 
-// CompileCheck validates that a CEL expression compiles against the admission
-// environment without evaluating it.
+// CompileCheck validates that a standalone CEL expression compiles against the
+// admission environment without evaluating it. It does not use an AdmissionPolicy,
+// so optional variables such as params use the evaluator's default declaration shape.
 func (e *Evaluator) CompileCheck(expr string) error {
 	compiler, decls, err := e.newCompilerWithMode(nil, e.compileCheckMode())
 	if err != nil {
@@ -338,8 +360,9 @@ func (e *Evaluator) CompileCheck(expr string) error {
 	return compilationErrors(evaluator.CompilationErrors())
 }
 
-// EvalExpression compiles and evaluates a single CEL expression against the
-// provided input, returning the raw result value.
+// EvalExpression compiles and evaluates a standalone CEL expression against the
+// provided input, returning the raw result value. It does not use an AdmissionPolicy,
+// so optional variables such as params use the evaluator's default declaration shape.
 func (e *Evaluator) EvalExpression(expr string, input *AdmissionInput) (interface{}, error) {
 	compiler, decls, err := e.newCompiler(nil)
 	if err != nil {
@@ -376,6 +399,10 @@ func (e *Evaluator) EvalValidations(policy *AdmissionPolicy, input *AdmissionInp
 	if err != nil {
 		return nil, err
 	}
+	messageResults, messageEvalErr, messageRemaining := e.evalMessageExpressions(state, policy.validations, remaining)
+	if messageRemaining >= 0 {
+		remaining = messageRemaining
+	}
 
 	for index, validation := range policy.validations {
 		evaluation := results[index]
@@ -394,26 +421,17 @@ func (e *Evaluator) EvalValidations(policy *AdmissionPolicy, input *AdmissionInp
 			})
 			continue
 		}
+		if errors.Is(messageEvalErr, apiservercel.ErrInternal) || errors.Is(messageEvalErr, apiservercel.ErrOutOfBudget) {
+			result.Allowed = false
+			result.Violations = append(result.Violations, Violation{Expression: validation.Expression, Error: fmt.Errorf("failed messageExpression: %w", messageEvalErr)})
+			continue
+		}
 		if value {
 			continue
 		}
 
 		result.Allowed = false
-		message := validation.Message
-		var messageErr error
-		if validation.MessageExpression != "" {
-			messageDecls := messageExpressionDeclarations(state.decls)
-			messageOptionalVars := messageExpressionOptionalBindings(state.inputs)
-			messageValue, nextRemaining, err := e.evaluateMutatingWithBindings(state.compiler, messageDecls, stringExpressionAccessor(validation.MessageExpression), state.inputs, messageOptionalVars, remaining)
-			if nextRemaining >= 0 {
-				remaining = nextRemaining
-			}
-			if err != nil {
-				messageErr = err
-			} else if resolved, ok := messageValue.(string); ok {
-				message = resolved
-			}
-		}
+		message, messageErr := validationMessage(validation, messageResultAt(messageResults, index))
 		result.Violations = append(result.Violations, Violation{Expression: validation.Expression, Message: message, MessageError: messageErr})
 	}
 
@@ -421,8 +439,10 @@ func (e *Evaluator) EvalValidations(policy *AdmissionPolicy, input *AdmissionInp
 	return result, nil
 }
 
-// EvalMutation evaluates all mutations in the policy against the input and
-// returns a MutationResult containing the raw CEL result for each mutation expression.
+// EvalMutation evaluates all mutation CEL expressions in the policy against the
+// input and returns a MutationResult containing the raw CEL result for each
+// mutation expression. It does not apply patches to objects or run the full
+// apiserver patch application path.
 // Compilation errors cause an immediate error return (symmetric with EvalValidations).
 // Runtime evaluation errors are recorded per-patch in PatchResult.Error.
 func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput) (*MutationResult, error) {
@@ -612,6 +632,55 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 		result.Annotations = append(result.Annotations, annotationResult)
 	}
 	return result, nil
+}
+
+func (e *Evaluator) evalMessageExpressions(state *policyEvaluationState, validations []validation, remainingBudget int64) ([]admissioncel.EvaluationResult, error, int64) {
+	accessors := make([]admissioncel.ExpressionAccessor, len(validations))
+	hasMessageExpression := false
+	for index, validation := range validations {
+		if validation.MessageExpression == "" {
+			continue
+		}
+		hasMessageExpression = true
+		accessors[index] = stringExpressionAccessor(validation.MessageExpression)
+	}
+	if !hasMessageExpression {
+		return nil, nil, remainingBudget
+	}
+
+	messageEvaluator := state.compiler.CompileCondition(accessors, messageExpressionDeclarations(state.decls), e.evaluationMode())
+	messageResults, remaining, err := messageEvaluator.ForInput(context.Background(), state.inputs.versionedAttr, state.inputs.request, messageExpressionOptionalBindings(state.inputs), state.inputs.namespace, remainingBudget)
+	return messageResults, err, remaining
+}
+
+func messageResultAt(results []admissioncel.EvaluationResult, index int) *admissioncel.EvaluationResult {
+	if len(results) <= index {
+		return nil
+	}
+	return &results[index]
+}
+
+func validationMessage(validation validation, messageResult *admissioncel.EvaluationResult) (string, error) {
+	message := ""
+	var messageErr error
+	if messageResult != nil && messageResult.Error == nil && messageResult.EvalResult != nil {
+		if resolved, ok := messageResult.EvalResult.Value().(string); ok {
+			message = strings.TrimSpace(resolved)
+			if len(message) > celconfig.MaxEvaluatedMessageExpressionSizeBytes || strings.ContainsAny(message, "\n") {
+				message = ""
+			}
+		}
+	}
+	if messageResult != nil && messageResult.Error != nil {
+		messageErr = messageResult.Error
+	}
+	if message == "" && validation.Message != "" {
+		message = strings.TrimSpace(validation.Message)
+	}
+	if message == "" {
+		message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
+	}
+	return message, messageErr
 }
 
 func (e *Evaluator) newCompiler(policy *AdmissionPolicy) (*admissioncel.CompositedCompiler, admissioncel.OptionalVariableDeclarations, error) {

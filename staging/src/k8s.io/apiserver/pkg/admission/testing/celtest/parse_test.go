@@ -310,11 +310,11 @@ namespaceObject:
 	if params["kind"] != "ConfigMap" {
 		t.Errorf("params.kind = %v, want ConfigMap", params["kind"])
 	}
-	if input.Request == nil || input.Request.Operation != admissionv1.Create {
-		t.Fatalf("request.operation = %v, want CREATE", input.Request)
+	if input.request == nil || input.request.Operation != admissionv1.Create {
+		t.Fatalf("request.operation = %v, want CREATE", input.request)
 	}
-	if input.Namespace == nil || input.Namespace.Name != "default" {
-		t.Fatalf("namespace.name = %v, want default", input.Namespace)
+	if input.namespace == nil || input.namespace.Name != "default" {
+		t.Fatalf("namespace.name = %v, want default", input.namespace)
 	}
 
 	e, err := NewEvaluator()
