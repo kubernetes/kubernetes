@@ -638,24 +638,37 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, resourceVersion ui
 }
 
 func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
-	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
-	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
-	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
+	items, index, matched, err := readPrefilteredByIndex(w.store, key, matchValues)
+	if err != nil {
+		return listResp{}, "", err
+	}
+	if !matched {
+		items = w.store.OrderedListPrefix(key, continueKey)
+	}
+	return listResp{
+		Items:           items,
+		ResourceVersion: w.resourceVersion,
+	}, index, nil
+}
+
+// readPrefilteredByIndex serves a prefiltered set of store elements through the first
+// matchValue that maps to an index, and reports whether an index matched. Callers fall
+// back to their own full read when no index matched. It is shared by the list path
+// (listLatestRV) and the watch initialization path (newCacheIntervalFromStore) so that
+// improvements to the indexed read benefit both.
+//
+// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
+// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
+// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
+// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
+func readPrefilteredByIndex(s store.Indexer, key string, matchValues []storage.MatchValue) (items []interface{}, indexName string, matched bool, err error) {
 	for _, matchValue := range matchValues {
-		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+		if result, err := s.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
 			result, err = filterPrefixAndOrder(key, result)
-			return listResp{
-				Items:           result,
-				ResourceVersion: w.resourceVersion,
-			}, matchValue.IndexName, err
+			return result, matchValue.IndexName, true, err
 		}
 	}
-	result := w.store.OrderedListPrefix(key, continueKey)
-	return listResp{
-		Items:           result,
-		ResourceVersion: w.resourceVersion,
-	}, "", nil
+	return nil, "", false, nil
 }
 
 func filterPrefixAndOrder(prefix string, items []interface{}) ([]interface{}, error) {
