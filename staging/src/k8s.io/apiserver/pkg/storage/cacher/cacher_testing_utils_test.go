@@ -160,12 +160,12 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 			t.Fatal(err)
 		}
 
-		err = c.cacher.watchCache.waitUntilFreshAndBlock(context.TODO(), rv)
+		c.cacher.watchCache.RLock()
+		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), rv)
+		c.cacher.watchCache.RUnlock()
 		if err != nil {
 			t.Fatalf("WatchCache didn't caught up to RV: %v", rv)
 		}
-		c.cacher.watchCache.RUnlock()
-
 		c.cacher.watchCache.Lock()
 		defer c.cacher.watchCache.Unlock()
 		c.cacher.Lock()
