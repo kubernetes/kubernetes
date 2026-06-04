@@ -1829,16 +1829,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "forbidden: can only create a node CSR with CN=system:node:mynode",
 		},
 		{
-			name:       "allow CSR create incorrect node with feature gate disabled",
-			attributes: createCSRAttributes("system:node:othernode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
-			err:        "",
-			features:   feature.DefaultFeatureGate,
-			setupFunc: func(t *testing.T) {
-				t.Helper()
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.AllowInsecureKubeletCertificateSigningRequests, true)
-			},
-		},
-		{
 			name:       "deny CSR create invalid",
 			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeletServingSignerName, false, privKey, mynode),
 			err:        "unable to parse csr: asn1: syntax error: sequence truncated",
