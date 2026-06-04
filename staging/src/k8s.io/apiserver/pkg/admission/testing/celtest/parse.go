@@ -101,7 +101,7 @@ func parseFlatPolicy(data []byte) (*AdmissionPolicy, error) {
 	if err := appendAuditAnnotations(policy, "auditAnnotations", flat.AuditAnnotations); err != nil {
 		return nil, err
 	}
-	if len(policy.Variables) == 0 && len(policy.Validations) == 0 && len(policy.MatchConditions) == 0 && len(policy.AuditAnnotations) == 0 {
+	if len(policy.variables) == 0 && len(policy.validations) == 0 && len(policy.matchConditions) == 0 && len(policy.auditAnnotations) == 0 {
 		return nil, fmt.Errorf("policy file does not contain CEL expressions")
 	}
 	return policy, nil
@@ -138,7 +138,7 @@ func NewFromValidatingAdmissionPolicy(vap *admissionregistrationv1.ValidatingAdm
 	if err := appendAuditAnnotations(policy, "spec.auditAnnotations", vap.Spec.AuditAnnotations); err != nil {
 		return nil, err
 	}
-	if len(policy.Variables) == 0 && len(policy.Validations) == 0 && len(policy.MatchConditions) == 0 && len(policy.AuditAnnotations) == 0 {
+	if len(policy.variables) == 0 && len(policy.validations) == 0 && len(policy.matchConditions) == 0 && len(policy.auditAnnotations) == 0 {
 		return nil, fmt.Errorf("ValidatingAdmissionPolicy does not contain CEL expressions")
 	}
 	return policy, nil
@@ -172,7 +172,7 @@ func NewFromMutatingAdmissionPolicy(map_ *admissionregistrationv1.MutatingAdmiss
 	if err := appendMutations(policy, "spec.mutations", map_.Spec.Mutations); err != nil {
 		return nil, err
 	}
-	if len(policy.Variables) == 0 && len(policy.Mutations) == 0 && len(policy.MatchConditions) == 0 {
+	if len(policy.variables) == 0 && len(policy.mutations) == 0 && len(policy.matchConditions) == 0 {
 		return nil, fmt.Errorf("MutatingAdmissionPolicy does not contain CEL expressions")
 	}
 	return policy, nil
@@ -204,7 +204,7 @@ func NewFromValidatingWebhookConfiguration(config *admissionregistrationv1.Valid
 			return nil, err
 		}
 	}
-	if len(policy.MatchConditions) == 0 {
+	if len(policy.matchConditions) == 0 {
 		return nil, fmt.Errorf("ValidatingWebhookConfiguration does not contain CEL expressions")
 	}
 	return policy, nil
@@ -236,38 +236,38 @@ func NewFromMutatingWebhookConfiguration(config *admissionregistrationv1.Mutatin
 			return nil, err
 		}
 	}
-	if len(policy.MatchConditions) == 0 {
+	if len(policy.matchConditions) == 0 {
 		return nil, fmt.Errorf("MutatingWebhookConfiguration does not contain CEL expressions")
 	}
 	return policy, nil
 }
 
 func appendVariables(policy *AdmissionPolicy, variables []admissionregistrationv1.Variable) error {
-	for _, variable := range variables {
-		if variable.Name == "" {
+	for _, item := range variables {
+		if item.Name == "" {
 			return fmt.Errorf("variable missing name")
 		}
-		if variable.Expression == "" {
-			return fmt.Errorf("variable %q missing expression", variable.Name)
+		if item.Expression == "" {
+			return fmt.Errorf("variable %q missing expression", item.Name)
 		}
-		policy.Variables = append(policy.Variables, Variable{
-			Name:       variable.Name,
-			Expression: variable.Expression,
+		policy.variables = append(policy.variables, variable{
+			Name:       item.Name,
+			Expression: item.Expression,
 		})
 	}
 	return nil
 }
 
 func appendValidations(policy *AdmissionPolicy, prefix string, validations []admissionregistrationv1.Validation) error {
-	for index, validation := range validations {
-		if validation.Expression == "" {
+	for index, item := range validations {
+		if item.Expression == "" {
 			return fmt.Errorf("validation %s[%d] missing expression", prefix, index)
 		}
-		policy.Validations = append(policy.Validations, Validation{
+		policy.validations = append(policy.validations, validation{
 			Path:              fmt.Sprintf("%s[%d]", prefix, index),
-			Expression:        validation.Expression,
-			Message:           validation.Message,
-			MessageExpression: validation.MessageExpression,
+			Expression:        item.Expression,
+			Message:           item.Message,
+			MessageExpression: item.MessageExpression,
 		})
 	}
 	return nil
@@ -278,7 +278,7 @@ func appendMatchConditions(policy *AdmissionPolicy, prefix string, conditions []
 		if condition.Expression == "" {
 			return fmt.Errorf("match condition %s[%d] missing expression", prefix, index)
 		}
-		policy.MatchConditions = append(policy.MatchConditions, MatchCondition{
+		policy.matchConditions = append(policy.matchConditions, matchCondition{
 			Path:       fmt.Sprintf("%s[%d]", prefix, index),
 			Name:       condition.Name,
 			Expression: condition.Expression,
@@ -295,7 +295,7 @@ func appendAuditAnnotations(policy *AdmissionPolicy, prefix string, annotations 
 		if annotation.ValueExpression == "" {
 			return fmt.Errorf("audit annotation %s[%d] missing valueExpression", prefix, index)
 		}
-		policy.AuditAnnotations = append(policy.AuditAnnotations, AuditAnnotation{
+		policy.auditAnnotations = append(policy.auditAnnotations, auditAnnotation{
 			Path:            fmt.Sprintf("%s[%d]", prefix, index),
 			Key:             annotation.Key,
 			ValueExpression: annotation.ValueExpression,
@@ -328,9 +328,9 @@ func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
 	}
 
 	return &AdmissionInput{
-		Object:    file.Object,
-		OldObject: file.OldObject,
-		Params:    file.Params,
+		object:    file.Object,
+		oldObject: file.OldObject,
+		params:    file.Params,
 		Request:   file.Request,
 		Namespace: namespace,
 	}, nil
@@ -345,28 +345,28 @@ func parseAdmissionInputFile(path string) (*AdmissionInput, error) {
 }
 
 func appendMutations(policy *AdmissionPolicy, prefix string, mutations []admissionregistrationv1.Mutation) error {
-	for index, mutation := range mutations {
-		if mutation.PatchType == "" {
+	for index, item := range mutations {
+		if item.PatchType == "" {
 			return fmt.Errorf("mutation %s[%d] missing patchType", prefix, index)
 		}
 		var expression string
-		switch mutation.PatchType {
+		switch item.PatchType {
 		case admissionregistrationv1.PatchTypeApplyConfiguration:
-			if mutation.ApplyConfiguration == nil || mutation.ApplyConfiguration.Expression == "" {
+			if item.ApplyConfiguration == nil || item.ApplyConfiguration.Expression == "" {
 				return fmt.Errorf("mutation %s[%d] missing applyConfiguration.expression", prefix, index)
 			}
-			expression = mutation.ApplyConfiguration.Expression
+			expression = item.ApplyConfiguration.Expression
 		case admissionregistrationv1.PatchTypeJSONPatch:
-			if mutation.JSONPatch == nil || mutation.JSONPatch.Expression == "" {
+			if item.JSONPatch == nil || item.JSONPatch.Expression == "" {
 				return fmt.Errorf("mutation %s[%d] missing jsonPatch.expression", prefix, index)
 			}
-			expression = mutation.JSONPatch.Expression
+			expression = item.JSONPatch.Expression
 		default:
-			return fmt.Errorf("mutation %s[%d] unsupported patchType %q", prefix, index, mutation.PatchType)
+			return fmt.Errorf("mutation %s[%d] unsupported patchType %q", prefix, index, item.PatchType)
 		}
-		policy.Mutations = append(policy.Mutations, Mutation{
+		policy.mutations = append(policy.mutations, mutation{
 			Path:       fmt.Sprintf("%s[%d]", prefix, index),
-			PatchType:  string(mutation.PatchType),
+			PatchType:  string(item.PatchType),
 			Expression: expression,
 		})
 	}

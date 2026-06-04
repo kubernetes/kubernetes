@@ -30,14 +30,14 @@ func TestEvalAuditAnnotations(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		AuditAnnotations: []AuditAnnotation{
+		auditAnnotations: []auditAnnotation{
 			{Path: "spec.auditAnnotations[0]", Key: "pod-name", ValueExpression: "string(object.metadata.name)"},
 			{Path: "spec.auditAnnotations[1]", Key: "empty", ValueExpression: "''"},
 			{Path: "spec.auditAnnotations[2]", Key: "null", ValueExpression: "null"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "audit-pod"},
@@ -51,22 +51,30 @@ func TestEvalAuditAnnotations(t *testing.T) {
 	if len(result.Annotations) != 3 {
 		t.Fatalf("got %d annotations, want 3", len(result.Annotations))
 	}
-	if result.Annotations[0].Value != "audit-pod" {
-		t.Errorf("annotation[0] = %#v, want audit-pod", result.Annotations[0])
+	wantAnnotations := []struct {
+		path            string
+		key             string
+		valueExpression string
+		value           interface{}
+	}{
+		{path: "spec.auditAnnotations[0]", key: "pod-name", valueExpression: "string(object.metadata.name)", value: "audit-pod"},
+		{path: "spec.auditAnnotations[1]", key: "empty", valueExpression: "''", value: ""},
+		{path: "spec.auditAnnotations[2]", key: "null", valueExpression: "null", value: nil},
 	}
-	if result.Annotations[1].Value != "" {
-		t.Errorf("annotation[1] value = %v, want empty string", result.Annotations[1].Value)
-	}
-	if result.Annotations[2].Value != nil {
-		t.Errorf("annotation[2] value = %v, want nil", result.Annotations[2].Value)
-	}
-
-	value, err := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input)
-	if err != nil {
-		t.Fatalf("EvalAuditAnnotation() error: %v", err)
-	}
-	if value != "audit-pod" {
-		t.Errorf("EvalAuditAnnotation() = %v, want audit-pod", value)
+	for i, want := range wantAnnotations {
+		annotation := result.Annotations[i]
+		if annotation.Path != want.path {
+			t.Errorf("annotation[%d].Path = %q, want %q", i, annotation.Path, want.path)
+		}
+		if annotation.Key != want.key {
+			t.Errorf("annotation[%d].Key = %q, want %q", i, annotation.Key, want.key)
+		}
+		if annotation.ValueExpression != want.valueExpression {
+			t.Errorf("annotation[%d].ValueExpression = %q, want %q", i, annotation.ValueExpression, want.valueExpression)
+		}
+		if annotation.Value != want.value {
+			t.Errorf("annotation[%d].Value = %#v, want %#v", i, annotation.Value, want.value)
+		}
 	}
 }
 
@@ -77,7 +85,7 @@ func TestEvalAuditAnnotations_CompileError(t *testing.T) {
 	}
 
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test-pod"},
@@ -85,20 +93,20 @@ func TestEvalAuditAnnotations_CompileError(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Validations:      []Validation{{Path: "spec.validations[0]", Expression: "true"}},
-		AuditAnnotations: []AuditAnnotation{{Path: "spec.auditAnnotations[0]", Key: "bad", ValueExpression: "1"}},
+		validations:      []validation{{Path: "spec.validations[0]", Expression: "true"}},
+		auditAnnotations: []auditAnnotation{{Path: "spec.auditAnnotations[0]", Key: "bad", ValueExpression: "1"}},
 	}
 
 	if _, err := e.EvalAuditAnnotations(policy, input); err == nil {
 		t.Fatal("expected audit annotation compile error")
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
-		t.Fatalf("EvalAdmission should only evaluate validations, got violations: %s", result.FormatViolations())
+		t.Fatalf("EvalValidations should only evaluate validations, got violations: %s", result.FormatViolations())
 	}
 }
 
@@ -109,10 +117,10 @@ func TestEvalAuditAnnotations_RejectsPatchTypes(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		AuditAnnotations: []AuditAnnotation{{Path: "spec.auditAnnotations[0]", Key: "patch", ValueExpression: patchTypeStringExpression}},
+		auditAnnotations: []auditAnnotation{{Path: "spec.auditAnnotations[0]", Key: "patch", ValueExpression: patchTypeStringExpression}},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test-pod"},
@@ -122,14 +130,9 @@ func TestEvalAuditAnnotations_RejectsPatchTypes(t *testing.T) {
 	if _, err := e.EvalAuditAnnotations(policy, input); err == nil {
 		t.Fatal("expected audit annotation evaluation to reject mutation patch types")
 	}
-	if _, err := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input); err == nil {
-		t.Fatal("expected single audit annotation evaluation to reject mutation patch types")
-	}
 }
 
-// TestEvalAuditAnnotation_StripsAuthorizerBinding asserts that both the bulk
-// EvalAuditAnnotations and the singular EvalAuditAnnotation paths.
-func TestEvalAuditAnnotation_StripsAuthorizerBinding(t *testing.T) {
+func TestEvalAuditAnnotations_StripsAuthorizerBinding(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
@@ -140,7 +143,7 @@ func TestEvalAuditAnnotation_StripsAuthorizerBinding(t *testing.T) {
 	})
 
 	policy := &AdmissionPolicy{
-		AuditAnnotations: []AuditAnnotation{
+		auditAnnotations: []auditAnnotation{
 			{
 				Path:            "spec.auditAnnotations[0]",
 				Key:             "auth",
@@ -149,7 +152,7 @@ func TestEvalAuditAnnotation_StripsAuthorizerBinding(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "audit-pod"},
@@ -166,10 +169,5 @@ func TestEvalAuditAnnotation_StripsAuthorizerBinding(t *testing.T) {
 	}
 	if bulkResult.Annotations[0].Error == nil {
 		t.Fatalf("EvalAuditAnnotations: expected runtime error from stripped authorizer binding, got value %#v", bulkResult.Annotations[0].Value)
-	}
-
-	value, singularErr := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input)
-	if singularErr == nil {
-		t.Fatalf("EvalAuditAnnotation: expected runtime error from stripped authorizer binding, got value %#v", value)
 	}
 }

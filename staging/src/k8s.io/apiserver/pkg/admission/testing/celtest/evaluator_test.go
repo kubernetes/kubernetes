@@ -122,7 +122,7 @@ func TestEvalExpression(t *testing.T) {
 			name: "object field access",
 			expr: "object.metadata.name",
 			input: &AdmissionInput{
-				Object: map[string]interface{}{
+				object: map[string]interface{}{
 					"apiVersion": "v1",
 					"kind":       "Pod",
 					"metadata":   map[string]interface{}{"name": "test-pod"},
@@ -225,16 +225,16 @@ func TestWithVersion(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "sets.contains([1, 2, 3], [1])"},
 		},
 	}
-	result, err := eOld.EvalAdmission(policy, &AdmissionInput{})
+	result, err := eOld.EvalValidations(policy, &AdmissionInput{})
 	if err != nil {
-		t.Fatalf("EvalAdmission should use stored expression compatibility, got error: %v", err)
+		t.Fatalf("EvalValidations should use stored expression compatibility, got error: %v", err)
 	}
 	if !result.Allowed {
-		t.Fatalf("EvalAdmission with stored expression compatibility should allow, got: %s", result.FormatViolations())
+		t.Fatalf("EvalValidations with stored expression compatibility should allow, got: %s", result.FormatViolations())
 	}
 
 	// Version 1.29+ should have sets library.
@@ -244,7 +244,7 @@ func TestWithVersion(t *testing.T) {
 	}
 	err = eNew.CompileCheck("sets.contains([1, 2, 3], [1])")
 	if err != nil {
-		t.Errorf("CompileCheck with sets at v1.29 should succeed, got: %v", err)
+		t.Errorf("compileCheck with sets at v1.29 should succeed, got: %v", err)
 	}
 }
 
@@ -257,24 +257,24 @@ func TestWithCostLimit(t *testing.T) {
 
 	// This expression has enough cost to exceed budget of 1.
 	policy := &AdmissionPolicy{
-		Variables: []Variable{
+		variables: []variable{
 			{Name: "a", Expression: "object.metadata.name"},
 			{Name: "b", Expression: "variables.a + variables.a"},
 			{Name: "c", Expression: "variables.b + variables.b"},
 		},
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "size(variables.c) > 0"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test-pod"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	// Either the evaluation returns an error due to budget exhaustion,
 	// or the result contains violations with errors.
 	if err != nil {

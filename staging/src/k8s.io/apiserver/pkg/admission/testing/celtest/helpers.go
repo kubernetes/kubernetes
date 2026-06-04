@@ -96,15 +96,15 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 	equivalentGVR := resolveEquivalentGVR(input.Request, equivalentGVK)
 	requestGVR := resolveRequestGVR(input.Request, equivalentGVR)
 
-	object, err := convertInputObject(input.Object, equivalentGVK)
+	object, err := convertInputObject(input.object, equivalentGVK)
 	if err != nil {
 		return nil, fmt.Errorf("converting object: %w", err)
 	}
-	oldObject, err := convertInputObject(input.OldObject, equivalentGVK)
+	oldObject, err := convertInputObject(input.oldObject, equivalentGVK)
 	if err != nil {
 		return nil, fmt.Errorf("converting oldObject: %w", err)
 	}
-	params, err := convertParamsObject(input.Params)
+	params, err := convertParamsObject(input.params)
 	if err != nil {
 		return nil, fmt.Errorf("converting params: %w", err)
 	}
@@ -214,10 +214,10 @@ func resolveEquivalentGVK(input *AdmissionInput) schema.GroupVersionKind {
 			}
 		}
 	}
-	if gvk, ok := gvkFromValue(input.Object); ok {
+	if gvk, ok := gvkFromValue(input.object); ok {
 		return gvk
 	}
-	if gvk, ok := gvkFromValue(input.OldObject); ok {
+	if gvk, ok := gvkFromValue(input.oldObject); ok {
 		return gvk
 	}
 	return defaultObjectGVK()

@@ -28,8 +28,8 @@ func TestEvalMutation_EvaluatesMutationsIndependentlyOfMatchConditions(t *testin
 	}
 
 	policy := &AdmissionPolicy{
-		MatchConditions: []MatchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
-		Mutations: []Mutation{{
+		matchConditions: []matchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
+		mutations: []mutation{{
 			Path:       "spec.mutations[0]",
 			PatchType:  "ApplyConfiguration",
 			Expression: "Object{metadata: Object.metadata{labels: {'mutated': 'true'}}}",
@@ -37,7 +37,7 @@ func TestEvalMutation_EvaluatesMutationsIndependentlyOfMatchConditions(t *testin
 	}
 
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{
@@ -63,10 +63,10 @@ func TestEvalMutation_ApplyConfiguration(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Variables: []Variable{
+		variables: []variable{
 			{Name: "newName", Expression: "'mutated-pod'"},
 		},
-		Mutations: []Mutation{
+		mutations: []mutation{
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "ApplyConfiguration",
@@ -75,7 +75,7 @@ func TestEvalMutation_ApplyConfiguration(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "original-pod"},
@@ -118,7 +118,7 @@ func TestEvalMutation_JSONPatch(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Mutations: []Mutation{
+		mutations: []mutation{
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "JSONPatch",
@@ -127,7 +127,7 @@ func TestEvalMutation_JSONPatch(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "old-name"},
@@ -164,7 +164,7 @@ func TestEvalMutation_RejectsInvalidPatchReturnTypes(t *testing.T) {
 	}
 
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
@@ -182,7 +182,7 @@ func TestEvalMutation_RejectsInvalidPatchReturnTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			policy := &AdmissionPolicy{
-				Mutations: []Mutation{
+				mutations: []mutation{
 					{
 						Path:       "spec.mutations[0]",
 						PatchType:  tt.patchType,
@@ -208,7 +208,7 @@ func TestEvalMutation_WithoutPatchTypesRejectsPatchExpressions(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Mutations: []Mutation{
+		mutations: []mutation{
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "ApplyConfiguration",
@@ -217,7 +217,7 @@ func TestEvalMutation_WithoutPatchTypesRejectsPatchExpressions(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
@@ -237,7 +237,7 @@ func TestEvalMutation_MultiplePatches(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Mutations: []Mutation{
+		mutations: []mutation{
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "ApplyConfiguration",
@@ -251,7 +251,7 @@ func TestEvalMutation_MultiplePatches(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "original"},
@@ -265,8 +265,20 @@ func TestEvalMutation_MultiplePatches(t *testing.T) {
 	if len(result.Patches) != 2 {
 		t.Fatalf("got %d patches, want 2", len(result.Patches))
 	}
-	wantNames := []string{"first", "second"}
+	wantPatches := []struct {
+		path string
+		name string
+	}{
+		{path: "spec.mutations[0]", name: "first"},
+		{path: "spec.mutations[1]", name: "second"},
+	}
 	for i, patch := range result.Patches {
+		if patch.Path != wantPatches[i].path {
+			t.Errorf("patch[%d].Path = %q, want %q", i, patch.Path, wantPatches[i].path)
+		}
+		if patch.PatchType != "ApplyConfiguration" {
+			t.Errorf("patch[%d].PatchType = %q, want ApplyConfiguration", i, patch.PatchType)
+		}
 		if patch.Error != nil {
 			t.Errorf("patch[%d] error: %v", i, patch.Error)
 			continue
@@ -281,8 +293,8 @@ func TestEvalMutation_MultiplePatches(t *testing.T) {
 			t.Errorf("patch[%d] metadata type = %T, want map[string]interface{}", i, applyConfig["metadata"])
 			continue
 		}
-		if metadata["name"] != wantNames[i] {
-			t.Errorf("patch[%d] metadata.name = %v, want %q", i, metadata["name"], wantNames[i])
+		if metadata["name"] != wantPatches[i].name {
+			t.Errorf("patch[%d] metadata.name = %v, want %q", i, metadata["name"], wantPatches[i].name)
 		}
 	}
 }
@@ -294,7 +306,7 @@ func TestEvalMutation_CostLimitIsPerMutation(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Mutations: []Mutation{
+		mutations: []mutation{
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "ApplyConfiguration",
@@ -308,7 +320,7 @@ func TestEvalMutation_CostLimitIsPerMutation(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test-pod"},
@@ -330,80 +342,16 @@ func TestEvalMutation_CostLimitIsPerMutation(t *testing.T) {
 	}
 }
 
-func TestEvalMutationByPath(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		Variables: []Variable{
-			{Name: "target", Expression: "'selected'"},
-		},
-		Mutations: []Mutation{
-			{
-				Path:       "spec.mutations[0]",
-				PatchType:  "ApplyConfiguration",
-				Expression: "Object{metadata: Object.metadata{name: \"first\"}}",
-			},
-			{
-				Path:       "spec.mutations[1]",
-				PatchType:  "ApplyConfiguration",
-				Expression: "Object{metadata: Object.metadata{name: variables.target}}",
-			},
-		},
-	}
-	input := &AdmissionInput{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "original"},
-		},
-	}
-
-	t.Run("select second mutation", func(t *testing.T) {
-		val, err := e.EvalMutationByPath(policy, MutationSelector{Path: "spec.mutations[1]"}, input)
-		if err != nil {
-			t.Fatalf("EvalMutationByPath() error: %v", err)
-		}
-		applyConfig, ok := val.(map[string]interface{})
-		if !ok {
-			t.Fatalf("value type = %T, want map[string]interface{}", val)
-		}
-		metadata, ok := applyConfig["metadata"].(map[string]interface{})
-		if !ok {
-			t.Fatalf("metadata type = %T, want map[string]interface{}", applyConfig["metadata"])
-		}
-		if metadata["name"] != "selected" {
-			t.Errorf("metadata.name = %v, want %q", metadata["name"], "selected")
-		}
-	})
-
-	t.Run("not found", func(t *testing.T) {
-		_, err := e.EvalMutationByPath(policy, MutationSelector{Path: "spec.mutations[99]"}, input)
-		if err == nil {
-			t.Error("expected error for missing path")
-		}
-	})
-
-	t.Run("empty path", func(t *testing.T) {
-		_, err := e.EvalMutationByPath(policy, MutationSelector{}, input)
-		if err == nil {
-			t.Error("expected error for empty path")
-		}
-	})
-}
-
 func TestEvalMutation_CompilationError(t *testing.T) {
 	// Verify that EvalMutation returns an error (not a result with per-patch errors)
-	// for compilation failures, symmetric with EvalAdmission.
+	// for compilation failures, symmetric with EvalValidations.
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Mutations: []Mutation{
+		mutations: []mutation{
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "ApplyConfiguration",
@@ -417,7 +365,7 @@ func TestEvalMutation_CompilationError(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},

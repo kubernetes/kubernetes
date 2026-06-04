@@ -26,12 +26,12 @@ import (
 
 // preambleVars returns example preamble variables that a policy framework may
 // inject before policy-specific variables.
-func preambleVars() []Variable {
-	return []Variable{
-		{Name: "anyObject", Expression: "object"},
-		{Name: "params", Expression: "params"},
-		{Name: "isUpdate", Expression: "has(request.operation) && request.operation == 'UPDATE'"},
-	}
+func preambleVars() Option {
+	return WithPreambleVariables(
+		PreambleVariable{Name: "anyObject", Expression: "object"},
+		PreambleVariable{Name: "params", Expression: "params"},
+		PreambleVariable{Name: "isUpdate", Expression: "has(request.operation) && request.operation == 'UPDATE'"},
+	)
 }
 
 // TestIntegration_ValidatingAdmissionPolicy tests end-to-end evaluation of a
@@ -69,7 +69,7 @@ spec:
 
 	t.Run("allowed when label present", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata": map[string]interface{}{
@@ -77,13 +77,13 @@ spec:
 					"labels": map[string]interface{}{"team": "backend"},
 				},
 			},
-			Params: map[string]interface{}{
+			params: map[string]interface{}{
 				"data": map[string]interface{}{"requiredLabel": "team"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true, violations: %s", result.FormatViolations())
@@ -92,18 +92,18 @@ spec:
 
 	t.Run("denied when label missing", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "bad-pod"},
 			},
-			Params: map[string]interface{}{
+			params: map[string]interface{}{
 				"data": map[string]interface{}{"requiredLabel": "team"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Allowed {
 			t.Fatal("expected Allowed=false")
@@ -121,7 +121,7 @@ spec:
 
 	t.Run("eval individual variable", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata": map[string]interface{}{
@@ -129,7 +129,7 @@ spec:
 					"labels": map[string]interface{}{"team": "backend"},
 				},
 			},
-			Params: map[string]interface{}{
+			params: map[string]interface{}{
 				"data": map[string]interface{}{"requiredLabel": "team"},
 			},
 		}
@@ -177,7 +177,7 @@ spec:
 
 	t.Run("mutation produces patch when label missing", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "no-labels"},
@@ -212,7 +212,7 @@ spec:
 
 	t.Run("variable evaluation", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata": map[string]interface{}{
@@ -261,12 +261,12 @@ webhooks:
 		if err != nil {
 			t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 		}
-		if len(policy.MatchConditions) != 2 {
-			t.Fatalf("got %d matchConditions, want 2", len(policy.MatchConditions))
+		if len(policy.matchConditions) != 2 {
+			t.Fatalf("got %d matchConditions, want 2", len(policy.matchConditions))
 		}
 
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata": map[string]interface{}{
@@ -321,7 +321,7 @@ webhooks:
 
 		// The matchCondition expression evaluates to false for kube-system.
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata": map[string]interface{}{
@@ -371,16 +371,16 @@ validations:
 
 	t.Run("allowed", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "apps/v1",
 				"kind":       "Deployment",
 				"metadata":   map[string]interface{}{"name": "small-deploy"},
 				"spec":       map[string]interface{}{"replicas": int64(3)},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true: %s", result.FormatViolations())
@@ -389,16 +389,16 @@ validations:
 
 	t.Run("denied with dynamic message", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "apps/v1",
 				"kind":       "Deployment",
 				"metadata":   map[string]interface{}{"name": "big-deploy"},
 				"spec":       map[string]interface{}{"replicas": int64(10)},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Allowed {
 			t.Fatal("expected Allowed=false")
@@ -412,15 +412,13 @@ validations:
 // TestIntegration_PreambleVariables tests using WithPreambleVariables and then
 // evaluating a policy that references those variables.
 func TestIntegration_PreambleVariables(t *testing.T) {
-	e, err := NewEvaluator(
-		WithPreambleVariables(preambleVars()...),
-	)
+	e, err := NewEvaluator(preambleVars())
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Variables: []Variable{
+		variables: []variable{
 			{Name: "containers", Expression: `has(variables.anyObject.spec.containers) ? variables.anyObject.spec.containers : []`},
 			{Name: "initContainers", Expression: `has(variables.anyObject.spec.initContainers) ? variables.anyObject.spec.initContainers : []`},
 			{Name: "allContainers", Expression: `variables.containers + variables.initContainers`},
@@ -429,7 +427,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 					has(container.securityContext) && has(container.securityContext.privileged) && container.securityContext.privileged
 				).map(container, "Privileged container is not allowed: " + container.name + ", securityContext.privileged: true")`},
 		},
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:              "validations[0]",
 				Expression:        "variables.isUpdate || size(variables.badContainers) == 0",
@@ -437,11 +435,11 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 			},
 		},
 	}
-	policy.SetHasParams(true)
+	policy.setHasParams(true)
 
 	t.Run("allowed - no privileged containers", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "safe-pod"},
@@ -460,9 +458,9 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true: %s", result.FormatViolations())
@@ -471,7 +469,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 
 	t.Run("denied - privileged container", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "bad-pod"},
@@ -493,9 +491,9 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Allowed {
 			t.Fatal("expected Allowed=false for privileged container")
@@ -513,7 +511,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 
 	t.Run("allowed on UPDATE - privileged container allowed", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "privileged-pod"},
@@ -529,7 +527,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 					},
 				},
 			},
-			OldObject: map[string]interface{}{
+			oldObject: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "privileged-pod"},
@@ -540,9 +538,9 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true on UPDATE: %s", result.FormatViolations())
@@ -551,7 +549,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 
 	t.Run("denied - privileged init container", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "init-pod"},
@@ -576,9 +574,9 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 				Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Allowed {
 			t.Fatal("expected Allowed=false for privileged init container")
@@ -590,7 +588,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 
 	t.Run("eval individual variable", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "pod"},
@@ -621,7 +619,7 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 	})
 }
 
-// TestIntegration_CompileCheck tests that CompileCheck catches syntax and type
+// TestIntegration_CompileCheck tests that compileCheck catches syntax and type
 // errors without needing input data.
 func TestIntegration_CompileCheck(t *testing.T) {
 	e, err := NewEvaluator()
@@ -663,20 +661,20 @@ func TestIntegration_CostTracking(t *testing.T) {
 			t.Fatalf("NewEvaluator() error: %v", err)
 		}
 		policy := &AdmissionPolicy{
-			Validations: []Validation{
+			validations: []validation{
 				{Path: "v0", Expression: "true"},
 			},
 		}
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "test"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Cost < 0 {
 			t.Errorf("expected non-negative cost, got %d", result.Cost)
@@ -689,20 +687,20 @@ func TestIntegration_CostTracking(t *testing.T) {
 			t.Fatalf("NewEvaluator() error: %v", err)
 		}
 		policy := &AdmissionPolicy{
-			Validations: []Validation{
+			validations: []validation{
 				{Path: "v0", Expression: "object.metadata.name == 'test'"},
 				{Path: "v1", Expression: "object.metadata.name == 'test'"},
 				{Path: "v2", Expression: "object.metadata.name == 'test'"},
 			},
 		}
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "test"},
 			},
 		}
-		_, err = e.EvalAdmission(policy, input)
+		_, err = e.EvalValidations(policy, input)
 		if err == nil {
 			t.Error("expected cost budget exceeded error")
 		}
@@ -717,7 +715,7 @@ func TestIntegration_EvalExpression(t *testing.T) {
 	}
 
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{

@@ -40,14 +40,14 @@ validations:
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.Variables) != 1 {
-		t.Errorf("got %d variables, want 1", len(policy.Variables))
+	if len(policy.variables) != 1 {
+		t.Errorf("got %d variables, want 1", len(policy.variables))
 	}
-	if len(policy.Validations) != 1 {
-		t.Errorf("got %d validations, want 1", len(policy.Validations))
+	if len(policy.validations) != 1 {
+		t.Errorf("got %d validations, want 1", len(policy.validations))
 	}
-	if policy.Variables[0].Name != "podName" {
-		t.Errorf("variable name = %q, want %q", policy.Variables[0].Name, "podName")
+	if policy.variables[0].Name != "podName" {
+		t.Errorf("variable name = %q, want %q", policy.variables[0].Name, "podName")
 	}
 }
 
@@ -70,17 +70,17 @@ spec:
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.MatchConditions) != 1 {
-		t.Fatalf("got %d matchConditions, want 1", len(policy.MatchConditions))
+	if len(policy.matchConditions) != 1 {
+		t.Fatalf("got %d matchConditions, want 1", len(policy.matchConditions))
 	}
-	if policy.MatchConditions[0].Path != "spec.matchConditions[0]" {
-		t.Errorf("matchCondition[0] path = %q, want spec.matchConditions[0]", policy.MatchConditions[0].Path)
+	if policy.matchConditions[0].Path != "spec.matchConditions[0]" {
+		t.Errorf("matchCondition[0] path = %q, want spec.matchConditions[0]", policy.matchConditions[0].Path)
 	}
-	if len(policy.Validations) != 1 {
-		t.Errorf("got %d validations, want 1", len(policy.Validations))
+	if len(policy.validations) != 1 {
+		t.Errorf("got %d validations, want 1", len(policy.validations))
 	}
-	if len(policy.AuditAnnotations) != 1 {
-		t.Errorf("got %d auditAnnotations, want 1", len(policy.AuditAnnotations))
+	if len(policy.auditAnnotations) != 1 {
+		t.Errorf("got %d auditAnnotations, want 1", len(policy.auditAnnotations))
 	}
 	if policy.hasParams {
 		t.Error("hasParams should be false when paramKind is not set")
@@ -128,20 +128,20 @@ func TestParseAdmissionPolicy_MAP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.Variables) != 1 {
-		t.Errorf("got %d variables, want 1", len(policy.Variables))
+	if len(policy.variables) != 1 {
+		t.Errorf("got %d variables, want 1", len(policy.variables))
 	}
-	if len(policy.MatchConditions) != 1 {
-		t.Errorf("got %d matchConditions, want 1", len(policy.MatchConditions))
+	if len(policy.matchConditions) != 1 {
+		t.Errorf("got %d matchConditions, want 1", len(policy.matchConditions))
 	}
-	if len(policy.Mutations) != 2 {
-		t.Fatalf("got %d mutations, want 2", len(policy.Mutations))
+	if len(policy.mutations) != 2 {
+		t.Fatalf("got %d mutations, want 2", len(policy.mutations))
 	}
-	if policy.Mutations[0].PatchType != "ApplyConfiguration" {
-		t.Errorf("mutation[0] patchType = %q, want ApplyConfiguration", policy.Mutations[0].PatchType)
+	if policy.mutations[0].PatchType != "ApplyConfiguration" {
+		t.Errorf("mutation[0] patchType = %q, want ApplyConfiguration", policy.mutations[0].PatchType)
 	}
-	if policy.Mutations[1].PatchType != "JSONPatch" {
-		t.Errorf("mutation[1] patchType = %q, want JSONPatch", policy.Mutations[1].PatchType)
+	if policy.mutations[1].PatchType != "JSONPatch" {
+		t.Errorf("mutation[1] patchType = %q, want JSONPatch", policy.mutations[1].PatchType)
 	}
 	if policy.hasParams {
 		t.Error("hasParams should be false when paramKind is not set")
@@ -242,11 +242,11 @@ validations:
 		if err != nil {
 			t.Fatalf("ParseAdmissionPolicyFile() error: %v", err)
 		}
-		if len(policy.Variables) != 1 {
-			t.Errorf("got %d variables, want 1", len(policy.Variables))
+		if len(policy.variables) != 1 {
+			t.Errorf("got %d variables, want 1", len(policy.variables))
 		}
-		if len(policy.Validations) != 1 {
-			t.Errorf("got %d validations, want 1", len(policy.Validations))
+		if len(policy.validations) != 1 {
+			t.Errorf("got %d validations, want 1", len(policy.validations))
 		}
 	})
 
@@ -302,11 +302,11 @@ namespaceObject:
 	if err != nil {
 		t.Fatalf("ParseAdmissionInput() error: %v", err)
 	}
-	object := input.Object.(map[string]interface{})
+	object := input.object.(map[string]interface{})
 	if object["kind"] != "Pod" {
 		t.Errorf("object.kind = %v, want Pod", object["kind"])
 	}
-	params := input.Params.(map[string]interface{})
+	params := input.params.(map[string]interface{})
 	if params["kind"] != "ConfigMap" {
 		t.Errorf("params.kind = %v, want ConfigMap", params["kind"])
 	}
@@ -322,12 +322,12 @@ namespaceObject:
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 	policy := &AdmissionPolicy{
-		Validations: []Validation{{Path: "validations[0]", Expression: "params.data.allowed == 'true'"}},
+		validations: []validation{{Path: "validations[0]", Expression: "params.data.allowed == 'true'"}},
 	}
-	policy.SetHasParams(true)
-	result, err := e.EvalAdmission(policy, input)
+	policy.setHasParams(true)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
 		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
@@ -366,18 +366,13 @@ request:
 		t.Fatalf("ParseAdmissionInput() error: %v", err)
 	}
 
-	e, err := NewEvaluator(WithPreambleVariables(
-		Variable{
-			Name:       "params",
-			Expression: `!has(params.spec) ? null : !has(params.spec.parameters) ? null : params.spec.parameters`,
-		},
-	))
+	e, err := NewEvaluator(WithPreambleVariables(PreambleVariable{Name: "params", Expression: `!has(params.spec) ? null : !has(params.spec.parameters) ? null : params.spec.parameters`}))
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:       "validations[0]",
 				Expression: `variables.params.labels.all(entry, has(object.metadata.labels) && entry.key in object.metadata.labels)`,
@@ -385,11 +380,11 @@ request:
 			},
 		},
 	}
-	policy.SetHasParams(true)
+	policy.setHasParams(true)
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
 		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
@@ -412,11 +407,11 @@ webhooks:
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.MatchConditions) != 2 {
-		t.Fatalf("got %d matchConditions, want 2", len(policy.MatchConditions))
+	if len(policy.matchConditions) != 2 {
+		t.Fatalf("got %d matchConditions, want 2", len(policy.matchConditions))
 	}
-	if policy.MatchConditions[0].Path != "webhooks[0].matchConditions[0]" {
-		t.Errorf("matchCondition[0] path = %q, want %q", policy.MatchConditions[0].Path, "webhooks[0].matchConditions[0]")
+	if policy.matchConditions[0].Path != "webhooks[0].matchConditions[0]" {
+		t.Errorf("matchCondition[0] path = %q, want %q", policy.matchConditions[0].Path, "webhooks[0].matchConditions[0]")
 	}
 	if policy.hasParams {
 		t.Error("hasParams should be false for webhook configurations")
@@ -437,11 +432,11 @@ webhooks:
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.MatchConditions) != 1 {
-		t.Fatalf("got %d matchConditions, want 1", len(policy.MatchConditions))
+	if len(policy.matchConditions) != 1 {
+		t.Fatalf("got %d matchConditions, want 1", len(policy.matchConditions))
 	}
-	if policy.MatchConditions[0].Expression != "request.resource.resource == 'pods'" {
-		t.Errorf("unexpected expression: %q", policy.MatchConditions[0].Expression)
+	if policy.matchConditions[0].Expression != "request.resource.resource == 'pods'" {
+		t.Errorf("unexpected expression: %q", policy.matchConditions[0].Expression)
 	}
 }
 

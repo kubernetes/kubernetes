@@ -40,45 +40,45 @@ func (o *unconvertibleRuntimeObject) DeepCopyObject() runtime.Object {
 	return &out
 }
 
-func TestEvalAdmission_Allowed(t *testing.T) {
+func TestEvalValidations_Allowed(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "object.metadata.name == 'allowed-name'"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "allowed-name"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
-		t.Errorf("EvalAdmission() Allowed = false, want true; violations: %s", result.FormatViolations())
+		t.Errorf("EvalValidations() Allowed = false, want true; violations: %s", result.FormatViolations())
 	}
 	if result.Cost <= 0 {
-		t.Errorf("EvalAdmission() Cost = %d, want > 0", result.Cost)
+		t.Errorf("EvalValidations() Cost = %d, want > 0", result.Cost)
 	}
 }
 
-func TestEvalAdmission_TypedAdmissionInput(t *testing.T) {
+func TestEvalValidations_TypedAdmissionInput(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "object.kind == 'Pod'"},
 			{Path: "validations[1]", Expression: "request.kind.kind == 'Pod'"},
 			{Path: "validations[2]", Expression: "request.resource.resource == 'pods'"},
@@ -88,10 +88,10 @@ func TestEvalAdmission_TypedAdmissionInput(t *testing.T) {
 			{Path: "validations[6]", Expression: "params.data.requiredTeam == object.metadata.labels.team"},
 		},
 	}
-	policy.SetHasParams(true)
+	policy.setHasParams(true)
 
 	input := &AdmissionInput{
-		Object: &corev1.Pod{
+		object: &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "typed-pod",
 				Namespace: "default",
@@ -101,42 +101,42 @@ func TestEvalAdmission_TypedAdmissionInput(t *testing.T) {
 				Containers: []corev1.Container{{Name: "app", Image: "registry.k8s.io/pause:3.10"}},
 			},
 		},
-		Params: &corev1.ConfigMap{
+		params: &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy-config"},
 			Data:       map[string]string{"requiredTeam": "platform"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
 		t.Fatalf("expected Allowed=true for typed input, got violations: %s", result.FormatViolations())
 	}
 }
 
-func TestEvalAdmission_TypedOldObject(t *testing.T) {
+func TestEvalValidations_TypedOldObject(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
 			{Path: "validations[1]", Expression: "oldObject.metadata.labels.version == 'old'"},
 			{Path: "validations[2]", Expression: "object.metadata.labels.version == 'new'"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: &corev1.Pod{
+		object: &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "typed-pod",
 				Labels: map[string]string{"version": "new"},
 			},
 		},
-		OldObject: &corev1.Pod{
+		oldObject: &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "typed-pod",
 				Labels: map[string]string{"version": "old"},
@@ -144,16 +144,16 @@ func TestEvalAdmission_TypedOldObject(t *testing.T) {
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
 		t.Fatalf("expected typed oldObject update to allow, got violations: %s", result.FormatViolations())
 	}
 }
 
-func TestEvalAdmission_TypedAdmissionInputConversionErrors(t *testing.T) {
+func TestEvalValidations_TypedAdmissionInputConversionErrors(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
@@ -172,17 +172,17 @@ func TestEvalAdmission_TypedAdmissionInputConversionErrors(t *testing.T) {
 	}{
 		{
 			name: "object",
-			in:   &AdmissionInput{Object: badObject()},
+			in:   &AdmissionInput{object: badObject()},
 			want: "converting object",
 		},
 		{
 			name: "oldObject",
-			in:   &AdmissionInput{OldObject: badObject()},
+			in:   &AdmissionInput{oldObject: badObject()},
 			want: "converting oldObject",
 		},
 		{
 			name: "params",
-			in:   &AdmissionInput{Params: badObject()},
+			in:   &AdmissionInput{params: badObject()},
 			want: "converting params",
 		},
 	}
@@ -199,14 +199,14 @@ func TestEvalAdmission_TypedAdmissionInputConversionErrors(t *testing.T) {
 	}
 }
 
-func TestEvalAdmission_Denied(t *testing.T) {
+func TestEvalValidations_Denied(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:       "validations[0]",
 				Expression: "object.metadata.name != 'bad-name'",
@@ -215,36 +215,36 @@ func TestEvalAdmission_Denied(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "bad-name"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if result.Allowed {
-		t.Error("EvalAdmission() Allowed = true, want false")
+		t.Error("EvalValidations() Allowed = true, want false")
 	}
 	if len(result.Violations) != 1 {
-		t.Fatalf("EvalAdmission() got %d violations, want 1", len(result.Violations))
+		t.Fatalf("EvalValidations() got %d violations, want 1", len(result.Violations))
 	}
 	if result.Violations[0].Message != "name must not be bad-name" {
 		t.Errorf("violation message = %q, want %q", result.Violations[0].Message, "name must not be bad-name")
 	}
 }
 
-func TestEvalAdmission_MessageExpression(t *testing.T) {
+func TestEvalValidations_MessageExpression(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:              "validations[0]",
 				Expression:        "false",
@@ -254,19 +254,19 @@ func TestEvalAdmission_MessageExpression(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "my-pod"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if result.Allowed {
-		t.Error("EvalAdmission() Allowed = true, want false")
+		t.Error("EvalValidations() Allowed = true, want false")
 	}
 	if len(result.Violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(result.Violations))
@@ -279,14 +279,14 @@ func TestEvalAdmission_MessageExpression(t *testing.T) {
 	}
 }
 
-func TestEvalAdmission_MessageExpressionError(t *testing.T) {
+func TestEvalValidations_MessageExpressionError(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:              "validations[0]",
 				Expression:        "false",
@@ -296,16 +296,16 @@ func TestEvalAdmission_MessageExpressionError(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if len(result.Violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(result.Violations))
@@ -319,14 +319,14 @@ func TestEvalAdmission_MessageExpressionError(t *testing.T) {
 	}
 }
 
-func TestEvalAdmission_MessageExpressionDoesNotDeclareAuthorizer(t *testing.T) {
+func TestEvalValidations_MessageExpressionDoesNotDeclareAuthorizer(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:              "validations[0]",
 				Expression:        "false",
@@ -336,16 +336,16 @@ func TestEvalAdmission_MessageExpressionDoesNotDeclareAuthorizer(t *testing.T) {
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if len(result.Violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(result.Violations))
@@ -357,39 +357,35 @@ func TestEvalAdmission_MessageExpressionDoesNotDeclareAuthorizer(t *testing.T) {
 		t.Errorf("violation message = %q, want fallback", result.Violations[0].Message)
 	}
 
-	_, err = e.EvalValidation(policy, ValidationSelector{Path: "validations[0]", Part: "messageExpression"}, input)
-	if err == nil {
-		t.Fatal("expected EvalValidation messageExpression to reject authorizer")
-	}
 }
 
-func TestEvalAdmission_Variables(t *testing.T) {
+func TestEvalValidations_Variables(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Variables: []Variable{
+		variables: []variable{
 			{Name: "podName", Expression: "object.metadata.name"},
 			{Name: "isAllowed", Expression: "variables.podName == 'good-pod'"},
 		},
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "variables.isAllowed"},
 		},
 	}
 
 	t.Run("allowed", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "good-pod"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
@@ -398,15 +394,15 @@ func TestEvalAdmission_Variables(t *testing.T) {
 
 	t.Run("denied", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "bad-pod"},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Allowed {
 			t.Error("expected Allowed=false")
@@ -421,13 +417,13 @@ func TestEvalVariable(t *testing.T) {
 	}
 
 	policy := &AdmissionPolicy{
-		Variables: []Variable{
+		variables: []variable{
 			{Name: "podName", Expression: "object.metadata.name"},
 			{Name: "nameLen", Expression: "size(variables.podName)"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "hello"},
@@ -462,85 +458,19 @@ func TestEvalVariable(t *testing.T) {
 	})
 }
 
-func TestEvalValidation(t *testing.T) {
+func TestEvalValidations_EvaluatesValidationsIndependentlyOfMatchConditions(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
-			{
-				Path:              "validations[0]",
-				Expression:        "object.metadata.name == 'test'",
-				Message:           "name must be test",
-				MessageExpression: "'got: ' + object.metadata.name",
-			},
-		},
-	}
-	input := &AdmissionInput{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "test"},
-		},
-	}
-
-	t.Run("expression part", func(t *testing.T) {
-		val, err := e.EvalValidation(policy, ValidationSelector{Path: "validations[0]"}, input)
-		if err != nil {
-			t.Fatalf("EvalValidation() error: %v", err)
-		}
-		if val != true {
-			t.Errorf("EvalValidation() = %v, want true", val)
-		}
-	})
-
-	t.Run("messageExpression part", func(t *testing.T) {
-		val, err := e.EvalValidation(policy, ValidationSelector{Path: "validations[0]", Part: "messageExpression"}, input)
-		if err != nil {
-			t.Fatalf("EvalValidation() error: %v", err)
-		}
-		if val != "got: test" {
-			t.Errorf("EvalValidation() = %v, want %q", val, "got: test")
-		}
-	})
-
-	t.Run("empty path", func(t *testing.T) {
-		_, err := e.EvalValidation(policy, ValidationSelector{}, input)
-		if err == nil {
-			t.Error("expected error for empty path")
-		}
-	})
-
-	t.Run("not found path", func(t *testing.T) {
-		_, err := e.EvalValidation(policy, ValidationSelector{Path: "validations[99]"}, input)
-		if err == nil {
-			t.Error("expected error for missing path")
-		}
-	})
-
-	t.Run("unsupported part", func(t *testing.T) {
-		_, err := e.EvalValidation(policy, ValidationSelector{Path: "validations[0]", Part: "bogus"}, input)
-		if err == nil {
-			t.Error("expected error for unsupported part")
-		}
-	})
-}
-
-func TestEvalAdmission_EvaluatesValidationsIndependentlyOfMatchConditions(t *testing.T) {
-	e, err := NewEvaluator()
-	if err != nil {
-		t.Fatalf("NewEvaluator() error: %v", err)
-	}
-
-	policy := &AdmissionPolicy{
-		MatchConditions: []MatchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
-		Validations:     []Validation{{Path: "spec.validations[0]", Expression: "false", Message: "validation still evaluated"}},
+		matchConditions: []matchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
+		validations:     []validation{{Path: "spec.validations[0]", Expression: "false", Message: "validation still evaluated"}},
 	}
 
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{
@@ -550,9 +480,9 @@ func TestEvalAdmission_EvaluatesValidationsIndependentlyOfMatchConditions(t *tes
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if result.Allowed {
 		t.Fatal("expected validation to be evaluated and deny")
@@ -562,19 +492,19 @@ func TestEvalAdmission_EvaluatesValidationsIndependentlyOfMatchConditions(t *tes
 	}
 }
 
-func TestEvalAdmission_RequestFields(t *testing.T) {
+func TestEvalValidations_RequestFields(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "request.operation == 'CREATE'"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
@@ -586,95 +516,95 @@ func TestEvalAdmission_RequestFields(t *testing.T) {
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
 		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
 	}
 }
 
-func TestEvalAdmission_CompilationError(t *testing.T) {
+func TestEvalValidations_CompilationError(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "???invalid"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
 	}
 
-	_, err = e.EvalAdmission(policy, input)
+	_, err = e.EvalValidations(policy, input)
 	if err == nil {
-		t.Error("EvalAdmission() expected compilation error")
+		t.Error("EvalValidations() expected compilation error")
 	}
 }
 
-func TestEvalAdmission_RejectsPatchTypes(t *testing.T) {
+func TestEvalValidations_RejectsPatchTypes(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{{Path: "validations[0]", Expression: patchTypeBoolExpression}},
+		validations: []validation{{Path: "validations[0]", Expression: patchTypeBoolExpression}},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
 	}
 
-	if _, err := e.EvalAdmission(policy, input); err == nil {
+	if _, err := e.EvalValidations(policy, input); err == nil {
 		t.Fatal("expected validation evaluation to reject mutation patch types")
-	}
-	if _, err := e.EvalValidation(policy, ValidationSelector{Path: "validations[0]"}, input); err == nil {
-		t.Fatal("expected single validation evaluation to reject mutation patch types")
 	}
 }
 
-func TestEvalAdmission_MultipleValidations(t *testing.T) {
+func TestEvalValidations_MultipleValidations(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "true"},
 			{Path: "validations[1]", Expression: "false", Message: "always fails"},
 			{Path: "validations[2]", Expression: "true"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if result.Allowed {
 		t.Error("expected Allowed=false when one validation fails")
 	}
 	if len(result.Violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(result.Violations))
+	}
+	if result.Violations[0].Expression != "false" {
+		t.Errorf("violation expression = %q, want false", result.Violations[0].Expression)
 	}
 	if result.Violations[0].Message != "always fails" {
 		t.Errorf("violation message = %q, want %q", result.Violations[0].Message, "always fails")
@@ -683,30 +613,28 @@ func TestEvalAdmission_MultipleValidations(t *testing.T) {
 
 func TestPreambleVariables(t *testing.T) {
 	e, err := NewEvaluator(
-		WithPreambleVariables(
-			Variable{Name: "alwaysTrue", Expression: "true"},
-		),
+		WithPreambleVariables(PreambleVariable{Name: "alwaysTrue", Expression: "true"}),
 	)
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{Path: "validations[0]", Expression: "variables.alwaysTrue"},
 		},
 	}
 	input := &AdmissionInput{
-		Object: map[string]interface{}{
+		object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata":   map[string]interface{}{"name": "test"},
 		},
 	}
 
-	result, err := e.EvalAdmission(policy, input)
+	result, err := e.EvalValidations(policy, input)
 	if err != nil {
-		t.Fatalf("EvalAdmission() error: %v", err)
+		t.Fatalf("EvalValidations() error: %v", err)
 	}
 	if !result.Allowed {
 		t.Errorf("expected Allowed=true with preamble variable, got violations: %s", result.FormatViolations())
@@ -721,26 +649,26 @@ func TestSetHasParams(t *testing.T) {
 
 	t.Run("params enabled", func(t *testing.T) {
 		policy := &AdmissionPolicy{
-			Validations: []Validation{
+			validations: []validation{
 				{Path: "validations[0]", Expression: "params.data.maxReplicas == '5'"},
 			},
 		}
-		policy.SetHasParams(true)
+		policy.setHasParams(true)
 
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "test"},
 			},
-			Params: map[string]interface{}{
+			params: map[string]interface{}{
 				"data": map[string]interface{}{"maxReplicas": "5"},
 			},
 		}
 
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
@@ -749,47 +677,47 @@ func TestSetHasParams(t *testing.T) {
 
 	t.Run("params disabled causes compilation error", func(t *testing.T) {
 		policy := &AdmissionPolicy{
-			Validations: []Validation{
+			validations: []validation{
 				{Path: "validations[0]", Expression: "params.data.maxReplicas == '5'"},
 			},
 		}
-		policy.SetHasParams(false)
+		policy.setHasParams(false)
 
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "test"},
 			},
 		}
 
-		_, err := e.EvalAdmission(policy, input)
+		_, err := e.EvalValidations(policy, input)
 		if err == nil {
 			t.Error("expected compilation error when params is disabled but expression references params")
 		}
 	})
 
 	t.Run("default enables params", func(t *testing.T) {
-		// Manually constructed policy without SetHasParams should default to params enabled.
+		// Manually constructed policy without setHasParams should default to params enabled.
 		policy := &AdmissionPolicy{
-			Validations: []Validation{
+			validations: []validation{
 				{Path: "validations[0]", Expression: "params.data.key == 'val'"},
 			},
 		}
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "test"},
 			},
-			Params: map[string]interface{}{
+			params: map[string]interface{}{
 				"data": map[string]interface{}{"key": "val"},
 			},
 		}
 
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true with default params, got violations: %s", result.FormatViolations())
@@ -797,14 +725,14 @@ func TestSetHasParams(t *testing.T) {
 	})
 }
 
-func TestEvalAdmission_OldObject(t *testing.T) {
+func TestEvalValidations_OldObject(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
 	policy := &AdmissionPolicy{
-		Validations: []Validation{
+		validations: []validation{
 			{
 				Path:       "validations[0]",
 				Expression: "object.metadata.name != oldObject.metadata.name",
@@ -815,12 +743,12 @@ func TestEvalAdmission_OldObject(t *testing.T) {
 
 	t.Run("names differ", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "new-name"},
 			},
-			OldObject: map[string]interface{}{
+			oldObject: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "old-name"},
@@ -832,9 +760,9 @@ func TestEvalAdmission_OldObject(t *testing.T) {
 			},
 		}
 
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
@@ -843,12 +771,12 @@ func TestEvalAdmission_OldObject(t *testing.T) {
 
 	t.Run("names same", func(t *testing.T) {
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "same-name"},
 			},
-			OldObject: map[string]interface{}{
+			oldObject: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "same-name"},
@@ -860,9 +788,9 @@ func TestEvalAdmission_OldObject(t *testing.T) {
 			},
 		}
 
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalValidations(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if result.Allowed {
 			t.Error("expected Allowed=false when names are the same")
@@ -878,12 +806,12 @@ func TestEvalAdmission_OldObject(t *testing.T) {
 	t.Run("inferred update operation", func(t *testing.T) {
 		// When both object and oldObject are set without explicit request, operation should be inferred as UPDATE.
 		input := &AdmissionInput{
-			Object: map[string]interface{}{
+			object: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "new-name"},
 			},
-			OldObject: map[string]interface{}{
+			oldObject: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata":   map[string]interface{}{"name": "old-name"},
@@ -891,14 +819,14 @@ func TestEvalAdmission_OldObject(t *testing.T) {
 		}
 
 		policyOp := &AdmissionPolicy{
-			Validations: []Validation{
+			validations: []validation{
 				{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
 			},
 		}
 
-		result, err := e.EvalAdmission(policyOp, input)
+		result, err := e.EvalValidations(policyOp, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalValidations() error: %v", err)
 		}
 		if !result.Allowed {
 			t.Errorf("expected inferred UPDATE operation, got violations: %s", result.FormatViolations())

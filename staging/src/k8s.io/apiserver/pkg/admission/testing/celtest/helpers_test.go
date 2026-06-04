@@ -46,15 +46,15 @@ func TestResolveEquivalentGVK(t *testing.T) {
 		{
 			name: "from object apiVersion/kind",
 			input: &AdmissionInput{
-				Object: map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap"},
+				object: map[string]interface{}{"apiVersion": "v1", "kind": "ConfigMap"},
 			},
 			want: schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
 		},
 		{
 			name: "from oldObject when object has no GVK",
 			input: &AdmissionInput{
-				Object:    map[string]interface{}{"metadata": map[string]interface{}{"name": "x"}},
-				OldObject: map[string]interface{}{"apiVersion": "v1", "kind": "Secret"},
+				object:    map[string]interface{}{"metadata": map[string]interface{}{"name": "x"}},
+				oldObject: map[string]interface{}{"apiVersion": "v1", "kind": "Secret"},
 			},
 			want: schema.GroupVersionKind{Version: "v1", Kind: "Secret"},
 		},
