@@ -21,11 +21,15 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -587,5 +591,174 @@ func TestAdmit(t *testing.T) {
 		if !ctnActual.Admit && ctnActual.Reason != ErrorTopologyAffinity {
 			t.Errorf("Error occurred, expected Reason in result to be %v got %v", ErrorTopologyAffinity, ctnActual.Reason)
 		}
+	}
+}
+
+type trackingHintProvider struct {
+	podHintsCalled          bool
+	containerHintsCalled    bool
+	allocatePodCalled       bool
+	allocateContainerCalled bool
+	hints                   map[string][]TopologyHint
+}
+
+func (m *trackingHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
+	m.containerHintsCalled = true
+	return m.hints
+}
+
+func (m *trackingHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
+	m.podHintsCalled = true
+	return m.hints
+}
+
+func (m *trackingHintProvider) AllocatePod(pod *v1.Pod) error {
+	m.allocatePodCalled = true
+	return nil
+}
+
+func (m *trackingHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+	m.allocateContainerCalled = true
+	return nil
+}
+
+func TestAdmitWithPodLevelResources(t *testing.T) {
+	numaInfo := &NUMAInfo{
+		Nodes: []int{0, 1},
+		NUMADistances: NUMADistances{
+			0: {10, 11},
+			1: {11, 10},
+		},
+	}
+	opts := PolicyOptions{}
+	restrictedPolicy := NewRestrictedPolicy(numaInfo, opts)
+
+	tcases := []struct {
+		name                            string
+		podLevelResourcesEnabled        bool
+		podLevelResourceManagersEnabled bool
+		pod                             *v1.Pod
+		expectedAdmit                   bool
+		expectedPodHintsCalled          bool
+		expectedContainerHintsCalled    bool
+		expectedAllocatePodCalled       bool
+		expectedAllocateContainerCalled bool
+		scope                           Scope
+	}{
+		{
+			name:                            "pod scope, feature disabled, falls back to container level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          true,
+			expectedContainerHintsCalled:    false,
+			expectedAllocatePodCalled:       false,
+			expectedAllocateContainerCalled: true,
+			scope:                           NewPodScope(restrictedPolicy),
+		},
+		{
+			name:                            "pod scope, feature enabled, uses pod-level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          true,
+			expectedContainerHintsCalled:    false,
+			expectedAllocatePodCalled:       true,
+			expectedAllocateContainerCalled: false,
+			scope:                           NewPodScope(restrictedPolicy),
+		},
+		{
+			name:                            "container scope, feature enabled, uses container-level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          false,
+			expectedContainerHintsCalled:    true,
+			expectedAllocatePodCalled:       false,
+			expectedAllocateContainerCalled: true,
+			scope:                           NewContainerScope(restrictedPolicy),
+		},
+		{
+			name:                            "container scope, feature disabled, uses container-level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          false,
+			expectedContainerHintsCalled:    true,
+			expectedAllocatePodCalled:       false,
+			expectedAllocateContainerCalled: true,
+			scope:                           NewContainerScope(restrictedPolicy),
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+
+			tracker := &trackingHintProvider{
+				hints: map[string][]TopologyHint{
+					"resource": {
+						{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					},
+				},
+			}
+
+			m := manager{scope: tc.scope}
+			switch scope := tc.scope.(type) {
+			case *podScope:
+				scope.hintProviders = []HintProvider{tracker}
+			case *containerScope:
+				scope.hintProviders = []HintProvider{tracker}
+			}
+
+			podAttr := lifecycle.PodAdmitAttributes{Pod: tc.pod}
+			actual := m.Admit(tCtx, &podAttr)
+
+			if actual.Admit != tc.expectedAdmit {
+				t.Errorf("Expected Admit to be %v got %v", tc.expectedAdmit, actual.Admit)
+			}
+			if tracker.podHintsCalled != tc.expectedPodHintsCalled {
+				t.Errorf("Expected podHintsCalled to be %v got %v", tc.expectedPodHintsCalled, tracker.podHintsCalled)
+			}
+			if tracker.containerHintsCalled != tc.expectedContainerHintsCalled {
+				t.Errorf("Expected containerHintsCalled to be %v got %v", tc.expectedContainerHintsCalled, tracker.containerHintsCalled)
+			}
+			if tracker.allocatePodCalled != tc.expectedAllocatePodCalled {
+				t.Errorf("Expected allocatePodCalled to be %v got %v", tc.expectedAllocatePodCalled, tracker.allocatePodCalled)
+			}
+			if tracker.allocateContainerCalled != tc.expectedAllocateContainerCalled {
+				t.Errorf("Expected allocateContainerCalled to be %v got %v", tc.expectedAllocateContainerCalled, tracker.allocateContainerCalled)
+			}
+		})
 	}
 }

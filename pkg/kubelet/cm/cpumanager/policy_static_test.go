@@ -2421,6 +2421,60 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				expTotalErrors: 0,
 			},
 		},
+		{
+			description: "scope: pod, should reject a pod due to SMT alignment error when FullPhysicalCPUsOnly is enabled",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-smt-error", "3", "3", []containerSpec{}, []containerSpec{
+				{name: "gu-container", request: "3", limit: "3"},
+			}),
+			topologyHint:                    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:                          SMTAlignmentError{RequestedCPUs: 3, CpusPerCore: 2},
+			expPodAssignments:               state.ContainerCPUAssignments{},
+			expDefaultCPUSet:                cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 1,
+			},
+		},
+		{
+			description: "scope: pod, should successfully allocate CPUs for a pod when FullPhysicalCPUsOnly is enabled and CPU request is a multiple of SMT level",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-smt-success", "4", "4", []containerSpec{}, []containerSpec{
+				{name: "gu-container-1", request: "2", limit: "2"},
+				{name: "gu-container-2", request: "2", limit: "2"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAssignments: state.ContainerCPUAssignments{
+				"pod-smt-success": map[string]cpuset.CPUSet{
+					"gu-container-1": cpuset.New(2, 8),
+					"gu-container-2": cpuset.New(4, 10),
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(3, 5, 6, 7, 9, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              2,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
