@@ -32,10 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/cert"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -275,45 +272,21 @@ func TestNewCertificateManagerConfigGetTemplate(t *testing.T) {
 		name          string
 		nodeAddresses []v1.NodeAddress
 		want          *x509.CertificateRequest
-		featuregate   bool
 	}{
 		{
-			name:        "node addresses or hostnames and gate enabled",
-			featuregate: true,
+			name: "no addresses",
 		},
 		{
-			name:        "node addresses or hostnames and gate disabled",
-			featuregate: false,
-		},
-		{
-			name: "only hostnames and gate enabled",
+			name: "only hostnames",
 			nodeAddresses: []v1.NodeAddress{
 				{
 					Type:    v1.NodeHostName,
 					Address: nodeName,
 				},
 			},
-			want: &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-					Organization: []string{"system:nodes"},
-				},
-				DNSNames: []string{nodeName},
-			},
-			featuregate: true,
 		},
 		{
-			name: "only hostnames and gate disabled",
-			nodeAddresses: []v1.NodeAddress{
-				{
-					Type:    v1.NodeHostName,
-					Address: nodeName,
-				},
-			},
-			featuregate: false,
-		},
-		{
-			name: "only IP addresses and gate enabled",
+			name: "only IP addresses",
 			nodeAddresses: []v1.NodeAddress{
 				{
 					Type:    v1.NodeInternalIP,
@@ -327,27 +300,9 @@ func TestNewCertificateManagerConfigGetTemplate(t *testing.T) {
 				},
 				IPAddresses: []net.IP{nodeIP},
 			},
-			featuregate: true,
 		},
 		{
-			name: "only IP addresses and gate disabled",
-			nodeAddresses: []v1.NodeAddress{
-				{
-					Type:    v1.NodeInternalIP,
-					Address: nodeIP.String(),
-				},
-			},
-			want: &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-					Organization: []string{"system:nodes"},
-				},
-				IPAddresses: []net.IP{nodeIP},
-			},
-			featuregate: false,
-		},
-		{
-			name: "IP addresses and hostnames and gate enabled",
+			name: "IP addresses and hostnames",
 			nodeAddresses: []v1.NodeAddress{
 				{
 					Type:    v1.NodeHostName,
@@ -366,34 +321,10 @@ func TestNewCertificateManagerConfigGetTemplate(t *testing.T) {
 				DNSNames:    []string{nodeName},
 				IPAddresses: []net.IP{nodeIP},
 			},
-			featuregate: true,
-		},
-		{
-			name: "IP addresses and hostnames and gate disabled",
-			nodeAddresses: []v1.NodeAddress{
-				{
-					Type:    v1.NodeHostName,
-					Address: nodeName,
-				},
-				{
-					Type:    v1.NodeInternalIP,
-					Address: nodeIP.String(),
-				},
-			},
-			want: &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-					Organization: []string{"system:nodes"},
-				},
-				DNSNames:    []string{nodeName},
-				IPAddresses: []net.IP{nodeIP},
-			},
-			featuregate: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowDNSOnlyNodeCSR, tt.featuregate)
 			getAddresses := func() []v1.NodeAddress {
 				return tt.nodeAddresses
 			}
