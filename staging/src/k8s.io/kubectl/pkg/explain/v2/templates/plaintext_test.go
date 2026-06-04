@@ -659,7 +659,8 @@ func TestPlaintext(t *testing.T) {
 				"short": true,
 			},
 			Checks: []check{
-				checkEquals("thefield\t<string> -required-\n"),
+				checkEquals(`thefield	<string> -required-
+`),
 			},
 		},
 		{
@@ -681,7 +682,10 @@ func TestPlaintext(t *testing.T) {
 				"short": false,
 			},
 			Checks: []check{
-				checkEquals("thefield\t<string> -required-\n  a description that should be printed\n\n"),
+				checkEquals(`thefield	<string> -required-
+  a description that should be printed
+
+`),
 			},
 		},
 		{
@@ -704,7 +708,8 @@ func TestPlaintext(t *testing.T) {
 				"level": 5,
 			},
 			Checks: []check{
-				checkEquals("          thefield\t<string> -required-\n"),
+				checkEquals(`          thefield	<string> -required-
+`),
 			},
 		},
 		{
@@ -759,7 +764,8 @@ func TestPlaintext(t *testing.T) {
 				"short": true,
 			},
 			Checks: []check{
-				checkEquals("thefield\t<string>\n"),
+				checkEquals(`thefield	<string>
+`),
 			},
 		},
 		{
@@ -790,7 +796,11 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1\n    2\n    3"),
+				checkEquals(`ENUM:
+    0
+    1
+    2
+    3`),
 			},
 		},
 		{
@@ -807,7 +817,8 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, 2, 3"),
+				checkEquals(`
+  enum: 0, 1, 2, 3`),
 			},
 		},
 		{
@@ -825,7 +836,8 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("\n  enum: 0, 1, ...."),
+				checkEquals(`
+  enum: 0, 1, ....`),
 			},
 		},
 		{
@@ -843,7 +855,9 @@ func TestPlaintext(t *testing.T) {
 				"indentAmount": 2,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    0\n    1, ...."),
+				checkEquals(`ENUM:
+    0
+    1, ....`),
 			},
 		},
 		{
@@ -859,7 +873,10 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
+				checkEquals(`ENUM:
+    Block
+    File
+    ""`),
 			},
 		},
 		{
@@ -1042,7 +1059,20 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  0,
 			},
 			Checks: []check{
-				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    id\t<string>\n    tags\t<Object>\n      key\t<string>\n  name\t<string>\n\n"),
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+      key	<string>
+  name	<string>
+
+`),
 			},
 		},
 		{
@@ -1055,7 +1085,17 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  1,
 			},
 			Checks: []check{
-				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n  name\t<string>\n\n"),
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+  name	<string>
+
+`),
 			},
 		},
 		{
@@ -1068,7 +1108,19 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  2,
 			},
 			Checks: []check{
-				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    id\t<string>\n    tags\t<Object>\n  name\t<string>\n\n"),
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+  name	<string>
+
+`),
 			},
 		},
 		{
@@ -1081,7 +1133,20 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  100,
 			},
 			Checks: []check{
-				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    id\t<string>\n    tags\t<Object>\n      key\t<string>\n  name\t<string>\n\n"),
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    id	<string>
+    tags	<Object>
+      key	<string>
+  name	<string>
+
+`),
 			},
 		},
 		{
@@ -1094,7 +1159,21 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  5,
 			},
 			Checks: []check{
-				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    <no description>\n\n  name\t<string>\n    <no description>\n\n\n"),
+				checkEquals(`GROUP:      example.com
+KIND:       Widget
+VERSION:    v1
+
+DESCRIPTION:
+    <empty>
+FIELDS:
+  meta	<Object>
+    <no description>
+
+  name	<string>
+    <no description>
+
+
+`),
 			},
 		},
 	}

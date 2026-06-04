@@ -84,50 +84,55 @@ func TestExplainMaxDepth(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	t.Run("negative max-depth fails validation", func(t *testing.T) {
-		flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
-		flags.MaxDepth = -1
+	testCases := []struct {
+		name          string
+		recursive     bool
+		maxDepth      int
+		expectedError string
+	}{
+		{
+			name:          "negative max-depth fails validation",
+			maxDepth:      -1,
+			expectedError: "--max-depth must be non-negative",
+		},
+		{
+			name:          "max-depth without recursive fails validation",
+			maxDepth:      2,
+			expectedError: "--max-depth requires --recursive",
+		},
+		{
+			name:      "max-depth with recursive passes validation",
+			recursive: true,
+			maxDepth:  2,
+		},
+	}
 
-		opts, err := flags.ToOptions(tf, "kubectl", []string{"pods"})
-		if err != nil {
-			t.Fatalf("unexpected error %v", err)
-		}
-		err = opts.Validate()
-		if err == nil || err.Error() != "--max-depth must be non-negative" {
-			t.Errorf("expected validation error for negative max-depth, got: %v", err)
-		}
-	})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
+			flags.Recursive = tc.recursive
+			flags.MaxDepth = tc.maxDepth
 
-	t.Run("max-depth without recursive fails validation", func(t *testing.T) {
-		flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
-		flags.MaxDepth = 2
+			opts, err := flags.ToOptions(tf, "kubectl", []string{"pods"})
+			if err != nil {
+				t.Fatalf("unexpected error %v", err)
+			}
 
-		opts, err := flags.ToOptions(tf, "kubectl", []string{"pods"})
-		if err != nil {
-			t.Fatalf("unexpected error %v", err)
-		}
-		err = opts.Validate()
-		if err == nil || err.Error() != "--max-depth requires --recursive" {
-			t.Errorf("expected validation error when --max-depth is set without --recursive, got: %v", err)
-		}
-	})
-
-	t.Run("max-depth with recursive passes validation", func(t *testing.T) {
-		flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
-		flags.MaxDepth = 2
-		flags.Recursive = true
-
-		opts, err := flags.ToOptions(tf, "kubectl", []string{"pods"})
-		if err != nil {
-			t.Fatalf("unexpected error %v", err)
-		}
-		if err := opts.Validate(); err != nil {
-			t.Errorf("unexpected validation error: %v", err)
-		}
-		if opts.MaxDepth != 2 {
-			t.Errorf("expected MaxDepth=2, got %d", opts.MaxDepth)
-		}
-	})
+			err = opts.Validate()
+			if len(tc.expectedError) > 0 {
+				if err == nil || err.Error() != tc.expectedError {
+					t.Errorf("expected validation error %q, got: %v", tc.expectedError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected validation error: %v", err)
+			}
+			if opts.MaxDepth != tc.maxDepth {
+				t.Errorf("expected MaxDepth=%d, got %d", tc.maxDepth, opts.MaxDepth)
+			}
+		})
+	}
 }
 
 func TestExplainNotExistResource(t *testing.T) {

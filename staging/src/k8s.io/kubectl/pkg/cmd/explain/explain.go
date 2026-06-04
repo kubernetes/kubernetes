@@ -51,6 +51,9 @@ var (
 		# Get all the fields in the resource
 		kubectl explain pods --recursive
 
+		# Get fields in the resource up to a specific recursive depth
+		kubectl explain pods --recursive --max-depth=2
+
 		# Get the explanation for deployment in supported api versions
 		kubectl explain deployments --api-version=apps/v1
 
