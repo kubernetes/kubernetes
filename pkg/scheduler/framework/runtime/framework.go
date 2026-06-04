@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -438,9 +439,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
-	}
-	if len(f.placementGeneratePlugins) > 1 {
-		return nil, fmt.Errorf("at most one placement generate plugin is allowed for profile with scheduler name %q", profile.SchedulerName)
 	}
 
 	podScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.ScorePlugin](), append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...))
@@ -2068,34 +2066,149 @@ func (f *frameworkImpl) AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]ti
 	f.waitingPods.add(waitingPod)
 }
 
-// RunPlacementGeneratePlugins runs the set of configured PlacementGeneratePlugins and returns the generated placements.
-// If no plugins are defined, the input placement is returned instead.
+// placementNameSeparator joins the names of the placements that are combined into a single
+// merged placement. It is also used as the prefix delimiter for disambiguating rare name
+// collisions, so it must not be a character that plugins are likely to rely on for parsing.
+const placementNameSeparator = "/"
+
+// RunPlacementGeneratePlugins runs the configured PlacementGeneratePlugins and returns the
+// generated placements. Each plugin is run independently against the same input node set, and
+// the framework merges their results: a pod must satisfy the constraints of every plugin, so
+// the merged placements are the cross product of the per-plugin placements, intersected by
+// node. Per-placement state attached by a plugin (keyed by placement name) is carried into the
+// merged placements. If no plugins are defined, or all plugins decline to constrain the input,
+// the input placement is returned instead.
 func (f *frameworkImpl) RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) (placements []*fwk.Placement, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementGenerate, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	placement := &fwk.Placement{
+	inputPlacement := &fwk.Placement{
 		Nodes: nodes,
 	}
 
 	if len(f.placementGeneratePlugins) == 0 {
-		return []*fwk.Placement{placement}, nil
+		return []*fwk.Placement{inputPlacement}, nil
 	}
 
-	plugin := f.placementGeneratePlugins[0]
-
-	result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, placement)
-	if !status.IsSuccess() {
-		return nil, status.WithPlugin(plugin.Name())
+	// Run each plugin independently and collect the placements that actually constrain the
+	// input. A plugin that returns the input placement unchanged imposes no constraint and is
+	// skipped (it carries no per-placement state, since state is keyed by placement name).
+	var constrained [][]*fwk.Placement
+	for _, plugin := range f.placementGeneratePlugins {
+		result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, inputPlacement)
+		if !status.IsSuccess() {
+			return nil, status.WithPlugin(plugin.Name())
+		}
+		if result == nil || len(result.Placements) == 0 {
+			return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+		}
+		if len(result.Placements) == 1 && result.Placements[0] == inputPlacement {
+			continue
+		}
+		constrained = append(constrained, result.Placements)
 	}
 
-	if len(result.Placements) == 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+	if len(constrained) == 0 {
+		return []*fwk.Placement{inputPlacement}, nil
 	}
 
-	return result.Placements, nil
+	// A single constraining plugin needs no merging; return its placements unchanged to
+	// preserve the original single-plugin behavior (names are passed through as-is).
+	if len(constrained) == 1 {
+		return constrained[0], nil
+	}
+
+	// When merging multiple plugins, placement names become the keys used to combine and look
+	// up per-placement state, so every placement must be uniquely named.
+	names := sets.New[string]()
+	for _, plugin := range constrained {
+		for _, p := range plugin {
+			if p.Name == "" {
+				return nil, fwk.AsStatus(fmt.Errorf("placement generate plugin returned a placement with an empty name"))
+			}
+			if strings.Contains(p.Name, placementNameSeparator) {
+				return nil, fwk.AsStatus(fmt.Errorf("placement name %q must not contain %q", p.Name, placementNameSeparator))
+			}
+			if names.Has(p.Name) {
+				return nil, fwk.AsStatus(fmt.Errorf("placement generate plugins returned duplicate placement name %q", p.Name))
+			}
+			names.Insert(p.Name)
+		}
+	}
+
+	merged := constrained[0]
+	for i := 1; i < len(constrained); i++ {
+		merged, status = f.mergePlacements(merged, constrained[i], state)
+		if !status.IsSuccess() {
+			return nil, status
+		}
+		if len(merged) == 0 {
+			return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible merged placements found")
+		}
+	}
+
+	return merged, nil
+}
+
+// mergePlacements combines two sets of placements into their cross product, where each merged
+// placement's node set is the intersection of a placement from each set. Pairs with an empty
+// intersection are dropped. The per-placement state of the two source placements is combined
+// and registered under the merged placement's name.
+func (f *frameworkImpl) mergePlacements(as, bs []*fwk.Placement, state fwk.PodGroupCycleState) (_ []*fwk.Placement, status *fwk.Status) {
+	stateImpl, _ := state.(*framework.CycleState)
+
+	var result []*fwk.Placement
+	seen := sets.New[string]()
+	for _, a := range as {
+		for _, b := range bs {
+			nodes := intersectNodes(a.Nodes, b.Nodes)
+			if len(nodes) == 0 {
+				continue
+			}
+
+			name := a.Name + placementNameSeparator + b.Name
+			// Belt-and-suspenders: plugin names are validated to exclude the separator, so
+			// pairs cannot collapse, but keep merged names unique across fold-merge rounds.
+			for seen.Has(name) {
+				name += placementNameSeparator
+			}
+			seen.Insert(name)
+
+			if stateImpl != nil {
+				if err := stateImpl.MergePlacementStatesInto(name, a.Name, b.Name); err != nil {
+					return nil, fwk.AsStatus(err)
+				}
+			}
+			result = append(result, &fwk.Placement{Name: name, Nodes: nodes})
+		}
+	}
+	return result, fwk.NewStatus(fwk.Success)
+}
+
+// intersectNodes returns the NodeInfos present in both as and bs, matched by node name. It
+// preserves the order and the NodeInfo instances of as (which come from the scheduler snapshot,
+// whose identity AssumePlacement relies on) and removes duplicates.
+func intersectNodes(as, bs []fwk.NodeInfo) []fwk.NodeInfo {
+	inB := make(map[string]struct{}, len(bs))
+	for _, n := range bs {
+		inB[n.Node().Name] = struct{}{}
+	}
+	var out []fwk.NodeInfo
+	added := make(map[string]struct{}, len(as))
+	for _, n := range as {
+		name := n.Node().Name
+		if _, ok := inB[name]; !ok {
+			continue
+		}
+		if _, dup := added[name]; dup {
+			continue
+		}
+		added[name] = struct{}{}
+		out = append(out, n)
+	}
+	return out
 }
 
 func (f *frameworkImpl) runPlacementGeneratePlugin(ctx context.Context, pl fwk.PlacementGeneratePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
