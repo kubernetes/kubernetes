@@ -977,6 +977,103 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 	}
 }
 
+// leaseHolder returns a function reporting the current holder identity of the
+// lease backing c ("" if unset).
+func leaseHolder(c *fake.Clientset) func() string {
+	return func() string {
+		l, err := c.CoordinationV1().Leases("foo").Get(context.Background(), "bar", metav1.GetOptions{})
+		if err != nil || l.Spec.HolderIdentity == nil {
+			return ""
+		}
+		return *l.Spec.HolderIdentity
+	}
+}
+
+// startReleaseElector starts a ReleaseOnCancel elector backed by c whose
+// OnStartedLeading blocks on drain after the context is cancelled, and returns a
+// holder getter once the lease is held.
+func startReleaseElector(t *testing.T, ctx context.Context, c *fake.Clientset, leaseDuration time.Duration, drain <-chan struct{}) func() string {
+	t.Helper()
+	lock, err := rl.New("leases", "foo", "bar", c.CoreV1(), c.CoordinationV1(),
+		rl.ResourceLockConfig{Identity: "baz", EventRecorder: record.NewFakeRecorder(100)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	elector, err := NewLeaderElector(LeaderElectionConfig{
+		Lock: lock, LeaseDuration: leaseDuration, RenewDeadline: leaseDuration / 2, RetryPeriod: leaseDuration / 4,
+		ReleaseOnCancel: true,
+		Callbacks: LeaderCallbacks{
+			OnStartedLeading: func(cbCtx context.Context) {
+				<-cbCtx.Done()
+				<-drain
+			},
+			OnStoppedLeading: func() {},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	go elector.Run(ctx)
+
+	holder := leaseHolder(c)
+	if err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		return holder() == "baz", nil
+	}); err != nil {
+		t.Fatalf("failed to acquire lease: %v", err)
+	}
+	return holder
+}
+
+// TestReleaseWaitsForOnStartedLeading verifies the lock is not released until the
+// OnStartedLeading callback returns, so the lease is never given up while guarded
+// work is still running (which would break mutual exclusion).
+func TestReleaseWaitsForOnStartedLeading(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c := fake.NewSimpleClientset()
+	resume := make(chan struct{})
+	holder := startReleaseElector(t, ctx, c, 15*time.Second, resume)
+
+	// Shutdown begins while the callback is still draining, so the lease must stay held.
+	cancel()
+	time.Sleep(2 * time.Second)
+	if got := holder(); got != "baz" {
+		t.Fatalf("lock released before OnStartedLeading returned: holder=%q", got)
+	}
+
+	// Once the callback returns, the lock is released.
+	close(resume)
+	if err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		return holder() == "", nil
+	}); err != nil {
+		t.Fatalf("lock not released after OnStartedLeading returned: %v", err)
+	}
+}
+
+// TestReleaseBoundedWhenOnStartedLeadingStuck verifies the wait before releasing
+// is bounded by LeaseDuration: a callback that ignores cancellation must not block
+// release forever.
+func TestReleaseBoundedWhenOnStartedLeadingStuck(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c := fake.NewSimpleClientset()
+	unblock := make(chan struct{})
+	t.Cleanup(func() { close(unblock) })
+	holder := startReleaseElector(t, ctx, c, 2*time.Second, unblock)
+
+	// The callback never returns, but the bounded wait must still release the lock.
+	cancel()
+	if err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		return holder() == "", nil
+	}); err != nil {
+		t.Fatalf("lock not released within the bounded wait: %v", err)
+	}
+}
+
 func TestLeaderElectionConfigValidation(t *testing.T) {
 	resourceLockConfig := rl.ResourceLockConfig{
 		Identity: "baz",

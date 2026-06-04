@@ -27,6 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/record"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -107,4 +110,76 @@ func TestLeaderElectionReleaseOnCancel(t *testing.T) {
 		t.Fatalf("expected lease holder to be cleared after shutdown, but got %q: %v", holder, err)
 	}
 	t.Log("lease holder cleared after shutdown")
+}
+
+// TestLeaderElectionReleaseWaitsForControllers verifies, against a real API server,
+// that with ReleaseOnCancel the leader lease is held until the OnStartedLeading
+// callback (the controllers) returns. Releasing earlier would let a standby acquire
+// the freed lease while this instance is still writing, breaking mutual exclusion.
+func TestLeaderElectionReleaseWaitsForControllers(t *testing.T) {
+	apiServer := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	t.Cleanup(apiServer.TearDownFn)
+
+	client, err := kubernetes.NewForConfig(apiServer.ClientConfig)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	const leaseName, identity = "test-release-wait", "instance-A"
+	lock, err := resourcelock.NewFromKubeconfig(resourcelock.LeasesResourceLock, metav1.NamespaceSystem, leaseName,
+		resourcelock.ResourceLockConfig{Identity: identity, EventRecorder: record.NewFakeRecorder(100)},
+		apiServer.ClientConfig, 5*time.Second)
+	if err != nil {
+		t.Fatalf("failed to create resource lock: %v", err)
+	}
+
+	// holder returns the lease's current holder identity ("" if unset/missing).
+	holder := func() string {
+		lease, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.Background(), leaseName, metav1.GetOptions{})
+		if err != nil || lease.Spec.HolderIdentity == nil {
+			return ""
+		}
+		return *lease.Spec.HolderIdentity
+	}
+
+	resume := make(chan struct{}) // closed when the test lets the controller finish draining
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+		Lock:            lock,
+		LeaseDuration:   15 * time.Second,
+		RenewDeadline:   10 * time.Second,
+		RetryPeriod:     2 * time.Second,
+		ReleaseOnCancel: true,
+		Name:            leaseName,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(cctx context.Context) {
+				<-cctx.Done()
+				<-resume // simulate a slow controller drain
+			},
+			OnStoppedLeading: func() {},
+		},
+	})
+
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(context.Context) (bool, error) {
+		return holder() == identity, nil
+	}); err != nil {
+		t.Fatalf("lease never acquired by %q: %v", identity, err)
+	}
+
+	// Shutdown begins while the controller is still draining, so the lease must stay held.
+	cancel()
+	time.Sleep(2 * time.Second)
+	if got := holder(); got != identity {
+		t.Fatalf("lease released while controller was still draining: holder=%q", got)
+	}
+
+	// Let the controller finish, then the lease may be released.
+	close(resume)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(context.Context) (bool, error) {
+		return holder() == "", nil
+	}); err != nil {
+		t.Fatalf("lease not released after controller drained: %v", err)
+	}
 }
