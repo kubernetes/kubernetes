@@ -3613,6 +3613,16 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: cri_streaming_enabled
+  subsystem: kubelet
+  help: Whether CRI list streaming RPCs are active (1) or fell back to unary (0).
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - service
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: desired_pods
   subsystem: kubelet
   help: The number of pods the kubelet is being instructed to run. static is true
