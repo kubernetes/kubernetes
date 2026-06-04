@@ -90,7 +90,7 @@ func WithoutPatchTypes() Option {
 func WithPreambleVariables(vars ...PreambleVariable) Option {
 	return func(e *Evaluator) {
 		for _, v := range vars {
-			e.preambleVars = append(e.preambleVars, variable{Name: v.Name, Expression: v.Expression})
+			e.preambleVars = append(e.preambleVars, variable(v))
 		}
 	}
 }
@@ -401,7 +401,7 @@ func (e *Evaluator) EvalValidations(policy *AdmissionPolicy, input *AdmissionInp
 	if err != nil {
 		return nil, err
 	}
-	messageResults, messageEvalErr, messageRemaining := e.evalMessageExpressions(state, policy.validations, remaining)
+	messageResults, messageRemaining, messageEvalErr := e.evalMessageExpressions(state, policy.validations, remaining)
 	if messageRemaining >= 0 {
 		remaining = messageRemaining
 	}
@@ -636,7 +636,7 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 	return result, nil
 }
 
-func (e *Evaluator) evalMessageExpressions(state *policyEvaluationState, validations []validation, remainingBudget int64) ([]admissioncel.EvaluationResult, error, int64) {
+func (e *Evaluator) evalMessageExpressions(state *policyEvaluationState, validations []validation, remainingBudget int64) ([]admissioncel.EvaluationResult, int64, error) {
 	accessors := make([]admissioncel.ExpressionAccessor, len(validations))
 	hasMessageExpression := false
 	for index, validation := range validations {
@@ -647,12 +647,12 @@ func (e *Evaluator) evalMessageExpressions(state *policyEvaluationState, validat
 		accessors[index] = &validatingpolicy.MessageExpressionCondition{MessageExpression: validation.MessageExpression}
 	}
 	if !hasMessageExpression {
-		return nil, nil, remainingBudget
+		return nil, remainingBudget, nil
 	}
 
 	messageEvaluator := state.compiler.CompileCondition(accessors, messageExpressionDeclarations(state.decls), e.evaluationMode())
 	messageResults, remaining, err := messageEvaluator.ForInput(context.Background(), state.inputs.versionedAttr, state.inputs.request, messageExpressionOptionalBindings(state.inputs), state.inputs.namespace, remainingBudget)
-	return messageResults, err, remaining
+	return messageResults, remaining, err
 }
 
 func messageResultAt(results []admissioncel.EvaluationResult, index int) *admissioncel.EvaluationResult {
