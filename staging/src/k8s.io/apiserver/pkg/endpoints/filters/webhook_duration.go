@@ -71,9 +71,7 @@ func (wt *writeLatencyTracker) Unwrap() http.ResponseWriter {
 
 func (wt *writeLatencyTracker) Write(bs []byte) (int, error) {
 	startedAt := time.Now()
-	defer func() {
-		request.TrackResponseWriteLatency(wt.ctx, time.Since(startedAt))
-	}()
-
-	return wt.ResponseWriter.Write(bs)
+	n, err := wt.ResponseWriter.Write(bs)
+	request.TrackResponseWriteLatency(wt.ctx, time.Since(startedAt))
+	return n, err
 }

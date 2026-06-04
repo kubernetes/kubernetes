@@ -10,5 +10,6 @@ reviewers:
   - sttts
   - munnerz
   - nikhita
+  - jefftree
 labels:
   - sig/api-machinery

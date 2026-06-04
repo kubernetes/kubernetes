@@ -368,7 +368,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionTrue,
-		Reason:            fmt.Sprintf("schedulable condition"),
+		Reason:            "schedulable condition",
 		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	node := &v1.Node{
@@ -381,7 +381,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		},
 	}
 
-	for ii := 0; ii < 5; ii++ {
+	for ii := range 5 {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
 		if _, err := createNode(cs, node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)

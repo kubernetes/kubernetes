@@ -36,7 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestVerifyAdmissionResponse(t *testing.T) {
@@ -502,8 +502,8 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		{
 			name: "v1",
 			attrs: &admission.VersionedAttributes{
-				VersionedObject:    versionedObj.DeepCopyObject(),
-				VersionedOldObject: versionedObjOld.DeepCopyObject(),
+				VersionedObject:    admission.NewLazyObject(versionedObj.DeepCopyObject()),
+				VersionedOldObject: admission.NewLazyObject(versionedObjOld.DeepCopyObject()),
 				Attributes:         attrs,
 			},
 			invocation: &generic.WebhookInvocation{
@@ -535,7 +535,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 						},
 						Object:    runtime.RawExtension{Object: versionedObj},
 						OldObject: runtime.RawExtension{Object: versionedObjOld},
-						DryRun:    utilpointer.BoolPtr(false),
+						DryRun:    ptr.To(false),
 						Options:   runtime.RawExtension{Object: &metav1.UpdateOptions{FieldManager: "foo"}},
 					},
 				}
@@ -545,8 +545,8 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		{
 			name: "v1beta1",
 			attrs: &admission.VersionedAttributes{
-				VersionedObject:    versionedObj.DeepCopyObject(),
-				VersionedOldObject: versionedObjOld.DeepCopyObject(),
+				VersionedObject:    admission.NewLazyObject(versionedObj.DeepCopyObject()),
+				VersionedOldObject: admission.NewLazyObject(versionedObjOld.DeepCopyObject()),
 				Attributes:         attrs,
 			},
 			invocation: &generic.WebhookInvocation{
@@ -578,7 +578,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 						},
 						Object:    runtime.RawExtension{Object: versionedObj},
 						OldObject: runtime.RawExtension{Object: versionedObjOld},
-						DryRun:    utilpointer.BoolPtr(false),
+						DryRun:    ptr.To(false),
 						Options:   runtime.RawExtension{Object: &metav1.UpdateOptions{FieldManager: "foo"}},
 					},
 				}

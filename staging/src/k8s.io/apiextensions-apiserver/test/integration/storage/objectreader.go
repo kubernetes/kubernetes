@@ -25,7 +25,6 @@ import (
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -115,10 +114,7 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 	cfg := clientv3.Config{
 		Endpoints:   config.ServerList,
 		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
+		TLS:         tlsConfig,
 	}
 
 	c, err := clientv3.New(cfg)
@@ -127,4 +123,17 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 	}
 
 	return c, clientv3.NewKV(c), nil
+}
+
+// SetStoredCustomResourceDefinition writes the storage representation of a CRD to etcd.
+func (s *EtcdObjectReader) SetStoredCustomResourceDefinition(name string, crd *apiextensionsv1.CustomResourceDefinition) error {
+	bs, err := json.Marshal(crd)
+	if err != nil {
+		return err
+	}
+	key := path.Join("/", s.storagePrefix, "apiextensions.k8s.io", "customresourcedefinitions", name)
+	if _, err := s.etcdClient.Put(context.Background(), key, string(bs)); err != nil {
+		return fmt.Errorf("error setting CRD %s in etcd at key %s: %w", name, key, err)
+	}
+	return nil
 }

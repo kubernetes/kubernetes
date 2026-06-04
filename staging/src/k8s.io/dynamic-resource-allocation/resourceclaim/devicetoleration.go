@@ -17,7 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 )
 
 // ToleratesTaint checks if the toleration tolerates the taint.
@@ -29,6 +29,9 @@ import (
 //  3. Empty toleration.key means to match all taint keys.
 //     If toleration.key is empty, toleration.operator must be 'Exists';
 //     this combination means to match all taint values and all taint keys.
+//
+// Callers must check separately what the effect is and only react to
+// known effects. Unknown effects and the None effect must be ignored.
 func ToleratesTaint(toleration resourceapi.DeviceToleration, taint resourceapi.DeviceTaint) bool {
 	// This code was copied from https://github.com/kubernetes/kubernetes/blob/f007012f5fe49e40ae0596cf463a8e7b247b3357/staging/src/k8s.io/api/core/v1/toleration.go#L39-L56.
 	// It wasn't placed in the resourceapi package because code related to logic

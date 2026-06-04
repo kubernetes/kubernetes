@@ -18,6 +18,7 @@ package endpoints
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -148,15 +150,15 @@ func TestAudit(t *testing.T) {
 
 	for _, test := range []struct {
 		desc   string
-		req    func(server string) (*http.Request, error)
+		req    func(ctx context.Context, server string) (*http.Request, error)
 		code   int
 		events int
 		checks []eventCheck
 	}{
 		{
 			"get",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleFooJSON))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodGet, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleFooJSON))
 			},
 			200,
 			2,
@@ -168,8 +170,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"list",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?labelSelector=a%3Dfoobar", nil)
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodGet, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?labelSelector=a%3Dfoobar", nil)
 			},
 			200,
 			2,
@@ -181,8 +183,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"create",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("POST", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(simpleFooJSON))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodPost, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(simpleFooJSON))
 			},
 			201,
 			2,
@@ -194,8 +196,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"not-allowed-named-create",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("POST", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/named", bytes.NewBuffer(simpleFooJSON))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodPost, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/named", bytes.NewBuffer(simpleFooJSON))
 			},
 			405,
 			2,
@@ -207,8 +209,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"delete",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("DELETE", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", nil)
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodDelete, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", nil)
 			},
 			200,
 			2,
@@ -220,8 +222,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"delete-with-options-in-body",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("DELETE", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", bytes.NewBuffer([]byte(`{"kind":"DeleteOptions"}`)))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodDelete, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", bytes.NewBuffer([]byte(`{"kind":"DeleteOptions"}`)))
 			},
 			200,
 			2,
@@ -233,8 +235,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"update",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("PUT", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodPut, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
 			},
 			200,
 			2,
@@ -246,8 +248,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"update-wrong-namespace",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("PUT", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodPut, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
 			},
 			400,
 			2,
@@ -259,8 +261,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"patch",
-			func(server string) (*http.Request, error) {
-				req, _ := http.NewRequest("PATCH", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+			func(ctx context.Context, server string) (*http.Request, error) {
+				req, _ := http.NewRequestWithContext(ctx, request.MethodPatch, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 				req.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 				return req, nil
 			},
@@ -274,8 +276,8 @@ func TestAudit(t *testing.T) {
 		},
 		{
 			"watch",
-			func(server string) (*http.Request, error) {
-				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?watch=true", nil)
+			func(ctx context.Context, server string) (*http.Request, error) {
+				return http.NewRequestWithContext(ctx, request.MethodGet, server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?watch=true", nil)
 			},
 			200,
 			3,
@@ -287,6 +289,7 @@ func TestAudit(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
+			ctx := t.Context()
 			sink := &fakeAuditSink{}
 			handler := handleInternal(map[string]rest.Storage{
 				"simple": &SimpleRESTStorage{
@@ -311,7 +314,7 @@ func TestAudit(t *testing.T) {
 			defer server.Close()
 			client := http.Client{Timeout: 2 * time.Second}
 
-			req, err := test.req(server.URL)
+			req, err := test.req(ctx, server.URL)
 			if err != nil {
 				t.Errorf("[%s] error creating the request: %v", test.desc, err)
 			}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	certsapi "k8s.io/kubernetes/pkg/apis/certificates"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
@@ -52,6 +53,7 @@ import (
 //     node <- pod <- pvc <- pv
 //     node <- pod <- pvc <- pv <- secret
 //     node <- pod <- ResourceClaim
+//     node <- pcr
 //  4. If a request is for a resourceslice, then authorize access if there is an
 //     edge from the existing slice object to the node, which is the case if the
 //     existing object has the node in its NodeName field. For create, the access gets
@@ -93,6 +95,7 @@ var (
 	svcAcctResource       = api.Resource("serviceaccounts")
 	leaseResource         = coordapi.Resource("leases")
 	csiNodeResource       = storageapi.Resource("csinodes")
+	pcrResource           = certsapi.Resource("podcertificaterequests")
 )
 
 func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -101,6 +104,16 @@ func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace
 		return nil, nil, true, fmt.Errorf("node authorizer does not support user rule resolution")
 	}
 	return nil, nil, false, nil
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (r *NodeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(r.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*NodeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -143,13 +156,14 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case resourceSlice:
 			return r.authorizeResourceSlice(nodeName, attrs)
 		case nodeResource:
-			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
-				return r.authorizeNode(nodeName, attrs)
-			}
+			return r.authorizeNode(nodeName, attrs)
 		case podResource:
-			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
-				return r.authorizePod(nodeName, attrs)
+			return r.authorizePod(nodeName, attrs)
+		case pcrResource:
+			if r.features.Enabled(features.PodCertificateRequest) {
+				return r.authorizePodCertificateRequest(nodeName, attrs)
 			}
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 	}
 
@@ -232,13 +246,13 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 }
 
 // authorizeServiceAccount authorizes
-// - "get" requests to serviceaccounts when KubeletServiceAccountTokenForCredentialProviders feature is enabled
+// - "get" requests to serviceaccounts when KubeletServiceAccountTokenForCredentialProviders or PodCertificateRequest features are enabled
 // - "create" requests to serviceaccounts 'token' subresource of pods running on a node
 func (r *NodeAuthorizer) authorizeServiceAccount(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	verb := attrs.GetVerb()
 
-	if verb == "get" && attrs.GetSubresource() == "" {
-		if !r.features.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
+	if verb == "get" && len(attrs.GetSubresource()) == 0 {
+		if !(r.features.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) || r.features.Enabled(features.PodCertificateRequest)) {
 			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 			return authorizer.DecisionNoOpinion, "not allowed to get service accounts", nil
 		}
@@ -351,29 +365,48 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 		// is allowed by recording a graph edge.
 		return r.authorize(nodeName, sliceVertexType, attrs)
 	case "watch", "list", "deletecollection":
-		if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
-			// only allow a scoped fieldSelector
-			reqs, _ := attrs.GetFieldSelector()
-			for _, req := range reqs {
-				if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
-					return authorizer.DecisionAllow, "", nil
-				}
+		// only allow a scoped fieldSelector
+		reqs, _ := attrs.GetFieldSelector()
+		for _, req := range reqs {
+			if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
+				return authorizer.DecisionAllow, "", nil
 			}
-			// deny otherwise
-			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-			return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
-		} else {
-			// Allow broad list/watch access if AuthorizeNodeWithSelectors is not enabled.
-			//
-			// The NodeRestriction admission plugin (plugin/pkg/admission/noderestriction)
-			// ensures that the node is not deleting some ResourceSlice belonging to
-			// some other node.
-			return authorizer.DecisionAllow, "", nil
 		}
+		// deny otherwise
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "only the following verbs are allowed for a ResourceSlice: get, watch, list, create, update, patch, delete, deletecollection", nil
 	}
+}
+
+func (r *NodeAuthorizer) authorizePodCertificateRequest(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if len(attrs.GetSubresource()) != 0 {
+		return authorizer.DecisionNoOpinion, "nodes may not access the status subresource of PodCertificateRequests", nil
+	}
+
+	switch attrs.GetVerb() {
+	case "create":
+		// Creates are further restricted by the noderestriction admission plugin.
+		return authorizer.DecisionAllow, "", nil
+	case "get":
+		return r.authorize(nodeName, pcrVertexType, attrs)
+	case "list", "watch":
+		// Allow requests that have a fieldselector restricting to this node.
+		reqs, _ := attrs.GetFieldSelector()
+		for _, req := range reqs {
+			if req.Field == "spec.nodeName" && req.Operator == selection.Equals && req.Value == nodeName {
+				return authorizer.DecisionAllow, "", nil
+			}
+		}
+		// deny otherwise
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only list/watch podcertificaterequests with nodeName field selector", nil
+	}
+
+	klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+	return authorizer.DecisionNoOpinion, fmt.Sprintf("nodes may not %s podcertificaterequests", attrs.GetVerb()), nil
 }
 
 // authorizeNode authorizes node requests to Node API objects

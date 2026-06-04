@@ -21,9 +21,11 @@ const (
 	DefaultBinder                   = "DefaultBinder"
 	DefaultPreemption               = "DefaultPreemption"
 	DynamicResources                = "DynamicResources"
+	GangScheduling                  = "GangScheduling"
 	ImageLocality                   = "ImageLocality"
 	InterPodAffinity                = "InterPodAffinity"
 	NodeAffinity                    = "NodeAffinity"
+	NodeDeclaredFeatures            = "NodeDeclaredFeatures"
 	NodeName                        = "NodeName"
 	NodePorts                       = "NodePorts"
 	NodeResourcesBalancedAllocation = "NodeResourcesBalancedAllocation"
@@ -36,4 +38,6 @@ const (
 	VolumeBinding                   = "VolumeBinding"
 	VolumeRestrictions              = "VolumeRestrictions"
 	VolumeZone                      = "VolumeZone"
+	TopologyPlacementGenerator      = "TopologyPlacementGenerator"
+	PodGroupPodsCount               = "PodGroupPodsCount"
 )

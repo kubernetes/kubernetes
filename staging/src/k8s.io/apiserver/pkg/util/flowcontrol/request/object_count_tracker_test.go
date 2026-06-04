@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apiserver/pkg/storage"
 	testclock "k8s.io/utils/clock/testing"
 )
 
@@ -29,18 +30,14 @@ func TestStorageObjectCountTracker(t *testing.T) {
 	tests := []struct {
 		name          string
 		lastUpdated   time.Duration
+		skipSetting   bool
 		count         int64
 		errExpected   error
 		countExpected int64
 	}{
 		{
 			name:        "object count not tracked for given resource",
-			count:       -2,
-			errExpected: ObjectCountNotFoundErr,
-		},
-		{
-			name:        "transient failure",
-			count:       -1,
+			skipSetting: true,
 			errExpected: ObjectCountNotFoundErr,
 		},
 		{
@@ -69,21 +66,23 @@ func TestStorageObjectCountTracker(t *testing.T) {
 			fakeClock := &testclock.FakePassiveClock{}
 			tracker := &objectCountTracker{
 				clock:  fakeClock,
-				counts: map[string]*timestampedCount{},
+				counts: map[string]*timestampedStats{},
 			}
 
 			key := "foo.bar.resource"
 			now := time.Now()
 			fakeClock.SetTime(now.Add(-test.lastUpdated))
-			tracker.Set(key, test.count)
+			if !test.skipSetting {
+				tracker.Set(key, storage.Stats{ObjectCount: test.count})
+			}
 
 			fakeClock.SetTime(now)
-			countGot, err := tracker.Get(key)
+			stats, err := tracker.Get(key)
 			if test.errExpected != err {
 				t.Errorf("Expected error: %v, but got: %v", test.errExpected, err)
 			}
-			if test.countExpected != countGot {
-				t.Errorf("Expected count: %d, but got: %d", test.countExpected, countGot)
+			if test.countExpected != stats.ObjectCount {
+				t.Errorf("Expected count: %d, but got: %d", test.countExpected, stats.ObjectCount)
 			}
 			if test.count <= -1 && len(tracker.counts) > 0 {
 				t.Errorf("Expected the cache to be empty, but got: %d", len(tracker.counts))
@@ -96,23 +95,23 @@ func TestStorageObjectCountTrackerWithPrune(t *testing.T) {
 	fakeClock := &testclock.FakePassiveClock{}
 	tracker := &objectCountTracker{
 		clock:  fakeClock,
-		counts: map[string]*timestampedCount{},
+		counts: map[string]*timestampedStats{},
 	}
 
 	now := time.Now()
 	fakeClock.SetTime(now.Add(-61 * time.Minute))
-	tracker.Set("k1", 61)
+	tracker.Set("k1", storage.Stats{ObjectCount: 61})
 	fakeClock.SetTime(now.Add(-60 * time.Minute))
-	tracker.Set("k2", 60)
+	tracker.Set("k2", storage.Stats{ObjectCount: 60})
 	// we are going to prune keys that are stale for >= 1h
 	// so the above keys are expected to be pruned and the
 	// key below should not be pruned.
 	mostRecent := now.Add(-59 * time.Minute)
 	fakeClock.SetTime(mostRecent)
-	tracker.Set("k3", 59)
-	expected := map[string]*timestampedCount{
+	tracker.Set("k3", storage.Stats{ObjectCount: 59})
+	expected := map[string]*timestampedStats{
 		"k3": {
-			count:         59,
+			Stats:         storage.Stats{ObjectCount: 59},
 			lastUpdatedAt: mostRecent,
 		},
 	}

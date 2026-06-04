@@ -125,7 +125,7 @@ func OrderSpecs(specs Specs, suiteConfig types.SuiteConfig) (GroupedSpecIndices,
 		// pick out a representative spec
 		representativeSpec := specs[executionGroups[groupID][0]]
 
-		// and grab the node on the spec that will represent which shufflable group this execution group belongs tu
+		// and grab the node on the spec that will represent which shufflable group this execution group belongs to
 		shufflableGroupingNode := representativeSpec.Nodes.FirstNodeWithType(nodeTypesToShuffle)
 
 		//add the execution group to its shufflable group
@@ -138,14 +138,35 @@ func OrderSpecs(specs Specs, suiteConfig types.SuiteConfig) (GroupedSpecIndices,
 		}
 	}
 
+	// now, for each shuffleable group, we compute the priority
+	shufflableGroupingIDPriorities := map[uint]int{}
+	for shufflableGroupingID, groupIDs := range shufflableGroupingIDToGroupIDs {
+		// the priority of a shufflable grouping is the max priority of any spec in any execution group in the shufflable grouping
+		maxPriority := -1 << 31 // min int
+		for _, groupID := range groupIDs {
+			for _, specIdx := range executionGroups[groupID] {
+				specPriority := specs[specIdx].Nodes.GetSpecPriority()
+				maxPriority = max(specPriority, maxPriority)
+			}
+		}
+		shufflableGroupingIDPriorities[shufflableGroupingID] = maxPriority
+	}
+
 	// now we permute the sorted shufflable grouping IDs and build the ordered Groups
-	orderedGroups := GroupedSpecIndices{}
 	permutation := r.Perm(len(shufflableGroupingIDs))
-	for _, j := range permutation {
-		//let's get the execution group IDs for this shufflable group:
-		executionGroupIDsForJ := shufflableGroupingIDToGroupIDs[shufflableGroupingIDs[j]]
-		// and we'll add their associated specindices to the orderedGroups slice:
-		for _, executionGroupID := range executionGroupIDsForJ {
+	shuffledGroupingIds := make([]uint, len(shufflableGroupingIDs))
+	for i, j := range permutation {
+		shuffledGroupingIds[i] = shufflableGroupingIDs[j]
+	}
+	// now, we need to stable sort the shuffledGroupingIds by priority (higher priority first)
+	sort.SliceStable(shuffledGroupingIds, func(i, j int) bool {
+		return shufflableGroupingIDPriorities[shuffledGroupingIds[i]] > shufflableGroupingIDPriorities[shuffledGroupingIds[j]]
+	})
+
+	// we can now take these prioritized, shuffled, groupings and form the final set of ordered spec groups
+	orderedGroups := GroupedSpecIndices{}
+	for _, id := range shuffledGroupingIds {
+		for _, executionGroupID := range shufflableGroupingIDToGroupIDs[id] {
 			orderedGroups = append(orderedGroups, executionGroups[executionGroupID])
 		}
 	}

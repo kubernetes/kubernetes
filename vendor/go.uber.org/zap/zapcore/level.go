@@ -179,19 +179,19 @@ func (l *Level) UnmarshalText(text []byte) error {
 
 func (l *Level) unmarshalText(text []byte) bool {
 	switch string(text) {
-	case "debug", "DEBUG":
+	case "debug":
 		*l = DebugLevel
-	case "info", "INFO", "": // make the zero value useful
+	case "info", "": // make the zero value useful
 		*l = InfoLevel
-	case "warn", "WARN":
+	case "warn", "warning":
 		*l = WarnLevel
-	case "error", "ERROR":
+	case "error":
 		*l = ErrorLevel
-	case "dpanic", "DPANIC":
+	case "dpanic":
 		*l = DPanicLevel
-	case "panic", "PANIC":
+	case "panic":
 		*l = PanicLevel
-	case "fatal", "FATAL":
+	case "fatal":
 		*l = FatalLevel
 	default:
 		return false

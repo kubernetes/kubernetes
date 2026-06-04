@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -35,9 +34,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"google.golang.org/protobuf/proto"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -247,11 +246,14 @@ func testStateFunc(ctx context.Context, envelopeService kmsservice.Service, cloc
 			return State{}, errGen
 		}
 		return State{
-			Transformer:         transformer,
-			EncryptedObject:     *encObject,
-			UID:                 "panda",
-			ExpirationTimestamp: clock.Now().Add(time.Hour),
-			CacheKey:            cacheKey,
+			Transformer:                           transformer,
+			EncryptedObjectKeyID:                  encObject.KeyID,
+			EncryptedObjectEncryptedDEKSource:     encObject.EncryptedDEKSource,
+			EncryptedObjectAnnotations:            encObject.Annotations,
+			EncryptedObjectEncryptedDEKSourceType: encObject.EncryptedDEKSourceType,
+			UID:                                   "panda",
+			ExpirationTimestamp:                   clock.Now().Add(time.Hour),
+			CacheKey:                              cacheKey,
 		}, nil
 	}
 }
@@ -312,7 +314,6 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -338,11 +339,11 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 			}
 
 			// inject test data before performing a read
-			state.EncryptedObject.KeyID = tt.testKeyID
+			state.EncryptedObjectKeyID = tt.testKeyID
 			if tt.useSeedRead {
-				state.EncryptedObject.EncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
+				state.EncryptedObjectEncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 			} else {
-				state.EncryptedObject.EncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_AES_GCM_KEY
+				state.EncryptedObjectEncryptedDEKSourceType = kmstypes.EncryptedDEKSourceType_AES_GCM_KEY
 			}
 			stateErr = tt.testErr
 
@@ -510,7 +511,6 @@ func TestTransformToStorageError(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -552,9 +552,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}
-	// reset internal field modified by marshaling obj
-	obj.XXX_sizecache = 0
-	if !reflect.DeepEqual(got, obj) {
+	if !proto.Equal(got, obj) {
 		t.Fatalf("envelopeTransformer: decoded data does not match original data. Got: %v, want %v", got, obj)
 	}
 }
@@ -658,7 +656,6 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 	t.Run("success", func(t *testing.T) {
 		for i := range successCases {
-			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				if err := validateAnnotations(successCases[i]); err != nil {
@@ -696,7 +693,6 @@ func TestValidateAnnotations(t *testing.T) {
 
 	t.Run("name error", func(t *testing.T) {
 		for i := range annotationsNameErrorCases {
-			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				err := validateAnnotations(annotationsNameErrorCases[i].annotations)
@@ -724,7 +720,6 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 	t.Run("size error", func(t *testing.T) {
 		for i := range annotationsSizeErrorCases {
-			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				err := validateAnnotations(annotationsSizeErrorCases[i].annotations)
@@ -769,7 +764,6 @@ func TestValidateKeyID(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			errCode, err := ValidateKeyID(tt.keyID)
@@ -822,7 +816,6 @@ func TestValidateEncryptedDEKSource(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := validateEncryptedDEKSource(tt.encryptedDEKSource)
@@ -1028,7 +1021,6 @@ func TestEnvelopeLogging(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
@@ -1103,7 +1095,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 
 	// this is to mimic a plugin that sets a static response for ciphertext
 	// but uses the annotation field to send the actual encrypted DEK source.
-	envelopeService.SetCiphertext(state.EncryptedObject.EncryptedDEKSource)
+	envelopeService.SetCiphertext(state.EncryptedObjectEncryptedDEKSource)
 	// for this plugin, it indicates a change in the remote key ID as the returned
 	// encrypted DEK source is different.
 	envelopeService.SetAnnotations(map[string][]byte{
@@ -1170,9 +1162,7 @@ func TestGenerateCacheKey(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		for _, tc2 := range testCases {
-			tc2 := tc2
 			t.Run(fmt.Sprintf("%+v-%+v", tc, tc2), func(t *testing.T) {
 				key1, err1 := generateCacheKey(tc.encryptedDEKSourceType, tc.encryptedDEKSource, tc.keyID, tc.annotations)
 				key2, err2 := generateCacheKey(tc2.encryptedDEKSourceType, tc2.encryptedDEKSource, tc2.keyID, tc2.annotations)
@@ -1240,7 +1230,6 @@ func TestGenerateTransformer(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

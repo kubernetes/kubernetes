@@ -108,13 +108,23 @@ type RepairIPAddress struct {
 	clock       clock.Clock
 }
 
-// NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
+// NewRepairIPAddress creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
 func NewRepairIPAddress(interval time.Duration,
 	client kubernetes.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
 	ipAddressInformer networkinginformers.IPAddressInformer) *RepairIPAddress {
+	return newRepairIPAddress(interval, client, serviceInformer, serviceCIDRInformer, ipAddressInformer, clock.RealClock{})
+}
+
+// newRepairIPAddress implements NewRepairIPAddress by additionally consuming clock.Clock.
+func newRepairIPAddress(interval time.Duration,
+	client kubernetes.Interface,
+	serviceInformer coreinformers.ServiceInformer,
+	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
+	ipAddressInformer networkinginformers.IPAddressInformer,
+	c clock.Clock) *RepairIPAddress {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "ipallocator-repair-controller")
 
@@ -138,7 +148,7 @@ func NewRepairIPAddress(interval time.Duration,
 		workerLoopPeriod: time.Second,
 		broadcaster:      eventBroadcaster,
 		recorder:         recorder,
-		clock:            clock.RealClock{},
+		clock:            c,
 	}
 
 	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -237,7 +247,18 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 
 // runOnce verifies the state of the ClusterIP allocations and returns an error if an unrecoverable problem occurs.
 func (r *RepairIPAddress) runOnce() error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, r.doRunOnce)
+	return retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		// When trying to repair the ClusterIP allocations, we may get a conflict or forbidden error.
+		// IsForbidden depends on the admission chain to be ready that may depend on the
+		// Namespace informer to be ready.
+		// Ref: https://issues.k8s.io/136288
+		if apierrors.IsConflict(err) || apierrors.IsForbidden(err) {
+			klog.ErrorS(err, "Running ipallocator repair failed ... retrying")
+			return true
+		}
+		klog.ErrorS(err, "Running ipallocator repair failed with not retryable error")
+		return false
+	}, r.doRunOnce)
 }
 
 // doRunOnce verifies the state of the ClusterIP allocations and returns an error if an unrecoverable problem occurs.
@@ -489,6 +510,10 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 		return nil
 	}
 
+	// When a Service is created, the IP allocator creates an IPAddress object for it, and
+	// at that moment the Service object is not created yet, so we have to wait for it to be created.
+	// In addition, if the apiserver "dies" in the middle of the creation of the Service, the IPAddress object will be orphaned.
+	// If the time since it was created is greater than 60 seconds (default timeout value on the kube-apiserver), the IPAddress is deleted.
 	svc, err := r.serviceLister.Services(ipAddress.Spec.ParentRef.Namespace).Get(ipAddress.Spec.ParentRef.Name)
 	if apierrors.IsNotFound(err) {
 		// cleaning all IPAddress without an owner reference IF the time since it was created is greater than 60 seconds (default timeout value on the kube-apiserver)
@@ -519,6 +544,38 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 		if ipAddress.Name == clusterIP {
 			return nil
 		}
+	}
+
+	// There is a special case when we "break the immutability" of the Service ClusterIPs,
+	// and we allocate IP addresses on Update. This is when a Service is mutated from Type ExternalName
+	// to any of the Types that require ClusterIP creation. Similar to the same logic we use to handle
+	// the case when the Service is created after the IPAddress, we delay the processing of the new
+	// IPAddress object by the 60 seconds timeout of the kube-apiserver.
+	if svc.Spec.Type == v1.ServiceTypeExternalName {
+		ipLifetime := r.clock.Now().Sub(ipAddress.CreationTimestamp.Time)
+		gracePeriod := 60 * time.Second
+		if ipLifetime < gracePeriod {
+			// requeue after the grace period
+			r.ipQueue.AddAfter(key, gracePeriod-ipLifetime)
+			return nil
+		}
+	}
+
+	// Service storage implements transactions. It creates an IPAddress object first and then creates
+	// the Service object, and if the Service object already exists the complete transaction is
+	// reverted. There can be race conditions when the repair loop picks up the new IPAddress object
+	// for reconciliation before the transaction is reverted. This leads to spurious
+	// IPAddressWrongReference warnings, to suppress these warnings we delay the processing of the new
+	// IPAddress object by 5 seconds. The service allocation creates the IPAddress object before creating
+	// the Service object, we easily identify this scenario when the IPAddress object creation timestamp
+	// is after the Service creation timestamp. We do this only when the IPAddress object is created
+	// recently in order to avoid indefinitely requeue/delay in IPAddress cleanup if for some reason
+	// the service transaction revert fails.
+	if ipAddress.CreationTimestamp.After(svc.CreationTimestamp.Time) &&
+		r.clock.Now().Sub(ipAddress.CreationTimestamp.Time) < 5*time.Second {
+		// requeue after the grace period
+		r.ipQueue.AddAfter(key, 5*time.Second)
+		return nil
 	}
 	runtime.HandleError(fmt.Errorf("the IPAddress: %s for Service %s/%s has a wrong reference %#v; cleaning up", ipAddress.Name, svc.Name, svc.Namespace, ipAddress.Spec.ParentRef))
 	r.recorder.Eventf(ipAddress, nil, v1.EventTypeWarning, "IPAddressWrongReference", "IPAddressAllocation", "IPAddress: %s for Service %s/%s has a wrong reference; cleaning up", ipAddress.Name, svc.Namespace, svc.Name)

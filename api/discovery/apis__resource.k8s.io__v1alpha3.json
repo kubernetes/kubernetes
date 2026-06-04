@@ -4,23 +4,6 @@
   "kind": "APIResourceList",
   "resources": [
     {
-      "kind": "DeviceClass",
-      "name": "deviceclasses",
-      "namespaced": false,
-      "singularName": "deviceclass",
-      "storageVersionHash": "OgEE055Fbnc=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
       "kind": "DeviceTaintRule",
       "name": "devicetaintrules",
       "namespaced": false,
@@ -38,26 +21,9 @@
       ]
     },
     {
-      "kind": "ResourceClaim",
-      "name": "resourceclaims",
-      "namespaced": true,
-      "singularName": "resourceclaim",
-      "storageVersionHash": "RnQSwRxMnsw=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "ResourceClaim",
-      "name": "resourceclaims/status",
-      "namespaced": true,
+      "kind": "DeviceTaintRule",
+      "name": "devicetaintrules/status",
+      "namespaced": false,
       "singularName": "",
       "verbs": [
         "get",
@@ -66,11 +32,11 @@
       ]
     },
     {
-      "kind": "ResourceClaimTemplate",
-      "name": "resourceclaimtemplates",
-      "namespaced": true,
-      "singularName": "resourceclaimtemplate",
-      "storageVersionHash": "F6aZtQPvFlU=",
+      "kind": "ResourcePoolStatusRequest",
+      "name": "resourcepoolstatusrequests",
+      "namespaced": false,
+      "singularName": "resourcepoolstatusrequest",
+      "storageVersionHash": "iy583CtMwdY=",
       "verbs": [
         "create",
         "delete",
@@ -83,20 +49,14 @@
       ]
     },
     {
-      "kind": "ResourceSlice",
-      "name": "resourceslices",
+      "kind": "ResourcePoolStatusRequest",
+      "name": "resourcepoolstatusrequests/status",
       "namespaced": false,
-      "singularName": "resourceslice",
-      "storageVersionHash": "7r9IQQZblMY=",
+      "singularName": "",
       "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
         "get",
-        "list",
         "patch",
-        "update",
-        "watch"
+        "update"
       ]
     }
   ]

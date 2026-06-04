@@ -168,10 +168,10 @@ func validateStorageVersionCondition(conditions []apiserverinternal.StorageVersi
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(condition.Type), fldPath.Index(i).Child("type"))...)
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(condition.Status), fldPath.Index(i).Child("status"))...)
 		if condition.Reason == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("reason"), "reason cannot be empty"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("reason"), ""))
 		}
 		if condition.Message == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("message"), "message cannot be empty"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("message"), ""))
 		}
 	}
 	return allErrs

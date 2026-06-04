@@ -20,9 +20,15 @@ package v1
 
 // TokenRequestApplyConfiguration represents a declarative configuration of the TokenRequest type for use
 // with apply.
+//
+// TokenRequest contains parameters of a service account token.
 type TokenRequestApplyConfiguration struct {
-	Audience          *string `json:"audience,omitempty"`
-	ExpirationSeconds *int64  `json:"expirationSeconds,omitempty"`
+	// audience is the intended audience of the token in "TokenRequestSpec".
+	// It will default to the audiences of kube apiserver.
+	Audience *string `json:"audience,omitempty"`
+	// expirationSeconds is the duration of validity of the token in "TokenRequestSpec".
+	// It has the same default value of "ExpirationSeconds" in "TokenRequestSpec".
+	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty"`
 }
 
 // TokenRequestApplyConfiguration constructs a declarative configuration of the TokenRequest type for use with

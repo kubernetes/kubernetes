@@ -30,7 +30,7 @@ import (
 	jose "gopkg.in/go-jose/go-jose.v2"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
-	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
+	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	externaljwtmetrics "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/metrics"
 )
@@ -85,14 +85,14 @@ func New(ctx context.Context, issuer, socketPath string, keySyncTimeout time.Dur
 // enables plugging in an external jwt signer.
 type Plugin struct {
 	iss                         string
-	client                      externaljwtv1alpha1.ExternalJWTSignerClient
+	client                      externaljwtv1.ExternalJWTSignerClient
 	keyCache                    *keyCache
 	allowSigningWithNonOIDCKeys bool
 }
 
 // newPlugin constructs an implementation of external JWT signer plugin.
 func newPlugin(iss string, conn *grpc.ClientConn, allowSigningWithNonOIDCKeys bool) *Plugin {
-	client := externaljwtv1alpha1.NewExternalJWTSignerClient(conn)
+	client := externaljwtv1.NewExternalJWTSignerClient(conn)
 	plugin := &Plugin{
 		iss:                         iss,
 		client:                      client,
@@ -118,7 +118,7 @@ func (p *Plugin) signAndAssembleJWT(ctx context.Context, claims *jwt.Claims, pri
 
 	payloadBase64 := base64.RawURLEncoding.EncodeToString(payload)
 
-	request := &externaljwtv1alpha1.SignJWTRequest{
+	request := &externaljwtv1.SignJWTRequest{
 		Claims: payloadBase64,
 	}
 
@@ -140,12 +140,12 @@ func (p *Plugin) signAndAssembleJWT(ctx context.Context, claims *jwt.Claims, pri
 
 // GetServiceMetadata returns metadata associated with externalJWTSigner
 // It Includes details like max token lifetime supported by externalJWTSigner, etc.
-func (p *Plugin) GetServiceMetadata(ctx context.Context) (*externaljwtv1alpha1.MetadataResponse, error) {
-	req := &externaljwtv1alpha1.MetadataRequest{}
+func (p *Plugin) GetServiceMetadata(ctx context.Context) (*externaljwtv1.MetadataResponse, error) {
+	req := &externaljwtv1.MetadataRequest{}
 	return p.client.Metadata(ctx, req)
 }
 
-func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1alpha1.SignJWTResponse) error {
+func (p *Plugin) validateJWTHeader(ctx context.Context, response *externaljwtv1.SignJWTResponse) error {
 	jsonBytes, err := base64.RawURLEncoding.DecodeString(response.Header)
 	if err != nil {
 		return fmt.Errorf("while unwrapping header: %w", err)

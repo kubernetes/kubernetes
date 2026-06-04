@@ -153,6 +153,9 @@ func (l *baseList) Contains(elem ref.Val) ref.Val {
 
 // ConvertToNative implements the ref.Val interface method.
 func (l *baseList) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	if typeDesc == reflect.TypeFor[any]() {
+		typeDesc = reflect.TypeFor[[]any]()
+	}
 	// If the underlying list value is assignable to the reflected type return it.
 	if reflect.TypeOf(l.value).AssignableTo(typeDesc) {
 		return l.value, nil
@@ -164,19 +167,19 @@ func (l *baseList) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// Attempt to convert the list to a set of well known protobuf types.
 	switch typeDesc {
 	case anyValueType:
-		json, err := l.ConvertToNative(jsonListValueType)
+		json, err := l.ConvertToNative(JSONListType)
 		if err != nil {
 			return nil, err
 		}
 		return anypb.New(json.(proto.Message))
-	case jsonValueType, jsonListValueType:
+	case JSONValueType, JSONListType:
 		jsonValues, err :=
 			l.ConvertToNative(reflect.TypeOf([]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
 		jsonList := &structpb.ListValue{Values: jsonValues.([]*structpb.Value)}
-		if typeDesc == jsonListValueType {
+		if typeDesc == JSONListType {
 			return jsonList, nil
 		}
 		return structpb.NewListValue(jsonList), nil
@@ -297,6 +300,22 @@ func (l *baseList) String() string {
 	}
 	sb.WriteString("]")
 	return sb.String()
+}
+
+func formatList(l traits.Lister, sb *strings.Builder) {
+	sb.WriteString("[")
+	n, _ := l.Size().(Int)
+	for i := 0; i < int(n); i++ {
+		formatTo(sb, l.Get(Int(i)))
+		if i != int(n)-1 {
+			sb.WriteString(", ")
+		}
+	}
+	sb.WriteString("]")
+}
+
+func (l *baseList) format(sb *strings.Builder) {
+	formatList(l, sb)
 }
 
 // mutableList aggregates values into its internal storage. For use with internal CEL variables only.

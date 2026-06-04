@@ -28,6 +28,8 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/defaulter-gen/args"
+	"k8s.io/code-generator/pkg/apidefinitions"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -61,27 +63,53 @@ var typeZeroValue = map[string]interface{}{
 
 // These are the comment tags that carry parameters for defaulter generation.
 const tagName = "k8s:defaulter-gen"
-const inputTagName = "k8s:defaulter-gen-input"
 const defaultTagName = "default"
 
-func extractDefaultTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[defaultTagName]
-}
-
-func extractTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[tagName]
-}
-
-func extractInputTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[inputTagName]
-}
-
-func checkTag(comments []string, require ...string) bool {
-	values := gengo.ExtractCommentTags("+", comments)[tagName]
-	if len(require) == 0 {
-		return len(values) == 1 && values[0] == ""
+func extractDefaultTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{defaultTagName}, comments)
+	if err != nil {
+		return nil, err
 	}
-	return reflect.DeepEqual(values, require)
+	return tags[defaultTagName], nil
+}
+
+func extractTag(comments []string) ([]string, bool) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		klog.Fatalf("Error extracting %s tag: %v", tagName, err)
+	}
+
+	values, found := tags[tagName]
+	if !found || len(values) == 0 {
+		return nil, false
+	}
+
+	return values, true
+}
+
+// defaulterMatchType returns the values to be defaulted for pkg, or false
+// if defaulter-gen should not run.
+func defaulterMatchType(pkg *types.Package, idOpts []apidefinitions.Option) ([]string, bool) {
+	info, err := apidefinitions.Identify(pkg, apidefinitions.Defaulter, idOpts...)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	if !info.ShouldGenerate() {
+		return nil, false
+	}
+	return info.TypeFilters(), true
+}
+
+func checkTag(comments []string, require ...string) (bool, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		return false, err
+	}
+
+	if len(require) == 0 {
+		return len(tags[tagName]) == 1 && tags[tagName][0] == "", nil
+	}
+	return reflect.DeepEqual(tags[tagName], require), nil
 }
 
 func defaultFnNamer() *namer.NameStrategy {
@@ -227,7 +255,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	targets := []generator.Target{}
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
+	targetList := []generator.Target{}
 
 	// Accumulate pre-existing default functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -242,23 +275,20 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	pkgToInput := map[string]string{}
 	for _, i := range context.Inputs {
 		klog.V(5).Infof("considering pkg %q", i)
-
 		pkg := context.Universe[i]
 
-		// if the types are not in the same package where the defaulter functions to be generated
-		inputTags := extractInputTag(pkg.Comments)
-		if len(inputTags) > 1 {
-			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
+		info, err := apidefinitions.Identify(pkg, apidefinitions.Defaulter, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
 		}
-		if len(inputTags) == 1 {
-			inputPath := inputTags[0]
-			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
-				// this is a relative dir, which will not work under gomodules.
-				// join with the local package path, but warn
-				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
-				inputPath = path.Join(pkg.Path, inputTags[0])
-			}
+		if !info.ShouldGenerate() {
+			continue
+		}
 
+		// +k8s:defaulter-gen-input may direct the generator at types in
+		// a different package than the one where defaulters will be emitted.
+		inputPath := info.ExternalTypes()
+		if inputPath != pkg.Path {
 			klog.V(5).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
 			pkgToInput[i] = inputPath
@@ -310,7 +340,11 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
 
-		typesWith := extractTag(pkg.Comments)
+		typesWith, found := defaulterMatchType(pkg, idOpts)
+		if !found {
+			klog.V(2).InfoS("  did not find required tag", "tag", tagName)
+			continue
+		}
 		shouldCreateObjectDefaulterFn := func(t *types.Type) bool {
 			if defaults, ok := existingDefaulters[t]; ok && defaults.object != nil {
 				// A default generator is defined
@@ -322,11 +356,19 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				return false
 			}
 			// opt-out
-			if checkTag(t.SecondClosestCommentLines, "false") {
+			optOut, err := checkTag(t.SecondClosestCommentLines, "false")
+			if err != nil {
+				klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+			}
+			if optOut {
 				return false
 			}
 			// opt-in
-			if checkTag(t.SecondClosestCommentLines, "true") {
+			optIn, err := checkTag(t.SecondClosestCommentLines, "true")
+			if err != nil {
+				klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+			}
+			if optIn {
 				return true
 			}
 			// For every k8s:defaulter-gen tag at the package level, interpret the value as a
@@ -405,9 +447,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 		if len(newDefaulters) == 0 {
 			klog.V(5).Infof("no defaulters in package %s", pkg.Name)
+			if _, hasTag := extractTag(pkg.Comments); !hasTag {
+				continue
+			}
 		}
 
-		targets = append(targets,
+		targetList = append(targetList,
 			&generator.SimpleTarget{
 				PkgName:       path.Base(pkg.Path),
 				PkgPath:       pkg.Path,
@@ -425,7 +470,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				},
 			})
 	}
-	return targets
+	return targetList
 }
 
 // callTreeForType contains fields necessary to build a tree for types.
@@ -497,13 +542,16 @@ func getPointerElementPath(t *types.Type) []*types.Type {
 }
 
 // getNestedDefault returns the first default value when resolving alias types
-func getNestedDefault(t *types.Type) string {
+func getNestedDefault(t *types.Type) (string, error) {
 	var prev *types.Type
 	for prev != t {
 		prev = t
-		defaultMap := extractDefaultTag(t.CommentLines)
+		defaultMap, err := extractDefaultTag(t.CommentLines)
+		if err != nil {
+			return "", err
+		}
 		if len(defaultMap) == 1 && defaultMap[0] != "" {
-			return defaultMap[0]
+			return defaultMap[0], nil
 		}
 		if t.Kind == types.Alias {
 			t = t.Underlying
@@ -511,7 +559,7 @@ func getNestedDefault(t *types.Type) string {
 			t = t.Elem
 		}
 	}
-	return ""
+	return "", nil
 }
 
 var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
@@ -538,7 +586,11 @@ func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
 }
 
 func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string, commentPackage string) *callNode {
-	defaultMap := extractDefaultTag(commentLines)
+	defaultMap, err := extractDefaultTag(commentLines)
+	if err != nil {
+		klog.Fatalf("Error extracting default tag: %v", err)
+	}
+
 	var defaultString string
 	if len(defaultMap) == 1 {
 		defaultString = defaultMap[0]
@@ -548,7 +600,10 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 
 	baseT, depth := resolveTypeAndDepth(t)
 	if depth > 0 && defaultString == "" {
-		defaultString = getNestedDefault(t)
+		defaultString, err = getNestedDefault(t)
+		if err != nil {
+			klog.Fatalf("Error extracting nested default tag: %v", err)
+		}
 	}
 
 	if len(defaultString) == 0 {
@@ -622,7 +677,11 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		parent.call = append(parent.call, defaults.base)
 		// if the base function indicates it "covers" (it already includes defaulters)
 		// we can halt recursion
-		if checkTag(defaults.base.CommentLines, "covers") {
+		isCovers, err := checkTag(defaults.base.CommentLines, "covers")
+		if err != nil {
+			klog.Fatalf("error extracting %s tag: %v", tagName, err)
+		}
+		if isCovers {
 			klog.V(6).Infof("the defaulter %s indicates it covers all sub generators", t.Name)
 			return parent
 		}

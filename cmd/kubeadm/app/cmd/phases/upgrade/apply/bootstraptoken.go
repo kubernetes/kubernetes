@@ -20,14 +20,13 @@ package apply
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewBootstrapTokenPhase returns a new bootstrap-token phase.
@@ -77,6 +76,11 @@ func runBootstrapToken(c workflow.RunData) error {
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
 	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Create/update RBAC rules that allow the API server kubelet client to access the kubelet API
+	if err := nodebootstraptoken.AllowAPIServerToAccessKubeletAPI(client); err != nil {
 		errs = append(errs, err)
 	}
 

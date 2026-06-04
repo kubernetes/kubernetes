@@ -23,7 +23,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/policy"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // minimalValidPods holds minimal valid OS neutral pods per-level per-version.
@@ -70,7 +70,7 @@ func init() {
 
 	// 1.0+: baseline + runAsNonRoot=true
 	restricted_1_0 := tweak(baseline_1_0, func(p *corev1.Pod) {
-		p.Spec.SecurityContext = &corev1.PodSecurityContext{RunAsNonRoot: pointer.BoolPtr(true)}
+		p.Spec.SecurityContext = &corev1.PodSecurityContext{RunAsNonRoot: ptr.To(true)}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = restricted_1_0
 	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = addLinux(restricted_1_0)
@@ -78,8 +78,8 @@ func init() {
 
 	// 1.8+: allowPrivilegeEscalation=false
 	restricted_1_8 := tweak(restricted_1_0, func(p *corev1.Pod) {
-		p.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
-		p.Spec.InitContainers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
+		p.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: ptr.To(false)}
+		p.Spec.InitContainers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: ptr.To(false)}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = restricted_1_8
 	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = addLinux(restricted_1_8)
@@ -183,9 +183,14 @@ type fixtureGenerator struct {
 	// Pass cases are not allowed to be feature-gated (pass cases must only depend on data existing in GA fields).
 	failRequiresFeatures []featuregate.Feature
 
-	// generatePass transforms a minimum valid pod into one or more valid pods.
+	// failRequiresError indicates the fixtures in the failure cases cannot be created with warnings, but result in API errors.
+	// This happens when the combination of fields required to fail the PSA check also fails validation.
+	// When failRequiresError=true, the controller test scenarios expect failure cases to be rejected rather than accepted with warnings.
+	failRequiresError bool
+
+	// generatePass transforms a minimum valid pod into one or more valid pods that pass the given policy level.
 	// pods do not need to populate metadata.name.
-	generatePass func(*corev1.Pod) []*corev1.Pod
+	generatePass func(*corev1.Pod, api.Level) []*corev1.Pod
 	// generateFail transforms a minimum valid pod into one or more invalid pods.
 	// pods do not need to populate metadata.name.
 	generateFail func(*corev1.Pod) []*corev1.Pod
@@ -200,6 +205,11 @@ type fixtureData struct {
 	// If empty, failure test cases are always run.
 	// Pass cases are not allowed to be feature-gated (pass cases must only depend on data existing in GA fields).
 	failRequiresFeatures []featuregate.Feature
+
+	// failRequiresError indicates the fixtures in the failure cases cannot be created with warnings, but result in API errors.
+	// This happens when the combination of fields required to fail the PSA check also fails validation.
+	// When failRequiresError=true, the controller test scenarios expect failure cases to be rejected rather than accepted with warnings.
+	failRequiresError bool
 
 	pass []*corev1.Pod
 	fail []*corev1.Pod
@@ -248,8 +258,9 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 			data := fixtureData{
 				expectErrorSubstring: generator.expectErrorSubstring,
 				failRequiresFeatures: generator.failRequiresFeatures,
+				failRequiresError:    generator.failRequiresError,
 
-				pass: generator.generatePass(validPodForLevel.DeepCopy()),
+				pass: generator.generatePass(validPodForLevel.DeepCopy(), key.level),
 				fail: generator.generateFail(validPodForLevel.DeepCopy()),
 			}
 			if len(data.expectErrorSubstring) == 0 {

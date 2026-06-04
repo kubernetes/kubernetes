@@ -32,6 +32,8 @@ import (
 	"k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	"k8s.io/code-generator/pkg/apidefinitions"
+	genutil "k8s.io/code-generator/pkg/util"
 )
 
 const (
@@ -61,7 +63,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	pkgTypes := packageTypesForInputs(context, args.OutputPkg)
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
+	pkgTypes := packageTypesForInputs(context, args.OutputPkg, idOpts)
 	initialTypes := args.ExternalApplyConfigurations
 	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
 	typeModels, err := newTypeModels(args.OpenAPISchemaFilePath, pkgTypes)
@@ -75,7 +82,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 	var targetList []generator.Target
 	for pkg, p := range pkgTypes {
-		gv := groupVersion(p)
+		gv, err := groupVersion(p)
+		if err != nil {
+			klog.Fatalf("Failed to parse comments of package %s: %v", p.Name, err)
+		}
 
 		var toGenerate []applyConfig
 		for _, t := range p.Types {
@@ -128,7 +138,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			Package: path.Clean(p.Path),
 		})
 
-		groupGoNames[groupPackageName] = goName(gv, p)
+		groupGoNames[groupPackageName], err = goName(gv, p)
+		if err != nil {
+			klog.Fatalf("Failed to parse comments of group package %s: %v", groupPackageName, err)
+		}
 		applyConfigsForGroupVersion[gv] = toGenerate
 		groupVersions[groupPackageName] = groupVersionsEntry
 	}
@@ -143,19 +156,6 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			boilerplate, typeModels))
 
 	return targetList
-}
-
-func friendlyName(name string) string {
-	nameParts := strings.Split(name, "/")
-	// Reverse first part. e.g., io.k8s... instead of k8s.io...
-	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
-		parts := strings.Split(nameParts[0], ".")
-		for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
-			parts[i], parts[j] = parts[j], parts[i]
-		}
-		nameParts[0] = strings.Join(parts, ".")
-	}
-	return strings.Join(nameParts, ".")
 }
 
 func typeName(t *types.Type) string {
@@ -244,18 +244,31 @@ func targetForInternal(outputDirBase, outputPkgBase string, boilerplate []byte, 
 	}
 }
 
-func goName(gv clientgentypes.GroupVersion, p *types.Package) string {
+func goName(gv clientgentypes.GroupVersion, p *types.Package) (string, error) {
 	goName := namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
-	if override := gengo.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
-		goName = namer.IC(override[0])
+	override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupGoName"}, p.Comments)
+
+	if err != nil {
+		return goName, err
 	}
-	return goName
+	if values, ok := override["groupGoName"]; ok {
+		goName = namer.IC(values[0])
+	}
+
+	return goName, nil
 }
 
-func packageTypesForInputs(context *generator.Context, outPkgBase string) map[string]*types.Package {
+func packageTypesForInputs(context *generator.Context, outPkgBase string, idOpts []apidefinitions.Option) map[string]*types.Package {
 	pkgTypes := map[string]*types.Package{}
 	for _, inputDir := range context.Inputs {
 		p := context.Universe.Package(inputDir)
+		info, err := apidefinitions.Identify(p, apidefinitions.ApplyConfiguration, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		if !info.ShouldGenerate() {
+			continue
+		}
 		internal := isInternalPackage(p)
 		if internal {
 			klog.Warningf("Skipping internal package: %s", p.Path)
@@ -272,7 +285,7 @@ func packageTypesForInputs(context *generator.Context, outPkgBase string) map[st
 	return pkgTypes
 }
 
-func groupVersion(p *types.Package) (gv clientgentypes.GroupVersion) {
+func groupVersion(p *types.Package) (gv clientgentypes.GroupVersion, err error) {
 	parts := strings.Split(p.Path, "/")
 	gv.Group = clientgentypes.Group(parts[len(parts)-2])
 	gv.Version = clientgentypes.Version(parts[len(parts)-1])
@@ -280,10 +293,15 @@ func groupVersion(p *types.Package) (gv clientgentypes.GroupVersion) {
 	// If there's a comment of the form "// +groupName=somegroup" or
 	// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 	// group when generating.
-	if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-		gv.Group = clientgentypes.Group(override[0])
+	override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
+	if err != nil {
+		return gv, err
 	}
-	return gv
+	if ok {
+		gv.Group = clientgentypes.Group(override)
+	}
+
+	return gv, nil
 }
 
 // isInternalPackage returns true if the package is an internal package

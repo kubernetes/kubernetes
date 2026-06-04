@@ -26,7 +26,7 @@ func NewDecoder(r io.Reader) *Decoder {
 }
 
 // Decode reads CBOR value and decodes it into the value pointed to by v.
-func (dec *Decoder) Decode(v interface{}) error {
+func (dec *Decoder) Decode(v any) error {
 	_, err := dec.readNext()
 	if err != nil {
 		// Return validation error or read error.
@@ -170,15 +170,21 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 // Encode writes the CBOR encoding of v.
-func (enc *Encoder) Encode(v interface{}) error {
-	if len(enc.indefTypes) > 0 && v != nil {
-		indefType := enc.indefTypes[len(enc.indefTypes)-1]
-		if indefType == cborTypeTextString {
+func (enc *Encoder) Encode(v any) error {
+	if len(enc.indefTypes) > 0 {
+		switch enc.indefTypes[len(enc.indefTypes)-1] {
+		case cborTypeTextString:
+			if v == nil {
+				return errors.New("cbor: cannot encode nil for indefinite-length text string")
+			}
 			k := reflect.TypeOf(v).Kind()
 			if k != reflect.String {
 				return errors.New("cbor: cannot encode item type " + k.String() + " for indefinite-length text string")
 			}
-		} else if indefType == cborTypeByteString {
+		case cborTypeByteString:
+			if v == nil {
+				return errors.New("cbor: cannot encode nil for indefinite-length byte string")
+			}
 			t := reflect.TypeOf(v)
 			k := t.Kind()
 			if (k != reflect.Array && k != reflect.Slice) || t.Elem().Kind() != reflect.Uint8 {
@@ -198,35 +204,35 @@ func (enc *Encoder) Encode(v interface{}) error {
 	return err
 }
 
-// StartIndefiniteByteString starts byte string encoding of indefinite length.
+// StartIndefiniteByteString starts indefinite-length byte string encoding.
 // Subsequent calls of (*Encoder).Encode() encodes definite length byte strings
 // ("chunks") as one contiguous string until EndIndefinite is called.
 func (enc *Encoder) StartIndefiniteByteString() error {
 	return enc.startIndefinite(cborTypeByteString)
 }
 
-// StartIndefiniteTextString starts text string encoding of indefinite length.
+// StartIndefiniteTextString starts indefinite-length text string encoding.
 // Subsequent calls of (*Encoder).Encode() encodes definite length text strings
 // ("chunks") as one contiguous string until EndIndefinite is called.
 func (enc *Encoder) StartIndefiniteTextString() error {
 	return enc.startIndefinite(cborTypeTextString)
 }
 
-// StartIndefiniteArray starts array encoding of indefinite length.
+// StartIndefiniteArray starts indefinite-length array encoding.
 // Subsequent calls of (*Encoder).Encode() encodes elements of the array
 // until EndIndefinite is called.
 func (enc *Encoder) StartIndefiniteArray() error {
 	return enc.startIndefinite(cborTypeArray)
 }
 
-// StartIndefiniteMap starts array encoding of indefinite length.
+// StartIndefiniteMap starts indefinite-length map encoding.
 // Subsequent calls of (*Encoder).Encode() encodes elements of the map
 // until EndIndefinite is called.
 func (enc *Encoder) StartIndefiniteMap() error {
 	return enc.startIndefinite(cborTypeMap)
 }
 
-// EndIndefinite closes last opened indefinite length value.
+// EndIndefinite closes last opened indefinite-length value.
 func (enc *Encoder) EndIndefinite() error {
 	if len(enc.indefTypes) == 0 {
 		return errors.New("cbor: cannot encode \"break\" code outside indefinite length values")
@@ -238,18 +244,22 @@ func (enc *Encoder) EndIndefinite() error {
 	return err
 }
 
-var cborIndefHeader = map[cborType][]byte{
-	cborTypeByteString: {cborByteStringWithIndefiniteLengthHead},
-	cborTypeTextString: {cborTextStringWithIndefiniteLengthHead},
-	cborTypeArray:      {cborArrayWithIndefiniteLengthHead},
-	cborTypeMap:        {cborMapWithIndefiniteLengthHead},
-}
-
 func (enc *Encoder) startIndefinite(typ cborType) error {
 	if enc.em.indefLength == IndefLengthForbidden {
 		return &IndefiniteLengthError{typ}
 	}
-	_, err := enc.w.Write(cborIndefHeader[typ])
+	var head byte
+	switch typ {
+	case cborTypeByteString:
+		head = cborByteStringWithIndefiniteLengthHead
+	case cborTypeTextString:
+		head = cborTextStringWithIndefiniteLengthHead
+	case cborTypeArray:
+		head = cborArrayWithIndefiniteLengthHead
+	case cborTypeMap:
+		head = cborMapWithIndefiniteLengthHead
+	}
+	_, err := enc.w.Write([]byte{head})
 	if err == nil {
 		enc.indefTypes = append(enc.indefTypes, typ)
 	}
@@ -262,7 +272,9 @@ type RawMessage []byte
 // MarshalCBOR returns m or CBOR nil if m is nil.
 func (m RawMessage) MarshalCBOR() ([]byte, error) {
 	if len(m) == 0 {
-		return cborNil, nil
+		b := make([]byte, len(cborNil))
+		copy(b, cborNil)
+		return b, nil
 	}
 	return m, nil
 }

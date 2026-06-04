@@ -119,11 +119,11 @@ func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 
 func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
 	return map[string]kubeopenapi.OpenAPIDefinition{
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":          {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":     {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":    {},
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":        buildTestOpenAPIDefinition(),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList": {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.Status":          {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions":     {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList":    {},
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup":        buildTestOpenAPIDefinition(),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {},
 	}
 }
 
@@ -532,6 +532,16 @@ type mockAuthorizer struct {
 func (authz *mockAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	authz.lastURI = a.GetPath()
 	return authorizer.DecisionAllow, "", nil
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (authz *mockAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(authz.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*mockAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 type testGetterStorage struct {

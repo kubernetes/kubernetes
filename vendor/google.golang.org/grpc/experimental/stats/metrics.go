@@ -19,9 +19,30 @@
 // Package stats contains experimental metrics/stats API's.
 package stats
 
-import "maps"
+import (
+	"context"
+
+	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/stats"
+)
+
+type customLabelKey struct{}
+
+// NewContextWithCustomLabel returns a new context with the provided custom label
+// attached. The label will be propagated to all metric instruments specified in gRFC A108.
+func NewContextWithCustomLabel(ctx context.Context, label string) context.Context {
+	return context.WithValue(ctx, customLabelKey{}, label)
+}
+
+// CustomLabelFromContext returns the custom label from the context if it exists.
+// If the custom label is not present, it returns an empty string.
+func CustomLabelFromContext(ctx context.Context) string {
+	label, _ := ctx.Value(customLabelKey{}).(string)
+	return label
+}
 
 // MetricsRecorder records on metrics derived from metric registry.
+// Implementors must embed UnimplementedMetricsRecorder.
 type MetricsRecorder interface {
 	// RecordInt64Count records the measurement alongside labels on the int
 	// count associated with the provided handle.
@@ -38,77 +59,90 @@ type MetricsRecorder interface {
 	// RecordInt64Gauge records the measurement alongside labels on the int
 	// gauge associated with the provided handle.
 	RecordInt64Gauge(handle *Int64GaugeHandle, incr int64, labels ...string)
+	// RecordInt64UpDownCounter records the measurement alongside labels on the int
+	// count associated with the provided handle.
+	RecordInt64UpDownCount(handle *Int64UpDownCountHandle, incr int64, labels ...string)
+	// RegisterAsyncReporter registers a reporter to produce metric values for
+	// only the listed descriptors. The returned function must be called when
+	// the metrics are no longer needed, which will remove the reporter. The
+	// returned method needs to be idempotent and concurrent safe.
+	RegisterAsyncReporter(reporter AsyncMetricReporter, descriptors ...AsyncMetric) func()
+
+	// EnforceMetricsRecorderEmbedding is included to force implementers to embed
+	// another implementation of this interface, allowing gRPC to add methods
+	// without breaking users.
+	internal.EnforceMetricsRecorderEmbedding
 }
 
-// Metric is an identifier for a metric.
-type Metric string
-
-// Metrics is a set of metrics to record. Once created, Metrics is immutable,
-// however Add and Remove can make copies with specific metrics added or
-// removed, respectively.
+// AsyncMetricReporter is an interface for types that record metrics asynchronously
+// for the set of descriptors they are registered with. The AsyncMetricsRecorder
+// parameter is used to record values for these metrics.
 //
-// Do not construct directly; use NewMetrics instead.
-type Metrics struct {
-	// metrics are the set of metrics to initialize.
-	metrics map[Metric]bool
+// Implementations must make unique recordings across all registered
+// AsyncMetricReporters. Meaning, they should not report values for a metric with
+// the same attributes as another AsyncMetricReporter will report.
+//
+// Implementations must be concurrent-safe.
+type AsyncMetricReporter interface {
+	// Report records metric values using the provided recorder.
+	Report(AsyncMetricsRecorder) error
 }
 
-// NewMetrics returns a Metrics containing Metrics.
+// AsyncMetricReporterFunc is an adapter to allow the use of ordinary functions as
+// AsyncMetricReporters.
+type AsyncMetricReporterFunc func(AsyncMetricsRecorder) error
+
+// Report calls f(r).
+func (f AsyncMetricReporterFunc) Report(r AsyncMetricsRecorder) error {
+	return f(r)
+}
+
+// AsyncMetricsRecorder records on asynchronous metrics derived from metric registry.
+type AsyncMetricsRecorder interface {
+	// RecordInt64AsyncGauge records the measurement alongside labels on the int
+	// count associated with the provided handle asynchronously
+	RecordInt64AsyncGauge(handle *Int64AsyncGaugeHandle, incr int64, labels ...string)
+}
+
+// Metrics is an experimental legacy alias of the now-stable stats.MetricSet.
+// Metrics will be deleted in a future release.
+type Metrics = stats.MetricSet
+
+// Metric was replaced by direct usage of strings.
+type Metric = string
+
+// NewMetrics is an experimental legacy alias of the now-stable
+// stats.NewMetricSet.  NewMetrics will be deleted in a future release.
 func NewMetrics(metrics ...Metric) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	for _, metric := range metrics {
-		newMetrics[metric] = true
-	}
-	return &Metrics{
-		metrics: newMetrics,
-	}
+	return stats.NewMetricSet(metrics...)
 }
 
-// Metrics returns the metrics set. The returned map is read-only and must not
-// be modified.
-func (m *Metrics) Metrics() map[Metric]bool {
-	return m.metrics
+// UnimplementedMetricsRecorder must be embedded to have forward compatible implementations.
+type UnimplementedMetricsRecorder struct {
+	internal.EnforceMetricsRecorderEmbedding
 }
 
-// Add adds the metrics to the metrics set and returns a new copy with the
-// additional metrics.
-func (m *Metrics) Add(metrics ...Metric) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	for metric := range m.metrics {
-		newMetrics[metric] = true
-	}
+// RecordInt64Count provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RecordInt64Count(*Int64CountHandle, int64, ...string) {}
 
-	for _, metric := range metrics {
-		newMetrics[metric] = true
-	}
-	return &Metrics{
-		metrics: newMetrics,
-	}
+// RecordFloat64Count provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RecordFloat64Count(*Float64CountHandle, float64, ...string) {}
+
+// RecordInt64Histo provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RecordInt64Histo(*Int64HistoHandle, int64, ...string) {}
+
+// RecordFloat64Histo provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RecordFloat64Histo(*Float64HistoHandle, float64, ...string) {}
+
+// RecordInt64Gauge provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RecordInt64Gauge(*Int64GaugeHandle, int64, ...string) {}
+
+// RecordInt64UpDownCount provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RecordInt64UpDownCount(*Int64UpDownCountHandle, int64, ...string) {
 }
 
-// Join joins the metrics passed in with the metrics set, and returns a new copy
-// with the merged metrics.
-func (m *Metrics) Join(metrics *Metrics) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	maps.Copy(newMetrics, m.metrics)
-	maps.Copy(newMetrics, metrics.metrics)
-	return &Metrics{
-		metrics: newMetrics,
-	}
-}
-
-// Remove removes the metrics from the metrics set and returns a new copy with
-// the metrics removed.
-func (m *Metrics) Remove(metrics ...Metric) *Metrics {
-	newMetrics := make(map[Metric]bool)
-	for metric := range m.metrics {
-		newMetrics[metric] = true
-	}
-
-	for _, metric := range metrics {
-		delete(newMetrics, metric)
-	}
-	return &Metrics{
-		metrics: newMetrics,
-	}
+// RegisterAsyncReporter provides a no-op implementation.
+func (UnimplementedMetricsRecorder) RegisterAsyncReporter(AsyncMetricReporter, ...AsyncMetric) func() {
+	// No-op: Return an empty function to ensure caller doesn't panic on nil function call
+	return func() {}
 }

@@ -100,8 +100,9 @@ type ServerRunOptions struct {
 	ComponentName string
 	// EmulationForwardCompatible is an option to implicitly enable all APIs which are introduced after the emulation version and
 	// have higher priority than APIs of the same group resource enabled at the emulation version.
-	// If true, all APIs that have higher priority than the APIs of the same group resource enabled at the emulation version will be installed.
+	// If true, all APIs that have higher priority than the APIs(beta+) of the same group resource enabled at the emulation version will be installed.
 	// This is needed when a controller implementation migrates to newer API versions, for the binary version, and also uses the newer API versions even when emulation version is set.
+	// Not applicable to alpha APIs.
 	EmulationForwardCompatible bool
 	// RuntimeConfigEmulationForwardCompatible is an option to explicitly enable specific APIs introduced after the emulation version through the runtime-config.
 	// If true, APIs identified by group/version that are enabled in the --runtime-config flag will be installed even if it is introduced after the emulation version. --runtime-config flag values that identify multiple APIs, such as api/all,api/ga,api/beta, are not influenced by this flag and will only enable APIs available at the current emulation version.
@@ -399,10 +400,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	s.ComponentGlobalsRegistry.AddFlags(fs)
 	fs.BoolVar(&s.EmulationForwardCompatible, "emulation-forward-compatible", s.EmulationForwardCompatible, ""+
-		"If true all APIs that have higher priority than the APIs enabled at the emulation version of the same group resource will be installed. "+
+		"If true, for any beta+ APIs enabled by default or by --runtime-config at the emulation version, their future versions with higher priority/stability will be auto enabled even if they introduced after the emulation version. "+
 		"Can only be set to true if the emulation version is lower than the binary version.")
 	fs.BoolVar(&s.RuntimeConfigEmulationForwardCompatible, "runtime-config-emulation-forward-compatible", s.RuntimeConfigEmulationForwardCompatible, ""+
 		"If true, APIs identified by group/version that are enabled in the --runtime-config flag will be installed even if it is introduced after the emulation version. "+
+		"If false, server would fail to start if any APIs identified by group/version that are enabled in the --runtime-config flag are introduced after the emulation version. "+
 		"Can only be set to true if the emulation version is lower than the binary version.")
 }
 

@@ -17,12 +17,11 @@ limitations under the License.
 package fuzzer
 
 import (
-	"sigs.k8s.io/randfill"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/randfill"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -38,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzDNS,
 		fuzzNodeRegistration,
 		fuzzLocalEtcd,
+		fuzzExternalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
@@ -89,7 +89,6 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c randfill.Cont
 	obj.CIImageRepository = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
 	obj.KubernetesVersion = "qux"
 	obj.CIKubernetesVersion = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
-	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{}
 	obj.ControllerManager.ExtraEnvs = nil
 	obj.APIServer.ExtraEnvs = nil
 	obj.Scheduler.ExtraEnvs = nil
@@ -117,6 +116,13 @@ func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c randfill.Continue) {
 	obj.DataDir = "foo"
 }
 
+func fuzzExternalEtcd(obj *kubeadm.ExternalEtcd, c randfill.Continue) {
+	c.FillNoCustom(obj)
+
+	// Required because the HTTPEndpoints is defaulted to Endpoints.
+	obj.HTTPEndpoints = obj.Endpoints
+}
+
 func fuzzNetworking(obj *kubeadm.Networking, c randfill.Continue) {
 	c.FillNoCustom(obj)
 
@@ -133,7 +139,6 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c randfill.Continue) 
 	obj.Discovery = kubeadm.Discovery{
 		BootstrapToken:    &kubeadm.BootstrapTokenDiscovery{Token: "baz"},
 		TLSBootstrapToken: "qux",
-		Timeout:           &metav1.Duration{Duration: constants.DiscoveryTimeout},
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent

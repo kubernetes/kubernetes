@@ -15,11 +15,11 @@ type Filter func(KeyValue) bool
 //
 // If keys is empty a deny-all filter is returned.
 func NewAllowKeysFilter(keys ...Key) Filter {
-	if len(keys) <= 0 {
-		return func(kv KeyValue) bool { return false }
+	if len(keys) == 0 {
+		return func(KeyValue) bool { return false }
 	}
 
-	allowed := make(map[Key]struct{})
+	allowed := make(map[Key]struct{}, len(keys))
 	for _, k := range keys {
 		allowed[k] = struct{}{}
 	}
@@ -34,11 +34,11 @@ func NewAllowKeysFilter(keys ...Key) Filter {
 //
 // If keys is empty an allow-all filter is returned.
 func NewDenyKeysFilter(keys ...Key) Filter {
-	if len(keys) <= 0 {
-		return func(kv KeyValue) bool { return true }
+	if len(keys) == 0 {
+		return func(KeyValue) bool { return true }
 	}
 
-	forbid := make(map[Key]struct{})
+	forbid := make(map[Key]struct{}, len(keys))
 	for _, k := range keys {
 		forbid[k] = struct{}{}
 	}

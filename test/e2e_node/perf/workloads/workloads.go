@@ -50,4 +50,4 @@ type NodePerfWorkload interface {
 }
 
 // NodePerfWorkloads is the collection of all node performance testing workloads.
-var NodePerfWorkloads = []NodePerfWorkload{npbISWorkload{}, npbEPWorkload{}, tfWideDeepWorkload{}}
+var NodePerfWorkloads = []NodePerfWorkload{npbISWorkload{}, npbEPWorkload{}, pytorchWideDeepWorkload{}}

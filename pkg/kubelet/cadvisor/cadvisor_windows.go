@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -24,6 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
@@ -35,8 +35,8 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
-	client, err := winstats.NewPerfCounterClient()
+func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+	client, err := winstats.NewPerfCounterClient(logger)
 	return &cadvisorClient{
 		rootPath:       rootPath,
 		winStatsClient: client,
@@ -56,8 +56,8 @@ func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, optio
 	return nil, nil
 }
 
-func (cu *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
-	return cu.winStatsClient.WinMachineInfo()
+func (cu *cadvisorClient) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
+	return cu.winStatsClient.WinMachineInfo(logger)
 }
 
 func (cu *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
@@ -78,4 +78,8 @@ func (cu *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cu.winStatsClient.GetDirFsInfo(path)
+}
+
+func IsPsiEnabled(_ klog.Logger) bool {
+	return false
 }

@@ -35,18 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	machineryutilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/version"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -91,12 +86,12 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
-	}, nil, nil, nil)
+	}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	if pods != nil && len(pods) > 0 {
-		ctx := genericapirequest.NewDefaultContext()
+		ctx := genericregistrytest.NewNamespaceScopeContext(podStorage.Pod.Store, metav1.NamespaceDefault)
 		for ix := range pods {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods[ix].Name)
 			if err := podStorage.Pod.Storage.Create(ctx, key, &pods[ix], nil, 0, false); err != nil {
@@ -114,7 +109,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	if endpoints != nil && len(endpoints) > 0 {
-		ctx := genericapirequest.NewDefaultContext()
+		ctx := genericregistrytest.NewNamespaceScopeContext(endpointsStorage.Store, metav1.NamespaceDefault)
 		for ix := range endpoints {
 			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
 			if err := endpointsStorage.Store.Storage.Create(ctx, key, endpoints[ix], nil, 0, false); err != nil {
@@ -804,7 +799,7 @@ func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCas
 			name += "__@L" + tc.line
 		}
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			// Create the object as specified and check the results.
 			obj, err := storage.Create(ctx, tc.create.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -1403,7 +1398,7 @@ func TestCreateIgnoresIPsForExternalName(t *testing.T) {
 					itc.svc.Spec.Type = api.ServiceTypeExternalName
 					itc.svc.Spec.ExternalName = "example.com"
 
-					ctx := genericapirequest.NewDefaultContext()
+					ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 					createdObj, err := storage.Create(ctx, itc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 					if itc.expectError && err != nil {
 						return
@@ -1486,7 +1481,7 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -5945,7 +5940,7 @@ func TestCreateInitIPFields(t *testing.T) {
 
 			for _, itc := range otc.cases {
 				t.Run(itc.name+"__@L"+itc.line, func(t *testing.T) {
-					ctx := genericapirequest.NewDefaultContext()
+					ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 					createdObj, err := storage.Create(ctx, itc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 					if itc.expectError && err != nil {
 						return
@@ -6095,7 +6090,7 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err == nil {
 				t.Fatalf("unexpected success creating service")
@@ -6134,7 +6129,7 @@ func TestCreateDeleteReuse(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			// Create it
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6389,7 +6384,7 @@ func TestCreateInitNodePorts(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if tc.expectError && err != nil {
 				return
@@ -6503,7 +6498,7 @@ func TestCreateSkipsAllocationsForHeadless(t *testing.T) {
 			// This test is ONLY headless services.
 			tc.svc.Spec.ClusterIP = api.ClusterIPNone
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if tc.expectError && err != nil {
 				return
@@ -6572,7 +6567,7 @@ func TestCreateDryRun(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -6612,7 +6607,7 @@ func TestDeleteWithFinalizer(t *testing.T) {
 			s.Finalizers = []string{"example.com/test"}
 		})
 
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 	// Create it with finalizer.
 	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6700,7 +6695,7 @@ func TestDeleteDryRun(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -6797,7 +6792,7 @@ func TestUpdateDryRun(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			obj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -11654,7 +11649,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 	for _, name := range []string{"unnamed", "unnamed2", "no-endpoints"} {
 		_, err := storage.Create(ctx,
 			svctest.MakeService(name,
@@ -11763,132 +11758,14 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 
 	testCases := []struct {
 		name                   string
-		ipModeEnabled          bool
 		statusBeforeUpdate     api.ServiceStatus
 		newStatus              api.ServiceStatus
 		expectedStatus         api.ServiceStatus
 		expectErr              bool
 		expectedReasonForError metav1.StatusReason
 	}{
-		/*LoadBalancerIPMode disabled*/
 		{
-			name:               "LoadBalancerIPMode disabled, ipMode not used in old, not used in new",
-			ipModeEnabled:      false,
-			statusBeforeUpdate: api.ServiceStatus{},
-			newStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			expectedStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			expectErr: false,
-		}, {
-			name:          "LoadBalancerIPMode disabled, ipMode used in old and in new",
-			ipModeEnabled: false,
-			statusBeforeUpdate: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				},
-			},
-			newStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				},
-			},
-			expectedStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				},
-			},
-			expectErr: false,
-		}, {
-			name:          "LoadBalancerIPMode disabled, ipMode not used in old, used in new",
-			ipModeEnabled: false,
-			statusBeforeUpdate: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			newStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				},
-			},
-			expectedStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			expectErr: false,
-		}, {
-			name:          "LoadBalancerIPMode disabled, ipMode used in old, not used in new",
-			ipModeEnabled: false,
-			statusBeforeUpdate: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeVIP,
-					}},
-				},
-			},
-			newStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			expectedStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			expectErr: false,
-		},
-		/*LoadBalancerIPMode enabled*/
-		{
-			name:               "LoadBalancerIPMode enabled, ipMode not used in old, not used in new",
-			ipModeEnabled:      true,
-			statusBeforeUpdate: api.ServiceStatus{},
-			newStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			expectedStatus:         api.ServiceStatus{},
-			expectErr:              true,
-			expectedReasonForError: metav1.StatusReasonInvalid,
-		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode used in old and in new",
-			ipModeEnabled: true,
+			name: "ipMode used in old and in new",
 			statusBeforeUpdate: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
 					Ingress: []api.LoadBalancerIngress{{
@@ -11915,35 +11792,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 			},
 			expectErr: false,
 		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode not used in old, used in new",
-			ipModeEnabled: true,
-			statusBeforeUpdate: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
-					}},
-				},
-			},
-			newStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				},
-			},
-			expectedStatus: api.ServiceStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{{
-						IP:     "1.2.3.4",
-						IPMode: &ipModeProxy,
-					}},
-				},
-			},
-			expectErr: false,
-		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode used in old, not used in new",
-			ipModeEnabled: true,
+			name: "ipMode used in old, not used in new",
 			statusBeforeUpdate: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
 					Ingress: []api.LoadBalancerIngress{{
@@ -11963,12 +11812,12 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 			expectErr:              true,
 			expectedReasonForError: metav1.StatusReasonInvalid,
 		}, {
-			name:          "LoadBalancerIPMode enabled, ipMode not used in old, invalid value used in new",
-			ipModeEnabled: true,
+			name: "ipMode used in old, invalid value used in new",
 			statusBeforeUpdate: api.ServiceStatus{
 				LoadBalancer: api.LoadBalancerStatus{
 					Ingress: []api.LoadBalancerIngress{{
-						IP: "1.2.3.4",
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
 					}},
 				},
 			},
@@ -11990,31 +11839,21 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
-				t.Errorf("created svc: %s", err)
+				t.Fatalf("created svc: %s", err)
 			}
 			defer storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 
 			// prepare status
-			// Test here is negative, because starting with v1.30 the feature gate is enabled by default, so we should
-			// now disable it to do the proper test
-			if !loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, false)
-			}
 			oldSvc := obj.(*api.Service).DeepCopy()
 			oldSvc.Status = tc.statusBeforeUpdate
 			obj, _, err = statusStorage.Update(ctx, oldSvc.Name, rest.DefaultUpdatedObjectInfo(oldSvc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 			if err != nil {
-				t.Errorf("updated status: %s", err)
+				t.Fatalf("updated status: %s", err)
 			}
 
-			if !tc.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			newSvc := obj.(*api.Service).DeepCopy()
 			newSvc.Status = tc.newStatus
 			obj, _, err = statusStorage.Update(ctx, newSvc.Name, rest.DefaultUpdatedObjectInfo(newSvc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
@@ -12022,7 +11861,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 				if tc.expectErr && tc.expectedReasonForError == errors.ReasonForError(err) {
 					return
 				}
-				t.Errorf("updated status: %s", err)
+				t.Fatalf("updated status: %s", err)
 			}
 
 			updated := obj.(*api.Service)
@@ -12031,13 +11870,4 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 			}
 		})
 	}
-}
-
-func loadbalancerIPModeInUse(status api.ServiceStatus) bool {
-	for _, ing := range status.LoadBalancer.Ingress {
-		if ing.IPMode != nil {
-			return true
-		}
-	}
-	return false
 }

@@ -26,14 +26,16 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ImageReview checks if the set of images in a pod are allowed.
+// +k8s:supportsSubresource="/status"
 type ImageReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the pod being evaluated
+	// +optional
 	Spec ImageReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status is filled in by the backend and indicates whether the pod should be allowed.
@@ -68,6 +70,7 @@ type ImageReviewContainerSpec struct {
 // ImageReviewStatus is the result of the review for the pod creation request.
 type ImageReviewStatus struct {
 	// Allowed indicates that all images were allowed to be run.
+	// +optional
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
 	// Reason should be empty unless Allowed is false in which case it
 	// may contain a short description of what is wrong.  Kubernetes

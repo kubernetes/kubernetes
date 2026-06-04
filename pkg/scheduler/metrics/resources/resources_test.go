@@ -526,6 +526,172 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="storage",scheduler="",unit="bytes"} 5
 				`,
 		},
+		{
+			name: "pod level resources",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("4"),
+								"memory": resource.MustParse("8G"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("4"),
+								"memory": resource.MustParse("8G"),
+							},
+						},
+						Containers: []v1.Container{
+							{Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									"cpu":    resource.MustParse("2"),
+									"memory": resource.MustParse("4G"),
+								},
+								Limits: v1.ResourceList{
+									"cpu":    resource.MustParse("2"),
+									"memory": resource.MustParse("4G"),
+								},
+							}},
+							{Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									"cpu":    resource.MustParse("0"),
+									"memory": resource.MustParse("0"),
+								},
+								Limits: v1.ResourceList{
+									"cpu":    resource.MustParse("0"),
+									"memory": resource.MustParse("0"),
+								},
+							}},
+						},
+					},
+				},
+			},
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 4
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 8e+09
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 4
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 8e+09
+				`,
+		},
+		{
+			name: "pod level resources with unsupported resource type",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"custom": resource.MustParse("2"),
+							},
+							Limits: v1.ResourceList{
+								"custom": resource.MustParse("2"),
+							},
+						},
+						Containers: []v1.Container{
+							{Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									"custom": resource.MustParse("1"),
+								},
+								Limits: v1.ResourceList{
+									"custom": resource.MustParse("1"),
+								},
+							}},
+						},
+					},
+				},
+			},
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="custom",scheduler="",unit=""} 1
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="custom",scheduler="",unit=""} 1
+				`,
+		},
+		{
+			name: "pod level resources with aggregated container limits",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2"),
+								"memory": resource.MustParse("4G"),
+							},
+						},
+						Containers: []v1.Container{
+							{Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									"cpu":    resource.MustParse("1"),
+									"memory": resource.MustParse("2G"),
+								},
+							}},
+							{Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									"cpu":    resource.MustParse("2"),
+									"memory": resource.MustParse("3G"),
+								},
+							}},
+						},
+					},
+				},
+			},
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 3
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 5e+09
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 2
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 4e+09
+				`,
+		},
+		{
+			name: "pod level resources with missing requests",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2"),
+								"memory": resource.MustParse("4G"),
+							},
+						},
+						Containers: []v1.Container{
+							{Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									"cpu":    resource.MustParse("1"),
+									"memory": resource.MustParse("2G"),
+								},
+								Limits: v1.ResourceList{
+									"cpu":    resource.MustParse("1"),
+									"memory": resource.MustParse("2G"),
+								},
+							}},
+						},
+					},
+				},
+			},
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 2
+				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 4e+09
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 1
+				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 2e+09
+				`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

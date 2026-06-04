@@ -129,6 +129,10 @@ Example resource specifications include:
 
 var StdinMultiUseError = errors.New("standard input cannot be used for multiple arguments")
 
+// ErrMultipleResourceTypes is returned when Builder.SingleResourceType() was called,
+// but multiple resource types were specified.
+var ErrMultipleResourceTypes = errors.New("you may only specify a single resource type")
+
 // TODO: expand this to include other errors.
 func IsUsageError(err error) bool {
 	if err == nil {
@@ -813,7 +817,7 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 
 func (b *Builder) resourceMappings() ([]*meta.RESTMapping, error) {
 	if len(b.resources) > 1 && b.singleResourceType {
-		return nil, fmt.Errorf("you may only specify a single resource type")
+		return nil, ErrMultipleResourceTypes
 	}
 	mappings := []*meta.RESTMapping{}
 	seen := map[schema.GroupVersionKind]bool{}
@@ -849,7 +853,7 @@ func (b *Builder) resourceTupleMappings() (map[string]*meta.RESTMapping, error) 
 		canonical[mapping.Resource] = struct{}{}
 	}
 	if len(canonical) > 1 && b.singleResourceType {
-		return nil, fmt.Errorf("you may only specify a single resource type")
+		return nil, ErrMultipleResourceTypes
 	}
 	return mappings, nil
 }

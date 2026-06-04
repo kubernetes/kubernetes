@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -272,6 +273,63 @@ func TestAllowBootstrapTokensToGetNodes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := AllowBootstrapTokensToGetNodes(tt.client); err != nil {
 				t.Errorf("AllowBootstrapTokensToGetNodes() return error = %v", err)
+			}
+		})
+	}
+}
+
+func TestAllowAPIServerToAccessKubeletAPI(t *testing.T) {
+	tests := []struct {
+		name   string
+		client clientset.Interface
+	}{
+		{
+			name:   "ClusterRoleBindings is empty",
+			client: clientsetfake.NewSimpleClientset(),
+		},
+		{
+			name: "ClusterRoleBindings already exists",
+			client: newMockClusterRoleBinddingClientForTest(t, &rbac.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: constants.KubeletAPIAdminClusterRoleBindingName,
+				},
+				RoleRef: rbac.RoleRef{
+					APIGroup: rbac.GroupName,
+					Kind:     "ClusterRole",
+					Name:     constants.KubeletAPIAdminClusterRoleName,
+				},
+				Subjects: []rbac.Subject{
+					{
+						Kind: rbac.UserKind,
+						Name: constants.APIServerKubeletClientCertCommonName,
+					},
+				},
+			}),
+		},
+		{
+			name: "Create new ClusterRoleBindings",
+			client: newMockClusterRoleBinddingClientForTest(t, &rbac.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: constants.KubeletAPIAdminClusterRoleBindingName,
+				},
+				RoleRef: rbac.RoleRef{
+					APIGroup: rbac.GroupName,
+					Kind:     "ClusterRole",
+					Name:     constants.KubeletAPIAdminClusterRoleName,
+				},
+				Subjects: []rbac.Subject{
+					{
+						Kind: rbac.GroupKind,
+						Name: constants.NodesGroup,
+					},
+				},
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := AllowAPIServerToAccessKubeletAPI(tt.client); err != nil {
+				t.Errorf("AllowAPIServerToAccessKubeletAPI() return error = %v", err)
 			}
 		})
 	}

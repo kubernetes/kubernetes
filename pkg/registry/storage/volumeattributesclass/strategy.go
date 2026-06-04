@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -29,13 +30,13 @@ import (
 
 // volumeAttributesClassStrategy implements behavior for VolumeAttributesClassStrategy objects
 type volumeAttributesClassStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // VolumeAttributesClass objects via the REST API.
-var Strategy = volumeAttributesClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = volumeAttributesClassStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (volumeAttributesClassStrategy) NamespaceScoped() bool {
 	return false
@@ -59,7 +60,7 @@ func (volumeAttributesClassStrategy) WarningsOnCreate(ctx context.Context, obj r
 func (volumeAttributesClassStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (volumeAttributesClassStrategy) AllowCreateOnUpdate() bool {
+func (volumeAttributesClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -68,8 +69,7 @@ func (volumeAttributesClassStrategy) PrepareForUpdate(ctx context.Context, obj, 
 }
 
 func (volumeAttributesClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateVolumeAttributesClass(obj.(*storage.VolumeAttributesClass))
-	return append(errorList, validation.ValidateVolumeAttributesClassUpdate(obj.(*storage.VolumeAttributesClass), old.(*storage.VolumeAttributesClass))...)
+	return validation.ValidateVolumeAttributesClassUpdate(obj.(*storage.VolumeAttributesClass), old.(*storage.VolumeAttributesClass))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -77,6 +77,6 @@ func (volumeAttributesClassStrategy) WarningsOnUpdate(ctx context.Context, obj, 
 	return nil
 }
 
-func (volumeAttributesClassStrategy) AllowUnconditionalUpdate() bool {
+func (volumeAttributesClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

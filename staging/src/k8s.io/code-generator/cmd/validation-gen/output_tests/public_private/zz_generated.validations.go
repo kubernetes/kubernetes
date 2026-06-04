@@ -37,22 +37,53 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
-			return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
-	})
+	// type T1
+	scheme.AddValidationFunc(
+		(*T1)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_T1(
+					ctx, op, nil, /* fldPath */
+					obj.(*T1),
+					safe.Cast[*T1](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
-func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
-	// field T1.Public
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.Public")...)
+// Validate_T1 validates an instance of T1 according
+// to declarative validation rules in the API schema.
+func Validate_T1(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *T1) (errs field.ErrorList) {
+
+	{ // field T1.Public
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.Public"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("public"), &obj.Public, safe.Field(oldObj, func(oldObj *T1) *string { return &oldObj.Public }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) *string {
+				return &oldObj.Public
+			})
+		errs = append(errs, fn(fldPath.Child("public"), &obj.Public, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

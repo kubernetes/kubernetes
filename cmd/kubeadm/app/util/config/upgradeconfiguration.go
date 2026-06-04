@@ -19,8 +19,6 @@ package config
 import (
 	"os"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
@@ -31,11 +29,12 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // documentMapToUpgradeConfiguration takes a map between GVKs and YAML/JSON documents (as returned by SplitYAMLDocuments),
 // finds a UpgradeConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
-func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.UpgradeConfiguration, error) {
+func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental, strictErrors bool) (*kubeadmapi.UpgradeConfiguration, error) {
 	upgradeBytes := []byte{}
 
 	for gvk, bytes := range gvkmap {
@@ -45,13 +44,17 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 		}
 
 		// check if this version is supported and possibly not deprecated
-		if err := validateSupportedVersion(gvk, allowDeprecated, true); err != nil {
+		if err := validateSupportedVersion(gvk, allowDeprecated, allowExperimental); err != nil {
 			return nil, err
 		}
 
 		// verify the validity of the YAML/JSON
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
-			klog.Warning(err.Error())
+			if !strictErrors {
+				klog.Warning(err.Error())
+			} else {
+				return nil, err
+			}
 		}
 
 		upgradeBytes = bytes
@@ -108,7 +111,7 @@ func BytesToUpgradeConfiguration(b []byte) (*kubeadmapi.UpgradeConfiguration, er
 		return nil, err
 	}
 
-	return documentMapToUpgradeConfiguration(gvkmap, false)
+	return documentMapToUpgradeConfiguration(gvkmap, false, false, false)
 }
 
 // LoadOrDefaultUpgradeConfiguration takes a path to a config file and a versioned configuration that can serve as the default config

@@ -176,7 +176,7 @@ func (x *intervalNode) visit(iv *Interval, sentinel *intervalNode, nv nodeVisito
 // IntervalValue represents a range tree node that contains a range and a value.
 type IntervalValue struct {
 	Ivl Interval
-	Val interface{}
+	Val any
 }
 
 // IntervalTree represents a (mostly) textbook implementation of the
@@ -184,7 +184,7 @@ type IntervalValue struct {
 // and chapter 14.3 interval tree with search supporting "stabbing queries".
 type IntervalTree interface {
 	// Insert adds a node with the given interval into the tree.
-	Insert(ivl Interval, val interface{})
+	Insert(ivl Interval, val any)
 	// Delete removes the node with the given interval from the tree, returning
 	// true if a node is in fact removed.
 	Delete(ivl Interval) bool
@@ -241,34 +241,34 @@ type intervalTree struct {
 //
 // "Introduction to Algorithms" (Cormen et al, 3rd ed.), chapter 13.4, p324
 //
-//	    RB-DELETE(T, z)
+//	  RB-DELETE(T, z)
 //
-//	    y = z
-//	    y-original-color = y.color
+//	  y = z
+//	  y-original-color = y.color
 //
-//	    if z.left == T.nil
-//	    	x = z.right
-//	    	RB-TRANSPLANT(T, z, z.right)
-//	    else if z.right == T.nil
-//	    	x = z.left
-//	    	RB-TRANSPLANT(T, z, z.left)
-//	    else
-//	    	y = TREE-MINIMUM(z.right)
-//	    	y-original-color = y.color
-//	    	x = y.right
-//	    	if y.p == z
-//	    		x.p = y
-//	    	else
-//	    		RB-TRANSPLANT(T, y, y.right)
-//	    		y.right = z.right
-//	    		y.right.p = y
-//	    	RB-TRANSPLANT(T, z, y)
-//	    	y.left = z.left
-//	    	y.left.p = y
-//	    	y.color = z.color
+//	  if z.left == T.nil
+//	  	x = z.right
+//	  	RB-TRANSPLANT(T, z, z.right)
+//	  else if z.right == T.nil
+//	  	x = z.left
+//	 	RB-TRANSPLANT(T, z, z.left)
+//	  else
+//	 	y = TREE-MINIMUM(z.right)
+//	 	y-original-color = y.color
+//	 	x = y.right
+//	 	if y.p == z
+//	 		x.p = y
+//	 	else
+//	 		RB-TRANSPLANT(T, y, y.right)
+//	 		y.right = z.right
+//	 		y.right.p = y
+//	 	RB-TRANSPLANT(T, z, y)
+//	 	y.left = z.left
+//	 	y.left.p = y
+//	 	y.color = z.color
 //
-//	    if y-original-color == BLACK
-//	    	RB-DELETE-FIXUP(T, x)
+//	  if y-original-color == BLACK
+//	  	RB-DELETE-FIXUP(T, x)
 
 // Delete removes the node with the given interval from the tree, returning
 // true if a node is in fact removed.
@@ -423,7 +423,7 @@ func (ivt *intervalTree) deleteFixup(x *intervalNode) {
 	}
 }
 
-func (ivt *intervalTree) createIntervalNode(ivl Interval, val interface{}) *intervalNode {
+func (ivt *intervalTree) createIntervalNode(ivl Interval, val any) *intervalNode {
 	return &intervalNode{
 		iv:     IntervalValue{ivl, val},
 		max:    ivl.End,
@@ -434,46 +434,27 @@ func (ivt *intervalTree) createIntervalNode(ivl Interval, val interface{}) *inte
 	}
 }
 
-// TODO: make this consistent with textbook implementation
-//
-// "Introduction to Algorithms" (Cormen et al, 3rd ed.), chapter 13.3, p315
-//
-//	    RB-INSERT(T, z)
-//
-//	    y = T.nil
-//	    x = T.root
-//
-//	    while x ≠ T.nil
-//	    	y = x
-//	    	if z.key < x.key
-//	    		x = x.left
-//	    	else
-//	    		x = x.right
-//
-//	    z.p = y
-//
-//	    if y == T.nil
-//	    	T.root = z
-//	    else if z.key < y.key
-//	    	y.left = z
-//	    else
-//	    	y.right = z
-//
-//	    z.left = T.nil
-//	    z.right = T.nil
-//	    z.color = RED
-//
-//	    RB-INSERT-FIXUP(T, z)
-
 // Insert adds a node with the given interval into the tree.
-func (ivt *intervalTree) Insert(ivl Interval, val interface{}) {
+//
+// Cormen "Introduction to Algorithms", Chapter 14 Exercise 14.3.5.
+// The algorithm follows Cormen "Introduction to Algorithms", Chapter 14 Exercise 14.3.5.
+// for modifying an interval tree structure to support exact interval matching.
+func (ivt *intervalTree) Insert(ivl Interval, val any) {
 	y := ivt.sentinel
 	z := ivt.createIntervalNode(ivl, val)
 	x := ivt.root
 	for x != ivt.sentinel {
 		y = x
-		if z.iv.Ivl.Begin.Compare(x.iv.Ivl.Begin) < 0 {
+		// Split on left endpoint. If left endpoints match, instead split on right endpoint.
+		beginCompare := z.iv.Ivl.Begin.Compare(x.iv.Ivl.Begin)
+		if beginCompare < 0 {
 			x = x.left
+		} else if beginCompare == 0 {
+			if z.iv.Ivl.End.Compare(x.iv.Ivl.End) < 0 {
+				x = x.left
+			} else {
+				x = x.right
+			}
 		} else {
 			x = x.right
 		}
@@ -483,8 +464,15 @@ func (ivt *intervalTree) Insert(ivl Interval, val interface{}) {
 	if y == ivt.sentinel {
 		ivt.root = z
 	} else {
-		if z.iv.Ivl.Begin.Compare(y.iv.Ivl.Begin) < 0 {
+		beginCompare := z.iv.Ivl.Begin.Compare(y.iv.Ivl.Begin)
+		if beginCompare < 0 {
 			y.left = z
+		} else if beginCompare == 0 {
+			if z.iv.Ivl.End.Compare(y.iv.Ivl.End) < 0 {
+				y.left = z
+			} else {
+				y.right = z
+			}
 		} else {
 			y.right = z
 		}
@@ -532,7 +520,6 @@ func (ivt *intervalTree) Insert(ivl Interval, val interface{}) {
 func (ivt *intervalTree) insertFixup(z *intervalNode) {
 	for z.parent.color(ivt.sentinel) == red {
 		if z.parent == z.parent.parent.left { // line 3-15
-
 			y := z.parent.parent.right
 			if y.color(ivt.sentinel) == red {
 				y.c = black
@@ -700,18 +687,34 @@ func (ivt *intervalTree) Visit(ivl Interval, ivv IntervalVisitor) {
 	ivt.root.visit(&ivl, ivt.sentinel, func(n *intervalNode) bool { return ivv(&n.iv) })
 }
 
-// find the exact node for a given interval
+// find the exact node for a given interval. The implementation follows
+// Cormen "Introduction to Algorithms", Chapter 14 Exercise 14.3.5. for
+// exact interval matching. The search runs in O(log n) time on an n-node
+// interval tree.
 func (ivt *intervalTree) find(ivl Interval) *intervalNode {
-	ret := ivt.sentinel
-	f := func(n *intervalNode) bool {
-		if n.iv.Ivl != ivl {
-			return true
+	x := ivt.root
+	// Search until hit sentinel or exact match.
+	for x != ivt.sentinel {
+		beginCompare := ivl.Begin.Compare(x.iv.Ivl.Begin)
+		endCompare := ivl.End.Compare(x.iv.Ivl.End)
+		if beginCompare == 0 && endCompare == 0 {
+			return x
 		}
-		ret = n
-		return false
+		// Split on left endpoint. If left endpoints match,
+		// instead split on right endpoints.
+		if beginCompare < 0 {
+			x = x.left
+		} else if beginCompare == 0 {
+			if endCompare < 0 {
+				x = x.left
+			} else {
+				x = x.right
+			}
+		} else {
+			x = x.right
+		}
 	}
-	ivt.root.visit(&ivl, ivt.sentinel, f)
-	return ret
+	return x
 }
 
 // Find gets the IntervalValue for the node matching the given interval

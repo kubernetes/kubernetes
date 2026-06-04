@@ -108,6 +108,12 @@ func statCpu(dirPath string, stats *cgroups.Stats) error {
 
 		case "throttled_usec":
 			stats.CpuStats.ThrottlingData.ThrottledTime = v * 1000
+
+		case "nr_bursts":
+			stats.CpuStats.BurstData.BurstsPeriods = v
+
+		case "burst_usec":
+			stats.CpuStats.BurstData.BurstTime = v * 1000
 		}
 	}
 	if err := sc.Err(); err != nil {

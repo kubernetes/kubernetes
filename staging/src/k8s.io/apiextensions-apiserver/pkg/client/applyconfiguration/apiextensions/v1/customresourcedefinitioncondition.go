@@ -25,12 +25,24 @@ import (
 
 // CustomResourceDefinitionConditionApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionCondition type for use
 // with apply.
+//
+// CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionConditionApplyConfiguration struct {
-	Type               *apiextensionsv1.CustomResourceDefinitionConditionType `json:"type,omitempty"`
-	Status             *apiextensionsv1.ConditionStatus                       `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                                           `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                                `json:"reason,omitempty"`
-	Message            *string                                                `json:"message,omitempty"`
+	// type is the type of the condition. Types include Established, NamesAccepted and Terminating.
+	Type *apiextensionsv1.CustomResourceDefinitionConditionType `json:"type,omitempty"`
+	// status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status *apiextensionsv1.ConditionStatus `json:"status,omitempty"`
+	// lastTransitionTime last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
+	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+	// with respect to the current state of the instance.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
 // CustomResourceDefinitionConditionApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionCondition type for use with
@@ -76,5 +88,13 @@ func (b *CustomResourceDefinitionConditionApplyConfiguration) WithReason(value s
 // If called multiple times, the Message field is set to the value of the last call.
 func (b *CustomResourceDefinitionConditionApplyConfiguration) WithMessage(value string) *CustomResourceDefinitionConditionApplyConfiguration {
 	b.Message = &value
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *CustomResourceDefinitionConditionApplyConfiguration) WithObservedGeneration(value int64) *CustomResourceDefinitionConditionApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }

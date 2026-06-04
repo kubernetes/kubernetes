@@ -17,18 +17,32 @@ package config
 type V2DeprecationEnum string
 
 const (
-	// Default in v3.5.  Issues a warning if v2store have meaningful content.
-	V2_DEPR_0_NOT_YET = V2DeprecationEnum("not-yet")
+	// V2Depr0NotYet means v2store isn't deprecated yet.
+	// Default in v3.5, and no longer supported in v3.6.
+	V2Depr0NotYet = V2DeprecationEnum("not-yet")
+
+	// V2Depr1WriteOnly means only writing v2store is allowed.
 	// Default in v3.6.  Meaningful v2 state is not allowed.
 	// The V2 files are maintained for v3.5 rollback.
-	V2_DEPR_1_WRITE_ONLY = V2DeprecationEnum("write-only")
-	// V2store is WIPED if found !!!
-	V2_DEPR_1_WRITE_ONLY_DROP = V2DeprecationEnum("write-only-drop-data")
-	// V2store is neither written nor read. Usage of this configuration is blocking
-	// ability to rollback to etcd v3.5.
-	V2_DEPR_2_GONE = V2DeprecationEnum("gone")
+	V2Depr1WriteOnly = V2DeprecationEnum("write-only")
 
-	V2_DEPR_DEFAULT = V2_DEPR_0_NOT_YET
+	// V2Depr1WriteOnlySkipCheck is like V2Depr1WriteOnly, but bypasses the v2 content check.
+	// Use only for 3.5 -> 3.6 upgrades with existing v2 data.
+	// WARNING: Users should read the 3.5 -> 3.6 upgrade guide and use this option at their own risk
+	V2Depr1WriteOnlySkipCheck = V2DeprecationEnum("write-only-skip-check")
+
+	// V2Depr1WriteOnlyDrop means v2store is WIPED if found !!!
+	// Will be default in 3.7.
+	V2Depr1WriteOnlyDrop = V2DeprecationEnum("write-only-drop-data")
+
+	// V2Depr2Gone means v2store is completely gone. The v2store is
+	// neither written nor read. Anything related to v2store will be
+	// cleaned up in v3.8. Usage of this configuration is blocking
+	// ability to rollback to etcd v3.5.
+	V2Depr2Gone = V2DeprecationEnum("gone")
+
+	// V2DeprDefault is the default deprecation level.
+	V2DeprDefault = V2Depr1WriteOnly
 )
 
 func (e V2DeprecationEnum) IsAtLeast(v2d V2DeprecationEnum) bool {
@@ -37,13 +51,13 @@ func (e V2DeprecationEnum) IsAtLeast(v2d V2DeprecationEnum) bool {
 
 func (e V2DeprecationEnum) level() int {
 	switch e {
-	case V2_DEPR_0_NOT_YET:
+	case V2Depr0NotYet:
 		return 0
-	case V2_DEPR_1_WRITE_ONLY:
+	case V2Depr1WriteOnly, V2Depr1WriteOnlySkipCheck:
 		return 1
-	case V2_DEPR_1_WRITE_ONLY_DROP:
+	case V2Depr1WriteOnlyDrop:
 		return 2
-	case V2_DEPR_2_GONE:
+	case V2Depr2Gone:
 		return 3
 	}
 	panic("Unknown V2DeprecationEnum: " + e)

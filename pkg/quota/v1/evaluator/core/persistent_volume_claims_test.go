@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -145,7 +146,6 @@ func TestPersistentVolumeClaimEvaluatorMatchingScopes(t *testing.T) {
 	}
 
 	for testName, testCase := range testCases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
 		t.Run(testName, func(t *testing.T) {
 			gotSelectors, err := evaluator.MatchingScopes(testCase.claim, testCase.selectors)
 			if err != nil {
@@ -159,6 +159,7 @@ func TestPersistentVolumeClaimEvaluatorMatchingScopes(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	classGold := "gold"
 	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		Selector: &metav1.LabelSelector{

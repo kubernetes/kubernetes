@@ -22,7 +22,10 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -30,7 +33,7 @@ const (
 	requiredTagName  = "k8s:required"
 	optionalTagName  = "k8s:optional"
 	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should evenually be +k8s:default
+	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
 )
 
 func init() {
@@ -64,10 +67,7 @@ func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv requirednessTagValidator) GetValidations(context Context, _ []string, _ string) (Validations, error) {
-	if context.Type.Kind == types.Alias {
-		panic("alias type should already have been unwrapped")
-	}
+func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	switch rtv.mode {
 	case requirednessRequired:
 		return rtv.doRequired(context)
@@ -93,13 +93,14 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
-	switch context.Type.Kind {
+	emits := Emission{field.ErrorTypeRequired, "", ""}
+	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
-		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredSliceValidator)}}, nil
+		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredSliceValidator).WithEmits(emits)}}, nil
 	case types.Map:
-		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredMapValidator)}}, nil
+		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredMapValidator).WithEmits(emits)}}, nil
 	case types.Pointer:
-		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredPointerValidator)}}, nil
+		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredPointerValidator).WithEmits(emits)}}, nil
 	case types.Struct:
 		// The +k8s:required tag on a non-pointer struct is not supported.
 		// If you encounter this error and believe you have a valid use case
@@ -108,7 +109,7 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 		// this behavior or provide alternative validation mechanisms.
 		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", requiredTagName)
 	}
-	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator)}}, nil
+	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator).WithEmits(emits)}}, nil
 }
 
 var (
@@ -147,7 +148,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	if hasDefault, zeroDefault, err := rtv.hasZeroDefault(context); err != nil {
 		return Validations{}, err
 	} else if hasDefault {
-		if !isNilableType(context.Type) && zeroDefault {
+		if !util.IsNilableType(context.Type) && zeroDefault {
 			return Validations{Comments: []string{"optional value-type fields with zero-value defaults are purely documentation"}}, nil
 		}
 		validations, err := rtv.doRequired(context)
@@ -164,7 +165,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
-	switch context.Type.Kind {
+	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
 		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalSliceValidator)}}, nil
 	case types.Map:
@@ -185,7 +186,6 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 // hasZeroDefault returns whether the field has a default value and whether
 // that default value is the zero value for the field's type.
 func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
-	t := realType(context.Type)
 	// This validator only applies to fields, so Member must be valid.
 	tagsByName, err := gengo.ExtractFunctionStyleCommentTags("+", []string{defaultTagName}, context.Member.CommentLines)
 	if err != nil {
@@ -212,6 +212,14 @@ func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool,
 		return false, false, fmt.Errorf("failed to parse default value %q: unmarshalled to nil", payload)
 	}
 
+	// For nilable types (pointer, slice, map, interface), the caller
+	// ignores zeroDefault and always treats a field-with-default as
+	// effectively required. Skip the zero-value comparison.
+	if util.IsNilableType(context.Type) {
+		return true, false, nil
+	}
+
+	t := util.NonPointer(util.NativeType(context.Type))
 	zero, found := typeZeroValue[t.String()]
 	if !found {
 		return false, false, fmt.Errorf("unknown zero-value for type %s", t.String())
@@ -264,25 +272,28 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 	// optional check and short-circuit (but without error).  Why?  For
 	// example, this prevents any further validation from trying to run on a
 	// nil pointer.
-	switch context.Type.Kind {
+	// The optional* siblings carry the NonError flag (they don't produce
+	// errors, just short-circuit), so they get no Emission.
+	forbids := Emission{field.ErrorTypeForbidden, "", ""}
+	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
 		return Validations{
 			Functions: []FunctionGen{
-				Function(forbiddenTagName, ShortCircuit, forbiddenSliceValidator),
+				Function(forbiddenTagName, ShortCircuit, forbiddenSliceValidator).WithEmits(forbids),
 				Function(forbiddenTagName, ShortCircuit|NonError, optionalSliceValidator),
 			},
 		}, nil
 	case types.Map:
 		return Validations{
 			Functions: []FunctionGen{
-				Function(forbiddenTagName, ShortCircuit, forbiddenMapValidator),
+				Function(forbiddenTagName, ShortCircuit, forbiddenMapValidator).WithEmits(forbids),
 				Function(forbiddenTagName, ShortCircuit|NonError, optionalMapValidator),
 			},
 		}, nil
 	case types.Pointer:
 		return Validations{
 			Functions: []FunctionGen{
-				Function(forbiddenTagName, ShortCircuit, forbiddenPointerValidator),
+				Function(forbiddenTagName, ShortCircuit, forbiddenPointerValidator).WithEmits(forbids),
 				Function(forbiddenTagName, ShortCircuit|NonError, optionalPointerValidator),
 			},
 		}, nil
@@ -296,7 +307,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 	}
 	return Validations{
 		Functions: []FunctionGen{
-			Function(forbiddenTagName, ShortCircuit, forbiddenValueValidator),
+			Function(forbiddenTagName, ShortCircuit, forbiddenValueValidator).WithEmits(forbids),
 			Function(forbiddenTagName, ShortCircuit|NonError, optionalValueValidator),
 		},
 	}, nil
@@ -305,15 +316,18 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 func (rtv requirednessTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:    rtv.TagName(),
-		Scopes: rtv.ValidScopes().UnsortedList(),
+		Scopes: sets.List(rtv.ValidScopes()),
 	}
 
 	switch rtv.mode {
 	case requirednessRequired:
+		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
+		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field is optional to clients."
 	case requirednessForbidden:
+		doc.StabilityLevel = TagStabilityLevelBeta
 		doc.Description = "Indicates that a field may not be specified."
 	default:
 		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))

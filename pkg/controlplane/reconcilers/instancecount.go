@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
@@ -45,6 +46,10 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 		masterCount: masterCount,
 		epAdapter:   epAdapter,
 	}
+}
+
+func (r *masterCountEndpointReconciler) ValidateIP(ip net.IP) error {
+	return validation.ValidateEndpointIP(ip.String(), nil).ToAggregate()
 }
 
 // ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).

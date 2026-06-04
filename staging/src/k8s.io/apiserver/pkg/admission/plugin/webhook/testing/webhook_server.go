@@ -137,6 +137,16 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Patch:     []byte(`[{"op": "add", "path": "/metadata/labels/added", "value": "test"}]`),
 			},
 		})
+	case "/invalidPatch":
+		w.Header().Set("Content-Type", "application/json")
+		pt := v1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed:   true,
+				PatchType: &pt,
+				Patch:     []byte(`[{`),
+			},
+		})
 	case "/invalidMutation":
 		w.Header().Set("Content-Type", "application/json")
 		pt := v1beta1.PatchTypeJSONPatch
@@ -147,6 +157,11 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Patch:     []byte(`[{"op": "add", "CORRUPTED_KEY":}]`),
 			},
 		})
+	case "/nonStatusError":
+		hj, _ := w.(http.Hijacker)
+		conn, _, _ := hj.Hijack()
+		defer conn.Close()             //nolint:errcheck
+		conn.Write([]byte("bad-http")) //nolint:errcheck
 	case "/nilResponse":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{})

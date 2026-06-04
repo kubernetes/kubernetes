@@ -25,9 +25,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
-
-	"github.com/pkg/errors"
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +43,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
@@ -148,7 +148,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 // NB. this method holds the information about how kubeadm creates kubeconfig files.
 func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConfigSpec, error) {
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
-	if os.IsNotExist(errors.Cause(err)) {
+	if os.IsNotExist(errors.Unwrap(err)) {
 		return nil, errors.Wrap(err, "the CA files do not exist, please run `kubeadm init phase certs ca` to generate it")
 	}
 	if err != nil {
@@ -280,15 +280,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	currentCaCert := currentCACerts[0]
 
 	// Find a common trust anchor
-	trustAnchorFound := false
-	for _, expectedCaCert := range expectedCACerts {
-		// Compare the current CA cert to the expected CA cert.
-		// If the certificates match then a common trust anchor was found.
-		if currentCaCert.Equal(expectedCaCert) {
-			trustAnchorFound = true
-			break
-		}
-	}
+	trustAnchorFound := slices.ContainsFunc(expectedCACerts, currentCaCert.Equal)
 	if !trustAnchorFound {
 		return errors.Errorf("a kubeconfig file %q exists but does not contain a trusted CA in its current context's "+
 			"cluster. Total CA certificates found: %d", kubeConfigFilePath, len(currentCACerts))
@@ -353,7 +345,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 			Organizations: organizations,
 		},
 		ClientCertNotAfter:  notAfter,
-		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 	}
 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
@@ -383,7 +375,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 			Token: token,
 		},
 		ClientCertNotAfter:  notAfter,
-		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 	}
 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
@@ -494,7 +486,7 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 				Organizations: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 			},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.SuperAdminKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -503,7 +495,7 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -512,21 +504,21 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 				Organizations: []string{kubeadmconstants.NodesGroup},
 			},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
 			APIServer:           localAPIEndpoint,
 			ClientName:          kubeadmconstants.ControllerManagerUser,
 			ClientCertAuth:      &clientCertAuth{},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
 			APIServer:           localAPIEndpoint,
 			ClientName:          kubeadmconstants.SchedulerUser,
 			ClientCertAuth:      &clientCertAuth{},
 			ClientCertNotAfter:  notAfter,
-			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithm,
 		},
 	}, nil
 }
@@ -623,14 +615,19 @@ type EnsureRBACFunc func(context.Context, clientset.Interface, clientset.Interfa
 // constructs a client from super-admin.conf if the file exists. It then proceeds
 // to pass the clients to EnsureAdminClusterRoleBindingImpl. The function returns a
 // usable client from admin.conf with RBAC properly constructed or an error.
-func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc) (clientset.Interface, error) {
+func EnsureAdminClusterRoleBinding(outDir string, lae *kubeadmapi.APIEndpoint, ensureRBACFunc EnsureRBACFunc) (clientset.Interface, error) {
 	var (
 		err                           error
 		adminClient, superAdminClient clientset.Interface
 	)
 
 	// Create a client from admin.conf.
-	adminClient, err = kubeconfigutil.ClientSetFromFile(filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName))
+	kubeconfig, err := clientcmd.LoadFromFile(filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName))
+	if err != nil {
+		return nil, err
+	}
+	kubeconfigutil.PointKubeConfigToLocalAPIEndpoint(kubeconfig, lae)
+	adminClient, err = kubeconfigutil.ToClientSet(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -638,7 +635,12 @@ func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc)
 	// Create a client from super-admin.conf.
 	superAdminPath := filepath.Join(outDir, kubeadmconstants.SuperAdminKubeConfigFileName)
 	if _, err := os.Stat(superAdminPath); err == nil {
-		superAdminClient, err = kubeconfigutil.ClientSetFromFile(superAdminPath)
+		kubeconfig, err := clientcmd.LoadFromFile(superAdminPath)
+		if err != nil {
+			return nil, err
+		}
+		kubeconfigutil.PointKubeConfigToLocalAPIEndpoint(kubeconfig, lae)
+		superAdminClient, err = kubeconfigutil.ToClientSet(kubeconfig)
 		if err != nil {
 			return nil, err
 		}

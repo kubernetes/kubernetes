@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -44,7 +45,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -611,7 +611,7 @@ func waitForAllCaPodsReadyInNamespace(ctx context.Context, f *framework.Framewor
 
 func makeNodeUnschedulable(ctx context.Context, c clientset.Interface, node *v1.Node) error {
 	ginkgo.By(fmt.Sprintf("Taint node %s", node.Name))
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		freshNode, err := c.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -648,7 +648,7 @@ func (CriticalAddonsOnlyError) Error() string {
 
 func makeNodeSchedulable(ctx context.Context, c clientset.Interface, node *v1.Node, failOnCriticalAddonsOnly bool) error {
 	ginkgo.By(fmt.Sprintf("Remove taint from node %s", node.Name))
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		freshNode, err := c.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -798,7 +798,7 @@ func runReplicatedPodOnEachNode(ctx context.Context, f *framework.Framework, nod
 
 		// Update replicas count, to create new pods that will be allocated on node
 		// (we retry 409 errors in case rc reference got out of sync)
-		for j := 0; j < 3; j++ {
+		for j := range 3 {
 			*rc.Spec.Replicas = int32((i + 1) * podsPerNode)
 			rc, err = f.ClientSet.CoreV1().ReplicationControllers(namespace).Update(ctx, rc, metav1.UpdateOptions{})
 			if err == nil {

@@ -45,6 +45,9 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 			SetDefaults_EnvVar(a)
 		}
 	}
+	if in.Etcd.External != nil {
+		SetDefaults_ExternalEtcd(in.Etcd.External)
+	}
 	for i := range in.APIServer.ControlPlaneComponent.ExtraEnvs {
 		a := &in.APIServer.ControlPlaneComponent.ExtraEnvs[i]
 		SetDefaults_EnvVar(a)

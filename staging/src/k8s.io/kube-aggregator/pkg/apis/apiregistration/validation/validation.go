@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -34,7 +34,7 @@ func ValidateAPIService(apiService *apiregistration.APIService) field.ErrorList 
 
 	allErrs := validation.ValidateObjectMeta(&apiService.ObjectMeta, false,
 		func(name string, prefix bool) []string {
-			if minimalFailures := path.IsValidPathSegmentName(name); len(minimalFailures) > 0 {
+			if minimalFailures := content.IsPathSegmentName(name); len(minimalFailures) > 0 {
 				return minimalFailures
 			}
 			// the name *must* be version.group

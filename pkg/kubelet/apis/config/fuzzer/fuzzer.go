@@ -64,6 +64,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageMaximumGCAge = metav1.Duration{}
 			obj.ImageGCHighThresholdPercent = 85
 			obj.ImageGCLowThresholdPercent = 80
+			obj.ImagePullCredentialsVerificationPolicy = string(kubeletconfig.NeverVerifyPreloadedImages)
 			obj.KernelMemcgNotification = false
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
@@ -121,10 +122,14 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = ptr.To(rand.Float64())
+			obj.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
 			obj.LocalStorageCapacityIsolation = true
 			obj.FeatureGates = map[string]bool{
 				"AllAlpha": false,
 				"AllBeta":  true,
+			}
+			obj.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{
+				MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
 			}
 		},
 

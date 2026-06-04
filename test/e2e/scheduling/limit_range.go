@@ -35,11 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -91,7 +94,7 @@ var _ = SIGDescribe("LimitRange", func() {
 				return f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(ctx, options)
 			},
 		}
-		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcherWithLogger(klog.FromContext(ctx), lw, &v1.LimitRange{})
 		defer w.Stop()
 
 		timeoutCtx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)
@@ -292,6 +295,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, f.Namespace.Name))
 		limitRange, err := lrClient.Create(ctx, limitRange, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create limitRange %q", lrName)
+		gomega.Expect(limitRange).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("Creating another limitRange in another namespace")
 		lrNamespace, err := f.CreateNamespace(ctx, lrName, nil)
@@ -333,6 +337,7 @@ var _ = SIGDescribe("LimitRange", func() {
 			framework.Failf("LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
 		}
 		framework.Logf("LimitRange %q has been patched", lrName)
+		gomega.Expect(resourceversion.CompareResourceVersion(limitRange.ResourceVersion, patchedLimitRange.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By(fmt.Sprintf("Delete LimitRange %q by Collection with labelSelector: %q", lrName, patchedLabelSelector))
 		err = lrClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: patchedLabelSelector})

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -220,12 +221,7 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 
 // ContainsAccessMode returns whether the requested mode is contained by modes
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modes, mode)
 }
 
 // ContainsAllAccessModes returns whether all of the requested modes are contained by modes
@@ -331,14 +327,6 @@ func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 	}
 	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
 	return pluginName, components[2], nil
-}
-
-// NewSafeFormatAndMountFromHost creates a new SafeFormatAndMount with Mounter
-// and Exec taken from given VolumeHost.
-func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *mount.SafeFormatAndMount {
-	mounter := host.GetMounter(pluginName)
-	exec := host.GetExec(pluginName)
-	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
 }
 
 // GetVolumeMode retrieves VolumeMode from pv.
@@ -684,7 +672,7 @@ func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, 
 		}
 		return true, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return nil, lastErr
 	}
 	return paths, err

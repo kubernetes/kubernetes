@@ -8,10 +8,10 @@ import (
 
 type HavePrefixMatcher struct {
 	Prefix string
-	Args   []interface{}
+	Args   []any
 }
 
-func (matcher *HavePrefixMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *HavePrefixMatcher) Match(actual any) (success bool, err error) {
 	actualString, ok := toString(actual)
 	if !ok {
 		return false, fmt.Errorf("HavePrefix matcher requires a string or stringer.  Got:\n%s", format.Object(actual, 1))
@@ -27,10 +27,10 @@ func (matcher *HavePrefixMatcher) prefix() string {
 	return matcher.Prefix
 }
 
-func (matcher *HavePrefixMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *HavePrefixMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to have prefix", matcher.prefix())
 }
 
-func (matcher *HavePrefixMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *HavePrefixMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to have prefix", matcher.prefix())
 }

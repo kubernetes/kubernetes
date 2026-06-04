@@ -17,6 +17,7 @@ limitations under the License.
 package staticpod
 
 import (
+	_ "embed"
 	"io"
 	"os"
 	"path/filepath"
@@ -34,7 +35,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestComponentResources(t *testing.T) {
@@ -579,68 +579,21 @@ func TestVolumeMountMapToSlice(t *testing.T) {
 	}
 }
 
-const (
-	validPod = `
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    component: etcd
-    tier: control-plane
-  name: etcd
-  namespace: kube-system
-spec:
-  containers:
-  - image: gcr.io/google_containers/etcd-amd64:3.1.11
-status: {}
-`
-	validPodWithDifferentFieldsOrder = `
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    tier: control-plane
-    component: etcd
-  name: etcd
-  namespace: kube-system
-spec:
-  containers:
-  - image: gcr.io/google_containers/etcd-amd64:3.1.11
-status: {}
-`
-	invalidWithDefaultFields = `
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    tier: control-plane
-    component: etcd
-  name: etcd
-  namespace: kube-system
-spec:
-  containers:
-  - image: gcr.io/google_containers/etcd-amd64:3.1.11
-  restartPolicy: "Always"
-status: {}
-`
+var (
+	//go:embed testdata/valid-pod.yaml
+	validPod string
 
-	validPod2 = `
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    component: etcd
-    tier: control-plane
-  name: etcd
-  namespace: kube-system
-spec:
-  containers:
-  - image: gcr.io/google_containers/etcd-amd64:3.1.12
-status: {}
-`
+	//go:embed testdata/valid-pod-different-order.yaml
+	validPodWithDifferentFieldsOrder string
 
-	invalidPod = `---{ broken yaml @@@`
+	//go:embed testdata/invalid-with-default-fields.yaml
+	invalidWithDefaultFields string
+
+	//go:embed testdata/valid-pod2.yaml
+	validPod2 string
 )
+
+const invalidPod = `---{ broken yaml @@@`
 
 func TestReadStaticPodFromDisk(t *testing.T) {
 	tests := []struct {
@@ -671,8 +624,7 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.description, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			manifestPath := filepath.Join(tmpdir, "pod.yaml")
 			if rt.writeManifest {
@@ -814,7 +766,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, validPod2},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: `@@ -12 +12 @@
+			expectedDiff: `@@ -11 +11 @@
 -  - image: gcr.io/google_containers/etcd-amd64:3.1.11
 +  - image: gcr.io/google_containers/etcd-amd64:3.1.12
 `,
@@ -824,7 +776,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, invalidWithDefaultFields},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: `@@ -14,0 +15 @@
+			expectedDiff: `@@ -13,0 +14 @@
 +  restartPolicy: Always
 `,
 		},
@@ -844,11 +796,10 @@ func TestManifestFilesAreEqual(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.description, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			// write 2 manifests
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				if rt.podYamls[i] != "" {
 					manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
 					err := os.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)

@@ -149,7 +149,7 @@ type blockValidationExemption struct{}
 
 // Name returns the name of the validator.
 func (blockValidationExemption) Name() string {
-	return "cel.lib.ext.validate.functions.cel.block"
+	return "cel.validator.cel_block"
 }
 
 // Configure implements the ASTValidatorConfigurer interface and augments the list of functions to skip
@@ -224,7 +224,7 @@ func (b *dynamicBlock) ID() int64 {
 }
 
 // Eval implements the Interpretable interface method.
-func (b *dynamicBlock) Eval(activation interpreter.Activation) ref.Val {
+func (b *dynamicBlock) Eval(activation cel.Activation) ref.Val {
 	sa := b.slotActivationPool.Get().(*dynamicSlotActivation)
 	sa.Activation = activation
 	defer b.clearSlots(sa)
@@ -242,10 +242,15 @@ type slotVal struct {
 }
 
 type dynamicSlotActivation struct {
-	interpreter.Activation
+	cel.Activation
 	slotExprs []interpreter.Interpretable
 	slotCount int
 	slotVals  []*slotVal
+}
+
+// Unwrap returns the underlying activation.
+func (sa *dynamicSlotActivation) Unwrap() cel.Activation {
+	return sa.Activation
 }
 
 // ResolveName implements the Activation interface method but handles variables prefixed with `@index`
@@ -295,15 +300,20 @@ func (b *constantBlock) ID() int64 {
 
 // Eval implements the interpreter.Interpretable interface method, and will proxy @index prefixed variable
 // lookups into a set of constant slots determined from the plan step.
-func (b *constantBlock) Eval(activation interpreter.Activation) ref.Val {
+func (b *constantBlock) Eval(activation cel.Activation) ref.Val {
 	vars := constantSlotActivation{Activation: activation, slots: b.slots, slotCount: b.slotCount}
 	return b.expr.Eval(vars)
 }
 
 type constantSlotActivation struct {
-	interpreter.Activation
+	cel.Activation
 	slots     traits.Lister
 	slotCount int
+}
+
+// Unwrap returns the underlying activation.
+func (sa *constantSlotActivation) Unwrap() cel.Activation {
+	return sa.Activation
 }
 
 // ResolveName implements Activation interface method and proxies @index prefixed lookups into the slot

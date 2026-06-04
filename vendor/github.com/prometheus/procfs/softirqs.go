@@ -1,4 +1,4 @@
-// Copyright 2022 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -68,8 +68,8 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 		if len(parts) < 2 {
 			continue
 		}
-		switch {
-		case parts[0] == "HI:":
+		switch parts[0] {
+		case "HI:":
 			perCPU := parts[1:]
 			softirqs.Hi = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -77,7 +77,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (HI%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "TIMER:":
+		case "TIMER:":
 			perCPU := parts[1:]
 			softirqs.Timer = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -85,7 +85,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (TIMER%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "NET_TX:":
+		case "NET_TX:":
 			perCPU := parts[1:]
 			softirqs.NetTx = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -93,7 +93,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (NET_TX%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "NET_RX:":
+		case "NET_RX:":
 			perCPU := parts[1:]
 			softirqs.NetRx = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -101,7 +101,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (NET_RX%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "BLOCK:":
+		case "BLOCK:":
 			perCPU := parts[1:]
 			softirqs.Block = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -109,7 +109,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (BLOCK%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "IRQ_POLL:":
+		case "IRQ_POLL:":
 			perCPU := parts[1:]
 			softirqs.IRQPoll = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -117,7 +117,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (IRQ_POLL%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "TASKLET:":
+		case "TASKLET:":
 			perCPU := parts[1:]
 			softirqs.Tasklet = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -125,7 +125,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (TASKLET%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "SCHED:":
+		case "SCHED:":
 			perCPU := parts[1:]
 			softirqs.Sched = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -133,7 +133,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (SCHED%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "HRTIMER:":
+		case "HRTIMER:":
 			perCPU := parts[1:]
 			softirqs.HRTimer = make([]uint64, len(perCPU))
 			for i, count := range perCPU {
@@ -141,7 +141,7 @@ func parseSoftirqs(r io.Reader) (Softirqs, error) {
 					return Softirqs{}, fmt.Errorf("%w: couldn't parse %q (HRTIMER%d): %w", ErrFileParse, count, i, err)
 				}
 			}
-		case parts[0] == "RCU:":
+		case "RCU:":
 			perCPU := parts[1:]
 			softirqs.RCU = make([]uint64, len(perCPU))
 			for i, count := range perCPU {

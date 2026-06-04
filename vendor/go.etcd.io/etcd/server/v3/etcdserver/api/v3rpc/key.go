@@ -18,24 +18,31 @@ package v3rpc
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/pkg/v3/adt"
 	"go.etcd.io/etcd/server/v3/etcdserver"
+	"go.etcd.io/etcd/server/v3/etcdserver/txn"
 )
 
 type kvServer struct {
 	hdr header
 	kv  etcdserver.RaftKV
+	aa  *AuthAdmin
 	// maxTxnOps is the max operations per txn.
 	// e.g suppose maxTxnOps = 128.
 	// Txn.Success can have at most 128 operations,
 	// and Txn.Failure can have at most 128 operations.
 	maxTxnOps uint
+	// we want compile errors if new methods are added
+	pb.UnsafeKVServer
 }
 
 func NewKVServer(s *etcdserver.EtcdServer) pb.KVServer {
-	return &kvServer{hdr: newHeader(s), kv: s, maxTxnOps: s.Cfg.MaxTxnOps}
+	return &kvServer{hdr: newHeader(s), kv: s, aa: &AuthAdmin{s}, maxTxnOps: s.Cfg.MaxTxnOps}
 }
 
 func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResponse, error) {
@@ -50,6 +57,34 @@ func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResp
 
 	s.hdr.fill(resp.Header)
 	return resp, nil
+}
+
+func (s *kvServer) RangeStream(r *pb.RangeRequest, rs pb.KV_RangeStreamServer) error {
+	if err := checkRangeStreamRequest(r); err != nil {
+		return err
+	}
+	err := s.kv.RangeStream(r, &headerFillingRangeStream{KV_RangeStreamServer: rs, hdr: &s.hdr})
+	if err != nil {
+		return togRPCError(err)
+	}
+	return nil
+}
+
+// headerFillingRangeStream wraps KV_RangeStreamServer to fill the cluster
+// header (cluster ID, member ID, raft term) on the chunk that carries it.
+// Revision is not filled: the handler must set it to the pinned read
+// revision so that a missing value surfaces as zero instead of being
+// silently replaced with the live store revision.
+type headerFillingRangeStream struct {
+	pb.KV_RangeStreamServer
+	hdr *header
+}
+
+func (s *headerFillingRangeStream) Send(resp *pb.RangeStreamResponse) error {
+	if resp.RangeResponse.Header != nil {
+		s.hdr.fillWithoutRevision(resp.RangeResponse.Header)
+	}
+	return s.KV_RangeStreamServer.Send(resp)
 }
 
 func (s *kvServer) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, error) {
@@ -102,6 +137,10 @@ func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, 
 }
 
 func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.CompactionResponse, error) {
+	if err := s.aa.isPermitted(ctx); err != nil {
+		return nil, togRPCError(err)
+	}
+
 	resp, err := s.kv.Compact(ctx, r)
 	if err != nil {
 		return nil, togRPCError(err)
@@ -114,6 +153,28 @@ func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.Co
 func checkRangeRequest(r *pb.RangeRequest) error {
 	if len(r.Key) == 0 {
 		return rpctypes.ErrGRPCEmptyKey
+	}
+
+	if _, ok := pb.RangeRequest_SortOrder_name[int32(r.SortOrder)]; !ok {
+		return rpctypes.ErrGRPCInvalidSortOption
+	}
+
+	if _, ok := pb.RangeRequest_SortTarget_name[int32(r.SortTarget)]; !ok {
+		return rpctypes.ErrGRPCInvalidSortOption
+	}
+
+	return nil
+}
+
+func checkRangeStreamRequest(r *pb.RangeRequest) error {
+	if err := checkRangeRequest(r); err != nil {
+		return err
+	}
+	if !txn.IsDefaultOrdering(r.SortTarget, r.SortOrder) {
+		return status.Errorf(codes.Unimplemented, "RangeStream does not support custom sort orders")
+	}
+	if txn.HasRevisionFilters(r) {
+		return status.Errorf(codes.Unimplemented, "RangeStream does not support revision filters")
 	}
 	return nil
 }

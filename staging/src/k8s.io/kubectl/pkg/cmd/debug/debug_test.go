@@ -1468,6 +1468,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1522,6 +1525,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1578,6 +1584,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1631,6 +1640,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1683,6 +1695,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1723,6 +1738,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1771,6 +1789,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1863,6 +1884,9 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1916,6 +1940,9 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1972,6 +1999,11 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 				},
 			},
 			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -2035,6 +2067,11 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 				},
 			},
 			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -2583,7 +2620,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Namespace:          "test",
 				PullPolicy:         corev1.PullPolicy("Always"),
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 			},
 		},
@@ -2596,7 +2633,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod1", "mypod2"},
 			},
 		},
@@ -2609,7 +2646,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod1", "mypod2"},
 			},
 		},
@@ -2624,7 +2661,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				Interactive:        true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 				TTY:                true,
 			},
@@ -2639,7 +2676,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 			},
 		},
@@ -2654,7 +2691,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 				TTY:                true,
 			},
@@ -2669,7 +2706,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				PullPolicy:         corev1.PullPolicy("Always"),
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				ShareProcesses:     true,
 				TargetNames:        []string{"mypod"},
 			},
@@ -2711,7 +2748,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 				TTY:                true,
 			},
@@ -2727,7 +2764,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 			},
 		},
@@ -2742,7 +2779,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 			},
 		},
@@ -2757,7 +2794,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 			},
 		},
@@ -2774,7 +2811,7 @@ func TestCompleteAndValidate(t *testing.T) {
 					"app": "app-debugger",
 				},
 				ShareProcesses: true,
-				Profile:        ProfileLegacy,
+				Profile:        ProfileGeneral,
 				TargetNames:    []string{"mypod"},
 			},
 		},
@@ -2794,7 +2831,7 @@ func TestCompleteAndValidate(t *testing.T) {
 					"sidecar": "sidecar:debug",
 				},
 				ShareProcesses: true,
-				Profile:        ProfileLegacy,
+				Profile:        ProfileGeneral,
 				TargetNames:    []string{"mypod"},
 				TTY:            true,
 			},
@@ -2811,7 +2848,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 				TTY:                true,
 			},
@@ -2833,7 +2870,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: false,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"mypod"},
 				TTY:                true,
 			},
@@ -2874,7 +2911,7 @@ func TestCompleteAndValidate(t *testing.T) {
 				KeepInitContainers: true,
 				Namespace:          "test",
 				ShareProcesses:     true,
-				Profile:            ProfileLegacy,
+				Profile:            ProfileGeneral,
 				TargetNames:        []string{"node/mynode"},
 				TTY:                true,
 			},

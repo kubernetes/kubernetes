@@ -15,19 +15,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"github.com/onsi/gomega/matchers/internal/miter"
 )
 
 type omegaMatcher interface {
-	Match(actual interface{}) (success bool, err error)
-	FailureMessage(actual interface{}) (message string)
-	NegatedFailureMessage(actual interface{}) (message string)
+	Match(actual any) (success bool, err error)
+	FailureMessage(actual any) (message string)
+	NegatedFailureMessage(actual any) (message string)
 }
 
-func isBool(a interface{}) bool {
+func isBool(a any) bool {
 	return reflect.TypeOf(a).Kind() == reflect.Bool
 }
 
-func isNumber(a interface{}) bool {
+func isNumber(a any) bool {
 	if a == nil {
 		return false
 	}
@@ -35,22 +37,22 @@ func isNumber(a interface{}) bool {
 	return reflect.Int <= kind && kind <= reflect.Float64
 }
 
-func isInteger(a interface{}) bool {
+func isInteger(a any) bool {
 	kind := reflect.TypeOf(a).Kind()
 	return reflect.Int <= kind && kind <= reflect.Int64
 }
 
-func isUnsignedInteger(a interface{}) bool {
+func isUnsignedInteger(a any) bool {
 	kind := reflect.TypeOf(a).Kind()
 	return reflect.Uint <= kind && kind <= reflect.Uint64
 }
 
-func isFloat(a interface{}) bool {
+func isFloat(a any) bool {
 	kind := reflect.TypeOf(a).Kind()
 	return reflect.Float32 <= kind && kind <= reflect.Float64
 }
 
-func toInteger(a interface{}) int64 {
+func toInteger(a any) int64 {
 	if isInteger(a) {
 		return reflect.ValueOf(a).Int()
 	} else if isUnsignedInteger(a) {
@@ -61,7 +63,7 @@ func toInteger(a interface{}) int64 {
 	panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 }
 
-func toUnsignedInteger(a interface{}) uint64 {
+func toUnsignedInteger(a any) uint64 {
 	if isInteger(a) {
 		return uint64(reflect.ValueOf(a).Int())
 	} else if isUnsignedInteger(a) {
@@ -72,7 +74,7 @@ func toUnsignedInteger(a interface{}) uint64 {
 	panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 }
 
-func toFloat(a interface{}) float64 {
+func toFloat(a any) float64 {
 	if isInteger(a) {
 		return float64(reflect.ValueOf(a).Int())
 	} else if isUnsignedInteger(a) {
@@ -83,26 +85,26 @@ func toFloat(a interface{}) float64 {
 	panic(fmt.Sprintf("Expected a number!  Got <%T> %#v", a, a))
 }
 
-func isError(a interface{}) bool {
+func isError(a any) bool {
 	_, ok := a.(error)
 	return ok
 }
 
-func isChan(a interface{}) bool {
+func isChan(a any) bool {
 	if isNil(a) {
 		return false
 	}
 	return reflect.TypeOf(a).Kind() == reflect.Chan
 }
 
-func isMap(a interface{}) bool {
+func isMap(a any) bool {
 	if a == nil {
 		return false
 	}
 	return reflect.TypeOf(a).Kind() == reflect.Map
 }
 
-func isArrayOrSlice(a interface{}) bool {
+func isArrayOrSlice(a any) bool {
 	if a == nil {
 		return false
 	}
@@ -114,14 +116,14 @@ func isArrayOrSlice(a interface{}) bool {
 	}
 }
 
-func isString(a interface{}) bool {
+func isString(a any) bool {
 	if a == nil {
 		return false
 	}
 	return reflect.TypeOf(a).Kind() == reflect.String
 }
 
-func toString(a interface{}) (string, bool) {
+func toString(a any) (string, bool) {
 	aString, isString := a.(string)
 	if isString {
 		return aString, true
@@ -145,18 +147,29 @@ func toString(a interface{}) (string, bool) {
 	return "", false
 }
 
-func lengthOf(a interface{}) (int, bool) {
+func lengthOf(a any) (int, bool) {
 	if a == nil {
 		return 0, false
 	}
 	switch reflect.TypeOf(a).Kind() {
 	case reflect.Map, reflect.Array, reflect.String, reflect.Chan, reflect.Slice:
 		return reflect.ValueOf(a).Len(), true
+	case reflect.Func:
+		if !miter.IsIter(a) {
+			return 0, false
+		}
+		var l int
+		if miter.IsSeq2(a) {
+			miter.IterateKV(a, func(k, v reflect.Value) bool { l++; return true })
+		} else {
+			miter.IterateV(a, func(v reflect.Value) bool { l++; return true })
+		}
+		return l, true
 	default:
 		return 0, false
 	}
 }
-func capOf(a interface{}) (int, bool) {
+func capOf(a any) (int, bool) {
 	if a == nil {
 		return 0, false
 	}
@@ -168,7 +181,7 @@ func capOf(a interface{}) (int, bool) {
 	}
 }
 
-func isNil(a interface{}) bool {
+func isNil(a any) bool {
 	if a == nil {
 		return true
 	}

@@ -20,16 +20,18 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
-	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -78,7 +80,7 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 			}
 			if port.EndPort != nil {
 				if *port.EndPort < port.Port.IntVal {
-					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
+					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "must be greater than or equal to `port`"))
 				}
 				for _, msg := range validation.IsValidPortNum(int(*port.EndPort)) {
 					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, msg))
@@ -244,7 +246,7 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts Net
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ipb.CIDR == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR, opts.AllowCIDRsEvenIfInvalid)...)
@@ -283,6 +285,9 @@ type IngressValidationOptions struct {
 
 	// AllowInvalidWildcardHostRule indicates whether invalid rule values are allowed in rules with wildcard hostnames
 	AllowInvalidWildcardHostRule bool
+
+	// AllowRelaxedServiceNameValidation indicates if the backend service name can be validated with apimachineryvalidation.NameIsDNSLabel
+	AllowRelaxedServiceNameValidation bool
 }
 
 // ValidateIngress validates Ingresses on create and update.
@@ -296,8 +301,9 @@ func validateIngress(ingress *networking.Ingress, opts IngressValidationOptions)
 func ValidateIngressCreate(ingress *networking.Ingress) field.ErrorList {
 	allErrs := field.ErrorList{}
 	opts := IngressValidationOptions{
-		AllowInvalidSecretName:       false,
-		AllowInvalidWildcardHostRule: false,
+		AllowInvalidSecretName:            false,
+		AllowInvalidWildcardHostRule:      false,
+		AllowRelaxedServiceNameValidation: allowRelaxedServiceNameValidation(nil),
 	}
 	allErrs = append(allErrs, validateIngress(ingress, opts)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
@@ -312,8 +318,9 @@ func ValidateIngressCreate(ingress *networking.Ingress) field.ErrorList {
 func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
 	opts := IngressValidationOptions{
-		AllowInvalidSecretName:       allowInvalidSecretName(oldIngress),
-		AllowInvalidWildcardHostRule: allowInvalidWildcardHostRule(oldIngress),
+		AllowInvalidSecretName:            allowInvalidSecretName(oldIngress),
+		AllowInvalidWildcardHostRule:      allowInvalidWildcardHostRule(oldIngress),
+		AllowRelaxedServiceNameValidation: allowRelaxedServiceNameValidation(oldIngress),
 	}
 
 	allErrs = append(allErrs, validateIngress(ingress, opts)...)
@@ -411,9 +418,7 @@ func ValidateIngressLoadBalancerStatus(status, oldStatus *networking.IngressLoad
 
 func validateIngressRules(ingressRules []networking.IngressRule, fldPath *field.Path, opts IngressValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(ingressRules) == 0 {
-		return append(allErrs, field.Required(fldPath, ""))
-	}
+
 	for i, ih := range ingressRules {
 		wildcardHost := false
 		if len(ih.Host) > 0 {
@@ -515,7 +520,13 @@ func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.P
 		if len(backend.Service.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("service", "name"), ""))
 		} else {
-			for _, msg := range apivalidation.ValidateServiceName(backend.Service.Name, false) {
+
+			validationFunc := apivalidation.ValidateServiceName
+			if opts.AllowRelaxedServiceNameValidation {
+				validationFunc = apimachineryvalidation.NameIsDNSLabel
+			}
+
+			for _, msg := range validationFunc(backend.Service.Name, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("service", "name"), backend.Service.Name, msg))
 			}
 		}
@@ -592,17 +603,17 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	}
 
 	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "kind is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
 	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Kind) {
+		for _, msg := range content.IsPathSegmentName(params.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
 		}
 	}
 
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
+		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
 		}
 	}
@@ -621,11 +632,27 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		return allErrs
 	}
 
-	allErrs = append(allErrs, validateIngressTypedLocalObjectReference(&api.TypedLocalObjectReference{
-		APIGroup: params.APIGroup,
-		Kind:     params.Kind,
-		Name:     params.Name,
-	}, fldPath)...)
+	if params.APIGroup != nil {
+		for _, msg := range validation.IsDNS1123Subdomain(*params.APIGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), *params.APIGroup, msg))
+		}
+	}
+
+	if params.Kind == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, msg := range content.IsPathSegmentName(params.Kind) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
+		}
+	}
+
+	if params.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, msg := range content.IsPathSegmentName(params.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
+		}
+	}
 
 	if params.Scope == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
@@ -687,6 +714,50 @@ func allowInvalidWildcardHostRule(oldIngress *networking.Ingress) bool {
 	return false
 }
 
+func allowRelaxedServiceNameValidation(oldIngress *networking.Ingress) bool {
+	// Early exit if the feature gate is enabled, as it allows relaxed validation
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedServiceNameValidation) {
+		return true
+	}
+	// Early exit if no old Ingress is provided
+	if oldIngress == nil {
+		return false
+	}
+
+	// Check if default backend service names in the old Ingress
+	if oldIngress.Spec.DefaultBackend != nil && oldIngress.Spec.DefaultBackend.Service != nil {
+		serviceName := oldIngress.Spec.DefaultBackend.Service.Name
+		// If a name doesn't validate with apimachineryvalidation.NameIsDNS1035Label, but does validate with apimachineryvalidation.NameIsDNSLabel,
+		// then we allow it to be used as a Service name in an Ingress.
+		dnsLabelValidationErrors := apimachineryvalidation.NameIsDNSLabel(serviceName, false)
+		dns1035LabelValidationErrors := apimachineryvalidation.NameIsDNS1035Label(serviceName, false)
+		if len(dnsLabelValidationErrors) == 0 && len(dns1035LabelValidationErrors) > 0 {
+			return true
+		}
+	}
+
+	// If feature gate is disabled, check if any service names in the old Ingress
+	for _, rule := range oldIngress.Spec.Rules {
+		if rule.HTTP == nil {
+			continue
+		}
+		for _, path := range rule.HTTP.Paths {
+			if path.Backend.Service == nil {
+				continue
+			}
+			serviceName := path.Backend.Service.Name
+			// If a name doesn't validate with apimachineryvalidation.NameIsDNS1035Label, but does validate with apimachineryvalidation.NameIsDNSLabel,
+			// then we allow it to be used as a Service name in an Ingress.
+			dnsLabelValidationErrors := apimachineryvalidation.NameIsDNSLabel(serviceName, false)
+			dns1035LabelValidationErrors := apimachineryvalidation.NameIsDNS1035Label(serviceName, false)
+			if len(dnsLabelValidationErrors) == 0 && len(dns1035LabelValidationErrors) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ValidateIPAddressName validates that the name is the decimal representation of an IP address.
 // IPAddress does not support generating names, prefix is not considered.
 func ValidateIPAddressName(name string, prefix bool) []string {
@@ -714,7 +785,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 
@@ -728,25 +799,25 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// resource is required
 	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "").MarkCoveredByDeclarative())
 	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Resource) {
+		for _, msg := range content.IsPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
 		}
 	}
 
 	// name is required
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
+		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
 		}
 	}
 
 	// namespace is optional
 	if params.Namespace != "" {
-		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Namespace) {
+		for _, msg := range content.IsPathSegmentName(params.Namespace) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), params.Namespace, msg))
 		}
 	}
@@ -757,7 +828,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 	return allErrs
 }
 
@@ -765,28 +836,31 @@ var ValidateServiceCIDRName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cidrConfig.ObjectMeta, false, ValidateServiceCIDRName, field.NewPath("metadata"))
-	fieldPath := field.NewPath("spec", "cidrs")
+	allErrs = append(allErrs, validateServiceCIDRSpec(&cidrConfig.Spec, field.NewPath("spec", "cidrs"))...)
+	return allErrs
+}
 
-	if len(cidrConfig.Spec.CIDRs) == 0 {
+func validateServiceCIDRSpec(cidrConfigSpec *networking.ServiceCIDRSpec, fieldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(cidrConfigSpec.CIDRs) == 0 {
 		allErrs = append(allErrs, field.Required(fieldPath, "at least one CIDR required"))
 		return allErrs
 	}
 
-	if len(cidrConfig.Spec.CIDRs) > 2 {
-		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may only hold up to 2 values"))
+	if len(cidrConfigSpec.CIDRs) > 2 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfigSpec, "may only hold up to 2 values"))
 		return allErrs
 	}
-	// validate cidrs are dual stack, one of each IP family
-	if len(cidrConfig.Spec.CIDRs) == 2 {
-		isDual, err := netutils.IsDualStackCIDRStrings(cidrConfig.Spec.CIDRs)
-		if err != nil || !isDual {
-			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
-			return allErrs
-		}
+
+	for i, cidr := range cidrConfigSpec.CIDRs {
+		allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(i), cidr)...)
 	}
 
-	for i, cidr := range cidrConfig.Spec.CIDRs {
-		allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(i), cidr)...)
+	// validate cidrs are dual stack, one of each IP family
+	if len(cidrConfigSpec.CIDRs) == 2 &&
+		netutils.IPFamilyOfCIDRString(cidrConfigSpec.CIDRs[0]) == netutils.IPFamilyOfCIDRString(cidrConfigSpec.CIDRs[1]) &&
+		netutils.IPFamilyOfCIDRString(cidrConfigSpec.CIDRs[0]) != netutils.IPFamilyUnknown {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfigSpec.CIDRs, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
 	}
 
 	return allErrs
@@ -796,8 +870,28 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs, old.Spec.CIDRs, field.NewPath("spec").Child("cidrs"))...)
+	switch {
+	// no change in Spec.CIDRs lengths fields must not change
+	case len(old.Spec.CIDRs) == len(update.Spec.CIDRs):
+		for i, ip := range old.Spec.CIDRs {
+			if ip != update.Spec.CIDRs[i] {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cidrs").Index(i), update.Spec.CIDRs[i], apimachineryvalidation.FieldImmutableErrorMsg))
+			}
+		}
+		// added a new CIDR is allowed to convert to Dual Stack
+		// ref: https://issues.k8s.io/131261
+	case len(old.Spec.CIDRs) == 1 && len(update.Spec.CIDRs) == 2:
+		// existing CIDR can not change
+		if update.Spec.CIDRs[0] != old.Spec.CIDRs[0] {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cidrs").Index(0), update.Spec.CIDRs[0], apimachineryvalidation.FieldImmutableErrorMsg))
+		}
+		// validate the new added CIDR
+		allErrs = append(allErrs, validateServiceCIDRSpec(&update.Spec, field.NewPath("spec", "cidrs"))...)
 
+		// no other changes allowed
+	default:
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cidrs"), update.Spec.CIDRs, apimachineryvalidation.FieldImmutableErrorMsg))
+	}
 	return allErrs
 }
 

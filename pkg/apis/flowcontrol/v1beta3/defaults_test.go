@@ -25,7 +25,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
@@ -46,8 +46,8 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1beta3.PriorityLevelEnablementExempt,
 					Exempt: &flowcontrolv1beta3.ExemptPriorityLevelConfiguration{
-						NominalConcurrencyShares: pointer.Int32(0),
-						LendablePercent:          pointer.Int32(0),
+						NominalConcurrencyShares: ptr.To[int32](0),
+						LendablePercent:          ptr.To[int32](0),
 					},
 				},
 			},
@@ -70,7 +70,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeReject,
 						},
@@ -97,7 +97,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeQueue,
 							Queuing: &flowcontrolv1beta3.QueuingConfiguration{
@@ -128,7 +128,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: PriorityLevelConfigurationDefaultNominalConcurrencyShares,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeReject,
 						},
@@ -164,7 +164,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 0,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeReject,
 						},
@@ -200,7 +200,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 0,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeReject,
 						},
@@ -236,7 +236,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 1,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta3.LimitResponse{
 							Type: flowcontrolv1beta3.LimitResponseTypeReject,
 						},

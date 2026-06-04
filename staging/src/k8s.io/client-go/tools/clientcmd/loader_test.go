@@ -122,6 +122,7 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 	}
 }
 
+//nolint:logcheck // Tests klog APIs.
 func TestToleratingMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
@@ -146,6 +147,7 @@ func TestToleratingMissingFiles(t *testing.T) {
 	}
 }
 
+//nolint:logcheck // Tests klog APIs.
 func TestWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
@@ -171,6 +173,7 @@ func TestWarningMissingFiles(t *testing.T) {
 	}
 }
 
+//nolint:logcheck // Tests klog APIs.
 func TestNoWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
@@ -309,7 +312,6 @@ contexts:
   name: "433e40"
 current-context: any-context-value
 kind: Config
-preferences: {}
 users: null
 `)
 	if !bytes.Equal(expected, data) {
@@ -757,7 +759,6 @@ func Example_noMergingOnExplicitPaths() {
 	//   name: federal-context
 	// current-context: ""
 	// kind: Config
-	// preferences: {}
 	// users:
 	// - name: red-user
 	//   user:
@@ -809,7 +810,6 @@ func Example_mergingSomeWithConflict() {
 	//   name: federal-context
 	// current-context: federal-context
 	// kind: Config
-	// preferences: {}
 	// users:
 	// - name: red-user
 	//   user:
@@ -887,7 +887,6 @@ func Example_mergingEverythingNoConflicts() {
 	//   name: shaker-context
 	// current-context: ""
 	// kind: Config
-	// preferences: {}
 	// users:
 	// - name: black-user
 	//   user:

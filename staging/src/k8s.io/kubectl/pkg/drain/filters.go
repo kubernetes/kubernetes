@@ -17,7 +17,6 @@ limitations under the License.
 package drain
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -33,7 +32,7 @@ const (
 	daemonSetWarning    = "ignoring DaemonSet-managed Pods"
 	localStorageFatal   = "Pods with local storage (use --delete-emptydir-data to override)"
 	localStorageWarning = "deleting Pods with local storage"
-	unmanagedFatal      = "cannot delete Pods that declare no controller (use --force to override)"
+	unmanagedFatal      = "Pods that declare no controller (use --force to override)"
 	unmanagedWarning    = "deleting Pods that declare no controller"
 )
 
@@ -171,6 +170,12 @@ func hasLocalStorage(pod corev1.Pod) bool {
 	return false
 }
 
+func isControllerRefDaemonSet(workloadRef *metav1.OwnerReference) bool {
+	// find if workloadRef is daemonSet
+	daemonSetAPIVersion, daemonSetKind := appsv1.SchemeGroupVersion.WithKind("DaemonSet").ToAPIVersionAndKind()
+	return workloadRef.Kind == daemonSetKind && workloadRef.APIVersion == daemonSetAPIVersion
+}
+
 func (d *Helper) daemonSetFilter(pod corev1.Pod) PodDeleteStatus {
 	// Note that we return false in cases where the pod is DaemonSet managed,
 	// regardless of flags.
@@ -179,7 +184,7 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) PodDeleteStatus {
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
 	controllerRef := metav1.GetControllerOf(&pod)
-	if controllerRef == nil || controllerRef.Kind != appsv1.SchemeGroupVersion.WithKind("DaemonSet").Kind {
+	if controllerRef == nil || !isControllerRefDaemonSet(controllerRef) {
 		return MakePodDeleteStatusOkay()
 	}
 	// Any finished pod can be removed.
@@ -187,7 +192,7 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) PodDeleteStatus {
 		return MakePodDeleteStatusOkay()
 	}
 
-	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{}); err != nil {
+	if _, err := d.Client.AppsV1().DaemonSets(pod.Namespace).Get(d.getContext(), controllerRef.Name, metav1.GetOptions{}); err != nil {
 		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && d.Force {
 			return MakePodDeleteStatusWithWarning(true, err.Error())

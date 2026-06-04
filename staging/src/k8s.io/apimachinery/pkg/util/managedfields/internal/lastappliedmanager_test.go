@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v4/merge"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/merge"
 	"sigs.k8s.io/yaml"
 )
 

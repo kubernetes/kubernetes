@@ -16,17 +16,34 @@ limitations under the License.
 
 package features
 
+import (
+	"k8s.io/apimachinery/pkg/util/version"
+)
+
+// Every feature gate should have an entry here following this template:
+//
+// // owner: @username
+// // alpha: v1.4
+// MyFeature featuregate.Feature = "MyFeature"
+//
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 const (
-	// Every feature gate should add method here following this template:
+	// owner: @michaelasp
+	// beta: v1.36
 	//
-	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature featuregate.Feature = "MyFeature"
+	// Allow the client to process events atomically rather than a stream of
+	// events for items popped off the FIFO.
+	AtomicFIFO Feature = "AtomicFIFO"
+
+	// owner: @yt2985
+	// beta: 1.36
 	//
-	// Feature gates should be listed in alphabetical, case-sensitive
-	// (upper before any lower case character) order. This reduces the risk
-	// of code conflicts because changes are more likely to be scattered
-	// across the file.
+	// If enabled, allows clients to gracefully handle Certificate Authority (CA)
+	// rotations without dropping connections or requiring a restart.
+	ClientsAllowCARotation Feature = "ClientsAllowCARotation"
 
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
@@ -37,6 +54,13 @@ const (
 	// "application/cbor" or "application/apply-patch+cbor" will instead write
 	// "application/json" or "application/apply-patch+yaml", respectively.
 	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
+
+	// owner: @enj
+	// beta: v1.36
+	//
+	// If enabled, the client-go TLS transport cache uses weak pointers to allow
+	// garbage collection of unused transports, preventing unbounded cache growth.
+	ClientsAllowTLSCacheGC Feature = "ClientsAllowTLSCacheGC"
 
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
@@ -49,36 +73,73 @@ const (
 	// "application/apply-patch+yaml".
 	ClientsPreferCBOR Feature = "ClientsPreferCBOR"
 
-	// owner: @nilekhc
-	// alpha: v1.30
-	InformerResourceVersion Feature = "InformerResourceVersion"
-
 	// owner: @deads2k
 	// beta: v1.33
 	//
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
 
+	// owner: @yue9944882
+	// beta: v1.35
+	//
+	// Allow InOrderInformer to process incoming events in batches to expedite the process rate.
+	InOrderInformersBatchProcess Feature = "InOrderInformersBatchProcess"
+
+	// owner: @enj, @michaelasp
+	// alpha: v1.30
+	// GA: v1.35
+	InformerResourceVersion Feature = "InformerResourceVersion"
+
+	// owner: @michaelasp
+	// beta: v1.36
+	//
+	// Allow the FIFO to unlock while processing items to allow other goroutines to add items to the queue.
+	UnlockWhileProcessingFIFO Feature = "UnlockWhileProcessingFIFO"
+
 	// owner: @p0lyn0mial
 	// beta: v1.30
 	//
 	// Allow the client to get a stream of individual items instead of chunking from the server.
-	//
-	// NOTE:
-	//  The feature is disabled in Beta by default because
-	//  it will only be turned on for selected control plane component(s).
 	WatchListClient Feature = "WatchListClient"
 )
 
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 //
 // To add a new feature, define a key for it above and add it here.
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
-var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
-	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
-	InOrderInformers:        {Default: true, PreRelease: Beta},
-	WatchListClient:         {Default: false, PreRelease: Beta},
+var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
+	AtomicFIFO: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	ClientsAllowCARotation: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	ClientsAllowCBOR: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsAllowTLSCacheGC: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	ClientsPreferCBOR: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	InOrderInformers: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: Beta},
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: GA, LockToDefault: true},
+	},
+	InOrderInformersBatchProcess: {
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
+	InformerResourceVersion: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: GA},
+	},
+	UnlockWhileProcessingFIFO: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	WatchListClient: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+	},
 }

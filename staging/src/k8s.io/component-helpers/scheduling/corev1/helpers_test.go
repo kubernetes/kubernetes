@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestPodPriority tests PodPriority function.
@@ -644,12 +645,15 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 }
 
 func TestFindMatchingUntoleratedTaint(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
-		description     string
-		tolerations     []v1.Toleration
-		taints          []v1.Taint
-		applyFilter     taintsFilterFunc
-		expectTolerated bool
+		description                 string
+		tolerations                 []v1.Toleration
+		taints                      []v1.Taint
+		applyFilter                 taintsFilterFunc
+		expectTolerated             bool
+		expectError                 bool
+		enableComparisonOperatorsFG bool
 	}{
 		{
 			description:     "empty tolerations tolerate empty taints",
@@ -747,10 +751,95 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			applyFilter:     func(t *v1.Taint) bool { return t.Effect == v1.TaintEffectNoExecute },
 			expectTolerated: true,
 		},
+		{
+			description: "numeric Gt operator with taint value below threshold, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "800",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "numeric Gt operator with taint value above threshold, expect tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "750",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "950",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             true,
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "numeric Lt operator with taint value above threshold, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Lt",
+					Value:    "800",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "950",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "numeric Gt operator with non-numeric taint value, expect not tolerated",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             false,
+			expectError:                 true,
+			enableComparisonOperatorsFG: true,
+		},
 	}
 
 	for _, tc := range testCases {
-		_, untolerated := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter)
+		_, untolerated := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}
 			for _, taint := range tc.taints {

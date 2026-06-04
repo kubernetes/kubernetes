@@ -17,13 +17,12 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
@@ -139,6 +139,8 @@ func removeContainers(criSocketPath string) error {
 	if err := containerRuntime.Connect(); err != nil {
 		return err
 	}
+	defer containerRuntime.Close(context.Background())
+
 	containers, err := containerRuntime.ListKubeContainers()
 	if err != nil {
 		return err

@@ -26,6 +26,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	applyconfigurationapiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1beta1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
@@ -47,18 +48,21 @@ type APIServiceInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*apiregistrationv1beta1.APIServiceList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *apiregistrationv1beta1.APIService, err error)
+	Apply(ctx context.Context, aPIService *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration, opts v1.ApplyOptions) (result *apiregistrationv1beta1.APIService, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, aPIService *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration, opts v1.ApplyOptions) (result *apiregistrationv1beta1.APIService, err error)
 	APIServiceExpansion
 }
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	*gentype.ClientWithList[*apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList]
+	*gentype.ClientWithListAndApply[*apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList, *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration]
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1beta1Client) *aPIServices {
 	return &aPIServices{
-		gentype.NewClientWithList[*apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList](
+		gentype.NewClientWithListAndApply[*apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList, *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration](
 			"apiservices",
 			c.RESTClient(),
 			scheme.ParameterCodec,

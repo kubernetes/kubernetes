@@ -40,13 +40,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -331,7 +331,7 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 
 	responses := sets.NewString()
 
-	for i := 0; i < maxTries; i++ {
+	for i := range maxTries {
 		resp, err := config.GetResponseFromContainer(ctx, protocol, dialCommand, containerIP, targetIP, containerHTTPPort, targetPort)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
@@ -387,7 +387,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(ctx context.Contex
 
 	eps := sets.NewString()
 
-	for i := 0; i < tries; i++ {
+	for i := range tries {
 		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, config.f, config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
@@ -493,7 +493,7 @@ func (config *NetworkingTestConfig) DialFromNode(ctx context.Context, protocol, 
 
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
-	for i := 0; i < maxTries; i++ {
+	for i := range maxTries {
 		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, config.f, config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
 			// A failure to exec command counts as a try, not a hard fail.
@@ -837,14 +837,10 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
 	}
 
-	// Obtain the primary IP family of the Cluster based on the first ClusterIP
-	// TODO: Eventually we should just be getting these from Spec.IPFamilies
-	// but for now that would only if the feature gate is enabled.
-	family := v1.IPv4Protocol
-	secondaryFamily := v1.IPv6Protocol
-	if netutils.IsIPv6String(config.ClusterIP) {
-		family = v1.IPv6Protocol
-		secondaryFamily = v1.IPv4Protocol
+	var family, secondaryFamily v1.IPFamily
+	family = config.NodePortService.Spec.IPFamilies[0]
+	if len(config.NodePortService.Spec.IPFamilies) == 2 {
+		secondaryFamily = config.NodePortService.Spec.IPFamilies[1]
 	}
 	if config.PreferExternalAddresses {
 		// Get Node IPs from the cluster, ExternalIPs take precedence
@@ -867,10 +863,10 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 	if config.DualStackEnabled {
 		numEndpoints = 2 * len(config.EndpointPods)
 	}
-	err = framework.WaitForServiceEndpointsNum(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints, time.Second, wait.ForeverTestTimeout)
+	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints)
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", nodePortServiceName, config.Namespace)
 	ginkgo.By("Waiting for Session Affinity service to expose endpoint")
-	err = framework.WaitForServiceEndpointsNum(ctx, config.f.ClientSet, config.Namespace, sessionAffinityServiceName, numEndpoints, time.Second, wait.ForeverTestTimeout)
+	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, sessionAffinityServiceName, numEndpoints)
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", sessionAffinityServiceName, config.Namespace)
 }
 
@@ -924,7 +920,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	if config.DualStackEnabled {
 		numEndpoints = 2 * len(config.EndpointPods)
 	}
-	err = framework.WaitForServiceEndpointsNum(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints, time.Second, wait.ForeverTestTimeout)
+	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints)
 	if err != nil {
 		framework.Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}

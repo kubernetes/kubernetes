@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -38,11 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -53,9 +48,9 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	ipvstest "k8s.io/kubernetes/pkg/proxy/ipvs/util/testing"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
-	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -167,7 +162,7 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 		ipFamily:              ipFamily,
 	}
 	p.setInitialized(true)
-	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
 	return p
 }
 
@@ -224,113 +219,6 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 	}
 	epsFunc(eps)
 	return eps
-}
-
-func TestCleanupLeftovers(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ipt := iptablestest.NewFake()
-	ipvs := ipvstest.NewFake()
-	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcNodePort := 3001
-	svcPortName := proxy.ServicePortName{
-		NamespacedName: makeNSN("ns1", "svc1"),
-		Port:           "p80",
-	}
-
-	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
-			svc.Spec.Type = "NodePort"
-			svc.Spec.ClusterIP = svcIP
-			svc.Spec.Ports = []v1.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
-				Protocol: v1.ProtocolTCP,
-				NodePort: int32(svcNodePort),
-			}}
-		}),
-	)
-	epIP := "10.180.0.1"
-	populateEndpointSlices(fp,
-		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
-			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = []discovery.Endpoint{{
-				Addresses: []string{epIP},
-			}}
-			eps.Ports = []discovery.EndpointPort{{
-				Name:     ptr.To(svcPortName.Port),
-				Port:     ptr.To(int32(svcPort)),
-				Protocol: ptr.To(v1.ProtocolTCP),
-			}}
-		}),
-	)
-
-	fp.syncProxyRules()
-
-	// test cleanup left over
-	if CleanupLeftovers(ctx, ipvs, ipt, ipset) {
-		t.Errorf("Cleanup leftovers failed")
-	}
-}
-
-func TestCanUseIPVSProxier(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	testCases := []struct {
-		name         string
-		scheduler    string
-		ipsetVersion string
-		ipsetErr     error
-		ipvsErr      string
-		ok           bool
-	}{
-		{
-			name:         "happy days",
-			ipsetVersion: MinIPSetCheckVersion,
-			ok:           true,
-		},
-		{
-			name:         "ipset error",
-			scheduler:    "",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipsetErr:     fmt.Errorf("oops"),
-			ok:           false,
-		},
-		{
-			name:         "ipset version too low",
-			scheduler:    "rr",
-			ipsetVersion: "4.3.0",
-			ok:           false,
-		},
-		{
-			name:         "GetVirtualServers fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "GetVirtualServers",
-			ok:           false,
-		},
-		{
-			name:         "AddVirtualServer fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "AddVirtualServer",
-			ok:           false,
-		},
-		{
-			name:         "DeleteVirtualServer fail",
-			ipsetVersion: MinIPSetCheckVersion,
-			ipvsErr:      "DeleteVirtualServer",
-			ok:           false,
-		},
-	}
-
-	for _, tc := range testCases {
-		ipvs := &fakeIpvs{tc.ipvsErr, false}
-		versioner := &fakeIPSetVersioner{version: tc.ipsetVersion, err: tc.ipsetErr}
-		err := CanUseIPVSProxier(ctx, ipvs, versioner, tc.scheduler)
-		if (err == nil) != tc.ok {
-			t.Errorf("Case [%s], expect %v, got err: %v", tc.name, tc.ok, err)
-		}
-	}
 }
 
 func TestGetNodeIPs(t *testing.T) {
@@ -5684,57 +5572,27 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 	testCases := []struct {
 		name             string
-		ipModeEnabled    bool
 		svcIP            string
 		svcLBIP          string
 		ipMode           *v1.LoadBalancerIPMode
 		expectedServices int
 	}{
-		/* LoadBalancerIPMode disabled */
 		{
-			name:             "LoadBalancerIPMode disabled, ipMode Proxy",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.41",
-			svcLBIP:          "1.2.3.4",
-			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
-			expectedServices: 2,
-		},
-		{
-			name:             "LoadBalancerIPMode disabled, ipMode VIP",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.42",
-			svcLBIP:          "1.2.3.5",
-			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
-			expectedServices: 2,
-		},
-		{
-			name:             "LoadBalancerIPMode disabled, ipMode nil",
-			ipModeEnabled:    false,
-			svcIP:            "10.20.30.43",
-			svcLBIP:          "1.2.3.6",
-			ipMode:           nil,
-			expectedServices: 2,
-		},
-		/* LoadBalancerIPMode enabled */
-		{
-			name:             "LoadBalancerIPMode enabled, ipMode Proxy",
-			ipModeEnabled:    true,
+			name:             "ipMode Proxy",
 			svcIP:            "10.20.30.41",
 			svcLBIP:          "1.2.3.4",
 			ipMode:           ptr.To(v1.LoadBalancerIPModeProxy),
 			expectedServices: 1,
 		},
 		{
-			name:             "LoadBalancerIPMode enabled, ipMode VIP",
-			ipModeEnabled:    true,
+			name:             "ipMode VIP",
 			svcIP:            "10.20.30.42",
 			svcLBIP:          "1.2.3.5",
 			ipMode:           ptr.To(v1.LoadBalancerIPModeVIP),
 			expectedServices: 2,
 		},
 		{
-			name:             "LoadBalancerIPMode enabled, ipMode nil",
-			ipModeEnabled:    true,
+			name:             "ipMode nil",
 			svcIP:            "10.20.30.43",
 			svcLBIP:          "1.2.3.6",
 			ipMode:           nil,
@@ -5751,10 +5609,6 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if !testCase.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)
 			_, fp := buildFakeProxier(t)
 			makeServiceMap(fp,
 				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {

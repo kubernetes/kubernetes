@@ -338,7 +338,7 @@ func ValidateFlowSchemaStatusUpdate(old, fs *flowcontrol.FlowSchema) field.Error
 func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }
@@ -395,28 +395,32 @@ func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "must be 'Exempt' if and only if `name` is 'exempt'"))
 	}
 	switch spec.Type {
 	case flowcontrol.PriorityLevelEnablementExempt:
 		if spec.Limited != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited").MarkCoveredByDeclarative())
 		}
 		if spec.Exempt != nil {
 			allErrs = append(allErrs, ValidateExemptPriorityLevelConfiguration(spec.Exempt, fldPath.Child("exempt"))...)
 		}
 	case flowcontrol.PriorityLevelEnablementLimited:
 		if spec.Exempt != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must be nil if the type is Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must be nil if the type is Limited").MarkCoveredByDeclarative())
 		}
 
 		if spec.Limited == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited").MarkCoveredByDeclarative())
 		} else {
 			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"), opts)...)
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
+		if len(spec.Type) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "").MarkCoveredByDeclarative())
+		} else {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
+		}
 	}
 	return allErrs
 }
@@ -466,16 +470,20 @@ func ValidateLimitResponse(lr flowcontrol.LimitResponse, fldPath *field.Path) fi
 	switch lr.Type {
 	case flowcontrol.LimitResponseTypeReject:
 		if lr.Queuing != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queuing"), "must be nil if limited.limitResponse.type is not Limited"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queuing"), "must be nil if limited.limitResponse.type is not Limited").MarkCoveredByDeclarative())
 		}
 	case flowcontrol.LimitResponseTypeQueue:
 		if lr.Queuing == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("queuing"), "must not be empty if limited.limitResponse.type is Limited"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("queuing"), "must not be empty if limited.limitResponse.type is Limited").MarkCoveredByDeclarative())
 		} else {
 			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(lr.Queuing, fldPath.Child("queuing"))...)
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, supportedLimitResponseType.List()))
+		if len(lr.Type) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "").MarkCoveredByDeclarative())
+		} else {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, supportedLimitResponseType.List()))
+		}
 	}
 	return allErrs
 }
@@ -530,7 +538,7 @@ func ValidatePriorityLevelConfigurationStatusUpdate(old, pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.PriorityLevelConfigurationCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }

@@ -22,11 +22,13 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func NewTestBitMask(sockets ...int) bitmask.BitMask {
@@ -216,6 +218,10 @@ func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]Topolog
 	return m.th
 }
 
+func (m *mockHintProvider) AllocatePod(pod *v1.Pod) error {
+	return nil
+}
+
 func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
 	return nil
@@ -226,7 +232,7 @@ type mockPolicy struct {
 	ph []map[string][]TopologyHint
 }
 
-func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+func (p *mockPolicy) Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	p.ph = providersHints
 	return TopologyHint{}, true
 }
@@ -247,9 +253,10 @@ func TestAddHintProvider(t *testing.T) {
 	}
 	mngr := manager{}
 	mngr.scope = NewContainerScope(NewNonePolicy())
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tcases {
 		for _, hp := range tc.hp {
-			mngr.AddHintProvider(hp)
+			mngr.AddHintProvider(logger, hp)
 		}
 		if len(tc.hp) != len(mngr.scope.(*containerScope).hintProviders) {
 			t.Errorf("error")
@@ -258,6 +265,7 @@ func TestAddHintProvider(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	numaInfo := &NUMAInfo{
 		Nodes: []int{0, 1},
 		NUMADistances: NUMADistances{
@@ -563,7 +571,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Container scope Admit
-		ctnActual := ctnScopeManager.Admit(&podAttr)
+		ctnActual := ctnScopeManager.Admit(tCtx, &podAttr)
 		if ctnActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
 		}
@@ -572,7 +580,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Pod scope Admit
-		podActual := podScopeManager.Admit(&podAttr)
+		podActual := podScopeManager.Admit(tCtx, &podAttr)
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
 		}

@@ -70,7 +70,7 @@ import (
 //
 //   - asInteger: returns a representation of the current value as an int64 if
 //     possible or results in an error if conversion would result in overflow
-//	   or loss of precision.
+//     or loss of precision.
 //
 //   - asApproximateFloat: returns a float64 representation of the quantity which may
 //     lose precision. If the value of the quantity is outside the range of a float64
@@ -82,12 +82,12 @@ import (
 //
 // Examples:
 //
-// quantity("50000000G").isInteger() // returns true
-// quantity("50k").isInteger() // returns true
-// quantity("9999999999999999999999999999999999999G").asInteger() // error: cannot convert value to integer
-// quantity("9999999999999999999999999999999999999G").isInteger() // returns false
-// quantity("50k").asInteger() == 50000 // returns true
-// quantity("50k").sub(20000).asApproximateFloat() == 30000 // returns true
+//	quantity("50000000G").isInteger() // returns true
+//	quantity("50k").isInteger() // returns true
+//	quantity("9999999999999999999999999999999999999G").asInteger() // error: cannot convert value to integer
+//	quantity("9999999999999999999999999999999999999G").isInteger() // returns false
+//	quantity("50k").asInteger() == 50000 // returns true
+//	quantity("50k").sub(20000).asApproximateFloat() == 30000 // returns true
 //
 // Arithmetic
 //
@@ -105,11 +105,11 @@ import (
 //
 // Examples:
 //
-// quantity("50k").add("20k") == quantity("70k") // returns true
-// quantity("50k").add(20) == quantity("50020") // returns true
-// quantity("50k").sub("20k") == quantity("30k") // returns true
-// quantity("50k").sub(20000) == quantity("30k") // returns true
-// quantity("50k").add(20).sub(quantity("100k")).sub(-50000) == quantity("20") // returns true
+//	quantity("50k").add("20k") == quantity("70k") // returns true
+//	quantity("50k").add(20) == quantity("50020") // returns true
+//	quantity("50k").sub("20k") == quantity("30k") // returns true
+//	quantity("50k").sub(20000) == quantity("30k") // returns true
+//	quantity("50k").add(20).sub(quantity("100k")).sub(-50000) == quantity("20") // returns true
 //
 // Comparisons
 //
@@ -119,21 +119,19 @@ import (
 //
 //   - compareTo: Compares receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
 //
-//
 //     <Quantity>.isLessThan(<quantity>) <bool>
 //     <Quantity>.isGreaterThan(<quantity>) <bool>
 //     <Quantity>.compareTo(<quantity>) <int>
 //
 // Examples:
 //
-// quantity("200M").compareTo(quantity("0.2G")) // returns 0
-// quantity("50M").compareTo(quantity("50Mi")) // returns -1
-// quantity("50Mi").compareTo(quantity("50M")) // returns 1
-// quantity("150Mi").isGreaterThan(quantity("100Mi")) // returns true
-// quantity("50Mi").isGreaterThan(quantity("100Mi")) // returns false
-// quantity("50M").isLessThan(quantity("100M")) // returns true
-// quantity("100M").isLessThan(quantity("50M")) // returns false
-
+//	quantity("200M").compareTo(quantity("0.2G")) // returns 0
+//	quantity("50M").compareTo(quantity("50Mi")) // returns -1
+//	quantity("50Mi").compareTo(quantity("50M")) // returns 1
+//	quantity("150Mi").isGreaterThan(quantity("100Mi")) // returns true
+//	quantity("50Mi").isGreaterThan(quantity("100Mi")) // returns false
+//	quantity("50M").isLessThan(quantity("100M")) // returns true
+//	quantity("100M").isLessThan(quantity("50M")) // returns false
 func Quantity() cel.EnvOption {
 	return cel.Lib(quantityLib)
 }

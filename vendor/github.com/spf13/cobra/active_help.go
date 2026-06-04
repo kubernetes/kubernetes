@@ -35,7 +35,7 @@ const (
 // This function can be called multiple times before and/or after completions are added to
 // the array.  Each time this function is called with the same array, the new
 // ActiveHelp line will be shown below the previous ones when completion is triggered.
-func AppendActiveHelp(compArray []string, activeHelpStr string) []string {
+func AppendActiveHelp(compArray []Completion, activeHelpStr string) []Completion {
 	return append(compArray, fmt.Sprintf("%s%s", activeHelpMarker, activeHelpStr))
 }
 

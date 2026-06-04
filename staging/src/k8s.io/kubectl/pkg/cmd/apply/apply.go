@@ -23,7 +23,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -184,7 +184,7 @@ var ApplySetToolVersion = version.Get().GitVersion
 func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: cmddelete.NewDeleteFlags("The files that contain the configurations to apply."),
+		DeleteFlags: cmddelete.NewDeleteFlags("The files, directories or URLs that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
@@ -284,13 +284,11 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	}
 
 	var openAPIV3Root openapi3.Root
-	if !cmdutil.OpenAPIV3Patch.IsDisabled() {
-		openAPIV3Client, err := f.OpenAPIV3Client()
-		if err == nil {
-			openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
-		} else {
-			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
-		}
+	openAPIV3Client, err := f.OpenAPIV3Client()
+	if err == nil {
+		openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+	} else {
+		klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
 	}
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
@@ -727,36 +725,43 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		return err
 	}
 
-	if o.DryRunStrategy != cmdutil.DryRunClient {
-		metadata, _ := meta.Accessor(info.Object)
-		annotationMap := metadata.GetAnnotations()
-		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
-			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName)
-		}
+	metadata, _ := meta.Accessor(info.Object)
+	annotationMap := metadata.GetAnnotations()
+	if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
+		fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName) //nolint:errcheck
+	}
 
-		patcher, err := newPatcher(o, info, helper)
+	patcher, err := newPatcher(o, info, helper)
+	if err != nil {
+		return err
+	}
+
+	var patchBytes []byte
+	var patchedObject runtime.Object
+
+	if o.DryRunStrategy != cmdutil.DryRunClient {
+		patchBytes, patchedObject, err = patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
+	} else {
+		patchBytes, patchedObject, err = patcher.PatchLocal(info.Object, modified, o.ErrOut)
+	}
+
+	if err != nil {
+		return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+	}
+
+	info.Refresh(patchedObject, true) //nolint:errcheck
+
+	WarnIfDeleting(info.Object, o.ErrOut)
+
+	if string(patchBytes) == "{}" && !o.shouldPrintObject() {
+		printer, err := o.ToPrinter("unchanged")
 		if err != nil {
 			return err
 		}
-		patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
+			return err
 		}
-
-		info.Refresh(patchedObject, true)
-
-		WarnIfDeleting(info.Object, o.ErrOut)
-
-		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
-			printer, err := o.ToPrinter("unchanged")
-			if err != nil {
-				return err
-			}
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			return nil
-		}
+		return nil
 	}
 
 	if o.shouldPrintObject() {

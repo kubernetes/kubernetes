@@ -16,7 +16,10 @@ limitations under the License.
 
 package eviction
 
-import "time"
+import (
+	"k8s.io/klog/v2"
+	"time"
+)
 
 const (
 	// this prevents constantly updating the memcg notifier if synchronize
@@ -30,6 +33,6 @@ type CgroupNotifierFactory struct{}
 var _ NotifierFactory = &CgroupNotifierFactory{}
 
 // NewCgroupNotifier implements the NotifierFactory interface
-func (n *CgroupNotifierFactory) NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
-	return NewCgroupNotifier(path, attribute, threshold)
+func (n *CgroupNotifierFactory) NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error) {
+	return NewCgroupNotifier(logger, path, attribute, threshold)
 }

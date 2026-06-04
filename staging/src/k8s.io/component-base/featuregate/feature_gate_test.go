@@ -409,9 +409,9 @@ func TestFeatureGateSetFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "set TestInvaild true",
+			name: "set TestInvalid true",
 			setmap: map[string]bool{
-				"TestInvaild": true,
+				"TestInvalid": true,
 			},
 			expect: map[Feature]bool{
 				testAlphaGate: false,
@@ -721,6 +721,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 	const testLockedFalseGate Feature = "TestLockedFalse"
 	const testAlphaGateNoVersion Feature = "TestAlphaNoVersion"
 	const testBetaGateNoVersion Feature = "TestBetaNoVersion"
+	const testCompatibilityGate Feature = "TestCompatibility"
 
 	tests := []struct {
 		arg        string
@@ -738,6 +739,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
@@ -750,20 +752,11 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    true,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
-			arg: "fooBarBaz=true",
-			expect: map[Feature]bool{
-				allAlphaGate:           false,
-				allBetaGate:            false,
-				testGAGate:             false,
-				testAlphaGate:          false,
-				testBetaGate:           false,
-				testLockedFalseGate:    false,
-				testAlphaGateNoVersion: false,
-				testBetaGateNoVersion:  false,
-			},
+			arg:        "fooBarBaz=true",
 			parseError: "unrecognized feature gate: fooBarBaz",
 		},
 		{
@@ -777,6 +770,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
@@ -790,6 +784,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: true,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
@@ -803,21 +798,12 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 			parseError: "invalid value of AllAlpha",
 		},
 		{
-			arg: "AllAlpha=false,TestAlpha=true,TestAlphaNoVersion=true",
-			expect: map[Feature]bool{
-				allAlphaGate:           false,
-				allBetaGate:            false,
-				testGAGate:             false,
-				testAlphaGate:          false,
-				testBetaGate:           false,
-				testLockedFalseGate:    false,
-				testAlphaGateNoVersion: true,
-				testBetaGateNoVersion:  false,
-			},
+			arg:        "AllAlpha=false,TestAlpha=true,TestAlphaNoVersion=true",
 			parseError: "cannot set feature gate TestAlpha to true, feature is PreAlpha at emulated version 1.28",
 		},
 		{
@@ -831,34 +817,15 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: true,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
-			arg: "TestAlpha=true,TestAlphaNoVersion=true,AllAlpha=false",
-			expect: map[Feature]bool{
-				allAlphaGate:           false,
-				allBetaGate:            false,
-				testGAGate:             false,
-				testAlphaGate:          false,
-				testBetaGate:           false,
-				testLockedFalseGate:    false,
-				testAlphaGateNoVersion: true,
-				testBetaGateNoVersion:  false,
-			},
+			arg:        "TestAlpha=true,TestAlphaNoVersion=true,AllAlpha=false",
 			parseError: "cannot set feature gate TestAlpha to true, feature is PreAlpha at emulated version 1.28",
 		},
 		{
-			arg: "AllAlpha=true,TestAlpha=false,TestAlphaNoVersion=false",
-			expect: map[Feature]bool{
-				allAlphaGate:           true,
-				allBetaGate:            false,
-				testGAGate:             false,
-				testAlphaGate:          false,
-				testBetaGate:           true,
-				testLockedFalseGate:    false,
-				testAlphaGateNoVersion: false,
-				testBetaGateNoVersion:  false,
-			},
+			arg:        "AllAlpha=true,TestAlpha=false,TestAlphaNoVersion=false",
 			parseError: "cannot set feature gate TestAlpha to false, feature is PreAlpha at emulated version 1.28",
 		},
 		{
@@ -872,20 +839,11 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
-			arg: "TestAlpha=false,TestAlphaNoVersion=false,AllAlpha=true",
-			expect: map[Feature]bool{
-				allAlphaGate:           true,
-				allBetaGate:            false,
-				testGAGate:             false,
-				testAlphaGate:          false,
-				testBetaGate:           true,
-				testLockedFalseGate:    false,
-				testAlphaGateNoVersion: false,
-				testBetaGateNoVersion:  false,
-			},
+			arg:        "TestAlpha=false,TestAlphaNoVersion=false,AllAlpha=true",
 			parseError: "cannot set feature gate TestAlpha to false, feature is PreAlpha at emulated version 1.28",
 		},
 		{
@@ -899,6 +857,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  true,
+				testCompatibilityGate:  false,
 			},
 		},
 
@@ -913,6 +872,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
@@ -926,19 +886,11 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  true,
+				testCompatibilityGate:  true,
 			},
 		},
 		{
-			arg: "AllBeta=banana",
-			expect: map[Feature]bool{
-				allAlphaGate:           false,
-				allBetaGate:            false,
-				testGAGate:             false,
-				testAlphaGate:          false,
-				testBetaGate:           false,
-				testAlphaGateNoVersion: false,
-				testBetaGateNoVersion:  false,
-			},
+			arg:        "AllBeta=banana",
 			parseError: "invalid value of AllBeta",
 		},
 		{
@@ -952,6 +904,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  true,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
@@ -965,6 +918,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  true,
+				testCompatibilityGate:  false,
 			},
 		},
 		{
@@ -978,6 +932,7 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  true,
 			},
 		},
 		{
@@ -991,21 +946,26 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  true,
 			},
 		},
 		{
-			arg: "TestAlpha=true,AllBeta=false",
+			arg:        "TestAlpha=true,AllBeta=false",
+			parseError: "cannot set feature gate TestAlpha to true, feature is PreAlpha at emulated version 1.28",
+		},
+		{
+			arg: "TestCompatibility=true",
 			expect: map[Feature]bool{
 				allAlphaGate:           false,
 				allBetaGate:            false,
 				testGAGate:             false,
-				testAlphaGate:          true,
+				testAlphaGate:          false,
 				testBetaGate:           false,
 				testLockedFalseGate:    false,
 				testAlphaGateNoVersion: false,
 				testBetaGateNoVersion:  false,
+				testCompatibilityGate:  true,
 			},
-			parseError: "cannot set feature gate TestAlpha to true, feature is PreAlpha at emulated version 1.28",
 		},
 	}
 	for i, test := range tests {
@@ -1031,6 +991,11 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate: {
 					{Version: version.MustParse("1.28"), Default: false, PreRelease: GA},
 					{Version: version.MustParse("1.29"), Default: false, PreRelease: GA, LockToDefault: true},
+				},
+				testCompatibilityGate: {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.28")},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA, LockToDefault: true},
 				},
 			})
 			require.NoError(t, err)
@@ -1181,6 +1146,8 @@ func TestVersionedFeatureGateKnownFeatures(t *testing.T) {
 		testPreAlphaGate            Feature = "TestPreAlpha"
 		testAlphaGate               Feature = "TestAlpha"
 		testBetaGate                Feature = "TestBeta"
+		testFastBetaGate            Feature = "TestFastBeta"
+		testLatestFastBetaGate      Feature = "TestLatestFastBeta"
 		testGAGate                  Feature = "TestGA"
 		testDeprecatedGate          Feature = "TestDeprecated"
 		testGAGateNoVersion         Feature = "TestGANoVersion"
@@ -1206,6 +1173,14 @@ func TestVersionedFeatureGateKnownFeatures(t *testing.T) {
 		testBetaGate: {
 			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
 		},
+		testFastBetaGate: {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.28")},
+		},
+		testLatestFastBetaGate: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+		},
 		testDeprecatedGate: {
 			{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
 			{Version: version.MustParse("1.28"), Default: true, PreRelease: Deprecated},
@@ -1225,12 +1200,106 @@ func TestVersionedFeatureGateKnownFeatures(t *testing.T) {
 	assert.NotContains(t, known, testPreAlphaGate)
 	assert.Contains(t, known, testAlphaGate)
 	assert.Contains(t, known, testBetaGate)
+	assert.Contains(t, known, "TestFastBeta=true|false (BETA - default=true) if --min-compatibility-version>=1.28")
+	assert.NotContains(t, known, testLatestFastBetaGate)
 	assert.NotContains(t, known, testGAGate)
 	assert.NotContains(t, known, testDeprecatedGate)
 	assert.Contains(t, known, testAlphaGateNoVersion)
 	assert.Contains(t, known, testBetaGateNoVersion)
 	assert.NotContains(t, known, testGAGateNoVersion)
 	assert.NotContains(t, known, testDeprecatedGateNoVersion)
+}
+
+func TestVersionedFeatureGateKnownFeaturesWithMinCompatVersion(t *testing.T) {
+	// gates for testing
+	const (
+		testPreAlphaGate            Feature = "TestPreAlpha"
+		testAlphaGate               Feature = "TestAlpha"
+		testBetaGate                Feature = "TestBeta"
+		testFastBetaGate            Feature = "TestFastBeta"
+		testLatestFastBetaGate      Feature = "TestLatestFastBeta"
+		testGAGate                  Feature = "TestGA"
+		testDeprecatedGate          Feature = "TestDeprecated"
+		testGAGateNoVersion         Feature = "TestGANoVersion"
+		testAlphaGateNoVersion      Feature = "TestAlphaNoVersion"
+		testBetaGateNoVersion       Feature = "TestBetaNoVersion"
+		testDeprecatedGateNoVersion Feature = "TestDeprecatedNoVersion"
+	)
+	// Don't parse the flag, assert defaults are used.
+	f := NewVersionedFeatureGate(version.MustParse("1.29"))
+	err := f.AddVersioned(map[Feature]VersionedSpecs{
+		testGAGate: {
+			{Version: version.MustParse("1.26"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.26"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.26")},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: GA},
+		},
+		testPreAlphaGate: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+		},
+		testAlphaGate: {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+		},
+		testBetaGate: {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+		},
+		testFastBetaGate: {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.28")},
+		},
+		testLatestFastBetaGate: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+		},
+		testDeprecatedGate: {
+			{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Deprecated},
+		},
+	})
+	require.NoError(t, err)
+	err = f.Add(map[Feature]FeatureSpec{
+		testAlphaGateNoVersion:      {Default: false, PreRelease: Alpha},
+		testBetaGateNoVersion:       {Default: false, PreRelease: Beta},
+		testGAGateNoVersion:         {Default: false, PreRelease: GA},
+		testDeprecatedGateNoVersion: {Default: false, PreRelease: Deprecated},
+	})
+	require.NoError(t, err)
+
+	knownExpected := []string{
+		"AllAlpha=true|false (ALPHA - default=false)",
+		"AllBeta=true|false (BETA - default=false)",
+		"TestAlpha=true|false (ALPHA - default=false)",
+		"TestAlphaNoVersion=true|false (ALPHA - default=false)",
+		"TestBeta=true|false (BETA - default=false)",
+		"TestBetaNoVersion=true|false (BETA - default=false)",
+		"TestFastBeta=true|false (BETA - default=true)",
+		"TestLatestFastBeta=true|false (BETA - default=false), or TestLatestFastBeta=true|false (BETA - default=true) if --min-compatibility-version>=1.29",
+		"TestPreAlpha=true|false (ALPHA - default=false)",
+	}
+	assert.ElementsMatch(t, f.KnownFeatures(), knownExpected)
+
+	require.NoError(t, f.SetEmulationVersionAndMinCompatibilityVersion(version.MustParse("1.28"), version.MustParse("1.28")))
+	knownExpected = []string{
+		"AllAlpha=true|false (ALPHA - default=false)",
+		"AllBeta=true|false (BETA - default=false)",
+		"TestAlpha=true|false (ALPHA - default=false)",
+		"TestAlphaNoVersion=true|false (ALPHA - default=false)",
+		"TestBeta=true|false (BETA - default=false)",
+		"TestBetaNoVersion=true|false (BETA - default=false)",
+		"TestFastBeta=true|false (BETA - default=true)",
+	}
+	assert.ElementsMatch(t, f.KnownFeatures(), knownExpected)
+
+	require.NoError(t, f.SetEmulationVersionAndMinCompatibilityVersion(version.MustParse("1.28"), version.MustParse("1.26")))
+	knownExpected = []string{
+		"AllAlpha=true|false (ALPHA - default=false)",
+		"AllBeta=true|false (BETA - default=false)",
+		"TestAlpha=true|false (ALPHA - default=false)",
+		"TestAlphaNoVersion=true|false (ALPHA - default=false)",
+		"TestBeta=true|false (BETA - default=false)",
+		"TestBetaNoVersion=true|false (BETA - default=false)",
+		"TestFastBeta=true|false (BETA - default=false), or TestFastBeta=true|false (BETA - default=true) if --min-compatibility-version>=1.28",
+	}
+	assert.ElementsMatch(t, f.KnownFeatures(), knownExpected)
 }
 
 func TestVersionedFeatureGateMetrics(t *testing.T) {
@@ -1311,11 +1380,11 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
 		if err := f.AddVersioned(map[Feature]VersionedSpecs{
 			"TestFeature1": {
-				{Version: version.MustParse("1.28"), Default: true},
+				{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta},
 			},
 			"TestFeature2": {
-				{Version: version.MustParse("1.26"), Default: false},
-				{Version: version.MustParse("1.29"), Default: false},
+				{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
+				{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 			},
 		}); err != nil {
 			t.Fatal(err)
@@ -1527,47 +1596,148 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 	})
 }
 
-func TestFeatureSpecAtEmulationVersion(t *testing.T) {
+func TestFeatureGateMinCompatibilityVersion(t *testing.T) {
+	const testCompatGateA Feature = "TestCompatA"
+	const testCompatGateB Feature = "TestCompatB"
+	const testCompatGateC Feature = "TestCompatC"
+
+	f := NewVersionedFeatureGateWithMinCompatibility(version.MustParse("1.30"), version.MustParse("1.27"))
+	err := f.AddVersioned(map[Feature]VersionedSpecs{
+		testCompatGateA: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.30"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.30")},
+		},
+		testCompatGateB: {
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.30"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.30")},
+		},
+		testCompatGateC: {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.28")},
+			{Version: version.MustParse("1.30"), Default: true, PreRelease: GA, LockToDefault: true},
+		},
+	})
+	require.NoError(t, err)
+
+	// KnownFeatures should show min-compatibility-version requirement.
+	knownExpected := []string{
+		"AllAlpha=true|false (ALPHA - default=false)",
+		"AllBeta=true|false (BETA - default=false)",
+		"TestCompatA=true|false (BETA - default=false), or TestCompatA=true|false (BETA - default=true) if --min-compatibility-version>=1.30",
+		"TestCompatB=true|false (BETA - default=false), or TestCompatB=true|false (BETA - default=true) if --min-compatibility-version>=1.30",
+		"TestCompatC=true|false (BETA - default=false)",
+	}
+	assert.ElementsMatch(t, f.KnownFeatures(), knownExpected)
+
+	// Gate is Alpha min compat version is 1.29, feature's is 1.30. Feature should be disabled.
+	assert.False(t, f.Enabled(testCompatGateA), "TestCompatA should be disabled at Alpha stage")
+	assert.False(t, f.Enabled(testCompatGateB), "TestCompatB should be disabled when its min compat version is too high")
+	assert.False(t, f.Enabled(testCompatGateC), "TestCompatC should be disabled when its min compat version is too high")
+	// Trying to override TestCompatA default should work.
+	require.NoError(t, f.OverrideDefault(testCompatGateA, true))
+	assert.True(t, f.Enabled(testCompatGateA), "TestCompatA should be enabled after overriding default")
+	// Trying to enable TestCompatA should work.
+	require.NoError(t, f.Set(string(testCompatGateA)+"=false"))
+	assert.False(t, f.Enabled(testCompatGateA), "TestCompatA should be enabled after setting it explicitly")
+	// Trying to override TestCompatB, TestCompatC default should fail.
+	require.NoError(t, f.OverrideDefault(testCompatGateB, false))
+	require.NoError(t, f.OverrideDefault(testCompatGateC, false))
+	// Trying to enable TestCompatB, TestCompatC should work.
+	require.NoError(t, f.Set(string(testCompatGateB)+"=true"))
+	require.NoError(t, f.Set(string(testCompatGateC)+"=true"))
+
+	// reset the feature gate first so no overrides or raw flags are carried over.
+	f = f.DeepCopyAndReset().(*featureGate)
+	// Now, update the gate's min compat version.
+	require.NoError(t, f.SetEmulationVersionAndMinCompatibilityVersion(version.MustParse("1.30"), version.MustParse("1.30")))
+	// KnownFeatures should not show the min-compatibility-version requirement anymore.
+	knownExpected = []string{
+		"AllAlpha=true|false (ALPHA - default=false)",
+		"AllBeta=true|false (BETA - default=false)",
+		"TestCompatA=true|false (BETA - default=true)",
+		"TestCompatB=true|false (BETA - default=true)",
+	}
+	assert.ElementsMatch(t, f.KnownFeatures(), knownExpected)
+
+	// Feature should now be enabled by default.
+	assert.True(t, f.Enabled(testCompatGateA), "TestCompatA should be Beta and enabled when its min compat version is met")
+	assert.True(t, f.Enabled(testCompatGateB), "TestCompatB should be enabled when its min compat version is met")
+	assert.True(t, f.Enabled(testCompatGateC), "TestCompatC should be enabled when its min compat version is met")
+
+	// Trying to disable feature should succeed.
+	require.NoError(t, f.Set(string(testCompatGateA)+"=false"))
+	assert.False(t, f.Enabled(testCompatGateA), "feature should be disabled")
+	require.NoError(t, f.Set(string(testCompatGateB)+"=false"))
+	assert.False(t, f.Enabled(testCompatGateB), "feature should be disabled")
+
+	require.NoError(t, f.ResetFeatureValueToDefault(testCompatGateB))
+	assert.True(t, f.Enabled(testCompatGateB), "feature should be enabled after resetting to default")
+	// Trying to override default should now succeed.
+	require.NoError(t, f.OverrideDefault(testCompatGateB, false))
+	assert.False(t, f.Enabled(testCompatGateB), "feature should be disabled by default after override default to false")
+	// Trying to override GA default should fail.
+	require.Error(t, f.OverrideDefault(testCompatGateC, false))
+	require.Error(t, f.Set(string(testCompatGateC)+"=false"))
+}
+
+func TestFeatureSpecAtEmulationAndMinCompatVersion(t *testing.T) {
 	specs := VersionedSpecs{
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.25")},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: GA, MinCompatibilityVersion: version.MustParse("1.25")},
 	}
 	sort.Sort(specs)
 	tests := []struct {
-		cVersion string
-		expect   FeatureSpec
+		emuVer       *version.Version
+		minCompatVer *version.Version
+		expect       FeatureSpec
 	}{
 		{
-			cVersion: "1.30",
-			expect:   FeatureSpec{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
+			emuVer: version.MustParse("1.30"),
+			expect: FeatureSpec{Version: version.MustParse("1.29"), Default: true, PreRelease: GA, MinCompatibilityVersion: version.MustParse("1.25")},
 		},
 		{
-			cVersion: "1.29",
-			expect:   FeatureSpec{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
+			emuVer: version.MustParse("1.29"),
+			expect: FeatureSpec{Version: version.MustParse("1.29"), Default: true, PreRelease: GA, MinCompatibilityVersion: version.MustParse("1.25")},
 		},
 		{
-			cVersion: "1.28",
-			expect:   FeatureSpec{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			emuVer: version.MustParse("1.28"),
+			expect: FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.25")},
 		},
 		{
-			cVersion: "1.27",
-			expect:   FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
+			emuVer: version.MustParse("1.26"),
+			expect: FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.25")},
 		},
 		{
-			cVersion: "1.25",
-			expect:   FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
+			emuVer:       version.MustParse("1.25"),
+			minCompatVer: version.MustParse("1.25"),
+			expect:       FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.25")},
 		},
 		{
-			cVersion: "1.24",
-			expect:   FeatureSpec{Version: version.MajorMinor(0, 0), Default: false, PreRelease: PreAlpha},
+			emuVer: version.MustParse("1.25"),
+			expect: FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
+		},
+		{
+			emuVer: version.MustParse("1.24"),
+			expect: FeatureSpec{Version: version.MajorMinor(0, 0), Default: false, PreRelease: PreAlpha},
+		},
+		{
+			emuVer:       version.MustParse("1.26"),
+			minCompatVer: version.MustParse("1.23"),
+			expect:       FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
+		},
+		{
+			emuVer:       version.MustParse("1.29"),
+			minCompatVer: version.MustParse("1.23"),
+			expect:       FeatureSpec{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
 		},
 	}
 	for i, test := range tests {
-		t.Run(fmt.Sprintf("featureSpecAtEmulationVersion for emulationVersion %s", test.cVersion), func(t *testing.T) {
-			result := featureSpecAtEmulationVersion(specs, version.MustParse(test.cVersion))
+		t.Run(fmt.Sprintf("featureSpecAtEmulationVersion for emulationVersion %s", test.emuVer), func(t *testing.T) {
+			result := featureSpecAtEmulationAndMinCompatVersion(specs, test.emuVer, test.minCompatVer)
 			if !reflect.DeepEqual(*result, test.expect) {
-				t.Errorf("%d: featureSpecAtEmulationVersion(, %s) Expected %v, Got %v", i, test.cVersion, test.expect, result)
+				t.Errorf("%d: featureSpecAtEmulationVersion(, %s) Expected %v, Got %v", i, test.emuVer, test.expect, result)
 			}
 		})
 	}
@@ -1884,6 +2054,191 @@ func TestAddVersioned(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "patch min compat version",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.30.1")},
+				},
+			},
+		},
+		{
+			name: "Alpha to GA",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: GA},
+				},
+			},
+		},
+		{
+			name: "GA with default false",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: GA},
+				},
+			},
+		},
+		{
+			name: "Beta to Deprecated",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Deprecated},
+				},
+			},
+		},
+		{
+			name: "Alpha to Deprecated",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Deprecated},
+				},
+			},
+		},
+		{
+			name:        "MinCompatibilityVersion > Version",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.30")},
+				},
+			},
+		},
+		{
+			name:        "decreasing minCompatibilityVersion",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Alpha, MinCompatibilityVersion: version.MustParse("1.28")},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.27")},
+				},
+			},
+		},
+		{
+			name:        "transition without stability change",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
+				},
+			},
+		},
+		{
+			name:        "resurrect from locked",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA, LockToDefault: true},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: GA, LockToDefault: false},
+				},
+			},
+		},
+		{
+			name:        "no version provided",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Default: false, PreRelease: Alpha},
+				},
+			},
+		},
+		{
+			name:        "direct to Beta with minCompatibilityVersion, no preceding entry",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+				},
+			},
+		},
+		{
+			name: "direct to Beta with minCompatibilityVersion",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+				},
+			},
+		},
+		{
+			name:        "minCompatibilityVersion greater than version",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.30")},
+				},
+			},
+		},
+		{
+			name: "same version with different minCompatibilityVersion",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: GA},
+				},
+			},
+		},
+		{
+			name:        "different version with different minCompatibilityVersion",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: GA},
+				},
+			},
+		},
+		{
+			name:        "same version with different stability",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: GA},
+				},
+			},
+		},
+		{
+			name:        "same version with different lockToDefault",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, LockToDefault: true, MinCompatibilityVersion: version.MustParse("1.29")},
+				},
+			},
+		},
+		{
+			name:        "only minCompatibilityVersion different",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha, MinCompatibilityVersion: version.MustParse("1.29")},
+				},
+			},
+		},
+		{
+			name:        "multiple entries for the same version and minCompatibilityVersion",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha, MinCompatibilityVersion: version.MustParse("1.29")},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta, MinCompatibilityVersion: version.MustParse("1.29")},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("AddVersioned-%s", test.name), func(t *testing.T) {
@@ -1901,6 +2256,324 @@ func TestAddVersioned(t *testing.T) {
 
 			if err == nil && test.expectError {
 				t.Errorf("expected errors, no errors found")
+			}
+		})
+	}
+}
+
+func TestAddDependencies(t *testing.T) {
+	const (
+		// Test features
+		fA       Feature = "FeatureA"
+		fB       Feature = "FeatureB"
+		fC       Feature = "FeatureC"
+		fUnknown Feature = "FeatureUnknown"
+	)
+
+	var (
+		v129 = version.MustParse("1.29")
+		v130 = version.MustParse("1.30")
+		v131 = version.MustParse("1.31")
+		v132 = version.MustParse("1.32")
+	)
+
+	testCases := []struct {
+		name        string
+		features    map[Feature]VersionedSpecs
+		initialDeps map[Feature][]Feature
+		newDeps     map[Feature][]Feature
+		expectedErr string
+		finalDeps   map[Feature][]Feature
+		closeGate   bool
+	}{
+		{
+			name: "dependency on unknown feature",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fUnknown}},
+			expectedErr: "cannot add dependency from FeatureA to unknown feature FeatureUnknown",
+		},
+		{
+			name: "unknown feature has dependency",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+			},
+			newDeps:     map[Feature][]Feature{fUnknown: {fA}},
+			expectedErr: "cannot add dependency for unknown feature FeatureUnknown",
+		},
+		{
+			name: "cycle",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+				fC: {{Version: v129}},
+			},
+			newDeps: map[Feature][]Feature{
+				fA: {fB},
+				fB: {fC},
+				fC: {fA},
+			},
+			expectedErr: "cycle detected with feature",
+		},
+		{
+			name: "valid: no cycle with overlapping dependencies",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+				fC: {{Version: v129}},
+			},
+			newDeps: map[Feature][]Feature{
+				fA: {fB, fC},
+				fB: {fC},
+			},
+		},
+		{
+			name: "self cycle",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fA}},
+			expectedErr: "cycle detected with feature FeatureA",
+		},
+		{
+			name: "merge dependencies",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+				fC: {{Version: v129}},
+			},
+			initialDeps: map[Feature][]Feature{fA: {fB}},
+			newDeps:     map[Feature][]Feature{fA: {fC}},
+			finalDeps:   map[Feature][]Feature{fA: {fB, fC}},
+		},
+		{
+			name: "add after close",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129}},
+				fB: {{Version: v129}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			closeGate:   true,
+			expectedErr: "cannot add a feature gate dependency after adding it to the flag set",
+		},
+		{
+			name: "valid: dependency is valid across all versions",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta}, {Version: v130, PreRelease: GA}},
+				fB: {{Version: v129, PreRelease: Beta}, {Version: v130, PreRelease: GA}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "invalid: stability inversion",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta}},
+				fB: {{Version: v129, PreRelease: Alpha}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.29",
+		},
+		{
+			name: "invalid: stability inversion at later version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha}, {Version: v130, PreRelease: Beta}},
+				fB: {{Version: v129, PreRelease: Alpha}, {Version: v130, PreRelease: Alpha, Default: true}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.30",
+		},
+		{
+			name: "invalid: stability inversion at earlier version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha}, {Version: v130, PreRelease: Beta}, {Version: v132, PreRelease: GA}},
+				fB: {{Version: v129, PreRelease: Alpha}, {Version: v131, PreRelease: Beta}, {Version: v132, PreRelease: GA}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "BETA feature FeatureA cannot depend on ALPHA feature FeatureB at version 1.30",
+		},
+		{
+			name: "valid: alpha feature depending on pre-alpha",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha}, {Version: v131, PreRelease: Beta}},
+				fB: {{Version: v130, PreRelease: Alpha}, {Version: v131, PreRelease: Beta}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "valid: default-enabled depends on default-enabled",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Beta, Default: true}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "valid: default-disabled depends on default-enabled",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: false}},
+				fB: {{Version: v129, PreRelease: Beta, Default: true}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "invalid: default-enabled depends on default-disabled",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Beta, Default: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "default-enabled feature FeatureA cannot depend on default-disabled feature FeatureB at version 1.29",
+		},
+		{
+			name: "invalid: default-enabled depends on default-disabled at a later version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Alpha, Default: false}, {Version: v130, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Alpha, Default: false}, {Version: v130, PreRelease: Beta, Default: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "default-enabled feature FeatureA cannot depend on default-disabled feature FeatureB at version 1.30",
+		},
+		{
+			name: "invalid: default-enabled depends on default-disabled at an earlier version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: Beta, Default: true}},
+				fB: {{Version: v129, PreRelease: Beta, Default: false}, {Version: v130, PreRelease: Beta, Default: true}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "default-enabled feature FeatureA cannot depend on default-disabled feature FeatureB at version 1.29",
+		},
+		{
+			name: "valid: locked depends on locked",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: true}},
+				fB: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: true}},
+			},
+			newDeps: map[Feature][]Feature{fA: {fB}},
+		},
+		{
+			name: "invalid: locked depends on unlocked",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: true}},
+				fB: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "locked-to-default feature FeatureA cannot depend on unlocked feature FeatureB at version 1.29",
+		},
+		{
+			name: "invalid: locked depends on unlocked at a later version",
+			features: map[Feature]VersionedSpecs{
+				fA: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: false}, {Version: v130, PreRelease: GA, Default: true, LockToDefault: true}},
+				fB: {{Version: v129, PreRelease: GA, Default: true, LockToDefault: false}},
+			},
+			newDeps:     map[Feature][]Feature{fA: {fB}},
+			expectedErr: "locked-to-default feature FeatureA cannot depend on unlocked feature FeatureB at version 1.30",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewFeatureGate()
+			require.NoError(t, f.AddVersioned(tc.features))
+			if tc.initialDeps != nil {
+				require.NoError(t, f.AddDependencies(tc.initialDeps))
+			}
+			if tc.closeGate {
+				f.Close()
+			}
+
+			err := f.AddDependencies(tc.newDeps)
+
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+
+				deps := f.Dependencies()
+				finalDeps := tc.finalDeps
+				if finalDeps == nil {
+					finalDeps = tc.newDeps
+				}
+				assert.Equal(t, finalDeps, deps)
+
+				// Verify that DeepCopy clones dependencies.
+				clone := f.DeepCopy().Dependencies()
+				assert.Equal(t, deps, clone, "dependencies should identical after DeepCopy")
+			}
+		})
+	}
+}
+
+func TestValidateDependencies(t *testing.T) {
+	const (
+		featureA Feature = "FeatureA"
+		featureB Feature = "FeatureB"
+		featureC Feature = "FeatureC"
+		featureD Feature = "FeatureD"
+	)
+
+	features := map[Feature]FeatureSpec{
+		featureA: {Default: false, PreRelease: Alpha},
+		featureB: {Default: false, PreRelease: Alpha},
+		featureC: {Default: false, PreRelease: Alpha},
+		featureD: {Default: false, PreRelease: Alpha},
+	}
+
+	dependencies := map[Feature][]Feature{
+		featureA: {featureB, featureC},
+		featureB: {featureD},
+	}
+
+	testCases := []struct {
+		name        string
+		set         string
+		expectedErr string
+	}{
+		{
+			name: "all enabled",
+			set:  "FeatureA=true,FeatureB=true,FeatureC=true,FeatureD=true",
+		},
+		{
+			name:        "one dependency disabled",
+			set:         "FeatureA=true,FeatureB=false,FeatureC=true,FeatureD=true",
+			expectedErr: "FeatureA is enabled, but depends on features that are disabled: [FeatureB]",
+		},
+		{
+			name:        "another dependency disabled",
+			set:         "FeatureA=true,FeatureB=true,FeatureC=false,FeatureD=true",
+			expectedErr: "FeatureA is enabled, but depends on features that are disabled: [FeatureC]",
+		},
+		{
+			name:        "multiple dependencies disabled",
+			set:         "FeatureA=true,FeatureB=false,FeatureC=false,FeatureD=true",
+			expectedErr: "FeatureA is enabled, but depends on features that are disabled: [FeatureB FeatureC]",
+		},
+		{
+			name:        "transitive dependency disabled",
+			set:         "FeatureA=true,FeatureB=true,FeatureC=true,FeatureD=false",
+			expectedErr: "FeatureB is enabled, but depends on features that are disabled: [FeatureD]",
+		},
+		{
+			name: "feature disabled",
+			set:  "FeatureA=false,FeatureB=false,FeatureC=true,FeatureD=true",
+		},
+		{
+			name: "all disabled",
+			set:  "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewFeatureGate()
+			require.NoError(t, f.Add(features))
+			require.NoError(t, f.AddDependencies(dependencies))
+
+			err := f.Set(tc.set)
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
 			}
 		})
 	}

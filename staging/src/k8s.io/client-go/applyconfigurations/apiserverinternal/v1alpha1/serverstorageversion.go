@@ -20,11 +20,22 @@ package v1alpha1
 
 // ServerStorageVersionApplyConfiguration represents a declarative configuration of the ServerStorageVersion type for use
 // with apply.
+//
+// An API server instance reports the version it can decode and the version it
+// encodes objects to when persisting objects in the backend.
 type ServerStorageVersionApplyConfiguration struct {
-	APIServerID       *string  `json:"apiServerID,omitempty"`
-	EncodingVersion   *string  `json:"encodingVersion,omitempty"`
+	// apiServerID is the ID of the reporting API server.
+	APIServerID *string `json:"apiServerID,omitempty"`
+	// encodingVersion the API server encodes the object to when persisting it in
+	// the backend (e.g., etcd).
+	EncodingVersion *string `json:"encodingVersion,omitempty"`
+	// decodableVersions are the encoding versions the API server can handle to decode.
+	// The API server can decode objects encoded in these versions.
+	// The encodingVersion must be included in the decodableVersions.
 	DecodableVersions []string `json:"decodableVersions,omitempty"`
-	ServedVersions    []string `json:"servedVersions,omitempty"`
+	// servedVersions lists all versions the API server can serve.
+	// DecodableVersions must include all ServedVersions.
+	ServedVersions []string `json:"servedVersions,omitempty"`
 }
 
 // ServerStorageVersionApplyConfiguration constructs a declarative configuration of the ServerStorageVersion type for use with

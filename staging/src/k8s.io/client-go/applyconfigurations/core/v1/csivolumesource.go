@@ -20,11 +20,27 @@ package v1
 
 // CSIVolumeSourceApplyConfiguration represents a declarative configuration of the CSIVolumeSource type for use
 // with apply.
+//
+// Represents a source location of a volume to mount, managed by an external CSI driver
 type CSIVolumeSourceApplyConfiguration struct {
-	Driver               *string                                 `json:"driver,omitempty"`
-	ReadOnly             *bool                                   `json:"readOnly,omitempty"`
-	FSType               *string                                 `json:"fsType,omitempty"`
-	VolumeAttributes     map[string]string                       `json:"volumeAttributes,omitempty"`
+	// driver is the name of the CSI driver that handles this volume.
+	// Consult with your admin for the correct name as registered in the cluster.
+	Driver *string `json:"driver,omitempty"`
+	// readOnly specifies a read-only configuration for the volume.
+	// Defaults to false (read/write).
+	ReadOnly *bool `json:"readOnly,omitempty"`
+	// fsType to mount. Ex. "ext4", "xfs", "ntfs".
+	// If not provided, the empty value is passed to the associated CSI driver
+	// which will determine the default filesystem to apply.
+	FSType *string `json:"fsType,omitempty"`
+	// volumeAttributes stores driver-specific properties that are passed to the CSI
+	// driver. Consult your driver's documentation for supported values.
+	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty"`
+	// nodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secret references are passed.
 	NodePublishSecretRef *LocalObjectReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty"`
 }
 

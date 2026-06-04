@@ -3,13 +3,13 @@
   "kind": "APIGroup",
   "name": "storagemigration.k8s.io",
   "preferredVersion": {
-    "groupVersion": "storagemigration.k8s.io/v1alpha1",
-    "version": "v1alpha1"
+    "groupVersion": "storagemigration.k8s.io/v1beta1",
+    "version": "v1beta1"
   },
   "versions": [
     {
-      "groupVersion": "storagemigration.k8s.io/v1alpha1",
-      "version": "v1alpha1"
+      "groupVersion": "storagemigration.k8s.io/v1beta1",
+      "version": "v1beta1"
     }
   ]
 }

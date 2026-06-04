@@ -18,8 +18,9 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"sort"
 
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
@@ -30,30 +31,37 @@ import (
 type linter struct {
 	linted map[*types.Type]bool
 	rules  []lintRule
-	// lintErrors is a list of errors that occurred during the linting process.
-	// lintErrors would be in the format:
-	// field <field_name>: <lint broken message>
-	// type <type_name>: <lint broken message>
-	lintErrors []error
+	// lintErrors is all the errors, grouped by type, that occurred during the
+	// linting process.
+	lintErrors map[*types.Type][]error
 }
 
-var defaultRules = []lintRule{
-	ruleOptionalAndRequired,
-	ruleRequiredAndDefault,
-}
+// lintRule is a function that validates a slice of comments.
+// container is the type containing the element being linted (e.g. the Struct when linting a Field).
+// It may be nil if the element is top-level (e.g. a Type definition).
+// t is the type of the element being linted (e.g. the Field's type, or the Type itself).
+// It returns a string as an error message if the comments are invalid,
+// and an error there is an error happened during the linting process.
+type lintRule func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error)
 
-func (l *linter) AddError(field, msg string) {
-	l.lintErrors = append(l.lintErrors, fmt.Errorf("%s: %s", field, msg))
+func (l *linter) AddError(t *types.Type, field, msg string) {
+	var err error
+	if field == "" {
+		err = fmt.Errorf("%s", msg)
+	} else {
+		err = fmt.Errorf("field %s: %s", field, msg)
+	}
+	l.lintErrors[t] = append(l.lintErrors[t], err)
 }
 
 func newLinter(rules ...lintRule) *linter {
 	if len(rules) == 0 {
-		rules = defaultRules
+		klog.Errorf("rules are not passed to the linter")
 	}
 	return &linter{
 		linted:     make(map[*types.Type]bool),
 		rules:      rules,
-		lintErrors: []error{},
+		lintErrors: map[*types.Type][]error{},
 	}
 }
 
@@ -64,13 +72,17 @@ func (l *linter) lintType(t *types.Type) error {
 	l.linted[t] = true
 
 	if t.CommentLines != nil {
+		extracted := codetags.Extract("+", t.CommentLines)
+		if _, ok := extracted["k8s:validation-gen-nolint"]; ok {
+			return nil
+		}
 		klog.V(5).Infof("linting type %s", t.Name.String())
-		lintErrs, err := l.lintComments(t.CommentLines)
+		lintErrs, err := l.lintComments(t, t, t.CommentLines)
 		if err != nil {
 			return err
 		}
 		for _, lintErr := range lintErrs {
-			l.AddError("type "+t.Name.String(), lintErr)
+			l.AddError(t, "", lintErr)
 		}
 	}
 	switch t.Kind {
@@ -83,12 +95,12 @@ func (l *linter) lintType(t *types.Type) error {
 		// Recursively lint each member of the struct.
 		for _, member := range t.Members {
 			klog.V(5).Infof("linting comments for field %s of type %s", member.String(), t.Name.String())
-			lintErrs, err := l.lintComments(member.CommentLines)
+			lintErrs, err := l.lintComments(t, member.Type, member.CommentLines)
 			if err != nil {
 				return err
 			}
 			for _, lintErr := range lintErrs {
-				l.AddError("type "+t.Name.String(), lintErr)
+				l.AddError(t, member.Name, lintErr)
 			}
 			if err := l.lintType(member.Type); err != nil {
 				return err
@@ -111,16 +123,30 @@ func (l *linter) lintType(t *types.Type) error {
 	return nil
 }
 
-// lintRule is a function that validates a slice of comments.
-// It returns a string as an error message if the comments are invalid,
-// and an error there is an error happened during the linting process.
-type lintRule func(comments []string) (string, error)
-
 // lintComments runs all registered rules on a slice of comments.
-func (l *linter) lintComments(comments []string) ([]string, error) {
+func (l *linter) lintComments(container *types.Type, t *types.Type, comments []string) ([]string, error) {
 	var lintErrs []string
+	var tags []codetags.Tag
+
+	extracted := codetags.Extract("+", comments)
+	keys := make([]string, 0, len(extracted))
+	for k := range extracted {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, tagName := range keys {
+		lines := extracted[tagName]
+		t, err := codetags.ParseAll(lines)
+		if err != nil {
+			// If parsing fails, it means it is not a valid tag.
+			continue
+		}
+		tags = append(tags, t...)
+	}
+
 	for _, rule := range l.rules {
-		if msg, err := rule(comments); err != nil {
+		if msg, err := rule(container, t, tags); err != nil {
 			return nil, err
 		} else if msg != "" {
 			lintErrs = append(lintErrs, msg)
@@ -128,33 +154,4 @@ func (l *linter) lintComments(comments []string) ([]string, error) {
 	}
 
 	return lintErrs, nil
-}
-
-// conflictingTagsRule checks for conflicting tags in a slice of comments.
-func conflictingTagsRule(comments []string, tags ...string) (string, error) {
-	if len(tags) < 2 {
-		return "", fmt.Errorf("at least two tags must be provided")
-	}
-	tagCount := make(map[string]bool)
-	for _, comment := range comments {
-		for _, tag := range tags {
-			if strings.HasPrefix(comment, tag) {
-				tagCount[tag] = true
-			}
-		}
-	}
-	if len(tagCount) > 1 {
-		return fmt.Sprintf("conflicting tags: {%s}", strings.Join(tags, ", ")), nil
-	}
-	return "", nil
-}
-
-// ruleOptionalAndRequired checks for conflicting tags +k8s:optional and +k8s:required in a slice of comments.
-func ruleOptionalAndRequired(comments []string) (string, error) {
-	return conflictingTagsRule(comments, "+k8s:optional", "+k8s:required")
-}
-
-// ruleRequiredAndDefault checks for conflicting tags +k8s:required and +default in a slice of comments.
-func ruleRequiredAndDefault(comments []string) (string, error) {
-	return conflictingTagsRule(comments, "+k8s:required", "+default")
 }

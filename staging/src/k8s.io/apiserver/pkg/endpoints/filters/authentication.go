@@ -66,9 +66,9 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		}
 		resp, ok, err := auth.AuthenticateRequest(req)
 		authenticationFinish := time.Now()
+		genericapirequest.TrackAuthenticationLatency(req.Context(), authenticationFinish.Sub(authenticationStart))
 		defer func() {
 			metrics(req.Context(), resp, ok, err, apiAuds, authenticationStart, authenticationFinish)
-			genericapirequest.TrackAuthenticationLatency(req.Context(), authenticationFinish.Sub(authenticationStart))
 		}()
 		if err != nil || !ok {
 			if err != nil {

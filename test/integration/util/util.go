@@ -28,11 +28,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
+	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -72,37 +74,47 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
 type ShutdownFunc func()
 
-// StartScheduler configures and starts a scheduler given a handle to the clientSet interface
-// and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
-// will keep running until the context is canceled.
-func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+// StartScheduler is a wrapper around StartSchedulerWithDone for backward compatibility.
+func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+	sched, informerFactory, _ := StartSchedulerWithDone(tCtx, cfg, outOfTreePluginRegistry)
+	return sched, informerFactory
+}
+
+// StartSchedulerWithDone configures and starts a scheduler. Background goroutines
+// will keep running until the context is canceled. It returns the running scheduler,
+// the informer factory, and a channel that is closed when the scheduler goroutine
+// actually exits. Callers can use this channel to ensure the scheduler has fully
+// stopped before performing operations that might race with it (e.g., resetting
+// global metrics).
+func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}) {
+	clientSet := tCtx.Client()
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
 	go func() {
-		<-ctx.Done()
+		<-tCtx.Done()
 		evtBroadcaster.Shutdown()
 	}()
 
-	evtBroadcaster.StartRecordingToSink(ctx.Done())
+	evtBroadcaster.StartRecordingToSink(tCtx.Done())
 
-	logger := klog.FromContext(ctx)
+	logger := tCtx.Logger()
 
 	sched, err := scheduler.New(
-		ctx,
+		tCtx,
 		clientSet,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(evtBroadcaster),
-		scheduler.WithKubeConfig(kubeConfig),
+		scheduler.WithKubeConfig(tCtx.RESTConfig()),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
@@ -111,37 +123,35 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 		scheduler.WithParallelism(cfg.Parallelism),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreePluginRegistry),
 	)
-	if err != nil {
-		logger.Error(err, "Error creating scheduler")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	tCtx.ExpectNoError(err, "creating scheduler")
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	if err = sched.WaitForHandlersSync(ctx); err != nil {
-		logger.Error(err, "Failed waiting for handlers to sync")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	informerFactory.Start(tCtx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
+	err = sched.WaitForHandlersSync(tCtx)
+	tCtx.ExpectNoError(err, "waiting for handlers to sync")
 	logger.V(3).Info("Handlers synced")
-	go sched.Run(ctx)
+	done := make(chan struct{})
+	go func() {
+		sched.Run(tCtx)
+		close(done)
+	}()
 
-	return sched, informerFactory
+	return sched, informerFactory, done
 }
 
-func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
+// CreateResourceClaimController creates a ResourceClaim controller and returns a blocking run function.
+// The caller is responsible for the management of the goroutine where that method is invoked.
+func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory, features resourceclaim.Features) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
-	claimTemplateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
-	features := resourceclaim.Features{
-		AdminAccess:     true,
-		PrioritizedList: true,
-	}
-	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), features, clientSet, podInformer, claimInformer, claimTemplateInformer)
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	claimTemplateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
+	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), features, clientSet, podInformer, podGroupInformer, claimInformer, claimTemplateInformer)
 	if err != nil {
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}
 	return func() {
-		go claimController.Run(ctx, 5 /* workers */)
+		claimController.Run(ctx, 5 /* workers */)
 	}
 }
 
@@ -517,6 +527,16 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					resourceapi.SchemeGroupVersion.String(): "true",
 				}
+				if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
+					// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
+					// we enable --runtime-config-emulation-forward-compatible.
+					options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
+				}
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
+					schedulingapiv1alpha2.SchemeGroupVersion.String(): "true",
+				}
 			}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
@@ -767,7 +787,7 @@ func CreateNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 
 func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
-	for i := 0; i < numNodes; i++ {
+	for i := range numNodes {
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
 		node, err := CreateNode(cs, wrapper.Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj())
 		if err != nil {
@@ -804,6 +824,7 @@ func WaitForNodesInCache(ctx context.Context, sched *scheduler.Scheduler, nodeCo
 type PausePodConfig struct {
 	Name                              string
 	Namespace                         string
+	PodGroupName                      string
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
@@ -814,6 +835,9 @@ type PausePodConfig struct {
 	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
 	Volumes                           []v1.Volume
+	ContainerPorts                    []v1.ContainerPort
+	RestartableInitContainerPorts     []v1.ContainerPort
+	NonRestartableInitContainerPorts  []v1.ContainerPort
 }
 
 // InitPausePod initializes a pod API object from the given config. It is used
@@ -833,6 +857,7 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 				{
 					Name:  conf.Name,
 					Image: imageutils.GetPauseImageName(),
+					Ports: conf.ContainerPorts,
 				},
 			},
 			Tolerations:       conf.Tolerations,
@@ -846,6 +871,31 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
+	}
+	if conf.RestartableInitContainerPorts != nil {
+		var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+		pod.Spec.InitContainers = []v1.Container{
+			{
+				Name:          conf.Name + "-init",
+				Image:         imageutils.GetPauseImageName(),
+				RestartPolicy: &containerRestartPolicyAlways,
+				Ports:         conf.RestartableInitContainerPorts,
+			},
+		}
+	}
+	if conf.NonRestartableInitContainerPorts != nil {
+		pod.Spec.InitContainers = []v1.Container{
+			{
+				Name:  conf.Name + "-init",
+				Image: imageutils.GetPauseImageName(),
+				Ports: conf.NonRestartableInitContainerPorts,
+			},
+		}
+	}
+	if conf.PodGroupName != "" {
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+			PodGroupName: &conf.PodGroupName,
+		}
 	}
 	return pod
 }
@@ -1144,21 +1194,21 @@ func timeout(ctx context.Context, d time.Duration, f func()) error {
 	}
 }
 
-// NextPodOrDie returns the next Pod in the scheduler queue.
+// NextEntityOrDie returns the next entity (either Pod or PodGroup) in the scheduler queue.
 // The operation needs to be completed within 5 seconds; otherwise the test gets aborted.
-func NextPodOrDie(t *testing.T, testCtx *TestContext) *schedulerframework.QueuedPodInfo {
+func NextEntityOrDie(t *testing.T, testCtx *TestContext) schedulerframework.QueuedEntityInfo {
 	t.Helper()
 
-	var podInfo *schedulerframework.QueuedPodInfo
+	var entity schedulerframework.QueuedEntityInfo
 	logger := klog.FromContext(testCtx.Ctx)
-	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
+	// NextEntity() is a blocking operation. Wrap it in timeout() to avoid relying on
 	// default go testing timeout (10m) to abort.
 	if err := timeout(testCtx.Ctx, time.Second*5, func() {
-		podInfo, _ = testCtx.Scheduler.NextPod(logger)
+		entity, _ = testCtx.Scheduler.NextEntity(logger)
 	}); err != nil {
-		t.Fatalf("Timed out waiting for the Pod to be popped: %v", err)
+		t.Fatalf("Timed out waiting for the entity to be popped: %v", err)
 	}
-	return podInfo
+	return entity
 }
 
 func WaitForNominatedNodeNameWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {

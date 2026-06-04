@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -22,10 +21,13 @@ package util
 import (
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetBootTime(t *testing.T) {
-	boottime, err := GetBootTime()
+	logger, _ := ktesting.NewTestContext(t)
+	boottime, err := GetBootTime(logger)
 
 	if err != nil {
 		t.Errorf("Unable to get system uptime")

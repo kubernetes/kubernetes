@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,15 +45,16 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting/format"
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -95,8 +97,9 @@ var _ = SIGDescribe("Aggregator", func() {
 		Testname: aggregator-supports-the-sample-apiserver
 		Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 		will work on the current Aggregator/API-Server.
+		This test is marked LinuxOnly because etcd does not provide or support images for Windows.
 	*/
-	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func(ctx context.Context) {
+	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator [LinuxOnly]", func(ctx context.Context) {
 		// Testing a 1.17 version of the sample-apiserver
 		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion)
 	})
@@ -362,7 +365,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: n.namespace,
 				Name:      "sample-api",
-				Port:      pointer.Int32(aggregatorServicePort),
+				Port:      ptr.To[int32](aggregatorServicePort),
 			},
 			Group:                apiServiceGroupName,
 			Version:              apiServiceVersion,
@@ -483,14 +486,25 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	flunderName = generateFlunderName("dynamic-flunder")
 
 	// Rerun the Create/List/Delete tests using the Dynamic client.
-	resources, discoveryErr := client.Discovery().ServerPreferredNamespacedResources()
-	groupVersionResources, err := discovery.GroupVersionResources(resources)
-	framework.ExpectNoError(err, "getting group version resources for dynamic client")
+	// Discovery may still show the aggregated API group as stale if the
+	// kube-apiserver's DiscoveryManager hasn't synced yet, so poll until
+	// the wardle/flunders GVR appears in the discovery results.
 	gvr := schema.GroupVersionResource{Group: apiServiceGroupName, Version: apiServiceVersion, Resource: "flunders"}
-	_, ok := groupVersionResources[gvr]
-	if !ok {
-		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
-	}
+	err = pollTimed(ctx, 1*time.Second, 60*time.Second, func(ctx context.Context) (bool, error) {
+		resources, discoveryErr := client.Discovery().ServerPreferredNamespacedResources()
+		if discoveryErr != nil {
+			framework.Logf("discovery returned error (may be transient), will retry: %v", discoveryErr)
+			return false, nil
+		}
+		groupVersionResources, err := discovery.GroupVersionResources(resources)
+		if err != nil {
+			framework.Logf("error getting group version resources for dynamic client, will retry: %v", err)
+			return false, nil
+		}
+		_, ok := groupVersionResources[gvr]
+		return ok, nil
+	}, "Waited %s for the dynamic client to discover wardle/flunders.")
+	framework.ExpectNoError(err, "timed out waiting for discovery to include wardle/flunders GVR")
 	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(n.namespace)
 
 	// kubectl create -f flunders-1.yaml
@@ -526,9 +540,11 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 
 	var jr *apiregistrationv1.APIService
 	err = json.Unmarshal([]byte(statusContent), &jr)
+	gomega.Expect(jr).To(apimachineryutils.HaveValidResourceVersion())
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
 	gomega.Expect(jr.Status.Conditions[0].Message).To(gomega.Equal("all checks passed"), "The Message returned was %v", jr.Status.Conditions[0].Message)
 
+	oldRV := jr.ResourceVersion
 	ginkgo.By("kubectl patch apiservice " + apiServiceName + " -p '{\"spec\":{\"versionPriority\": 400}}'")
 	patchContent, err := restClient.Patch(types.MergePatchType).
 		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName).
@@ -539,6 +555,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = json.Unmarshal([]byte(patchContent), &jr)
 	framework.ExpectNoError(err, "Failed to process patchContent: %v | err: %v ", string(patchContent), err)
 	gomega.Expect(jr.Spec.VersionPriority).To(gomega.Equal(int32(400)), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
+	gomega.Expect(resourceversion.CompareResourceVersion(oldRV, jr.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 	ginkgo.By("List APIServices")
 	listApiservices, err := restClient.Get().

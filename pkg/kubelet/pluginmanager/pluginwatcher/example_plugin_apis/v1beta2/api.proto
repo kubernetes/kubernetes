@@ -19,16 +19,6 @@ syntax = "proto3";
 package v1beta2;
 option go_package = "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
 // Renames a field from v1beta1 ExampleRequest.
 message ExampleRequest {
 	string request = 1;

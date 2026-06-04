@@ -232,8 +232,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	}
 
 	// convert versionedAttr.VersionedObject to the internal version in the underlying admission.Attributes
-	if v.versionedAttr != nil && v.versionedAttr.VersionedObject != nil && v.versionedAttr.Dirty {
-		return o.GetObjectConvertor().Convert(v.versionedAttr.VersionedObject, v.versionedAttr.Attributes.GetObject(), nil)
+	if v.versionedAttr != nil && v.versionedAttr.VersionedObject.Object() != nil && v.versionedAttr.Dirty {
+		return o.GetObjectConvertor().Convert(v.versionedAttr.VersionedObject.Object(), v.versionedAttr.Attributes.GetObject(), nil)
 	}
 
 	return nil
@@ -261,7 +261,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	// Make the webhook request
 	client, err := invocation.Webhook.GetRESTClient(a.cm)
 	if err != nil {
-		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewBadRequest("error getting REST client")}
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewInternalError(err)}
 	}
 	ctx, span := tracing.Start(ctx, "Call mutating webhook",
 		attribute.String("configuration", configurationName),
@@ -305,7 +305,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se
 		} else {
-			status = apierrors.NewBadRequest("error calling webhook")
+			status = apierrors.NewServiceUnavailable("error calling webhook")
 		}
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("failed to call webhook: %w", err), Status: status}
 	}
@@ -335,7 +335,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 	patchObj, err := jsonpatch.DecodePatch(result.Patch)
 	if err != nil {
-		return false, apierrors.NewInternalError(err)
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("received undecodable patch in webhook response: %w", err), Status: apierrors.NewServiceUnavailable("error decoding patch in webhook response")}
 	}
 
 	if len(patchObj) == 0 {
@@ -343,7 +343,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 
 	// if a non-empty patch was provided, and we have no object we can apply it to (e.g. a DELETE admission operation), error
-	if attr.VersionedObject == nil {
+	if attr.VersionedObject.Object() == nil {
 		return false, apierrors.NewInternalError(fmt.Errorf("admission webhook %q attempted to modify the object, which is not supported for this operation", h.Name))
 	}
 
@@ -352,7 +352,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	switch result.PatchType {
 	// VerifyAdmissionResponse normalizes to v1 patch types, regardless of the AdmissionReview version used
 	case admissionv1.PatchTypeJSONPatch:
-		objJS, err := runtime.Encode(jsonSerializer, attr.VersionedObject)
+		objJS, err := runtime.Encode(jsonSerializer, attr.VersionedObject.Object())
 		if err != nil {
 			return false, apierrors.NewInternalError(err)
 		}
@@ -365,7 +365,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 
 	var newVersionedObject runtime.Object
-	if _, ok := attr.VersionedObject.(*unstructured.Unstructured); ok {
+	if _, ok := attr.VersionedObject.Object().(*unstructured.Unstructured); ok {
 		// Custom Resources don't have corresponding Go struct's.
 		// They are represented as Unstructured.
 		newVersionedObject = &unstructured.Unstructured{}
@@ -382,12 +382,11 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		return false, apierrors.NewInternalError(err)
 	}
 
-	changed = !apiequality.Semantic.DeepEqual(attr.VersionedObject, newVersionedObject)
+	changed = !apiequality.Semantic.DeepEqual(attr.VersionedObject.Object(), newVersionedObject)
 	span.AddEvent("Patch applied")
 	annotator.addPatchAnnotation(patchObj, result.PatchType)
-	attr.Dirty = true
-	attr.VersionedObject = newVersionedObject
-	o.GetObjectDefaulter().Default(attr.VersionedObject)
+	attr.UpdateObject(newVersionedObject)
+	o.GetObjectDefaulter().Default(attr.VersionedObject.Object())
 	return changed, nil
 }
 

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -929,10 +928,12 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 		name string
 		// Function that prepares directory structure for the test under given
 		// base.
-		prepare      func(base string) ([]string, string, string, error)
-		expectError  bool
-		expectAction []mount.FakeAction
-		mountExists  bool
+		prepare        func(base string) ([]string, string, string, error)
+		modifyMounter  func(fm *mount.FakeMounter, bindPathTarget string)
+		expectError    bool
+		expectAction   []mount.FakeAction
+		mountExists    bool
+		expectDirExist bool
 	}{
 		{
 			name: "subpath-mount-already-exists-with-mismatching-mount",
@@ -981,6 +982,50 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 			expectAction: []mount.FakeAction{},
 			mountExists:  true,
 		},
+		{
+			name: "subpath-mount-corrupted-recovered",
+			prepare: func(base string) ([]string, string, string, error) {
+				volpath, subpathMount := getTestPaths(base)
+				mounts := []string{subpathMount}
+				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				subpath := filepath.Join(volpath, "dir0")
+				return mounts, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
+			},
+			modifyMounter: func(fm *mount.FakeMounter, bindPathTarget string) {
+				fm.MountCheckErrors = map[string]error{
+					bindPathTarget: os.NewSyscallError("fake", syscall.ESTALE),
+				}
+			},
+			expectError:  false,
+			expectAction: []mount.FakeAction{{Action: "unmount"}},
+			mountExists:  false,
+		},
+		{
+			name: "subpath-mount-corrupted-unmount-fails",
+			prepare: func(base string) ([]string, string, string, error) {
+				volpath, subpathMount := getTestPaths(base)
+				mounts := []string{subpathMount}
+				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				subpath := filepath.Join(volpath, "dir0")
+				return mounts, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
+			},
+			modifyMounter: func(fm *mount.FakeMounter, bindPathTarget string) {
+				fm.MountCheckErrors = map[string]error{
+					bindPathTarget: os.NewSyscallError("fake", syscall.ESTALE),
+				}
+				fm.UnmountFunc = func(path string) error {
+					return fmt.Errorf("unmount failed")
+				}
+			},
+			expectError:    true,
+			expectDirExist: true,
+		},
 	}
 	for _, test := range tests {
 		klog.V(4).Infof("test %q", test.name)
@@ -1008,6 +1053,9 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 		}
 
 		_, subpathMount := getTestPaths(base)
+		if test.modifyMounter != nil {
+			test.modifyMounter(fm, subpathMount)
+		}
 		bindMountExists, bindPathTarget, err := prepareSubpathTarget(fm, subpath)
 
 		if bindMountExists != test.mountExists {
@@ -1040,8 +1088,10 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 			if bindPathTarget != "" {
 				t.Errorf("test %q failed: expected empty bindPathTarget, got %v", test.name, bindPathTarget)
 			}
-			if err = validateDirNotExists(subpathMount); err != nil {
-				t.Errorf("test %q failed: %v", test.name, err)
+			if !test.expectDirExist {
+				if err = validateDirNotExists(subpathMount); err != nil {
+					t.Errorf("test %q failed: %v", test.name, err)
+				}
 			}
 		}
 		if !test.expectError {

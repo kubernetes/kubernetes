@@ -5,9 +5,11 @@
 package html
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	a "golang.org/x/net/html/atom"
@@ -136,7 +138,7 @@ func (p *parser) indexOfElementInScope(s scope, matchTags ...a.Atom) int {
 					return -1
 				}
 			default:
-				panic("unreachable")
+				panic(fmt.Sprintf("html: internal error: indexOfElementInScope unknown scope: %d", s))
 			}
 		}
 		switch s {
@@ -179,7 +181,7 @@ func (p *parser) clearStackToContext(s scope) {
 				return
 			}
 		default:
-			panic("unreachable")
+			panic(fmt.Sprintf("html: internal error: clearStackToContext unknown scope: %d", s))
 		}
 	}
 }
@@ -231,7 +233,14 @@ func (p *parser) addChild(n *Node) {
 	}
 
 	if n.Type == ElementNode {
-		p.oe = append(p.oe, n)
+		p.insertOpenElement(n)
+	}
+}
+
+func (p *parser) insertOpenElement(n *Node) {
+	p.oe = append(p.oe, n)
+	if len(p.oe) > 512 {
+		panic("html: open stack of elements exceeds 512 nodes")
 	}
 }
 
@@ -321,6 +330,14 @@ func (p *parser) addText(text string) {
 	})
 }
 
+func attrCompare(a, b Attribute) int {
+	return cmp.Or(
+		cmp.Compare(a.Namespace, b.Namespace),
+		cmp.Compare(a.Key, b.Key),
+		cmp.Compare(a.Val, b.Val),
+	)
+}
+
 // addElement adds a child element based on the current token.
 func (p *parser) addElement() {
 	p.addChild(&Node{
@@ -335,6 +352,10 @@ func (p *parser) addElement() {
 func (p *parser) addFormattingElement() {
 	tagAtom, attr := p.tok.DataAtom, p.tok.Attr
 	p.addElement()
+
+	// In order to optimize the search, we need the attributes to be sorted, so we
+	// can just use slices.Equal.
+	slices.SortFunc(attr, attrCompare)
 
 	// Implement the Noah's Ark clause, but with three per family instead of two.
 	identicalElements := 0
@@ -353,19 +374,7 @@ findIdenticalElements:
 		if n.DataAtom != tagAtom {
 			continue
 		}
-		if len(n.Attr) != len(attr) {
-			continue
-		}
-	compareAttributes:
-		for _, t0 := range n.Attr {
-			for _, t1 := range attr {
-				if t0.Key == t1.Key && t0.Namespace == t1.Namespace && t0.Val == t1.Val {
-					// Found a match for this attribute, continue with the next attribute.
-					continue compareAttributes
-				}
-			}
-			// If we get here, there is no attribute that matches a.
-			// Therefore the element is not identical to the new one.
+		if !slices.Equal(n.Attr, attr) {
 			continue findIdenticalElements
 		}
 
@@ -375,7 +384,11 @@ findIdenticalElements:
 		}
 	}
 
-	p.afe = append(p.afe, p.top())
+	// Sort the attributes to optimize future identical-element searches.
+	top := p.top()
+	slices.SortFunc(top.Attr, attrCompare)
+
+	p.afe = append(p.afe, top)
 }
 
 // Section 12.2.4.3.
@@ -810,7 +823,7 @@ func afterHeadIM(p *parser) bool {
 			p.im = inFramesetIM
 			return true
 		case a.Base, a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Script, a.Style, a.Template, a.Title:
-			p.oe = append(p.oe, p.head)
+			p.insertOpenElement(p.head)
 			defer p.oe.remove(p.head)
 			return inHeadIM(p)
 		case a.Head:
@@ -1365,8 +1378,6 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 }
 
 // inBodyEndTagOther performs the "any other end tag" algorithm for inBodyIM.
-// "Any other end tag" handling from 12.2.6.5 The rules for parsing tokens in foreign content
-// https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inforeign
 func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 	for i := len(p.oe) - 1; i >= 0; i-- {
 		// Two element nodes have the same tag if they have the same Data (a
@@ -1376,7 +1387,7 @@ func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 		// Uncommon (custom) tags get a zero DataAtom.
 		//
 		// The if condition here is equivalent to (p.oe[i].Data == tagName).
-		if (p.oe[i].DataAtom == tagAtom) &&
+		if p.oe[i].Namespace == "" && (p.oe[i].DataAtom == tagAtom) &&
 			((tagAtom != 0) || (p.oe[i].Data == tagName)) {
 			p.oe = p.oe[:i]
 			break
@@ -1678,7 +1689,7 @@ func inTableBodyIM(p *parser) bool {
 	return inTableIM(p)
 }
 
-// Section 12.2.6.4.14.
+// Section 13.2.6.4.14.
 func inRowIM(p *parser) bool {
 	switch p.tok.Type {
 	case StartTagToken:
@@ -1690,7 +1701,9 @@ func inRowIM(p *parser) bool {
 			p.im = inCellIM
 			return true
 		case a.Caption, a.Col, a.Colgroup, a.Tbody, a.Tfoot, a.Thead, a.Tr:
-			if p.popUntil(tableScope, a.Tr) {
+			if p.elementInScope(tableScope, a.Tr) {
+				p.clearStackToContext(tableRowScope)
+				p.oe.pop()
 				p.im = inTableBodyIM
 				return false
 			}
@@ -1700,22 +1713,28 @@ func inRowIM(p *parser) bool {
 	case EndTagToken:
 		switch p.tok.DataAtom {
 		case a.Tr:
-			if p.popUntil(tableScope, a.Tr) {
+			if p.elementInScope(tableScope, a.Tr) {
+				p.clearStackToContext(tableRowScope)
+				p.oe.pop()
 				p.im = inTableBodyIM
 				return true
 			}
 			// Ignore the token.
 			return true
 		case a.Table:
-			if p.popUntil(tableScope, a.Tr) {
+			if p.elementInScope(tableScope, a.Tr) {
+				p.clearStackToContext(tableRowScope)
+				p.oe.pop()
 				p.im = inTableBodyIM
 				return false
 			}
 			// Ignore the token.
 			return true
 		case a.Tbody, a.Tfoot, a.Thead:
-			if p.elementInScope(tableScope, p.tok.DataAtom) {
-				p.parseImpliedToken(EndTagToken, a.Tr, a.Tr.String())
+			if p.elementInScope(tableScope, p.tok.DataAtom) && p.elementInScope(tableScope, a.Tr) {
+				p.clearStackToContext(tableRowScope)
+				p.oe.pop()
+				p.im = inTableBodyIM
 				return false
 			}
 			// Ignore the token.
@@ -2222,16 +2241,20 @@ func parseForeignContent(p *parser) bool {
 			p.acknowledgeSelfClosingTag()
 		}
 	case EndTagToken:
+		if strings.EqualFold(p.oe[len(p.oe)-1].Data, p.tok.Data) {
+			p.oe = p.oe[:len(p.oe)-1]
+			return true
+		}
 		for i := len(p.oe) - 1; i >= 0; i-- {
-			if p.oe[i].Namespace == "" {
-				return p.im(p)
-			}
 			if strings.EqualFold(p.oe[i].Data, p.tok.Data) {
 				p.oe = p.oe[:i]
+				return true
+			}
+			if i > 0 && p.oe[i-1].Namespace == "" {
 				break
 			}
 		}
-		return true
+		return p.im(p)
 	default:
 		// Ignore the token.
 	}
@@ -2312,9 +2335,13 @@ func (p *parser) parseCurrentToken() {
 	}
 }
 
-func (p *parser) parse() error {
+func (p *parser) parse() (err error) {
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			err = fmt.Errorf("%s", panicErr)
+		}
+	}()
 	// Iterate until EOF. Any other error will cause an early return.
-	var err error
 	for err != io.EOF {
 		// CDATA sections are allowed only in foreign content.
 		n := p.oe.top()
@@ -2342,6 +2369,8 @@ func (p *parser) parse() error {
 // differ from the nesting implied by a naive processing of start and end
 // <tag>s. Conversely, explicit <tag>s in r's data can be silently dropped,
 // with no corresponding node in the resulting tree.
+//
+// Parse will reject HTML that is nested deeper than 512 elements.
 //
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader) (*Node, error) {

@@ -17,31 +17,35 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
 	"path/filepath"
 	"reflect"
 	"sync"
 
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
+	resourcebeta "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -78,7 +82,7 @@ func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *createResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	if op.CountParam != "" {
 		var err error
 		op.Count, err = w.Params.get(op.CountParam[1:])
@@ -104,7 +108,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 	var mutex sync.Mutex
 	create := func(i int) {
 		err := func() error {
-			if _, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
+			if _, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create claim: %v", err)
 			}
 			return nil
@@ -116,10 +120,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
-	workers := op.Count
-	if workers > 30 {
-		workers = 30
-	}
+	workers := min(op.Count, 30)
 	workqueue.ParallelizeUntil(tCtx, workers, op.Count, create)
 	if createErr != nil {
 		tCtx.Fatal(createErr.Error())
@@ -141,7 +142,6 @@ type createResourceDriverOp struct {
 }
 
 var _ realOp = &createResourceDriverOp{}
-var _ runnableOp = &createResourceDriverOp{}
 
 func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 	if !isValidCount(allowParameterization, op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam) {
@@ -159,7 +159,7 @@ func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 func (op *createResourceDriverOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceDriverOp) patchParams(w *Workload) (realOp, error) {
 	if op.MaxClaimsPerNodeParam != "" {
 		var err error
 		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
@@ -170,9 +170,7 @@ func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
-func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
-
-func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
+func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framework.SharedDRAManager) {
 	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
 	var driverNodes []string
@@ -191,13 +189,22 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
+	numSlices := 0
 	for _, nodeName := range driverNodes {
 		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-		_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+		_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create node resource slice")
+		numSlices++
 	}
+
+	tCtx.Eventually(func(tCtx ktesting.TContext) int {
+		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
+		tCtx.ExpectNoError(err, "list ResourceSlices")
+		return len(slices)
+	}).Should(gomega.Equal(numSlices), "informer has received all ResourceSlices")
+
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		err := tCtx.Client().ResourceV1beta1().ResourceSlices().DeleteCollection(tCtx,
+		err := tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx,
 			metav1.DeleteOptions{},
 			metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
 		)
@@ -213,7 +220,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 
 		Spec: resourceapi.ResourceSliceSpec{
 			Driver:   driverName,
-			NodeName: nodeName,
+			NodeName: &nodeName,
 			Pool: resourceapi.ResourcePool{
 				Name:               nodeName,
 				ResourceSliceCount: 1,
@@ -221,20 +228,18 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
-	for i := 0; i < capacity; i++ {
+	for i := range capacity {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
 				Name: fmt.Sprintf("instance-%d", i),
-				Basic: &resourceapi.BasicDevice{
-					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"model":                {StringValue: ptr.To("A100")},
-						"family":               {StringValue: ptr.To("GPU")},
-						"driverVersion":        {VersionValue: ptr.To("1.2.3")},
-						"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
-					},
-					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-						"memory": {Value: resource.MustParse("1Gi")},
-					},
+				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"model":                {StringValue: ptr.To("A100")},
+					"family":               {StringValue: ptr.To("GPU")},
+					"driverVersion":        {VersionValue: ptr.To("1.2.3")},
+					"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
+				},
+				Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"memory": {Value: resource.MustParse("1Gi")},
 				},
 			},
 		)
@@ -262,53 +267,76 @@ func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *allocResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *allocResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
 func (op *allocResourceClaimsOp) requiredNamespaces() []string { return nil }
 
 func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
-	claims, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
+	claims, err := tCtx.Client().ResourceV1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
-	tCtx = ktesting.WithCancel(tCtx)
+	tCtx = tCtx.WithCancel()
 	defer tCtx.Cancel("allocResourceClaimsOp.run is done")
 
 	// Track cluster state.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
-		EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-		SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
-		KubeClient:         tCtx.Client(),
+		EnableDeviceTaintRules:   utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		KubeClient:               tCtx.Client(),
 	}
-	if resourceSliceTrackerOpts.EnableDeviceTaints {
-		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
-		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
+		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	tCtx.ExpectNoError(err, "start resource slice tracker")
-	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), resourceSliceTracker, informerFactory)
+	assumeCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
+	draManager := dynamicresources.NewDRAManager(tCtx, assumeCache, resourceSliceTracker, informerFactory)
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
 		informerFactory.Shutdown()
 	}()
-	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
-	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+	syncResult := informerFactory.WaitForCacheSyncWithContext(tCtx)
+	expectSyncResult := cache.SyncResult{
+		Synced: map[reflect.Type]bool{
+			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
+			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*v1.Node]():                   true,
+		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
-		expectSyncedInformers[reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{})] = true
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		expectSyncResult.Synced[reflect.TypeFor[*resourcebeta.DeviceTaintRule]()] = true
+	}
+	if diff := cmp.Diff(expectSyncResult, syncResult,
+		cmp.Transformer("TypeOf", func(t reflect.Type) string {
+			return t.String()
+		}),
+	); diff != "" {
+		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := cel.NewCache(10)
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
+
+	// Also wait for the assume cache to catch up.
+	// Without this we cannot reliably store the result of
+	// the UpdateStatus call below.
+	// Has to be done indirectly, the assume cache itself has
+	// no HasSynced method (maybe it should).
+	handle := assumeCache.AddEventHandler(cache.ResourceEventHandlerFuncs{})
+	if !cache.WaitForCacheSync(tCtx.Done(), handle.HasSynced) {
+		tCtx.Fatalf("assume cache failed to sync: %v", context.Cause(tCtx))
+	}
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
@@ -329,32 +357,52 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
+		allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
+		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
 				continue
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
-				allocatedDevices.Insert(structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+				allocatedDevices.Insert(deviceID)
+				if result.ShareID == nil {
+					allocatedDevices.Insert(deviceID)
+					continue
+				}
+				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
+				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				claimedCapacity := result.ConsumedCapacity
+				if claimedCapacity != nil {
+					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)
+					aggregatedCapacity.Insert(allocatedCapacity)
+				}
 			}
 		}
-
+		allocatedState := structured.AllocatedState{
+			AllocatedDevices:         allocatedDevices,
+			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
+			AggregatedCapacity:       aggregatedCapacity,
+		}
 		allocator, err := structured.NewAllocator(tCtx, structured.Features{
-			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			DeviceTaints:    utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-		}, []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
+			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		}, allocatedState, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {
 			nodes[i], nodes[j] = nodes[j], nodes[i]
 		})
 		for _, node := range nodes {
-			result, err := allocator.Allocate(tCtx, node)
+			result, err := allocator.Allocate(tCtx, node, []*resourceapi.ResourceClaim{claim})
 			tCtx.ExpectNoError(err, "allocate claim")
 			if result != nil {
 				claim = claim.DeepCopy()
 				claim.Status.Allocation = &result[0]
-				claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+				claim, err := tCtx.Client().ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
 				tCtx.ExpectNoError(err, "update claim status with allocation")
 				tCtx.ExpectNoError(draManager.ResourceClaims().AssumeClaimAfterAPICall(claim), "assume claim")
 				continue claims

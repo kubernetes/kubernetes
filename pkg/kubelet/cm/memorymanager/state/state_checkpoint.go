@@ -17,19 +17,24 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"sync"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	cperrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
 var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
 	sync.RWMutex
+	logger            klog.Logger
 	cache             State
 	policyName        string
 	checkpointManager checkpointmanager.CheckpointManager
@@ -37,13 +42,15 @@ type stateCheckpoint struct {
 }
 
 // NewCheckpointState creates new State for keeping track of memory/pod assignment with checkpoint backend
-func NewCheckpointState(stateDir, checkpointName, policyName string) (State, error) {
+func NewCheckpointState(logger klog.Logger, stateDir, checkpointName, policyName string) (State, error) {
+	logger = klog.LoggerWithName(logger, "Memory Manager state checkpoint")
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
 	}
 	stateCheckpoint := &stateCheckpoint{
-		cache:             NewMemoryState(),
+		logger:            logger,
+		cache:             NewMemoryState(logger),
 		policyName:        policyName,
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
@@ -58,42 +65,139 @@ func NewCheckpointState(stateDir, checkpointName, policyName string) (State, err
 	return stateCheckpoint, nil
 }
 
+// migrateV1CheckpointToV2Checkpoint converts checkpoints from the v1 format to the v2 format
+func (sc *stateCheckpoint) migrateV1CheckpointToV2Checkpoint(src *MemoryManagerCheckpointV1, dst *MemoryManagerCheckpointV2) {
+	if src.PolicyName != "" {
+		dst.PolicyName = src.PolicyName
+	}
+	if src.MachineState != nil {
+		dst.MachineState = src.MachineState.Clone()
+	}
+	if len(src.Entries) > 0 {
+		dst.Entries = src.Entries.Clone()
+	}
+}
+
 // restores state from a checkpoint and creates it if it doesn't exist
 func (sc *stateCheckpoint) restoreState() error {
 	sc.Lock()
 	defer sc.Unlock()
+
+	var checkpoint any
 	var err error
 
-	checkpoint := NewMemoryManagerCheckpoint()
-	if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpoint); err != nil {
-		if err == errors.ErrCheckpointNotFound {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		checkpoint, err = sc.loadAndMigrateCheckpointV2()
+	} else {
+		checkpoint, err = sc.loadCheckpointV1()
+	}
+
+	if err != nil {
+		if errors.Is(err, cperrors.ErrCheckpointNotFound) {
 			return sc.storeState()
 		}
 		return err
 	}
 
-	if sc.policyName != checkpoint.PolicyName {
-		return fmt.Errorf("[memorymanager] configured policy %q differs from state checkpoint policy %q", sc.policyName, checkpoint.PolicyName)
+	switch cp := checkpoint.(type) {
+	case *MemoryManagerCheckpointV2:
+		if sc.policyName != cp.PolicyName {
+			return fmt.Errorf("[memorymanager] configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.PolicyName)
+		}
+		sc.cache.SetMachineState(cp.MachineState)
+		sc.cache.SetMemoryAssignments(cp.Entries)
+		sc.cache.SetPodMemoryAssignments(cp.PodEntries)
+	case *MemoryManagerCheckpointV1:
+		if sc.policyName != cp.PolicyName {
+			return fmt.Errorf("[memorymanager] configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.PolicyName)
+		}
+		sc.cache.SetMachineState(cp.MachineState)
+		sc.cache.SetMemoryAssignments(cp.Entries)
+	default:
+		return fmt.Errorf("unknown checkpoint type: %T", cp)
 	}
 
-	sc.cache.SetMachineState(checkpoint.MachineState)
-	sc.cache.SetMemoryAssignments(checkpoint.Entries)
-
-	klog.V(2).InfoS("State checkpoint: restored state from checkpoint")
+	sc.logger.V(2).Info("State checkpoint: restored state from checkpoint")
 
 	return nil
 }
 
+// loadAndMigrateCheckpointV2 loads the latest checkpoint and migrates it from older versions if needed.
+func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*MemoryManagerCheckpointV2, error) {
+	// Try to load as V2.
+	checkpointV2 := newMemoryManagerCheckpointV2()
+	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV2)
+	if err == nil {
+		return checkpointV2, nil
+	}
+	if errors.Is(err, cperrors.ErrCheckpointNotFound) {
+		return nil, err
+	}
+
+	// Log the V2 load error and fall back to V1.
+	if errors.Is(err, cperrors.CorruptCheckpointError{}) {
+		sc.logger.Error(err, "V2 checkpoint for memory manager is corrupt, falling back to V1")
+	} else {
+		sc.logger.Info("could not load V2 checkpoint for memory manager, falling back to V1", "err", err)
+	}
+
+	// Try to load as V1.
+	checkpointV1, err := sc.loadCheckpointV1()
+	if err != nil {
+		// This will return ErrCheckpointNotFound if it's not found, or a corruption error.
+		return nil, err
+	}
+
+	// Loaded V1, now migrate to V2.
+	sc.logger.Info("migrating memory manager checkpoint from v1 to v2")
+	sc.migrateV1CheckpointToV2Checkpoint(checkpointV1, checkpointV2)
+
+	return checkpointV2, nil
+}
+
+func (sc *stateCheckpoint) loadCheckpointV1() (*MemoryManagerCheckpointV1, error) {
+	checkpointV1 := newMemoryManagerCheckpointV1()
+	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1)
+	if err != nil {
+		return nil, err
+	}
+	return checkpointV1, nil
+}
+
 // saves state to a checkpoint, caller is responsible for locking
 func (sc *stateCheckpoint) storeState() error {
-	checkpoint := NewMemoryManagerCheckpoint()
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		return sc.storeStateV2()
+	}
+	return sc.storeStateV1()
+}
+
+func (sc *stateCheckpoint) storeStateV2() error {
+	checkpoint := newMemoryManagerCheckpoint()
+	checkpoint.PolicyName = sc.policyName
+	checkpoint.MachineState = sc.cache.GetMachineState()
+	checkpoint.Entries = sc.cache.GetMemoryAssignments()
+
+	podAssignments := sc.cache.GetPodMemoryAssignments()
+	maps.Copy(checkpoint.PodEntries, podAssignments)
+
+	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
+	if err != nil {
+		sc.logger.Error(err, "Could not save checkpoint")
+		return err
+	}
+	return nil
+}
+
+func (sc *stateCheckpoint) storeStateV1() error {
+	checkpoint := newMemoryManagerCheckpointV1()
 	checkpoint.PolicyName = sc.policyName
 	checkpoint.MachineState = sc.cache.GetMachineState()
 	checkpoint.Entries = sc.cache.GetMemoryAssignments()
 
 	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
-		klog.ErrorS(err, "Could not save checkpoint")
+		sc.logger.Error(err, "Could not save checkpoint")
 		return err
 	}
 	return nil
@@ -123,6 +227,22 @@ func (sc *stateCheckpoint) GetMemoryAssignments() ContainerMemoryAssignments {
 	return sc.cache.GetMemoryAssignments()
 }
 
+// GetPodMemoryBlocks returns memory assignments of a pod
+func (sc *stateCheckpoint) GetPodMemoryBlocks(podUID string) []Block {
+	sc.RLock()
+	defer sc.RUnlock()
+
+	return sc.cache.GetPodMemoryBlocks(podUID)
+}
+
+// GetPodMemoryAssignments returns all pod-level memory assignments
+func (sc *stateCheckpoint) GetPodMemoryAssignments() PodMemoryAssignments {
+	sc.RLock()
+	defer sc.RUnlock()
+
+	return sc.cache.GetPodMemoryAssignments()
+}
+
 // SetMachineState stores NUMANodeMap in State
 func (sc *stateCheckpoint) SetMachineState(memoryMap NUMANodeMap) {
 	sc.Lock()
@@ -131,7 +251,7 @@ func (sc *stateCheckpoint) SetMachineState(memoryMap NUMANodeMap) {
 	sc.cache.SetMachineState(memoryMap)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint")
+		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }
 
@@ -143,7 +263,7 @@ func (sc *stateCheckpoint) SetMemoryBlocks(podUID string, containerName string, 
 	sc.cache.SetMemoryBlocks(podUID, containerName, blocks)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
 	}
 }
 
@@ -155,7 +275,30 @@ func (sc *stateCheckpoint) SetMemoryAssignments(assignments ContainerMemoryAssig
 	sc.cache.SetMemoryAssignments(assignments)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint")
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+func (sc *stateCheckpoint) SetPodMemoryAssignments(assignments PodMemoryAssignments) {
+	sc.Lock()
+	defer sc.Unlock()
+
+	sc.cache.SetPodMemoryAssignments(assignments)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// SetPodMemoryBlocks stores memory assignments of a pod
+func (sc *stateCheckpoint) SetPodMemoryBlocks(podUID string, blocks []Block) {
+	sc.Lock()
+	defer sc.Unlock()
+
+	sc.cache.SetPodMemoryBlocks(podUID, blocks)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
 	}
 }
 
@@ -167,7 +310,20 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
 	sc.cache.Delete(podUID, containerName)
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+	}
+}
+
+// DeletePod deletes pod-level CPU assignments for specified pod. It does not
+// affect container-level assignments.
+func (sc *stateCheckpoint) DeletePod(podUID string) {
+	sc.Lock()
+	defer sc.Unlock()
+
+	sc.cache.DeletePod(podUID)
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
 	}
 }
 
@@ -179,6 +335,6 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.cache.ClearState()
 	err := sc.storeState()
 	if err != nil {
-		klog.ErrorS(err, "Failed to store state to checkpoint")
+		sc.logger.Error(err, "Failed to store state to checkpoint")
 	}
 }

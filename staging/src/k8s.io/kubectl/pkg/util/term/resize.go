@@ -21,12 +21,28 @@ import (
 
 	"github.com/moby/term"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/remotecommand"
 )
+
+// TerminalSize represents the width and height of a terminal.
+// It is the same as staging/src/k8s.io/client-go/tools/remotecommand.TerminalSize.
+// Copied to decouple the packages. Terminal-related package should not depend on API client and vice versa.
+type TerminalSize struct {
+	Width  uint16
+	Height uint16
+}
+
+// TerminalSizeQueue is capable of returning terminal resize events as they occur.
+// It is the same as staging/src/k8s.io/client-go/tools/remotecommand.TerminalSizeQueue.
+// Copied to decouple the packages. Terminal-related package should not depend on API client and vice versa.
+type TerminalSizeQueue interface {
+	// Next returns the new terminal size after the terminal has been resized. It returns nil when
+	// monitoring has been stopped.
+	Next() *TerminalSize
+}
 
 // GetSize returns the current size of the user's terminal. If it isn't a terminal,
 // nil is returned.
-func (t TTY) GetSize() *remotecommand.TerminalSize {
+func (t TTY) GetSize() *TerminalSize {
 	outFd, isTerminal := term.GetFdInfo(t.Out)
 	if !isTerminal {
 		return nil
@@ -35,19 +51,19 @@ func (t TTY) GetSize() *remotecommand.TerminalSize {
 }
 
 // GetSize returns the current size of the terminal associated with fd.
-func GetSize(fd uintptr) *remotecommand.TerminalSize {
+func GetSize(fd uintptr) *TerminalSize {
 	winsize, err := term.GetWinsize(fd)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("unable to get terminal size: %v", err))
 		return nil
 	}
 
-	return &remotecommand.TerminalSize{Width: winsize.Width, Height: winsize.Height}
+	return &TerminalSize{Width: winsize.Width, Height: winsize.Height}
 }
 
 // MonitorSize monitors the terminal's size. It returns a TerminalSizeQueue primed with
 // initialSizes, or nil if there's no TTY present.
-func (t *TTY) MonitorSize(initialSizes ...*remotecommand.TerminalSize) remotecommand.TerminalSizeQueue {
+func (t *TTY) MonitorSize(initialSizes ...*TerminalSize) TerminalSizeQueue {
 	outFd, isTerminal := term.GetFdInfo(t.Out)
 	if !isTerminal {
 		return nil
@@ -57,7 +73,7 @@ func (t *TTY) MonitorSize(initialSizes ...*remotecommand.TerminalSize) remotecom
 		t: *t,
 		// make it buffered so we can send the initial terminal sizes without blocking, prior to starting
 		// the streaming below
-		resizeChan:   make(chan remotecommand.TerminalSize, len(initialSizes)),
+		resizeChan:   make(chan TerminalSize, len(initialSizes)),
 		stopResizing: make(chan struct{}),
 	}
 
@@ -70,16 +86,16 @@ func (t *TTY) MonitorSize(initialSizes ...*remotecommand.TerminalSize) remotecom
 type sizeQueue struct {
 	t TTY
 	// resizeChan receives a Size each time the user's terminal is resized.
-	resizeChan   chan remotecommand.TerminalSize
+	resizeChan   chan TerminalSize
 	stopResizing chan struct{}
 }
 
-// make sure sizeQueue implements the resize.TerminalSizeQueue interface
-var _ remotecommand.TerminalSizeQueue = &sizeQueue{}
+// make sure sizeQueue implements the TerminalSizeQueue interface
+var _ TerminalSizeQueue = &sizeQueue{}
 
 // monitorSize primes resizeChan with initialSizes and then monitors for resize events. With each
 // new event, it sends the current terminal size to resizeChan.
-func (s *sizeQueue) monitorSize(outFd uintptr, initialSizes ...*remotecommand.TerminalSize) {
+func (s *sizeQueue) monitorSize(outFd uintptr, initialSizes ...*TerminalSize) {
 	// send the initial sizes
 	for i := range initialSizes {
 		if initialSizes[i] != nil {
@@ -87,7 +103,7 @@ func (s *sizeQueue) monitorSize(outFd uintptr, initialSizes ...*remotecommand.Te
 		}
 	}
 
-	resizeEvents := make(chan remotecommand.TerminalSize, 1)
+	resizeEvents := make(chan TerminalSize, 1)
 
 	monitorResizeEvents(outFd, resizeEvents, s.stopResizing)
 
@@ -118,7 +134,7 @@ func (s *sizeQueue) monitorSize(outFd uintptr, initialSizes ...*remotecommand.Te
 
 // Next returns the new terminal size after the terminal has been resized. It returns nil when
 // monitoring has been stopped.
-func (s *sizeQueue) Next() *remotecommand.TerminalSize {
+func (s *sizeQueue) Next() *TerminalSize {
 	size, ok := <-s.resizeChan
 	if !ok {
 		return nil

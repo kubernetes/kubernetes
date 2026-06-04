@@ -118,9 +118,9 @@ Use Gomega's gmeasure package instead.
 You can learn more here: https://onsi.github.io/ginkgo/#benchmarking-code
 */
 type Benchmarker interface {
-	Time(name string, body func(), info ...interface{}) (elapsedTime time.Duration)
-	RecordValue(name string, value float64, info ...interface{})
-	RecordValueWithPrecision(name string, value float64, units string, precision int, info ...interface{})
+	Time(name string, body func(), info ...any) (elapsedTime time.Duration)
+	RecordValue(name string, value float64, info ...any)
+	RecordValueWithPrecision(name string, value float64, units string, precision int, info ...any)
 }
 
 /*
@@ -129,7 +129,7 @@ Deprecated: Measure() has been removed from Ginkgo 2.0
 Use Gomega's gmeasure package instead.
 You can learn more here: https://onsi.github.io/ginkgo/#benchmarking-code
 */
-func Measure(_ ...interface{}) bool {
+func Measure(_ ...any) bool {
 	deprecationTracker.TrackDeprecation(types.Deprecations.Measure(), types.NewCodeLocation(1))
 	return true
 }

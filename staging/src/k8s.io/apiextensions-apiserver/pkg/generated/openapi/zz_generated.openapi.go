@@ -22,142 +22,148 @@ limitations under the License.
 package openapi
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/api/autoscaling/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	version "k8s.io/apimachinery/pkg/version"
 	common "k8s.io/kube-openapi/pkg/common"
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"k8s.io/api/autoscaling/v1.ContainerResourceMetricSource":                                         schema_k8sio_api_autoscaling_v1_ContainerResourceMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus":                                         schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.CrossVersionObjectReference":                                           schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref),
-		"k8s.io/api/autoscaling/v1.ExternalMetricSource":                                                  schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ExternalMetricStatus":                                                  schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscaler":                                               schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerCondition":                                      schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerList":                                           schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec":                                           schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerStatus":                                         schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref),
-		"k8s.io/api/autoscaling/v1.MetricSpec":                                                            schema_k8sio_api_autoscaling_v1_MetricSpec(ref),
-		"k8s.io/api/autoscaling/v1.MetricStatus":                                                          schema_k8sio_api_autoscaling_v1_MetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.ObjectMetricSource":                                                    schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ObjectMetricStatus":                                                    schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.PodsMetricSource":                                                      schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.PodsMetricStatus":                                                      schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.ResourceMetricSource":                                                  schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ResourceMetricStatus":                                                  schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.Scale":                                                                 schema_k8sio_api_autoscaling_v1_Scale(ref),
-		"k8s.io/api/autoscaling/v1.ScaleSpec":                                                             schema_k8sio_api_autoscaling_v1_ScaleSpec(ref),
-		"k8s.io/api/autoscaling/v1.ScaleStatus":                                                           schema_k8sio_api_autoscaling_v1_ScaleStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionRequest":                      schema_pkg_apis_apiextensions_v1_ConversionRequest(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionResponse":                     schema_pkg_apis_apiextensions_v1_ConversionResponse(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionReview":                       schema_pkg_apis_apiextensions_v1_ConversionReview(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceColumnDefinition":         schema_pkg_apis_apiextensions_v1_CustomResourceColumnDefinition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceConversion":               schema_pkg_apis_apiextensions_v1_CustomResourceConversion(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinition":               schema_pkg_apis_apiextensions_v1_CustomResourceDefinition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionCondition":      schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionCondition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionList":           schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionList(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionNames":          schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionSpec":           schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionStatus":         schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionVersion":        schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceScale":         schema_pkg_apis_apiextensions_v1_CustomResourceSubresourceScale(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceStatus":        schema_pkg_apis_apiextensions_v1_CustomResourceSubresourceStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresources":             schema_pkg_apis_apiextensions_v1_CustomResourceSubresources(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceValidation":               schema_pkg_apis_apiextensions_v1_CustomResourceValidation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ExternalDocumentation":                  schema_pkg_apis_apiextensions_v1_ExternalDocumentation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON":                                   schema_pkg_apis_apiextensions_v1_JSON(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps":                        schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrArray":                 schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool":                  schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrStringArray":           schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.SelectableField":                        schema_pkg_apis_apiextensions_v1_SelectableField(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ServiceReference":                       schema_pkg_apis_apiextensions_v1_ServiceReference(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ValidationRule":                         schema_pkg_apis_apiextensions_v1_ValidationRule(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookClientConfig":                    schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookConversion":                      schema_pkg_apis_apiextensions_v1_WebhookConversion(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionRequest":                 schema_pkg_apis_apiextensions_v1beta1_ConversionRequest(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionResponse":                schema_pkg_apis_apiextensions_v1beta1_ConversionResponse(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionReview":                  schema_pkg_apis_apiextensions_v1beta1_ConversionReview(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition":    schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceConversion":          schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinition":          schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionCondition": schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionList":      schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames":     schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionSpec":      schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionStatus":    schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionVersion":   schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceScale":    schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceStatus":   schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources":        schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation":          schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation":             schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON":                              schema_pkg_apis_apiextensions_v1beta1_JSON(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps":                   schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray":            schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool":             schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray":      schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.SelectableField":                   schema_pkg_apis_apiextensions_v1beta1_SelectableField(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ServiceReference":                  schema_pkg_apis_apiextensions_v1beta1_ServiceReference(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ValidationRule":                    schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.WebhookClientConfig":               schema_pkg_apis_apiextensions_v1beta1_WebhookClientConfig(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":                                                   schema_pkg_apis_meta_v1_APIGroup(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":                                               schema_pkg_apis_meta_v1_APIGroupList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource":                                                schema_pkg_apis_meta_v1_APIResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList":                                            schema_pkg_apis_meta_v1_APIResourceList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":                                                schema_pkg_apis_meta_v1_APIVersions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ApplyOptions":                                               schema_pkg_apis_meta_v1_ApplyOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Condition":                                                  schema_pkg_apis_meta_v1_Condition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.CreateOptions":                                              schema_pkg_apis_meta_v1_CreateOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.DeleteOptions":                                              schema_pkg_apis_meta_v1_DeleteOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Duration":                                                   schema_pkg_apis_meta_v1_Duration(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.FieldSelectorRequirement":                                   schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1":                                                   schema_pkg_apis_meta_v1_FieldsV1(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GetOptions":                                                 schema_pkg_apis_meta_v1_GetOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupKind":                                                  schema_pkg_apis_meta_v1_GroupKind(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupResource":                                              schema_pkg_apis_meta_v1_GroupResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersion":                                               schema_pkg_apis_meta_v1_GroupVersion(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery":                                   schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionKind":                                           schema_pkg_apis_meta_v1_GroupVersionKind(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionResource":                                       schema_pkg_apis_meta_v1_GroupVersionResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent":                                              schema_pkg_apis_meta_v1_InternalEvent(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector":                                              schema_pkg_apis_meta_v1_LabelSelector(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement":                                   schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.List":                                                       schema_pkg_apis_meta_v1_List(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta":                                                   schema_pkg_apis_meta_v1_ListMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ListOptions":                                                schema_pkg_apis_meta_v1_ListOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry":                                         schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime":                                                  schema_pkg_apis_meta_v1_MicroTime(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta":                                                 schema_pkg_apis_meta_v1_ObjectMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference":                                             schema_pkg_apis_meta_v1_OwnerReference(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata":                                      schema_pkg_apis_meta_v1_PartialObjectMetadata(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadataList":                                  schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Patch":                                                      schema_pkg_apis_meta_v1_Patch(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.PatchOptions":                                               schema_pkg_apis_meta_v1_PatchOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions":                                              schema_pkg_apis_meta_v1_Preconditions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.RootPaths":                                                  schema_pkg_apis_meta_v1_RootPaths(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR":                                  schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":                                                     schema_pkg_apis_meta_v1_Status(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause":                                                schema_pkg_apis_meta_v1_StatusCause(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails":                                              schema_pkg_apis_meta_v1_StatusDetails(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Table":                                                      schema_pkg_apis_meta_v1_Table(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition":                                      schema_pkg_apis_meta_v1_TableColumnDefinition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableOptions":                                               schema_pkg_apis_meta_v1_TableOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableRow":                                                   schema_pkg_apis_meta_v1_TableRow(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition":                                          schema_pkg_apis_meta_v1_TableRowCondition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Time":                                                       schema_pkg_apis_meta_v1_Time(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Timestamp":                                                  schema_pkg_apis_meta_v1_Timestamp(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta":                                                   schema_pkg_apis_meta_v1_TypeMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.UpdateOptions":                                              schema_pkg_apis_meta_v1_UpdateOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.WatchEvent":                                                 schema_pkg_apis_meta_v1_WatchEvent(ref),
-		"k8s.io/apimachinery/pkg/runtime.RawExtension":                                                    schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
-		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                        schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
-		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                         schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
-		"k8s.io/apimachinery/pkg/version.Info":                                                            schema_k8sio_apimachinery_pkg_version_Info(ref),
+		v1.ContainerResourceMetricSource{}.OpenAPIModelName():                  schema_k8sio_api_autoscaling_v1_ContainerResourceMetricSource(ref),
+		v1.ContainerResourceMetricStatus{}.OpenAPIModelName():                  schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref),
+		v1.CrossVersionObjectReference{}.OpenAPIModelName():                    schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref),
+		v1.ExternalMetricSource{}.OpenAPIModelName():                           schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref),
+		v1.ExternalMetricStatus{}.OpenAPIModelName():                           schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref),
+		v1.HorizontalPodAutoscaler{}.OpenAPIModelName():                        schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref),
+		v1.HorizontalPodAutoscalerCondition{}.OpenAPIModelName():               schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref),
+		v1.HorizontalPodAutoscalerList{}.OpenAPIModelName():                    schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref),
+		v1.HorizontalPodAutoscalerSpec{}.OpenAPIModelName():                    schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref),
+		v1.HorizontalPodAutoscalerStatus{}.OpenAPIModelName():                  schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref),
+		v1.MetricSpec{}.OpenAPIModelName():                                     schema_k8sio_api_autoscaling_v1_MetricSpec(ref),
+		v1.MetricStatus{}.OpenAPIModelName():                                   schema_k8sio_api_autoscaling_v1_MetricStatus(ref),
+		v1.ObjectMetricSource{}.OpenAPIModelName():                             schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref),
+		v1.ObjectMetricStatus{}.OpenAPIModelName():                             schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref),
+		v1.PodsMetricSource{}.OpenAPIModelName():                               schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref),
+		v1.PodsMetricStatus{}.OpenAPIModelName():                               schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref),
+		v1.ResourceMetricSource{}.OpenAPIModelName():                           schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref),
+		v1.ResourceMetricStatus{}.OpenAPIModelName():                           schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref),
+		v1.Scale{}.OpenAPIModelName():                                          schema_k8sio_api_autoscaling_v1_Scale(ref),
+		v1.ScaleSpec{}.OpenAPIModelName():                                      schema_k8sio_api_autoscaling_v1_ScaleSpec(ref),
+		v1.ScaleStatus{}.OpenAPIModelName():                                    schema_k8sio_api_autoscaling_v1_ScaleStatus(ref),
+		apiextensionsv1.ConversionRequest{}.OpenAPIModelName():                 schema_pkg_apis_apiextensions_v1_ConversionRequest(ref),
+		apiextensionsv1.ConversionResponse{}.OpenAPIModelName():                schema_pkg_apis_apiextensions_v1_ConversionResponse(ref),
+		apiextensionsv1.ConversionReview{}.OpenAPIModelName():                  schema_pkg_apis_apiextensions_v1_ConversionReview(ref),
+		apiextensionsv1.CustomResourceColumnDefinition{}.OpenAPIModelName():    schema_pkg_apis_apiextensions_v1_CustomResourceColumnDefinition(ref),
+		apiextensionsv1.CustomResourceConversion{}.OpenAPIModelName():          schema_pkg_apis_apiextensions_v1_CustomResourceConversion(ref),
+		apiextensionsv1.CustomResourceDefinition{}.OpenAPIModelName():          schema_pkg_apis_apiextensions_v1_CustomResourceDefinition(ref),
+		apiextensionsv1.CustomResourceDefinitionCondition{}.OpenAPIModelName(): schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionCondition(ref),
+		apiextensionsv1.CustomResourceDefinitionList{}.OpenAPIModelName():      schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionList(ref),
+		apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName():     schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref),
+		apiextensionsv1.CustomResourceDefinitionSpec{}.OpenAPIModelName():      schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref),
+		apiextensionsv1.CustomResourceDefinitionStatus{}.OpenAPIModelName():    schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref),
+		apiextensionsv1.CustomResourceDefinitionVersion{}.OpenAPIModelName():   schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref),
+		apiextensionsv1.CustomResourceSubresourceScale{}.OpenAPIModelName():    schema_pkg_apis_apiextensions_v1_CustomResourceSubresourceScale(ref),
+		apiextensionsv1.CustomResourceSubresourceStatus{}.OpenAPIModelName():   schema_pkg_apis_apiextensions_v1_CustomResourceSubresourceStatus(ref),
+		apiextensionsv1.CustomResourceSubresources{}.OpenAPIModelName():        schema_pkg_apis_apiextensions_v1_CustomResourceSubresources(ref),
+		apiextensionsv1.CustomResourceValidation{}.OpenAPIModelName():          schema_pkg_apis_apiextensions_v1_CustomResourceValidation(ref),
+		apiextensionsv1.ExternalDocumentation{}.OpenAPIModelName():             schema_pkg_apis_apiextensions_v1_ExternalDocumentation(ref),
+		apiextensionsv1.JSON{}.OpenAPIModelName():                              schema_pkg_apis_apiextensions_v1_JSON(ref),
+		apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName():                   schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref),
+		apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPIModelName():            schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref),
+		apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPIModelName():             schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref),
+		apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPIModelName():      schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref),
+		apiextensionsv1.SelectableField{}.OpenAPIModelName():                   schema_pkg_apis_apiextensions_v1_SelectableField(ref),
+		apiextensionsv1.ServiceReference{}.OpenAPIModelName():                  schema_pkg_apis_apiextensions_v1_ServiceReference(ref),
+		apiextensionsv1.ValidationRule{}.OpenAPIModelName():                    schema_pkg_apis_apiextensions_v1_ValidationRule(ref),
+		apiextensionsv1.WebhookClientConfig{}.OpenAPIModelName():               schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref),
+		apiextensionsv1.WebhookConversion{}.OpenAPIModelName():                 schema_pkg_apis_apiextensions_v1_WebhookConversion(ref),
+		v1beta1.ConversionRequest{}.OpenAPIModelName():                         schema_pkg_apis_apiextensions_v1beta1_ConversionRequest(ref),
+		v1beta1.ConversionResponse{}.OpenAPIModelName():                        schema_pkg_apis_apiextensions_v1beta1_ConversionResponse(ref),
+		v1beta1.ConversionReview{}.OpenAPIModelName():                          schema_pkg_apis_apiextensions_v1beta1_ConversionReview(ref),
+		v1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName():            schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref),
+		v1beta1.CustomResourceConversion{}.OpenAPIModelName():                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref),
+		v1beta1.CustomResourceDefinition{}.OpenAPIModelName():                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref),
+		v1beta1.CustomResourceDefinitionCondition{}.OpenAPIModelName():         schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref),
+		v1beta1.CustomResourceDefinitionList{}.OpenAPIModelName():              schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref),
+		v1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName():             schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref),
+		v1beta1.CustomResourceDefinitionSpec{}.OpenAPIModelName():              schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref),
+		v1beta1.CustomResourceDefinitionStatus{}.OpenAPIModelName():            schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref),
+		v1beta1.CustomResourceDefinitionVersion{}.OpenAPIModelName():           schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref),
+		v1beta1.CustomResourceSubresourceScale{}.OpenAPIModelName():            schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref),
+		v1beta1.CustomResourceSubresourceStatus{}.OpenAPIModelName():           schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref),
+		v1beta1.CustomResourceSubresources{}.OpenAPIModelName():                schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref),
+		v1beta1.CustomResourceValidation{}.OpenAPIModelName():                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref),
+		v1beta1.ExternalDocumentation{}.OpenAPIModelName():                     schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref),
+		v1beta1.JSON{}.OpenAPIModelName():                                      schema_pkg_apis_apiextensions_v1beta1_JSON(ref),
+		v1beta1.JSONSchemaProps{}.OpenAPIModelName():                           schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref),
+		v1beta1.JSONSchemaPropsOrArray{}.OpenAPIModelName():                    schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref),
+		v1beta1.JSONSchemaPropsOrBool{}.OpenAPIModelName():                     schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref),
+		v1beta1.JSONSchemaPropsOrStringArray{}.OpenAPIModelName():              schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref),
+		v1beta1.SelectableField{}.OpenAPIModelName():                           schema_pkg_apis_apiextensions_v1beta1_SelectableField(ref),
+		v1beta1.ServiceReference{}.OpenAPIModelName():                          schema_pkg_apis_apiextensions_v1beta1_ServiceReference(ref),
+		v1beta1.ValidationRule{}.OpenAPIModelName():                            schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref),
+		v1beta1.WebhookClientConfig{}.OpenAPIModelName():                       schema_pkg_apis_apiextensions_v1beta1_WebhookClientConfig(ref),
+		resource.Quantity{}.OpenAPIModelName():                                 schema_apimachinery_pkg_api_resource_Quantity(ref),
+		metav1.APIGroup{}.OpenAPIModelName():                                   schema_pkg_apis_meta_v1_APIGroup(ref),
+		metav1.APIGroupList{}.OpenAPIModelName():                               schema_pkg_apis_meta_v1_APIGroupList(ref),
+		metav1.APIResource{}.OpenAPIModelName():                                schema_pkg_apis_meta_v1_APIResource(ref),
+		metav1.APIResourceList{}.OpenAPIModelName():                            schema_pkg_apis_meta_v1_APIResourceList(ref),
+		metav1.APIVersions{}.OpenAPIModelName():                                schema_pkg_apis_meta_v1_APIVersions(ref),
+		metav1.ApplyOptions{}.OpenAPIModelName():                               schema_pkg_apis_meta_v1_ApplyOptions(ref),
+		metav1.Condition{}.OpenAPIModelName():                                  schema_pkg_apis_meta_v1_Condition(ref),
+		metav1.CreateOptions{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_CreateOptions(ref),
+		metav1.DeleteOptions{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_DeleteOptions(ref),
+		metav1.Duration{}.OpenAPIModelName():                                   schema_pkg_apis_meta_v1_Duration(ref),
+		metav1.FieldSelectorRequirement{}.OpenAPIModelName():                   schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref),
+		metav1.FieldsV1{}.OpenAPIModelName():                                   schema_pkg_apis_meta_v1_FieldsV1(ref),
+		metav1.GetOptions{}.OpenAPIModelName():                                 schema_pkg_apis_meta_v1_GetOptions(ref),
+		metav1.GroupKind{}.OpenAPIModelName():                                  schema_pkg_apis_meta_v1_GroupKind(ref),
+		metav1.GroupResource{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_GroupResource(ref),
+		metav1.GroupVersion{}.OpenAPIModelName():                               schema_pkg_apis_meta_v1_GroupVersion(ref),
+		metav1.GroupVersionForDiscovery{}.OpenAPIModelName():                   schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref),
+		metav1.GroupVersionKind{}.OpenAPIModelName():                           schema_pkg_apis_meta_v1_GroupVersionKind(ref),
+		metav1.GroupVersionResource{}.OpenAPIModelName():                       schema_pkg_apis_meta_v1_GroupVersionResource(ref),
+		metav1.InternalEvent{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_InternalEvent(ref),
+		metav1.LabelSelector{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_LabelSelector(ref),
+		metav1.LabelSelectorRequirement{}.OpenAPIModelName():                   schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref),
+		metav1.List{}.OpenAPIModelName():                                       schema_pkg_apis_meta_v1_List(ref),
+		metav1.ListMeta{}.OpenAPIModelName():                                   schema_pkg_apis_meta_v1_ListMeta(ref),
+		metav1.ListOptions{}.OpenAPIModelName():                                schema_pkg_apis_meta_v1_ListOptions(ref),
+		metav1.ManagedFieldsEntry{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref),
+		metav1.MicroTime{}.OpenAPIModelName():                                  schema_pkg_apis_meta_v1_MicroTime(ref),
+		metav1.ObjectMeta{}.OpenAPIModelName():                                 schema_pkg_apis_meta_v1_ObjectMeta(ref),
+		metav1.OwnerReference{}.OpenAPIModelName():                             schema_pkg_apis_meta_v1_OwnerReference(ref),
+		metav1.PartialObjectMetadata{}.OpenAPIModelName():                      schema_pkg_apis_meta_v1_PartialObjectMetadata(ref),
+		metav1.PartialObjectMetadataList{}.OpenAPIModelName():                  schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref),
+		metav1.Patch{}.OpenAPIModelName():                                      schema_pkg_apis_meta_v1_Patch(ref),
+		metav1.PatchOptions{}.OpenAPIModelName():                               schema_pkg_apis_meta_v1_PatchOptions(ref),
+		metav1.Preconditions{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_Preconditions(ref),
+		metav1.RootPaths{}.OpenAPIModelName():                                  schema_pkg_apis_meta_v1_RootPaths(ref),
+		metav1.ServerAddressByClientCIDR{}.OpenAPIModelName():                  schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
+		metav1.ShardInfo{}.OpenAPIModelName():                                  schema_pkg_apis_meta_v1_ShardInfo(ref),
+		metav1.Status{}.OpenAPIModelName():                                     schema_pkg_apis_meta_v1_Status(ref),
+		metav1.StatusCause{}.OpenAPIModelName():                                schema_pkg_apis_meta_v1_StatusCause(ref),
+		metav1.StatusDetails{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_StatusDetails(ref),
+		metav1.Table{}.OpenAPIModelName():                                      schema_pkg_apis_meta_v1_Table(ref),
+		metav1.TableColumnDefinition{}.OpenAPIModelName():                      schema_pkg_apis_meta_v1_TableColumnDefinition(ref),
+		metav1.TableOptions{}.OpenAPIModelName():                               schema_pkg_apis_meta_v1_TableOptions(ref),
+		metav1.TableRow{}.OpenAPIModelName():                                   schema_pkg_apis_meta_v1_TableRow(ref),
+		metav1.TableRowCondition{}.OpenAPIModelName():                          schema_pkg_apis_meta_v1_TableRowCondition(ref),
+		metav1.Time{}.OpenAPIModelName():                                       schema_pkg_apis_meta_v1_Time(ref),
+		metav1.Timestamp{}.OpenAPIModelName():                                  schema_pkg_apis_meta_v1_Timestamp(ref),
+		metav1.TypeMeta{}.OpenAPIModelName():                                   schema_pkg_apis_meta_v1_TypeMeta(ref),
+		metav1.UpdateOptions{}.OpenAPIModelName():                              schema_pkg_apis_meta_v1_UpdateOptions(ref),
+		metav1.WatchEvent{}.OpenAPIModelName():                                 schema_pkg_apis_meta_v1_WatchEvent(ref),
+		runtime.RawExtension{}.OpenAPIModelName():                              schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
+		runtime.TypeMeta{}.OpenAPIModelName():                                  schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
+		runtime.Unknown{}.OpenAPIModelName():                                   schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
+		version.Info{}.OpenAPIModelName():                                      schema_k8sio_apimachinery_pkg_version_Info(ref),
 	}
 }
 
@@ -186,7 +192,7 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricSource(ref common.Re
 					"targetAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "targetAverageValue is the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"container": {
@@ -202,7 +208,7 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricSource(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -231,7 +237,7 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref common.Re
 					"currentAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "currentAverageValue is the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"container": {
@@ -247,7 +253,7 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -311,19 +317,19 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref common.ReferenceCa
 					"metricSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metricSelector is used to identify a specific time series within a given metric.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
 					"targetValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "targetValue is the target value of the metric (as a quantity). Mutually exclusive with TargetAverageValue.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"targetAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "targetAverageValue is the target per-pod value of global metric (as a quantity). Mutually exclusive with TargetValue.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -331,7 +337,7 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -353,19 +359,19 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 					"metricSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metricSelector is used to identify a specific time series within a given metric.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
 					"currentValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "currentValue is the current value of the metric (as a quantity)",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"currentAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "currentAverageValue is the current value of metric averaged over autoscaled pods.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -373,7 +379,7 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -400,30 +406,31 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec"),
+							Ref:         ref(v1.HorizontalPodAutoscalerSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the current information about the autoscaler.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerStatus"),
+							Ref:         ref(v1.HorizontalPodAutoscalerStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec", "k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.HorizontalPodAutoscalerSpec{}.OpenAPIModelName(), v1.HorizontalPodAutoscalerStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -453,7 +460,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lastTransitionTime is the last time the condition transitioned from one status to another",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
@@ -470,12 +477,19 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 							Format:      "",
 						},
 					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -504,7 +518,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.Refe
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -514,8 +528,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/autoscaling/v1.HorizontalPodAutoscaler"),
+										Ref: ref(v1.HorizontalPodAutoscaler{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -526,7 +539,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.HorizontalPodAutoscaler", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.HorizontalPodAutoscaler{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -539,9 +552,9 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"scaleTargetRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
+							Description: "scaleTargetRef is the reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.CrossVersionObjectReference"),
+							Ref:         ref(v1.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
 					"minReplicas": {
@@ -571,7 +584,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.CrossVersionObjectReference"},
+			v1.CrossVersionObjectReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -592,7 +605,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 					"lastScaleTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"currentReplicas": {
@@ -623,7 +636,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -646,31 +659,31 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 					"object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ObjectMetricSource"),
+							Ref:         ref(v1.ObjectMetricSource{}.OpenAPIModelName()),
 						},
 					},
 					"pods": {
 						SchemaProps: spec.SchemaProps{
 							Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
-							Ref:         ref("k8s.io/api/autoscaling/v1.PodsMetricSource"),
+							Ref:         ref(v1.PodsMetricSource{}.OpenAPIModelName()),
 						},
 					},
 					"resource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ResourceMetricSource"),
+							Ref:         ref(v1.ResourceMetricSource{}.OpenAPIModelName()),
 						},
 					},
 					"containerResource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ContainerResourceMetricSource"),
+							Ref:         ref(v1.ContainerResourceMetricSource{}.OpenAPIModelName()),
 						},
 					},
 					"external": {
 						SchemaProps: spec.SchemaProps{
 							Description: "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ExternalMetricSource"),
+							Ref:         ref(v1.ExternalMetricSource{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -678,7 +691,7 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.ContainerResourceMetricSource", "k8s.io/api/autoscaling/v1.ExternalMetricSource", "k8s.io/api/autoscaling/v1.ObjectMetricSource", "k8s.io/api/autoscaling/v1.PodsMetricSource", "k8s.io/api/autoscaling/v1.ResourceMetricSource"},
+			v1.ContainerResourceMetricSource{}.OpenAPIModelName(), v1.ExternalMetricSource{}.OpenAPIModelName(), v1.ObjectMetricSource{}.OpenAPIModelName(), v1.PodsMetricSource{}.OpenAPIModelName(), v1.ResourceMetricSource{}.OpenAPIModelName()},
 	}
 }
 
@@ -701,31 +714,31 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 					"object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ObjectMetricStatus"),
+							Ref:         ref(v1.ObjectMetricStatus{}.OpenAPIModelName()),
 						},
 					},
 					"pods": {
 						SchemaProps: spec.SchemaProps{
 							Description: "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
-							Ref:         ref("k8s.io/api/autoscaling/v1.PodsMetricStatus"),
+							Ref:         ref(v1.PodsMetricStatus{}.OpenAPIModelName()),
 						},
 					},
 					"resource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ResourceMetricStatus"),
+							Ref:         ref(v1.ResourceMetricStatus{}.OpenAPIModelName()),
 						},
 					},
 					"containerResource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus"),
+							Ref:         ref(v1.ContainerResourceMetricStatus{}.OpenAPIModelName()),
 						},
 					},
 					"external": {
 						SchemaProps: spec.SchemaProps{
 							Description: "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
-							Ref:         ref("k8s.io/api/autoscaling/v1.ExternalMetricStatus"),
+							Ref:         ref(v1.ExternalMetricStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -733,7 +746,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus", "k8s.io/api/autoscaling/v1.ExternalMetricStatus", "k8s.io/api/autoscaling/v1.ObjectMetricStatus", "k8s.io/api/autoscaling/v1.PodsMetricStatus", "k8s.io/api/autoscaling/v1.ResourceMetricStatus"},
+			v1.ContainerResourceMetricStatus{}.OpenAPIModelName(), v1.ExternalMetricStatus{}.OpenAPIModelName(), v1.ObjectMetricStatus{}.OpenAPIModelName(), v1.PodsMetricStatus{}.OpenAPIModelName(), v1.ResourceMetricStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -748,7 +761,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 						SchemaProps: spec.SchemaProps{
 							Description: "target is the described Kubernetes object.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.CrossVersionObjectReference"),
+							Ref:         ref(v1.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
 					"metricName": {
@@ -762,19 +775,19 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 					"targetValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "targetValue is the target value of the metric (as a quantity).",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "selector is the string-encoded form of a standard kubernetes label selector for the given metric. When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
 					"averageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -782,7 +795,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.CrossVersionObjectReference", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			v1.CrossVersionObjectReference{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -797,7 +810,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 						SchemaProps: spec.SchemaProps{
 							Description: "target is the described Kubernetes object.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.CrossVersionObjectReference"),
+							Ref:         ref(v1.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
 					"metricName": {
@@ -811,19 +824,19 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 					"currentValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "currentValue is the current value of the metric (as a quantity).",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the ObjectMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
 					"averageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -831,7 +844,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.CrossVersionObjectReference", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			v1.CrossVersionObjectReference{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -853,13 +866,13 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref common.ReferenceCallba
 					"targetAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -867,7 +880,7 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -889,13 +902,13 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallba
 					"currentAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the PodsMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -903,7 +916,7 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			resource.Quantity{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -932,7 +945,7 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref common.ReferenceCa
 					"targetAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "targetAverageValue is the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -940,7 +953,7 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -969,7 +982,7 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCa
 					"currentAverageValue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "currentAverageValue is the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -977,7 +990,7 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -1004,30 +1017,30 @@ func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+							Description: "metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.ScaleSpec"),
+							Ref:         ref(v1.ScaleSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/autoscaling/v1.ScaleStatus"),
+							Ref:         ref(v1.ScaleStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.ScaleSpec", "k8s.io/api/autoscaling/v1.ScaleStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.ScaleSpec{}.OpenAPIModelName(), v1.ScaleStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1041,6 +1054,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback) com
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "replicas is the desired number of instances for the scaled object.",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1115,7 +1129,7 @@ func schema_pkg_apis_apiextensions_v1_ConversionRequest(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+										Ref: ref(runtime.RawExtension{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1126,7 +1140,7 @@ func schema_pkg_apis_apiextensions_v1_ConversionRequest(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -1157,7 +1171,7 @@ func schema_pkg_apis_apiextensions_v1_ConversionResponse(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+										Ref: ref(runtime.RawExtension{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1167,7 +1181,7 @@ func schema_pkg_apis_apiextensions_v1_ConversionResponse(ref common.ReferenceCal
 						SchemaProps: spec.SchemaProps{
 							Description: "result contains the result of conversion with extra details if the conversion failed. `result.status` determines if the conversion failed or succeeded. The `result.status` field is required and represents the success or failure of the conversion. A successful conversion must set `result.status` to `Success`. A failed conversion must set `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message` will be used to construct an error message for the end user.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Status"),
+							Ref:         ref(metav1.Status{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -1175,7 +1189,7 @@ func schema_pkg_apis_apiextensions_v1_ConversionResponse(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Status", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			metav1.Status{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -1203,20 +1217,20 @@ func schema_pkg_apis_apiextensions_v1_ConversionReview(ref common.ReferenceCallb
 					"request": {
 						SchemaProps: spec.SchemaProps{
 							Description: "request describes the attributes for the conversion request.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionRequest"),
+							Ref:         ref(apiextensionsv1.ConversionRequest{}.OpenAPIModelName()),
 						},
 					},
 					"response": {
 						SchemaProps: spec.SchemaProps{
 							Description: "response describes the attributes for the conversion response.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionResponse"),
+							Ref:         ref(apiextensionsv1.ConversionResponse{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionRequest", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ConversionResponse"},
+			apiextensionsv1.ConversionRequest{}.OpenAPIModelName(), apiextensionsv1.ConversionResponse{}.OpenAPIModelName()},
 	}
 }
 
@@ -1297,7 +1311,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceConversion(ref common.Refere
 					"webhook": {
 						SchemaProps: spec.SchemaProps{
 							Description: "webhook describes how to call the conversion webhook. Required when `strategy` is set to `\"Webhook\"`.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookConversion"),
+							Ref:         ref(apiextensionsv1.WebhookConversion{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -1305,7 +1319,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceConversion(ref common.Refere
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookConversion"},
+			apiextensionsv1.WebhookConversion{}.OpenAPIModelName()},
 	}
 }
 
@@ -1334,21 +1348,21 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinition(ref common.Refere
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec describes how the user wants the resources to appear",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionSpec"),
+							Ref:         ref(apiextensionsv1.CustomResourceDefinitionSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status indicates the actual state of the CustomResourceDefinition",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionStatus"),
+							Ref:         ref(apiextensionsv1.CustomResourceDefinitionStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -1356,7 +1370,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinition(ref common.Refere
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionSpec", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			apiextensionsv1.CustomResourceDefinitionSpec{}.OpenAPIModelName(), apiextensionsv1.CustomResourceDefinitionStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1386,7 +1400,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionCondition(ref comm
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lastTransitionTime last time the condition transitioned from one status to another.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
@@ -1403,12 +1417,19 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionCondition(ref comm
 							Format:      "",
 						},
 					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -1437,7 +1458,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionList(ref common.Re
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -1447,8 +1468,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionList(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinition"),
+										Ref: ref(apiextensionsv1.CustomResourceDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1459,7 +1479,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionList(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			apiextensionsv1.CustomResourceDefinition{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1497,9 +1517,8 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1532,9 +1551,8 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1566,7 +1584,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 						SchemaProps: spec.SchemaProps{
 							Description: "names specify the resource and kind names for the custom resource.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionNames"),
+							Ref:         ref(apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
 					"scope": {
@@ -1589,8 +1607,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionVersion"),
+										Ref: ref(apiextensionsv1.CustomResourceDefinitionVersion{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1599,7 +1616,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 					"conversion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "conversion defines conversion settings for the CRD.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceConversion"),
+							Ref:         ref(apiextensionsv1.CustomResourceConversion{}.OpenAPIModelName()),
 						},
 					},
 					"preserveUnknownFields": {
@@ -1614,7 +1631,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceConversion", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionNames", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionVersion"},
+			apiextensionsv1.CustomResourceConversion{}.OpenAPIModelName(), apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName(), apiextensionsv1.CustomResourceDefinitionVersion{}.OpenAPIModelName()},
 	}
 }
 
@@ -1640,8 +1657,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionCondition"),
+										Ref: ref(apiextensionsv1.CustomResourceDefinitionCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1651,7 +1667,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 						SchemaProps: spec.SchemaProps{
 							Description: "acceptedNames are the names that are actually being used to serve discovery. They may be different than the names in spec.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionNames"),
+							Ref:         ref(apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
 					"storedVersions": {
@@ -1666,19 +1682,25 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
+						},
+					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation observed by the CRD controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionCondition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceDefinitionNames"},
+			apiextensionsv1.CustomResourceDefinitionCondition{}.OpenAPIModelName(), apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName()},
 	}
 }
 
@@ -1730,13 +1752,13 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 					"schema": {
 						SchemaProps: spec.SchemaProps{
 							Description: "schema describes the schema used for validation, pruning, and defaulting of this version of the custom resource.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceValidation"),
+							Ref:         ref(apiextensionsv1.CustomResourceValidation{}.OpenAPIModelName()),
 						},
 					},
 					"subresources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "subresources specify what subresources this version of the defined custom resource have.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresources"),
+							Ref:         ref(apiextensionsv1.CustomResourceSubresources{}.OpenAPIModelName()),
 						},
 					},
 					"additionalPrinterColumns": {
@@ -1751,8 +1773,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceColumnDefinition"),
+										Ref: ref(apiextensionsv1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1770,8 +1791,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.SelectableField"),
+										Ref: ref(apiextensionsv1.SelectableField{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1782,7 +1802,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceColumnDefinition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresources", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceValidation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.SelectableField"},
+			apiextensionsv1.CustomResourceColumnDefinition{}.OpenAPIModelName(), apiextensionsv1.CustomResourceSubresources{}.OpenAPIModelName(), apiextensionsv1.CustomResourceValidation{}.OpenAPIModelName(), apiextensionsv1.SelectableField{}.OpenAPIModelName()},
 	}
 }
 
@@ -1844,20 +1864,20 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceSubresources(ref common.Refe
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status indicates the custom resource should serve a `/status` subresource. When enabled: 1. requests to the custom resource primary endpoint ignore changes to the `status` stanza of the object. 2. requests to the custom resource `/status` subresource ignore changes to anything other than the `status` stanza of the object.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceStatus"),
+							Ref:         ref(apiextensionsv1.CustomResourceSubresourceStatus{}.OpenAPIModelName()),
 						},
 					},
 					"scale": {
 						SchemaProps: spec.SchemaProps{
 							Description: "scale indicates the custom resource should serve a `/scale` subresource that returns an `autoscaling/v1` Scale object.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceScale"),
+							Ref:         ref(apiextensionsv1.CustomResourceSubresourceScale{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceScale", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.CustomResourceSubresourceStatus"},
+			apiextensionsv1.CustomResourceSubresourceScale{}.OpenAPIModelName(), apiextensionsv1.CustomResourceSubresourceStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -1871,14 +1891,14 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceValidation(ref common.Refere
 					"openAPIV3Schema": {
 						SchemaProps: spec.SchemaProps{
 							Description: "openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+							Ref:         ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"},
+			apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()},
 	}
 }
 
@@ -1912,8 +1932,8 @@ func schema_pkg_apis_apiextensions_v1_JSON(ref common.ReferenceCallback) common.
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
-				Type:        v1.JSON{}.OpenAPISchemaType(),
-				Format:      v1.JSON{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSON{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSON{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -1972,7 +1992,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 					"default": {
 						SchemaProps: spec.SchemaProps{
 							Description: "default is a default value for undefined object fields. Defaulting is a beta feature under the CustomResourceDefaulting feature gate. Defaulting requires spec.preserveUnknownFields to be false.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
+							Ref:         ref(apiextensionsv1.JSON{}.OpenAPIModelName()),
 						},
 					},
 					"maximum": {
@@ -2052,7 +2072,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
+										Ref: ref(apiextensionsv1.JSON{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2081,9 +2101,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2091,7 +2110,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrArray"),
+							Ref: ref(apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPIModelName()),
 						},
 					},
 					"allOf": {
@@ -2105,8 +2124,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2123,8 +2141,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2141,8 +2158,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2150,7 +2166,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 					},
 					"not": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+							Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 						},
 					},
 					"properties": {
@@ -2160,8 +2176,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2169,7 +2184,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 					},
 					"additionalProperties": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool"),
+							Ref: ref(apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPIModelName()),
 						},
 					},
 					"patternProperties": {
@@ -2179,8 +2194,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2193,7 +2207,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrStringArray"),
+										Ref: ref(apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2201,7 +2215,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 					},
 					"additionalItems": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool"),
+							Ref: ref(apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPIModelName()),
 						},
 					},
 					"definitions": {
@@ -2211,8 +2225,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps"),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2220,12 +2233,12 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 					},
 					"externalDocs": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ExternalDocumentation"),
+							Ref: ref(apiextensionsv1.ExternalDocumentation{}.OpenAPIModelName()),
 						},
 					},
 					"example": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
+							Ref: ref(apiextensionsv1.JSON{}.OpenAPIModelName()),
 						},
 					},
 					"nullable": {
@@ -2267,9 +2280,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2306,8 +2318,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ValidationRule"),
+										Ref: ref(apiextensionsv1.ValidationRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2317,7 +2328,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ExternalDocumentation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaProps", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrBool", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSONSchemaPropsOrStringArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ValidationRule"},
+			apiextensionsv1.ExternalDocumentation{}.OpenAPIModelName(), apiextensionsv1.JSON{}.OpenAPIModelName(), apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName(), apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPIModelName(), apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPIModelName(), apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPIModelName(), apiextensionsv1.ValidationRule{}.OpenAPIModelName()},
 	}
 }
 
@@ -2326,8 +2337,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref common.Referenc
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps or an array of JSONSchemaProps. Mainly here for serialization purposes.",
-				Type:        v1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -2338,8 +2349,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref common.Reference
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.",
-				Type:        v1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -2350,8 +2361,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref common.Re
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
-				Type:        v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -2498,7 +2509,7 @@ func schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref common.ReferenceCa
 					"service": {
 						SchemaProps: spec.SchemaProps{
 							Description: "service is a reference to the service for this webhook. Either service or url must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ServiceReference"),
+							Ref:         ref(apiextensionsv1.ServiceReference{}.OpenAPIModelName()),
 						},
 					},
 					"caBundle": {
@@ -2512,7 +2523,7 @@ func schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.ServiceReference"},
+			apiextensionsv1.ServiceReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -2526,7 +2537,7 @@ func schema_pkg_apis_apiextensions_v1_WebhookConversion(ref common.ReferenceCall
 					"clientConfig": {
 						SchemaProps: spec.SchemaProps{
 							Description: "clientConfig is the instructions for how to call the webhook if strategy is `Webhook`.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookClientConfig"),
+							Ref:         ref(apiextensionsv1.WebhookClientConfig{}.OpenAPIModelName()),
 						},
 					},
 					"conversionReviewVersions": {
@@ -2541,9 +2552,8 @@ func schema_pkg_apis_apiextensions_v1_WebhookConversion(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2554,7 +2564,7 @@ func schema_pkg_apis_apiextensions_v1_WebhookConversion(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.WebhookClientConfig"},
+			apiextensionsv1.WebhookClientConfig{}.OpenAPIModelName()},
 	}
 }
 
@@ -2593,7 +2603,7 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionRequest(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+										Ref: ref(runtime.RawExtension{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2604,7 +2614,7 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionRequest(ref common.Referenc
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -2635,7 +2645,7 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionResponse(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+										Ref: ref(runtime.RawExtension{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2645,7 +2655,7 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionResponse(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "result contains the result of conversion with extra details if the conversion failed. `result.status` determines if the conversion failed or succeeded. The `result.status` field is required and represents the success or failure of the conversion. A successful conversion must set `result.status` to `Success`. A failed conversion must set `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message` will be used to construct an error message for the end user.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Status"),
+							Ref:         ref(metav1.Status{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -2653,7 +2663,7 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionResponse(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Status", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			metav1.Status{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -2681,20 +2691,20 @@ func schema_pkg_apis_apiextensions_v1beta1_ConversionReview(ref common.Reference
 					"request": {
 						SchemaProps: spec.SchemaProps{
 							Description: "request describes the attributes for the conversion request.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionRequest"),
+							Ref:         ref(v1beta1.ConversionRequest{}.OpenAPIModelName()),
 						},
 					},
 					"response": {
 						SchemaProps: spec.SchemaProps{
 							Description: "response describes the attributes for the conversion response.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionResponse"),
+							Ref:         ref(v1beta1.ConversionResponse{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionRequest", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ConversionResponse"},
+			v1beta1.ConversionRequest{}.OpenAPIModelName(), v1beta1.ConversionResponse{}.OpenAPIModelName()},
 	}
 }
 
@@ -2775,7 +2785,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref common.R
 					"webhookClientConfig": {
 						SchemaProps: spec.SchemaProps{
 							Description: "webhookClientConfig is the instructions for how to call the webhook if strategy is `Webhook`. Required when `strategy` is set to `Webhook`.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.WebhookClientConfig"),
+							Ref:         ref(v1beta1.WebhookClientConfig{}.OpenAPIModelName()),
 						},
 					},
 					"conversionReviewVersions": {
@@ -2790,9 +2800,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2803,7 +2812,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref common.R
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.WebhookClientConfig"},
+			v1beta1.WebhookClientConfig{}.OpenAPIModelName()},
 	}
 }
 
@@ -2832,21 +2841,21 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref common.R
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec describes how the user wants the resources to appear",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionSpec"),
+							Ref:         ref(v1beta1.CustomResourceDefinitionSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status indicates the actual state of the CustomResourceDefinition",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionStatus"),
+							Ref:         ref(v1beta1.CustomResourceDefinitionStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -2854,7 +2863,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref common.R
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionSpec", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1beta1.CustomResourceDefinitionSpec{}.OpenAPIModelName(), v1beta1.CustomResourceDefinitionStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -2884,7 +2893,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lastTransitionTime last time the condition transitioned from one status to another.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
@@ -2901,12 +2910,19 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref
 							Format:      "",
 						},
 					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -2935,7 +2951,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref comm
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -2945,8 +2961,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinition"),
+										Ref: ref(v1beta1.CustomResourceDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2957,7 +2972,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref comm
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1beta1.CustomResourceDefinition{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -2995,9 +3010,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -3030,9 +3044,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -3071,7 +3084,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 						SchemaProps: spec.SchemaProps{
 							Description: "names specify the resource and kind names for the custom resource.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames"),
+							Ref:         ref(v1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
 					"scope": {
@@ -3085,13 +3098,13 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 					"validation": {
 						SchemaProps: spec.SchemaProps{
 							Description: "validation describes the schema used for validation and pruning of the custom resource. If present, this validation schema is used to validate all versions. Top-level and per-version schemas are mutually exclusive.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation"),
+							Ref:         ref(v1beta1.CustomResourceValidation{}.OpenAPIModelName()),
 						},
 					},
 					"subresources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "subresources specify what subresources the defined custom resource has. If present, this field configures subresources for all versions. Top-level and per-version subresources are mutually exclusive.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources"),
+							Ref:         ref(v1beta1.CustomResourceSubresources{}.OpenAPIModelName()),
 						},
 					},
 					"versions": {
@@ -3106,8 +3119,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionVersion"),
+										Ref: ref(v1beta1.CustomResourceDefinitionVersion{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3125,8 +3137,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition"),
+										Ref: ref(v1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3144,8 +3155,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.SelectableField"),
+										Ref: ref(v1beta1.SelectableField{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3154,7 +3164,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 					"conversion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "conversion defines conversion settings for the CRD.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceConversion"),
+							Ref:         ref(v1beta1.CustomResourceConversion{}.OpenAPIModelName()),
 						},
 					},
 					"preserveUnknownFields": {
@@ -3169,7 +3179,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceConversion", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionVersion", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.SelectableField"},
+			v1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName(), v1beta1.CustomResourceConversion{}.OpenAPIModelName(), v1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName(), v1beta1.CustomResourceDefinitionVersion{}.OpenAPIModelName(), v1beta1.CustomResourceSubresources{}.OpenAPIModelName(), v1beta1.CustomResourceValidation{}.OpenAPIModelName(), v1beta1.SelectableField{}.OpenAPIModelName()},
 	}
 }
 
@@ -3195,8 +3205,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionCondition"),
+										Ref: ref(v1beta1.CustomResourceDefinitionCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3206,7 +3215,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 						SchemaProps: spec.SchemaProps{
 							Description: "acceptedNames are the names that are actually being used to serve discovery. They may be different than the names in spec.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames"),
+							Ref:         ref(v1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
 					"storedVersions": {
@@ -3221,19 +3230,25 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
+						},
+					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation observed by the CRD controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionCondition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames"},
+			v1beta1.CustomResourceDefinitionCondition{}.OpenAPIModelName(), v1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName()},
 	}
 }
 
@@ -3285,13 +3300,13 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 					"schema": {
 						SchemaProps: spec.SchemaProps{
 							Description: "schema describes the schema used for validation and pruning of this version of the custom resource. Top-level and per-version schemas are mutually exclusive. Per-version schemas must not all be set to identical values (top-level validation schema should be used instead).",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation"),
+							Ref:         ref(v1beta1.CustomResourceValidation{}.OpenAPIModelName()),
 						},
 					},
 					"subresources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "subresources specify what subresources this version of the defined custom resource have. Top-level and per-version subresources are mutually exclusive. Per-version subresources must not all be set to identical values (top-level subresources should be used instead).",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources"),
+							Ref:         ref(v1beta1.CustomResourceSubresources{}.OpenAPIModelName()),
 						},
 					},
 					"additionalPrinterColumns": {
@@ -3306,8 +3321,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition"),
+										Ref: ref(v1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3325,8 +3339,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.SelectableField"),
+										Ref: ref(v1beta1.SelectableField{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3337,7 +3350,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.SelectableField"},
+			v1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName(), v1beta1.CustomResourceSubresources{}.OpenAPIModelName(), v1beta1.CustomResourceValidation{}.OpenAPIModelName(), v1beta1.SelectableField{}.OpenAPIModelName()},
 	}
 }
 
@@ -3399,20 +3412,20 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref common
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status indicates the custom resource should serve a `/status` subresource. When enabled: 1. requests to the custom resource primary endpoint ignore changes to the `status` stanza of the object. 2. requests to the custom resource `/status` subresource ignore changes to anything other than the `status` stanza of the object.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceStatus"),
+							Ref:         ref(v1beta1.CustomResourceSubresourceStatus{}.OpenAPIModelName()),
 						},
 					},
 					"scale": {
 						SchemaProps: spec.SchemaProps{
 							Description: "scale indicates the custom resource should serve a `/scale` subresource that returns an `autoscaling/v1` Scale object.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceScale"),
+							Ref:         ref(v1beta1.CustomResourceSubresourceScale{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceScale", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceStatus"},
+			v1beta1.CustomResourceSubresourceScale{}.OpenAPIModelName(), v1beta1.CustomResourceSubresourceStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -3426,14 +3439,14 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref common.R
 					"openAPIV3Schema": {
 						SchemaProps: spec.SchemaProps{
 							Description: "openAPIV3Schema is the OpenAPI v3 schema to use for validation and pruning.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+							Ref:         ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"},
+			v1beta1.JSONSchemaProps{}.OpenAPIModelName()},
 	}
 }
 
@@ -3527,7 +3540,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 					"default": {
 						SchemaProps: spec.SchemaProps{
 							Description: "default is a default value for undefined object fields. Defaulting is a beta feature under the CustomResourceDefaulting feature gate. CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON"),
+							Ref:         ref(v1beta1.JSON{}.OpenAPIModelName()),
 						},
 					},
 					"maximum": {
@@ -3607,7 +3620,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON"),
+										Ref: ref(v1beta1.JSON{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3636,9 +3649,8 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -3646,7 +3658,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray"),
+							Ref: ref(v1beta1.JSONSchemaPropsOrArray{}.OpenAPIModelName()),
 						},
 					},
 					"allOf": {
@@ -3660,8 +3672,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+										Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3678,8 +3689,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+										Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3696,8 +3706,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+										Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3705,7 +3714,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 					},
 					"not": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+							Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 						},
 					},
 					"properties": {
@@ -3715,8 +3724,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+										Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3724,7 +3732,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 					},
 					"additionalProperties": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool"),
+							Ref: ref(v1beta1.JSONSchemaPropsOrBool{}.OpenAPIModelName()),
 						},
 					},
 					"patternProperties": {
@@ -3734,8 +3742,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+										Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3748,7 +3755,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray"),
+										Ref: ref(v1beta1.JSONSchemaPropsOrStringArray{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3756,7 +3763,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 					},
 					"additionalItems": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool"),
+							Ref: ref(v1beta1.JSONSchemaPropsOrBool{}.OpenAPIModelName()),
 						},
 					},
 					"definitions": {
@@ -3766,8 +3773,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps"),
+										Ref: ref(v1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3775,12 +3781,12 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 					},
 					"externalDocs": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation"),
+							Ref: ref(v1beta1.ExternalDocumentation{}.OpenAPIModelName()),
 						},
 					},
 					"example": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON"),
+							Ref: ref(v1beta1.JSON{}.OpenAPIModelName()),
 						},
 					},
 					"nullable": {
@@ -3822,9 +3828,8 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -3861,8 +3866,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ValidationRule"),
+										Ref: ref(v1beta1.ValidationRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3872,7 +3876,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray", "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ValidationRule"},
+			v1beta1.ExternalDocumentation{}.OpenAPIModelName(), v1beta1.JSON{}.OpenAPIModelName(), v1beta1.JSONSchemaProps{}.OpenAPIModelName(), v1beta1.JSONSchemaPropsOrArray{}.OpenAPIModelName(), v1beta1.JSONSchemaPropsOrBool{}.OpenAPIModelName(), v1beta1.JSONSchemaPropsOrStringArray{}.OpenAPIModelName(), v1beta1.ValidationRule{}.OpenAPIModelName()},
 	}
 }
 
@@ -4053,7 +4057,7 @@ func schema_pkg_apis_apiextensions_v1beta1_WebhookClientConfig(ref common.Refere
 					"service": {
 						SchemaProps: spec.SchemaProps{
 							Description: "service is a reference to the service for this webhook. Either service or url must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.",
-							Ref:         ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ServiceReference"),
+							Ref:         ref(v1beta1.ServiceReference{}.OpenAPIModelName()),
 						},
 					},
 					"caBundle": {
@@ -4067,7 +4071,55 @@ func schema_pkg_apis_apiextensions_v1beta1_WebhookClientConfig(ref common.Refere
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ServiceReference"},
+			v1beta1.ServiceReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_apimachinery_pkg_api_resource_Quantity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.EmbedOpenAPIDefinitionIntoV2Extension(common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+				OneOf:       common.GenerateOpenAPIV3OneOfSchema(resource.Quantity{}.OpenAPIV3OneOfTypes()),
+				Format:      resource.Quantity{}.OpenAPISchemaFormat(),
+			},
+		},
+	}, common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+				Type:        resource.Quantity{}.OpenAPISchemaType(),
+				Format:      resource.Quantity{}.OpenAPISchemaFormat(),
+			},
+		},
+	})
+}
+
+func schema_apimachinery_pkg_api_resource_int64Amount(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "int64Amount represents a fixed precision numerator and arbitrary scale exponent. It is faster than operations on inf.Dec for values that can be represented as int64.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Default: 0,
+							Type:    []string{"integer"},
+							Format:  "int64",
+						},
+					},
+					"scale": {
+						SchemaProps: spec.SchemaProps{
+							Default: 0,
+							Type:    []string{"integer"},
+							Format:  "int32",
+						},
+					},
+				},
+				Required: []string{"value", "scale"},
+			},
+		},
 	}
 }
 
@@ -4112,8 +4164,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery"),
+										Ref: ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4123,7 +4174,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 						SchemaProps: spec.SchemaProps{
 							Description: "preferredVersion is the version preferred by the API server, which probably is the storage version.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery"),
+							Ref:         ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 						},
 					},
 					"serverAddressByClientCIDRs": {
@@ -4138,8 +4189,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"),
+										Ref: ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4150,7 +4200,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+			metav1.GroupVersionForDiscovery{}.OpenAPIModelName(), metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()},
 	}
 }
 
@@ -4187,8 +4237,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup"),
+										Ref: ref(metav1.APIGroup{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4199,7 +4248,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup"},
+			metav1.APIGroup{}.OpenAPIModelName()},
 	}
 }
 
@@ -4263,9 +4312,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4283,9 +4331,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4303,9 +4350,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4366,8 +4412,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIResource"),
+										Ref: ref(metav1.APIResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4378,7 +4423,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource"},
+			metav1.APIResource{}.OpenAPIModelName()},
 	}
 }
 
@@ -4415,9 +4460,8 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4435,8 +4479,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"),
+										Ref: ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4447,7 +4490,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+			metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()},
 	}
 }
 
@@ -4484,9 +4527,8 @@ func schema_pkg_apis_meta_v1_ApplyOptions(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4548,7 +4590,7 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
@@ -4572,7 +4614,7 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -4609,9 +4651,8 @@ func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4668,7 +4709,7 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 					"preconditions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"),
+							Ref:         ref(metav1.Preconditions{}.OpenAPIModelName()),
 						},
 					},
 					"orphanDependents": {
@@ -4697,9 +4738,8 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4716,7 +4756,7 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"},
+			metav1.Preconditions{}.OpenAPIModelName()},
 	}
 }
 
@@ -4767,9 +4807,8 @@ func schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5028,15 +5067,12 @@ func schema_pkg_apis_meta_v1_InternalEvent(ref common.ReferenceCallback) common.
 					"Object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Bookmark: the object (instance of a type being watched) where\n   only ResourceVersion field is set. On successful restart of watch from a\n   bookmark resourceVersion, client is guaranteed to not get repeat event\n   nor miss any events.\n * If Type is Error: *api.Status is recommended; other types may make sense\n   depending on context.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.Object"),
 						},
 					},
 				},
 				Required: []string{"Type", "Object"},
 			},
 		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.Object"},
 	}
 }
 
@@ -5055,9 +5091,8 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5075,8 +5110,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"),
+										Ref: ref(metav1.LabelSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5091,7 +5125,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"},
+			metav1.LabelSelectorRequirement{}.OpenAPIModelName()},
 	}
 }
 
@@ -5130,9 +5164,8 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5170,7 +5203,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -5180,7 +5213,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+										Ref: ref(runtime.RawExtension{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5191,7 +5224,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			metav1.ListMeta{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -5230,9 +5263,17 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 							Format:      "int64",
 						},
 					},
+					"shardInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardInfo is set when the list is a filtered subset of the full collection, as selected by a shard selector on the request. It echoes back the selector so clients can verify which shard they received and merge sharded responses. Clients should not cache sharded list responses as a full representation of the collection.\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+							Ref:         ref(metav1.ShardInfo{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
+		Dependencies: []string{
+			metav1.ShardInfo{}.OpenAPIModelName()},
 	}
 }
 
@@ -5327,6 +5368,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"shardSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -5364,7 +5412,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 					"time": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Time is the timestamp of when the ManagedFields entry was added. The timestamp will also be updated if a field is added, the manager changes any of the owned fields value or removes a field. The timestamp does not update when a field is removed from the entry because another manager took it over.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"fieldsType": {
@@ -5377,7 +5425,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 					"fieldsV1": {
 						SchemaProps: spec.SchemaProps{
 							Description: "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1"),
+							Ref:         ref(metav1.FieldsV1{}.OpenAPIModelName()),
 						},
 					},
 					"subresource": {
@@ -5391,7 +5439,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.FieldsV1{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -5466,13 +5514,13 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					"creationTimestamp": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"deletionTimestamp": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field, once the finalizers list is empty. As long as the finalizers list contains items, deletion is blocked. Once the deletionTimestamp is set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"deletionGracePeriodSeconds": {
@@ -5490,9 +5538,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5506,9 +5553,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5531,8 +5577,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference"),
+										Ref: ref(metav1.OwnerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5551,9 +5596,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5571,8 +5615,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry"),
+										Ref: ref(metav1.ManagedFieldsEntry{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5582,7 +5625,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry", "k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.ManagedFieldsEntry{}.OpenAPIModelName(), metav1.OwnerReference{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -5676,14 +5719,14 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadata(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -5712,7 +5755,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -5722,8 +5765,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata"),
+										Ref: ref(metav1.PartialObjectMetadata{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5734,7 +5776,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata"},
+			metav1.ListMeta{}.OpenAPIModelName(), metav1.PartialObjectMetadata{}.OpenAPIModelName()},
 	}
 }
 
@@ -5782,9 +5824,8 @@ func schema_pkg_apis_meta_v1_PatchOptions(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5863,9 +5904,8 @@ func schema_pkg_apis_meta_v1_RootPaths(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5908,6 +5948,28 @@ func schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref common.ReferenceCallb
 	}
 }
 
+func schema_pkg_apis_meta_v1_ShardInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ShardInfo describes the shard selector that was applied to produce a list response. Its presence on a list response indicates the list is a filtered subset.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "selector is the shard selector string from the request, echoed back so clients can verify which shard they received and merge responses from multiple shards.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"selector"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -5933,7 +5995,7 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
@@ -5958,14 +6020,9 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 						},
 					},
 					"details": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails"),
+							Ref:         ref(metav1.StatusDetails{}.OpenAPIModelName()),
 						},
 					},
 					"code": {
@@ -5979,7 +6036,7 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails"},
+			metav1.ListMeta{}.OpenAPIModelName(), metav1.StatusDetails{}.OpenAPIModelName()},
 	}
 }
 
@@ -6064,8 +6121,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"),
+										Ref: ref(metav1.StatusCause{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6082,7 +6138,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"},
+			metav1.StatusCause{}.OpenAPIModelName()},
 	}
 }
 
@@ -6111,7 +6167,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"columnDefinitions": {
@@ -6126,8 +6182,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition"),
+										Ref: ref(metav1.TableColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6145,8 +6200,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TableRow"),
+										Ref: ref(metav1.TableRow{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6157,7 +6211,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.TableRow"},
+			metav1.ListMeta{}.OpenAPIModelName(), metav1.TableColumnDefinition{}.OpenAPIModelName(), metav1.TableRow{}.OpenAPIModelName()},
 	}
 }
 
@@ -6287,8 +6341,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition"),
+										Ref: ref(metav1.TableRowCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6297,7 +6350,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 					"object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "This field contains the requested additional information about each object based on the includeObject policy when requesting the Table. If \"None\", this field is empty, if \"Object\" this will be the default serialization of the object for the current API version, and if \"Metadata\" (the default) will contain the object metadata. Check the returned kind and apiVersion of the object before parsing. The media type of the object will always match the enclosing list - if this as a JSON table, these will be JSON encoded objects.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -6305,7 +6358,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			metav1.TableRowCondition{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -6455,9 +6508,8 @@ func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -6500,7 +6552,7 @@ func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.Ope
 					"object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -6508,7 +6560,7 @@ func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -6516,7 +6568,7 @@ func schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
+				Description: "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\"\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\"\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
 				Type:        []string{"object"},
 			},
 		},
@@ -6527,7 +6579,7 @@ func schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type, like this:\n\n\ttype MyAwesomeAPIObject struct {\n\t     runtime.TypeMeta    `json:\",inline\"`\n\t     ... // other fields\n\t}\n\nfunc (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind\n\nTypeMeta is provided here for convenience. You may use it directly from this package or define your own with the same fields.",
+				Description: "TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type, like this:\n\n\ttype MyAwesomeAPIObject struct {\n\t     runtime.TypeMeta    `json:\"\"`\n\t     ... // other fields\n\t}\n\nfunc (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind\n\nTypeMeta is provided here for convenience. You may use it directly from this package or define your own with the same fields.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"apiVersion": {

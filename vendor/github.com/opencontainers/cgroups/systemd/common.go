@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -89,7 +90,7 @@ func ExpandSlice(slice string) (string, error) {
 	return path, nil
 }
 
-func newProp(name string, units interface{}) systemdDbus.Property {
+func newProp(name string, units any) systemdDbus.Property {
 	return systemdDbus.Property{
 		Name:  name,
 		Value: dbus.MakeVariant(units),
@@ -208,6 +209,20 @@ func stopUnit(cm *dbusConnManager, unitName string) error {
 	return nil
 }
 
+func addPid(cm *dbusConnManager, unitName, subcgroup string, pid int) error {
+	absSubcgroup := subcgroup
+	if !path.IsAbs(absSubcgroup) {
+		absSubcgroup = "/" + subcgroup
+	}
+	if absSubcgroup != path.Clean(absSubcgroup) {
+		return fmt.Errorf("bad sub cgroup path: %s", subcgroup)
+	}
+
+	return cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
+		return c.AttachProcessesToUnit(context.TODO(), unitName, absSubcgroup, []uint32{uint32(pid)})
+	})
+}
+
 func resetFailedUnit(cm *dbusConnManager, name string) error {
 	return cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
 		return c.ResetFailedUnitContext(context.TODO(), name)
@@ -266,7 +281,7 @@ func systemdVersionAtoi(str string) (int, error) {
 	// Unconditionally remove the leading prefix ("v).
 	str = strings.TrimLeft(str, `"v`)
 	// Match on the first integer we can grab.
-	for i := 0; i < len(str); i++ {
+	for i := range len(str) {
 		if str[i] < '0' || str[i] > '9' {
 			// First non-digit: cut the tail.
 			str = str[:i]
@@ -280,7 +295,9 @@ func systemdVersionAtoi(str string) (int, error) {
 	return ver, nil
 }
 
-func addCpuQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota int64, period uint64) {
+// addCPUQuota adds CPUQuotaPeriodUSec and CPUQuotaPerSecUSec to the properties. The passed quota may be modified
+// along with round-up during calculation in order to write the same value to cgroupfs later.
+func addCPUQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota *int64, period uint64) {
 	if period != 0 {
 		// systemd only supports CPUQuotaPeriodUSec since v242
 		sdVer := systemdVersion(cm)
@@ -292,10 +309,10 @@ func addCpuQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota 
 				" (setting will still be applied to cgroupfs)", sdVer)
 		}
 	}
-	if quota != 0 || period != 0 {
+	if *quota != 0 || period != 0 {
 		// corresponds to USEC_INFINITY in systemd
 		cpuQuotaPerSecUSec := uint64(math.MaxUint64)
-		if quota > 0 {
+		if *quota > 0 {
 			if period == 0 {
 				// assume the default
 				period = defCPUQuotaPeriod
@@ -304,9 +321,11 @@ func addCpuQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota 
 			// (integer percentage of CPU) internally.  This means that if a fractional percent of
 			// CPU is indicated by Resources.CpuQuota, we need to round up to the nearest
 			// 10ms (1% of a second) such that child cgroups can set the cpu.cfs_quota_us they expect.
-			cpuQuotaPerSecUSec = uint64(quota*1000000) / period
+			cpuQuotaPerSecUSec = uint64(*quota*1000000) / period
 			if cpuQuotaPerSecUSec%10000 != 0 {
 				cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
+				// Update the requested quota along with the round-up in order to write the same value to cgroupfs.
+				*quota = int64(cpuQuotaPerSecUSec) * int64(period) / 1000000
 			}
 		}
 		*properties = append(*properties,

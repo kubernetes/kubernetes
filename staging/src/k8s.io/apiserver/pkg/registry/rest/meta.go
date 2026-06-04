@@ -24,7 +24,7 @@ import (
 )
 
 // metav1Now returns metav1.Now(), but allows override for unit testing
-var metav1Now = func() metav1.Time { return metav1.Now() }
+var metav1Now = metav1.Now
 
 // WipeObjectMetaSystemFields erases fields that are managed by the system on ObjectMeta.
 func WipeObjectMetaSystemFields(meta metav1.Object) {

@@ -20,11 +20,31 @@ package v1
 
 // AWSElasticBlockStoreVolumeSourceApplyConfiguration represents a declarative configuration of the AWSElasticBlockStoreVolumeSource type for use
 // with apply.
+//
+// Represents a Persistent Disk resource in AWS.
+//
+// An AWS EBS disk must exist before mounting to a container. The disk
+// must also be in the same AWS zone as the kubelet. An AWS EBS disk
+// can only be mounted as read/write once. AWS EBS volumes support
+// ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSourceApplyConfiguration struct {
-	VolumeID  *string `json:"volumeID,omitempty"`
-	FSType    *string `json:"fsType,omitempty"`
-	Partition *int32  `json:"partition,omitempty"`
-	ReadOnly  *bool   `json:"readOnly,omitempty"`
+	// volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume).
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+	VolumeID *string `json:"volumeID,omitempty"`
+	// fsType is the filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType *string `json:"fsType,omitempty"`
+	// partition is the partition in the volume that you want to mount.
+	// If omitted, the default is to mount by volume name.
+	// Examples: For volume /dev/sda1, you specify the partition as "1".
+	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
+	Partition *int32 `json:"partition,omitempty"`
+	// readOnly value true will force the readOnly setting in VolumeMounts.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // AWSElasticBlockStoreVolumeSourceApplyConfiguration constructs a declarative configuration of the AWSElasticBlockStoreVolumeSource type for use with

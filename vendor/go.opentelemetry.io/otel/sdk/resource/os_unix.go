@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris || zos
-// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris zos
 
 package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
@@ -56,7 +55,8 @@ func uname() (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s %s %s %s %s",
+	return fmt.Sprintf(
+		"%s %s %s %s %s",
 		unix.ByteSliceToString(utsName.Sysname[:]),
 		unix.ByteSliceToString(utsName.Nodename[:]),
 		unix.ByteSliceToString(utsName.Release[:]),

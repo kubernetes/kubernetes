@@ -23,15 +23,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // TestFieldsRoundTrip tests that a fields trie can be round tripped as a path set
 func TestFieldsRoundTrip(t *testing.T) {
 	tests := []metav1.FieldsV1{
-		{
-			Raw: []byte(`{"f:metadata":{".":{},"f:name":{}}}`),
-		},
+		*metav1.NewFieldsV1(`{"f:metadata":{".":{},"f:name":{}}}`),
 		EmptyFields,
 	}
 
@@ -57,9 +55,9 @@ func TestFieldsToSetError(t *testing.T) {
 		errString string
 	}{
 		{
-			fields: metav1.FieldsV1{
-				Raw: []byte(`{"k:{invalid json}":{"f:name":{},".":{}}}`),
-			},
+			fields: *metav1.NewFieldsV1(
+				`{"k:{invalid json}":{"f:name":{},".":{}}}`,
+			),
 			errString: "ReadObjectCB",
 		},
 	}

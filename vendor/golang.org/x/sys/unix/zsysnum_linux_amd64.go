@@ -342,6 +342,7 @@ const (
 	SYS_IO_PGETEVENTS           = 333
 	SYS_RSEQ                    = 334
 	SYS_URETPROBE               = 335
+	SYS_UPROBE                  = 336
 	SYS_PIDFD_SEND_SIGNAL       = 424
 	SYS_IO_URING_SETUP          = 425
 	SYS_IO_URING_ENTER          = 426
@@ -385,4 +386,9 @@ const (
 	SYS_GETXATTRAT              = 464
 	SYS_LISTXATTRAT             = 465
 	SYS_REMOVEXATTRAT           = 466
+	SYS_OPEN_TREE_ATTR          = 467
+	SYS_FILE_GETATTR            = 468
+	SYS_FILE_SETATTR            = 469
+	SYS_LISTNS                  = 470
+	SYS_RSEQ_SLICE_YIELD        = 471
 )

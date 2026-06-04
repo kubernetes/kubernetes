@@ -24,9 +24,26 @@ import (
 
 // ResourceHealthApplyConfiguration represents a declarative configuration of the ResourceHealth type for use
 // with apply.
+//
+// ResourceHealth represents the health of a resource. It has the latest device health information.
+// This is a part of KEP https://kep.k8s.io/4680.
 type ResourceHealthApplyConfiguration struct {
-	ResourceID *corev1.ResourceID           `json:"resourceID,omitempty"`
-	Health     *corev1.ResourceHealthStatus `json:"health,omitempty"`
+	// ResourceID is the unique identifier of the resource. See the ResourceID type for more information.
+	ResourceID *corev1.ResourceID `json:"resourceID,omitempty"`
+	// Health of the resource.
+	// can be one of:
+	// - Healthy: operates as normal
+	// - Unhealthy: reported unhealthy. We consider this a temporary health issue
+	// since we do not have a mechanism today to distinguish
+	// temporary and permanent issues.
+	// - Unknown: The status cannot be determined.
+	// For example, Device Plugin got unregistered and hasn't been re-registered since.
+	//
+	// In future we may want to introduce the PermanentlyUnhealthy Status.
+	Health *corev1.ResourceHealthStatus `json:"health,omitempty"`
+	// Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+	// This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
+	Message *string `json:"message,omitempty"`
 }
 
 // ResourceHealthApplyConfiguration constructs a declarative configuration of the ResourceHealth type for use with
@@ -48,5 +65,13 @@ func (b *ResourceHealthApplyConfiguration) WithResourceID(value corev1.ResourceI
 // If called multiple times, the Health field is set to the value of the last call.
 func (b *ResourceHealthApplyConfiguration) WithHealth(value corev1.ResourceHealthStatus) *ResourceHealthApplyConfiguration {
 	b.Health = &value
+	return b
+}
+
+// WithMessage sets the Message field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Message field is set to the value of the last call.
+func (b *ResourceHealthApplyConfiguration) WithMessage(value string) *ResourceHealthApplyConfiguration {
+	b.Message = &value
 	return b
 }

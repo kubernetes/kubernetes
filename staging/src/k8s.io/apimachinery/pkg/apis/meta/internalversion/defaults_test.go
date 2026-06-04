@@ -25,13 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetListOptionsDefaults(t *testing.T) {
-	boolPtrFn := func(b bool) *bool {
-		return &b
-	}
-
 	scenarios := []struct {
 		name                    string
 		watchListFeatureEnabled bool
@@ -47,8 +44,8 @@ func TestSetListOptionsDefaults(t *testing.T) {
 		{
 			name:                    "no-op, SendInitialEvents set",
 			watchListFeatureEnabled: true,
-			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(true)},
-			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(true)},
+			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(true)},
+			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(true)},
 		},
 		{
 			name:                    "no-op, ResourceVersionMatch set",
@@ -66,13 +63,13 @@ func TestSetListOptionsDefaults(t *testing.T) {
 			name:                    "defaults applied, match on empty RV",
 			watchListFeatureEnabled: true,
 			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true},
-			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(true), ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan},
+			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(true), ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan},
 		},
 		{
 			name:                    "defaults applied, match on RV=0",
 			watchListFeatureEnabled: true,
 			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, ResourceVersion: "0"},
-			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, ResourceVersion: "0", SendInitialEvents: boolPtrFn(true), ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan},
+			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, ResourceVersion: "0", SendInitialEvents: ptr.To(true), ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan},
 		},
 		{
 			name:        "no-op, match on empty RV but watch-list fg is off",
@@ -82,14 +79,14 @@ func TestSetListOptionsDefaults(t *testing.T) {
 		{
 			name:                    "no-op, match on empty RV but SendInitialEvents is on",
 			watchListFeatureEnabled: true,
-			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(true)},
-			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(true)},
+			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(true)},
+			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(true)},
 		},
 		{
 			name:                    "no-op, match on empty RV but SendInitialEvents is off",
 			watchListFeatureEnabled: true,
-			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(false)},
-			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: boolPtrFn(false)},
+			targetObj:               ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(false)},
+			expectedObj:             ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything(), Watch: true, SendInitialEvents: ptr.To(false)},
 		},
 		{
 			name:                    "no-op, match on empty RV but ResourceVersionMatch set",

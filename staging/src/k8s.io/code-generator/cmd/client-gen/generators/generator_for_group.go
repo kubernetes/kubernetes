@@ -20,12 +20,11 @@ import (
 	"io"
 	"path"
 
-	"k8s.io/gengo/v2"
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -73,8 +72,12 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(g.inputPackage)
 	groupName := g.group
-	if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-		groupName = override[0]
+	override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
+	if err != nil {
+		return err
+	}
+	if ok {
+		groupName = override
 	}
 
 	apiPath := `"` + g.apiPath + `"`

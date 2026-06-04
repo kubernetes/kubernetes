@@ -48,7 +48,7 @@ func ensureCapabilities(p *corev1.Pod) *corev1.Pod {
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "capabilities",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			// don't generate fixtures if minimal valid pod drops ALL
 			if p.Spec.Containers[0].SecurityContext != nil && p.Spec.Containers[0].SecurityContext.Capabilities != nil {
 				for _, capability := range p.Spec.Containers[0].SecurityContext.Capabilities.Drop {

@@ -17,76 +17,121 @@ limitations under the License.
 package ktesting
 
 import (
-	"bytes"
+	"context"
+	"io"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
+	"go.uber.org/goleak"
 )
 
 func TestStepContext(t *testing.T) {
 	for name, tc := range map[string]testcase{
 		"output": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Log("Log", "a", "b", 42)
 				tCtx.Logf("Logf %s %s %d", "a", "b", 42)
 				tCtx.Error("Error", "a", "b", 42)
 				tCtx.Errorf("Errorf %s %s %d", "a", "b", 42)
 			},
-			expectLog: `<klog header>: step: Log a b 42
-<klog header>: step: Logf a b 42
+			expectTrace: `(LOG) <klog header>: step: Log a b 42
+(LOG) <klog header>: step: Logf a b 42
+(ERROR) ERROR: <klog header>:
+	step: Error a b 42
+(ERROR) ERROR: <klog header>:
+	step: Errorf a b 42
 `,
-			expectError: `step: Error a b 42
-step: Errorf a b 42`,
 		},
 		"fatal": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Fatal("Error", "a", "b", 42)
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectError: `step: Error a b 42`,
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	step: Error a b 42
+`,
 		},
 		"fatalf": {
 			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
+				tCtx = tCtx.WithStep("step")
 				tCtx.Fatalf("Error %s %s %d", "a", "b", 42)
 				// not reached
 				tCtx.Log("Log")
 			},
-			expectError: `step: Error a b 42`,
-		},
-		"progress": {
-			cb: func(tCtx TContext) {
-				tCtx = WithStep(tCtx, "step")
-				var buffer bytes.Buffer
-				oldOut := defaultProgressReporter.setOutput(&buffer)
-				defer defaultProgressReporter.setOutput(oldOut)
-				remove := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgoReporter).AttachProgressReporter(func() string { return "hello world" })
-				defer remove()
-				defaultSignalChannel <- os.Interrupt
-				// No good way to sync here, so let's just wait.
-				time.Sleep(5 * time.Second)
-				defaultProgressReporter.setOutput(oldOut)
-				tCtx.Log(buffer.String())
-
-				noSuchValue := tCtx.Value("some other key")
-				assert.Nil(tCtx, noSuchValue, "value for unknown context value key")
-			},
-			expectLog: `<klog header>: step: You requested a progress report.
-
-step: hello world
+			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
+	step: Error a b 42
 `,
-			expectDuration: 5 * time.Second,
-			expectNoFail:   true,
 		},
 	} {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			tc.run(t)
 		})
 	}
+}
+
+func TestProgressReport(t *testing.T) {
+	oldOut := defaultProgressReporter.out
+	out := newOutputStream()
+	defaultProgressReporter.out = out
+	t.Cleanup(func() {
+		goleak.VerifyNone(t)
+		defaultProgressReporter.out = oldOut
+
+		// If we get here, the defaultProgressReporter is not active anymore,
+		// but the interrupt context should still be canceled.
+		gomega.NewGomegaWithT(t).Expect(defaultProgressReporter.usageCount).To(gomega.Equal(int64(0)), "usage count")
+		gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.MatchError(gomega.Equal("received interrupt signal")), "interrupted persistently")
+
+		// Reset for next test.
+		interruptCtx, interrupted = context.WithCancelCause(context.Background())
+	})
+
+	// This must use a real testing.T, otherwise Init doesn't initialize signal handling.
+	tCtx := Init(t)
+	tCtx = tCtx.WithStep("step")
+	removeReporter := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgoReporter).AttachProgressReporter(func() string { return "hello world" })
+	defer removeReporter()
+	tCtx.Expect(tCtx.Value("some other key")).To(gomega.BeNil(), "value for unknown context value key")
+
+	// Trigger report and wait for it.
+	defaultProgressReporter.progressChannel <- os.Interrupt
+	report := <-out.stream
+	tCtx.Expect(report).To(gomega.Equal(`You requested a progress report.
+
+step: hello world
+`), "report")
+
+	gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.Succeed(), "not interrupted yet")
+	defaultProgressReporter.signalChannel <- os.Interrupt
+	message := <-out.stream
+	tCtx.Expect(message).To(gomega.Equal(`
+
+INFO: canceling test context: received interrupt signal
+
+`))
+	gomega.NewGomegaWithT(t).Eventually(func() error { return context.Cause(tCtx) }).WithTimeout(30*time.Second).To(gomega.MatchError(gomega.Equal("received interrupt signal")), "interrupted")
+}
+
+// outputStream forwards exactly one Write call to a stream.
+// A second Write call is an error and will panic.
+type outputStream struct {
+	stream chan string
+}
+
+var _ io.Writer = &outputStream{}
+
+func newOutputStream() *outputStream {
+	return &outputStream{
+		stream: make(chan string),
+	}
+}
+
+func (s *outputStream) Write(buf []byte) (int, error) {
+	s.stream <- string(buf)
+	return len(buf), nil
 }

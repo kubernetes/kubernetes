@@ -16,7 +16,10 @@ limitations under the License.
 
 package validators
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import (
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
+)
 
 const (
 	opaqueTypeTagName = "k8s:opaqueType"
@@ -35,17 +38,18 @@ func (opaqueTypeTagValidator) TagName() string {
 }
 
 func (opaqueTypeTagValidator) ValidScopes() sets.Set[Scope] {
-	return sets.New(ScopeAny)
+	return sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 }
 
-func (opaqueTypeTagValidator) GetValidations(context Context, _ []string, _ string) (Validations, error) {
+func (opaqueTypeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validations, error) {
 	return Validations{OpaqueType: true}, nil
 }
 
 func (opaqueTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:    opaqueTypeTagName,
-		Scopes: []Scope{ScopeField},
+		Tag:            opaqueTypeTagName,
+		StabilityLevel: TagStabilityLevelAlpha,
+		Scopes:         []Scope{ScopeField},
 		Description: "Indicates that any validations declared on the referenced type will be ignored. " +
 			"If a referenced type's package is not included in the generator's current " +
 			"flags, this tag must be set, or code generation will fail (preventing silent " +

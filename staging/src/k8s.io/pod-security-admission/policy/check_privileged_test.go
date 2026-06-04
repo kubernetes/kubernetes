@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestPrivileged(t *testing.T) {
@@ -36,9 +36,9 @@ func TestPrivileged(t *testing.T) {
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
-					{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: utilpointer.Bool(false)}},
-					{Name: "d", SecurityContext: &corev1.SecurityContext{Privileged: utilpointer.Bool(true)}},
-					{Name: "e", SecurityContext: &corev1.SecurityContext{Privileged: utilpointer.Bool(true)}},
+					{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: ptr.To(false)}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{Privileged: ptr.To(true)}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{Privileged: ptr.To(true)}},
 				},
 			}},
 			expectReason: `privileged`,

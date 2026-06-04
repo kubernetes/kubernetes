@@ -17,11 +17,12 @@ limitations under the License.
 package validators
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -32,17 +33,24 @@ const (
 
 	// This tag always returns an error from ExtractValidations.
 	validateErrorTagName = "k8s:validateError"
+
+	// validate true alpha/beta  test tags.
+	validateAlphaTagName = "k8s:validateTrueAlpha"
+	validateBetaTagName  = "k8s:validateTrueBeta"
 )
 
 func init() {
 	RegisterTagValidator(fixedResultTagValidator{result: true})
 	RegisterTagValidator(fixedResultTagValidator{result: false})
 	RegisterTagValidator(fixedResultTagValidator{error: true})
+	RegisterTagValidator(fixedResultTagValidator{result: true, stability: TagStabilityLevelAlpha})
+	RegisterTagValidator(fixedResultTagValidator{result: true, stability: TagStabilityLevelBeta})
 }
 
 type fixedResultTagValidator struct {
-	result bool
-	error  bool
+	result    bool
+	error     bool
+	stability TagStabilityLevel
 }
 
 func (fixedResultTagValidator) Init(_ Config) {}
@@ -51,29 +59,40 @@ func (frtv fixedResultTagValidator) TagName() string {
 	if frtv.error {
 		return validateErrorTagName
 	} else if frtv.result {
-		return validateTrueTagName
+		switch frtv.stability {
+		case TagStabilityLevelAlpha:
+			return validateAlphaTagName
+		case TagStabilityLevelBeta:
+			return validateBetaTagName
+		default:
+			return validateTrueTagName
+		}
 	}
 	return validateFalseTagName
 }
 
-var fixedResultTagValidScopes = sets.New(ScopeAny)
+var fixedResultTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
 func (fixedResultTagValidator) ValidScopes() sets.Set[Scope] {
 	return fixedResultTagValidScopes
 }
 
-func (frtv fixedResultTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (frtv fixedResultTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	if frtv.error {
-		return result, fmt.Errorf("forced error: %q", payload)
+		return result, fmt.Errorf("forced error: %q", tag.Value)
 	}
 
-	tag, err := frtv.parseTagPayload(payload)
+	args, err := frtv.toFixedResultArgs(tag)
 	if err != nil {
 		return result, fmt.Errorf("can't decode tag payload: %w", err)
 	}
-	result.AddFunction(Function(frtv.TagName(), tag.flags, fixedResultValidator, frtv.result, tag.msg).WithTypeArgs(tag.typeArgs...))
+	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).
+		WithTypeArgs(args.typeArgs...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "validateFalse", ""})
+	fn.Cohort = args.cohort
+	result.AddFunction(fn)
 
 	return result, nil
 }
@@ -82,61 +101,57 @@ var (
 	fixedResultValidator = types.Name{Package: libValidationPkg, Name: "FixedResult"}
 )
 
-type fixedResultPayload struct {
+type fixedResultArgs struct {
 	flags    FunctionFlags
 	msg      string
 	typeArgs []types.Name
+	cohort   string
 }
 
-func (fixedResultTagValidator) parseTagPayload(in string) (fixedResultPayload, error) {
-	type payload struct {
-		Flags   []string `json:"flags"`
-		Msg     string   `json:"msg"`
-		TypeArg string   `json:"typeArg,omitempty"`
-	}
-	// We expect either a string (maybe empty) or a JSON object.
-	if len(in) == 0 {
-		return fixedResultPayload{}, nil
-	}
-	var pl payload
-	if err := json.Unmarshal([]byte(in), &pl); err != nil {
-		s := ""
-		if err := json.Unmarshal([]byte(in), &s); err != nil {
-			return fixedResultPayload{}, fmt.Errorf("error parsing JSON value: %w (%q)", err, in)
-		}
-		return fixedResultPayload{msg: s}, nil
-	}
-	// The msg field is required in JSON mode.
-	if pl.Msg == "" {
-		return fixedResultPayload{}, fmt.Errorf("JSON msg is required")
-	}
-	var flags FunctionFlags
-	for _, fl := range pl.Flags {
-		switch fl {
-		case "ShortCircuit":
-			flags |= ShortCircuit
-		case "NonError":
-			flags |= NonError
-		default:
-			return fixedResultPayload{}, fmt.Errorf("unknown flag: %q", fl)
+func (fixedResultTagValidator) toFixedResultArgs(in codetags.Tag) (fixedResultArgs, error) {
+	result := fixedResultArgs{}
+	for _, a := range in.Args {
+		switch a.Name {
+		case "flags":
+			for _, fl := range strings.Split(a.Value, ",") {
+				fl = strings.TrimSpace(fl)
+				switch fl {
+				case "ShortCircuit":
+					result.flags |= ShortCircuit
+				case "NonError":
+					result.flags |= NonError
+				default:
+					return fixedResultArgs{}, fmt.Errorf("unknown flag: %q", fl)
+				}
+			}
+		case "typeArg":
+			if tn := a.Value; len(tn) > 0 {
+				if !strings.HasPrefix(tn, "*") {
+					tn = "*" + tn // We always need the pointer type.
+				}
+				result.typeArgs = []types.Name{{Package: "", Name: tn}}
+			}
+		case "cohort":
+			result.cohort = a.Value
 		}
 	}
-	var typeArgs []types.Name
-	if tn := pl.TypeArg; len(tn) > 0 {
-		if !strings.HasPrefix(tn, "*") {
-			tn = "*" + tn // We always need the pointer type.
-		}
-		typeArgs = []types.Name{{Package: "", Name: tn}}
+	if in.ValueType == codetags.ValueTypeString {
+		result.msg = in.Value
 	}
-
-	return fixedResultPayload{flags, pl.Msg, typeArgs}, nil
+	return result, nil
 }
 
 func (frtv fixedResultTagValidator) Docs() TagDoc {
-	doc := TagDoc{
-		Tag:    frtv.TagName(),
-		Scopes: frtv.ValidScopes().UnsortedList(),
+	tagStabilityLevel := TagStabilityLevelAlpha
+	if frtv.stability != "" {
+		tagStabilityLevel = frtv.stability
 	}
+	doc := TagDoc{
+		Tag:            frtv.TagName(),
+		StabilityLevel: tagStabilityLevel,
+		Scopes:         sets.List(frtv.ValidScopes()),
+	}
+	doc.PayloadsType = codetags.ValueTypeString
 	if frtv.error {
 		doc.Description = "Always fails code generation (useful for testing)."
 		doc.Payloads = []TagPayloadDoc{{
@@ -144,28 +159,28 @@ func (frtv fixedResultTagValidator) Docs() TagDoc {
 			Docs:        "This string will be included in the error message.",
 		}}
 	} else {
-		// True and false have the same payloads.
+		// True and false have the same args and payload.
 		doc.Payloads = []TagPayloadDoc{{
 			Description: "<none>",
 		}, {
-			Description: "<quoted-string>",
+			Description: "<string>",
 			Docs:        "The generated code will include this string.",
+		}}
+		doc.Args = []TagArgDoc{{
+			Name:        "flags",
+			Description: "<comma-separated-list-of-flag-string>",
+			Docs:        `values: ShortCircuit, NonError`,
+			Type:        codetags.ArgTypeString,
 		}, {
-			Description: "<json-object>",
-			Docs:        "",
-			Schema: []TagPayloadSchema{{
-				Key:   "flags",
-				Value: "<list-of-flag-string>",
-				Docs:  `values: ShortCircuit, NonError`,
-			}, {
-				Key:   "msg",
-				Value: "<string>",
-				Docs:  "The generated code will include this string.",
-			}, {
-				Key:   "typeArg",
-				Value: "<string>",
-				Docs:  "The type arg in generated code (must be the value-type, not pointer).",
-			}},
+			Name:        "typeArg",
+			Description: "<string>",
+			Docs:        "The type arg in generated code (must be the value-type, not pointer).",
+			Type:        codetags.ArgTypeString,
+		}, {
+			Name:        "cohort",
+			Description: "<string>",
+			Docs:        "An optional cohort name to group multiple validations.",
+			Type:        codetags.ArgTypeString,
 		}}
 		if frtv.result {
 			doc.Description = "Always passes validation (useful for testing)."

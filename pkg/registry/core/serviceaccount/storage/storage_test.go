@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -120,11 +119,8 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 	// Enable JTI feature
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, true)
 
-	ctx := context.Background()
-	// Create a test service account
 	serviceAccount := validNewServiceAccount("foo")
-	// add the namespace to the context as it is required
-	ctx = request.WithNamespace(ctx, serviceAccount.Namespace)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, serviceAccount.Namespace)
 	_, err := storage.Store.Create(ctx, serviceAccount, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed creating test service account: %v", err)
@@ -144,7 +140,7 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 	}
 
 	auditContext := audit.AuditContextFrom(ctx)
-	issuedCredentialID, ok := auditContext.Event.Annotations["authentication.kubernetes.io/issued-credential-id"]
+	issuedCredentialID, ok := auditContext.GetEventAnnotation("authentication.kubernetes.io/issued-credential-id")
 	if !ok || len(issuedCredentialID) == 0 {
 		t.Errorf("did not find issued-credential-id in audit event annotations")
 	}

@@ -148,7 +148,7 @@ func (is *InputStream) GetTextFromInterval(i Interval) string {
 }
 
 func (*InputStream) GetSourceName() string {
-	return ""
+	return "Obtained from string"
 }
 
 // String returns the entire input stream as a string

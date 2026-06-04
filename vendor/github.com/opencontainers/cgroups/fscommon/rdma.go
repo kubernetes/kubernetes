@@ -50,7 +50,7 @@ func readRdmaEntries(dir, file string) ([]cgroups.RdmaEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer fd.Close() //nolint:errorlint
+	defer fd.Close()
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
 		parts := strings.SplitN(scanner.Text(), " ", 4)

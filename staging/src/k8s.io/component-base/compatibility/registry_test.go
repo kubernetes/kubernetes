@@ -17,15 +17,16 @@ limitations under the License.
 package compatibility
 
 import (
-	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 const (
@@ -117,7 +118,7 @@ func TestVersionFlagOptions(t *testing.T) {
 
 func TestVersionFlagOptionsWithMapping(t *testing.T) {
 	r := testRegistry(t)
-	utilruntime.Must(r.SetEmulationVersionMapping(testComponent, DefaultKubeComponent,
+	utilruntime.Must(r.SetVersionMapping(testComponent, DefaultKubeComponent,
 		func(from *version.Version) *version.Version { return version.MajorMinor(1, from.Minor()+23) }))
 	emuVers := strings.Join(r.unsafeVersionFlagOptions(true), ",")
 	expectedEmuVers := "test=2.8..2.8(default:2.8)"
@@ -125,7 +126,7 @@ func TestVersionFlagOptionsWithMapping(t *testing.T) {
 		t.Errorf("wanted emulation version flag options to be: %s, got %s", expectedEmuVers, emuVers)
 	}
 	minCompVers := strings.Join(r.unsafeVersionFlagOptions(false), ",")
-	expectedMinCompVers := "kube=1.30..1.31(default:1.30),test=2.7..2.8(default:2.7)"
+	expectedMinCompVers := "test=2.7..2.8(default:2.7)"
 	if minCompVers != expectedMinCompVers {
 		t.Errorf("wanted min compatibility version flag options to be: %s, got %s", expectedMinCompVers, minCompVers)
 	}
@@ -149,19 +150,22 @@ func TestVersionedFeatureGateFlags(t *testing.T) {
 
 func TestFlags(t *testing.T) {
 	tests := []struct {
-		name                         string
-		setupRegistry                func(r *componentGlobalsRegistry) error
-		flags                        []string
-		parseError                   string
-		expectedKubeEmulationVersion string
-		expectedTestEmulationVersion string
-		expectedKubeFeatureValues    map[featuregate.Feature]bool
-		expectedTestFeatureValues    map[featuregate.Feature]bool
+		name                                string
+		setupRegistry                       func(r *componentGlobalsRegistry) error
+		flags                               []string
+		parseError                          string
+		expectedKubeEmulationVersion        string
+		expectedTestEmulationVersion        string
+		expectedKubeMinCompatibilityVersion string
+		expectedTestMinCompatibilityVersion string
+		expectedKubeFeatureValues           map[featuregate.Feature]bool
+		expectedTestFeatureValues           map[featuregate.Feature]bool
 	}{
 		{
-			name:                         "setting kube emulation version",
-			flags:                        []string{"--emulated-version=kube=1.30"},
-			expectedKubeEmulationVersion: "1.30",
+			name:                                "setting kube emulation version",
+			flags:                               []string{"--emulated-version=kube=1.30", "--min-compatibility-version=kube=1.28"},
+			expectedKubeEmulationVersion:        "1.30",
+			expectedKubeMinCompatibilityVersion: "1.28",
 		},
 		{
 			name: "setting kube emulation version twice",
@@ -172,9 +176,18 @@ func TestFlags(t *testing.T) {
 			parseError: "duplicate version flag, kube=1.30 and kube=1.32",
 		},
 		{
-			name:                         "prefix v ok",
-			flags:                        []string{"--emulated-version=kube=v1.30"},
-			expectedKubeEmulationVersion: "1.30",
+			name: "setting min compatibility version twice",
+			flags: []string{
+				"--min-compatibility-version=kube=1.30",
+				"--min-compatibility-version=kube=1.29",
+			},
+			parseError: "duplicate version flag, kube=1.30 and kube=1.29",
+		},
+		{
+			name:                                "prefix v ok",
+			flags:                               []string{"--emulated-version=kube=v1.30", "--min-compatibility-version=kube=v1.28"},
+			expectedKubeEmulationVersion:        "1.30",
+			expectedKubeMinCompatibilityVersion: "1.28",
 		},
 		{
 			name:       "patch version not ok",
@@ -182,15 +195,23 @@ func TestFlags(t *testing.T) {
 			parseError: "patch version not allowed, got: kube=1.30.2",
 		},
 		{
-			name:                         "setting test emulation version",
-			flags:                        []string{"--emulated-version=test=2.7"},
-			expectedKubeEmulationVersion: "1.31",
-			expectedTestEmulationVersion: "2.7",
+			name:       "patch min compatibility version not ok",
+			flags:      []string{"--min-compatibility-version=kube=1.30.2"},
+			parseError: "patch version not allowed, got: kube=1.30.2",
 		},
 		{
-			name:                         "version missing component default to kube",
-			flags:                        []string{"--emulated-version=1.30"},
-			expectedKubeEmulationVersion: "1.30",
+			name:                                "setting test emulation version",
+			flags:                               []string{"--emulated-version=test=2.7", "--min-compatibility-version=test=v2.5"},
+			expectedKubeEmulationVersion:        "1.31",
+			expectedTestEmulationVersion:        "2.7",
+			expectedKubeMinCompatibilityVersion: "1.30",
+			expectedTestMinCompatibilityVersion: "2.5",
+		},
+		{
+			name:                                "version missing component default to kube",
+			flags:                               []string{"--emulated-version=1.30", "--min-compatibility-version=v1.28"},
+			expectedKubeEmulationVersion:        "1.30",
+			expectedKubeMinCompatibilityVersion: "1.28",
 		},
 		{
 			name:       "version missing component default to kube with duplicate",
@@ -205,6 +226,21 @@ func TestFlags(t *testing.T) {
 		{
 			name:       "invalid version",
 			flags:      []string{"--emulated-version=test=1.foo"},
+			parseError: "illegal version string \"1.foo\"",
+		},
+		{
+			name:       "min compatibility version missing component default to kube with duplicate",
+			flags:      []string{"--min-compatibility-version=1.30", "--min-compatibility-version=kube=1.30"},
+			parseError: "duplicate version flag, kube=1.30 and kube=1.30",
+		},
+		{
+			name:       "min compatibility version unregistered component",
+			flags:      []string{"--min-compatibility-version=test3=1.31"},
+			parseError: "component not registered: test3",
+		},
+		{
+			name:       "invalid min compatibility version",
+			flags:      []string{"--min-compatibility-version=test=1.foo"},
 			parseError: "illegal version string \"1.foo\"",
 		},
 		{
@@ -330,6 +366,12 @@ func TestFlags(t *testing.T) {
 			if len(test.expectedTestEmulationVersion) > 0 {
 				assertVersionEqualTo(t, r.EffectiveVersionFor(testComponent).EmulationVersion(), test.expectedTestEmulationVersion)
 			}
+			if len(test.expectedKubeMinCompatibilityVersion) > 0 {
+				assertVersionEqualTo(t, r.EffectiveVersionFor(DefaultKubeComponent).MinCompatibilityVersion(), test.expectedKubeMinCompatibilityVersion)
+			}
+			if len(test.expectedTestMinCompatibilityVersion) > 0 {
+				assertVersionEqualTo(t, r.EffectiveVersionFor(testComponent).MinCompatibilityVersion(), test.expectedTestMinCompatibilityVersion)
+			}
 			for f, v := range test.expectedKubeFeatureValues {
 				if r.FeatureGateFor(DefaultKubeComponent).Enabled(f) != v {
 					t.Errorf("%d: expected kube feature Enabled(%s)=%v", i, f, v)
@@ -355,25 +397,31 @@ func TestVersionMapping(t *testing.T) {
 	utilruntime.Must(r.Register("test3", ver3, nil))
 
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").EmulationVersion(), "0.58")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").MinCompatibilityVersion(), "0.57")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").EmulationVersion(), "1.28")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").MinCompatibilityVersion(), "1.27")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").EmulationVersion(), "2.10")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").MinCompatibilityVersion(), "2.9")
 
-	utilruntime.Must(r.SetEmulationVersionMapping("test2", "test3",
+	utilruntime.Must(r.SetVersionMapping("test2", "test3",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()+1, from.Minor()-19)
 		}))
-	utilruntime.Must(r.SetEmulationVersionMapping("test1", "test2",
+	utilruntime.Must(r.SetVersionMapping("test1", "test2",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()+1, from.Minor()-28)
 		}))
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").EmulationVersion(), "0.58")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").MinCompatibilityVersion(), "0.57")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").EmulationVersion(), "1.30")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").MinCompatibilityVersion(), "1.29")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").EmulationVersion(), "2.11")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").MinCompatibilityVersion(), "2.10")
 
 	fs := pflag.NewFlagSet("testflag", pflag.ContinueOnError)
 	r.AddFlags(fs)
 
-	if err := fs.Parse([]string{fmt.Sprintf("--emulated-version=%s", "test1=0.56")}); err != nil {
+	if err := fs.Parse([]string{"--emulated-version=test1=0.56", "--min-compatibility-version=test1=0.54"}); err != nil {
 		t.Fatal(err)
 		return
 	}
@@ -382,8 +430,11 @@ func TestVersionMapping(t *testing.T) {
 		return
 	}
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").EmulationVersion(), "0.56")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").MinCompatibilityVersion(), "0.54")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").EmulationVersion(), "1.28")
-	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").EmulationVersion(), "2.09")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").MinCompatibilityVersion(), "1.26")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").EmulationVersion(), "2.9")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").MinCompatibilityVersion(), "2.7")
 }
 
 func TestVersionMappingWithMultipleDependency(t *testing.T) {
@@ -399,12 +450,15 @@ func TestVersionMappingWithMultipleDependency(t *testing.T) {
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").EmulationVersion(), "0.58")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").EmulationVersion(), "1.28")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").EmulationVersion(), "2.10")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").MinCompatibilityVersion(), "0.57")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").MinCompatibilityVersion(), "1.27")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").MinCompatibilityVersion(), "2.9")
 
-	utilruntime.Must(r.SetEmulationVersionMapping("test1", "test2",
+	utilruntime.Must(r.SetVersionMapping("test1", "test2",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()+1, from.Minor()-28)
 		}))
-	err := r.SetEmulationVersionMapping("test3", "test2",
+	err := r.SetVersionMapping("test3", "test2",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()-1, from.Minor()+19)
 		})
@@ -426,16 +480,19 @@ func TestVersionMappingWithCyclicDependency(t *testing.T) {
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").EmulationVersion(), "0.58")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").EmulationVersion(), "1.28")
 	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").EmulationVersion(), "2.10")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test1").MinCompatibilityVersion(), "0.57")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test2").MinCompatibilityVersion(), "1.27")
+	assertVersionEqualTo(t, r.EffectiveVersionFor("test3").MinCompatibilityVersion(), "2.9")
 
-	utilruntime.Must(r.SetEmulationVersionMapping("test1", "test2",
+	utilruntime.Must(r.SetVersionMapping("test1", "test2",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()+1, from.Minor()-28)
 		}))
-	utilruntime.Must(r.SetEmulationVersionMapping("test2", "test3",
+	utilruntime.Must(r.SetVersionMapping("test2", "test3",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()+1, from.Minor()-19)
 		}))
-	err := r.SetEmulationVersionMapping("test3", "test1",
+	err := r.SetVersionMapping("test3", "test1",
 		func(from *version.Version) *version.Version {
 			return version.MajorMinor(from.Major()-2, from.Minor()+48)
 		})
@@ -444,9 +501,75 @@ func TestVersionMappingWithCyclicDependency(t *testing.T) {
 	}
 }
 
+func TestAddMetrics(t *testing.T) {
+	r := NewComponentGlobalsRegistry()
+	ver1 := NewEffectiveVersionFromString("0.58", "", "")
+	ver2 := NewEffectiveVersionFromString("1.2", "1.1", "")
+
+	if err := r.Register("comp1", ver1, nil); err != nil {
+		t.Fatalf("expected no error to register new component, but got err: %v", err)
+	}
+	if err := r.Register("comp2", ver2, nil); err != nil {
+		t.Fatalf("expected no error to register new component, but got err: %v", err)
+	}
+	r.AddMetrics()
+
+	expectedOutput := `# HELP version_info [ALPHA] Provides the compatibility version info of the component. The component label is the name of the component, usually kube, but is relevant for aggregated-apiservers.
+    # TYPE version_info gauge
+    version_info{binary="0.58",component="comp1",emulation="0.58",min_compat="0.57"} 1
+    version_info{binary="1.2",component="comp2",emulation="1.2",min_compat="1.1"} 1
+`
+	testedMetrics := []string{"version_info"}
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedOutput), testedMetrics...); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func assertVersionEqualTo(t *testing.T, ver *version.Version, expectedVer string) {
 	if ver.EqualTo(version.MustParse(expectedVer)) {
 		return
 	}
 	t.Errorf("expected: %s, got %s", expectedVer, ver.String())
+}
+
+func Test_enabledAlphaFeatures(t *testing.T) {
+	features := map[featuregate.Feature]featuregate.FeatureSpec{
+		"myFeat": {
+			PreRelease: featuregate.Alpha,
+		},
+		"myOtherFeat": {
+			PreRelease: featuregate.Beta,
+		},
+		"otherFeatDisabled": {
+			PreRelease: featuregate.Alpha,
+		},
+	}
+
+	alphaGate := featuregate.NewFeatureGate()
+	if err := alphaGate.Add(features); err != nil {
+		t.Fatalf("Unable to add features, %s", err)
+	}
+
+	err := alphaGate.SetFromMap(
+		map[string]bool{
+			"myFeat":            true,
+			"myOtherFeat":       true,
+			"otherFeatDisabled": false,
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unable to set feature gate, %s", err)
+	}
+
+	globals := &ComponentGlobals{
+		featureGate: alphaGate,
+	}
+
+	want := []string{
+		"myFeat",
+	}
+
+	if got := enabledAlphaFeatures(features, globals); !reflect.DeepEqual(got, want) {
+		t.Errorf("enabledAlphaFeatures() = %v, want %v", got, want)
+	}
 }

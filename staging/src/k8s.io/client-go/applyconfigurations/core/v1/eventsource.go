@@ -20,9 +20,13 @@ package v1
 
 // EventSourceApplyConfiguration represents a declarative configuration of the EventSource type for use
 // with apply.
+//
+// EventSource contains information for an event.
 type EventSourceApplyConfiguration struct {
+	// Component from which the event is generated.
 	Component *string `json:"component,omitempty"`
-	Host      *string `json:"host,omitempty"`
+	// Node name on which the event is generated.
+	Host *string `json:"host,omitempty"`
 }
 
 // EventSourceApplyConfiguration constructs a declarative configuration of the EventSource type for use with

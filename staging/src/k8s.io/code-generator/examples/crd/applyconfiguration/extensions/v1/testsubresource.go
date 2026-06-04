@@ -25,7 +25,7 @@ import (
 // TestSubresourceApplyConfiguration represents a declarative configuration of the TestSubresource type for use
 // with apply.
 type TestSubresourceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	Name                              *string `json:"name,omitempty"`
 }
 
@@ -37,6 +37,8 @@ func TestSubresource() *TestSubresourceApplyConfiguration {
 	b.WithAPIVersion("extensions.test.crd.code-generator.k8s.io/v1")
 	return b
 }
+
+func (b TestSubresourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -60,4 +62,14 @@ func (b *TestSubresourceApplyConfiguration) WithAPIVersion(value string) *TestSu
 func (b *TestSubresourceApplyConfiguration) WithName(value string) *TestSubresourceApplyConfiguration {
 	b.Name = &value
 	return b
+}
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *TestSubresourceApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *TestSubresourceApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
 }

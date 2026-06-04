@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -24,10 +23,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/utils/ptr"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // Mutate modifies absolute path fields in the KubeletConfiguration to be Windows compatible absolute paths.

@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -105,12 +106,24 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	})
 	framework.ExpectNoError(err)
 
-	framework.Logf("Scheduling 1 pod per node to consume all allocatable memory")
+	// Subtract any per-pod overhead the cluster's admission chain injects
+	// (Pod Overhead, KEP-688) so limit+overhead fits Allocatable.Memory.
+	overhead, err := detectPodOverheadMemory(ctx, f.ClientSet, f.Namespace.Name)
+	framework.ExpectNoError(err, "detecting pod overhead memory")
+
+	framework.Logf("Scheduling 1 pod per node to consume all allocatable memory (detected overhead: %d bytes)", overhead)
 	for _, node := range nodeList.Items {
 		status := node.Status
-		podMemLimt := resource.NewQuantity(status.Allocatable.Memory().Value()-(1024*1024*100), resource.BinarySI)
+		// Subtract overhead (consume pod's own), existing (DaemonSets/system pods,
+		// incl. their overhead), and safety buffer (kubelet accounting noise).
+		existing := sumExistingPodMemoryReservation(ctx, f.ClientSet, node.Name)
+		podMemLimt := resource.NewQuantity(
+			status.Allocatable.Memory().Value()-existing-overhead-windowsTestMemorySafetyBuffer,
+			resource.BinarySI,
+		)
 		podName := "mem-test-" + string(uuid.NewUUID())
-		framework.Logf("Scheduling pod %s on node %s (allocatable memory=%v) with memory limit %v", podName, node.Name, status.Allocatable.Memory(), podMemLimt)
+		framework.Logf("Scheduling pod %s on node %s (allocatable=%d, existing-reservation=%d, overhead=%d, safety-buffer=%d) with memory limit %v",
+			podName, node.Name, status.Allocatable.Memory().Value(), existing, overhead, windowsTestMemorySafetyBuffer, podMemLimt)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -162,18 +175,20 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	framework.Logf("Ensuring that pod %s fails to schedule", podName)
 	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	gomega.Eventually(ctx, func() bool {
+	gomega.Eventually(ctx, func() error {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		if err != nil {
+			return fmt.Errorf("error getting events: %w", err)
+		}
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
 				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
-				return true
+				return nil
 			}
 		}
-		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("Expected %s pod to be failed scheduling", podName))
+		return fmt.Errorf("did not find any FailedScheduling event for pod %s", failurePod.ObjectMeta.Name)
+	}, 3*time.Minute, 10*time.Second).Should(gomega.Succeed())
 }
 
 func getNodeMemory(ctx context.Context, f *framework.Framework, node v1.Node) nodeMemory {

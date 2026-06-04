@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -67,7 +68,7 @@ const (
 func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
 	framework.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
-	runningPods, err := e2ekubelet.GetKubeletPods(ctx, c, nodeName)
+	runningPods, err := e2ekubelet.GetKubeletRunningPods(ctx, c, nodeName)
 	if err != nil {
 		framework.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches
@@ -91,9 +92,8 @@ func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, 
 func waitTillNPodsRunningOnNodes(ctx context.Context, c clientset.Interface, nodeNames sets.String, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, pollInterval, timeout, false, func(ctx context.Context) (bool, error) {
 		matchCh := make(chan sets.String, len(nodeNames))
-		for _, item := range nodeNames.List() {
+		for _, nodeName := range nodeNames.List() {
 			// Launch a goroutine per node to check the pods running on the nodes.
-			nodeName := item
 			go func() {
 				matchCh <- getPodMatches(ctx, c, nodeName, podNamePrefix, namespace)
 			}()
@@ -189,7 +189,7 @@ func getHostExternalAddress(ctx context.Context, client clientset.Interface, p *
 		}
 	}
 	if externalAddress == "" {
-		err = fmt.Errorf("No external address for pod %v on node %v",
+		e2eskipper.Skipf("No NodeExternalIP for pod %v on node %v, test requires SSH-reachable worker nodes",
 			p.Name, p.Spec.NodeName)
 	}
 	return
@@ -322,7 +322,6 @@ var _ = SIGDescribe("kubelet", func() {
 		for _, itArg := range deleteTests {
 			name := fmt.Sprintf(
 				"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
-			itArg := itArg
 			ginkgo.It(name, func(ctx context.Context) {
 				start(ctx)
 				totalPods := itArg.podsPerNode * numNodes
@@ -370,7 +369,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 
 	// Test host cleanup when disrupting the volume environment.
-	f.Describe("host cleanup with volume mounts [HostCleanup]", f.WithFlaky(), func() {
+	f.Describe("host cleanup with volume mounts [HostCleanup]", func() {
 
 		type hostCleanupTest struct {
 			itDescr string
@@ -408,15 +407,11 @@ var _ = SIGDescribe("kubelet", func() {
 			})
 
 			ginkgo.AfterEach(func(ctx context.Context) {
-				err := e2epod.DeletePodWithWait(ctx, c, pod)
-				framework.ExpectNoError(err, "AfterEach: Failed to delete client pod ", pod.Name)
-				err = e2epod.DeletePodWithWait(ctx, c, nfsServerPod)
-				framework.ExpectNoError(err, "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
+				e2epod.DeletePodsWithWait(ctx, c, []*v1.Pod{pod, nfsServerPod})
 			})
 
 			// execute It blocks from above table of tests
 			for _, t := range testTbl {
-				t := t
 				ginkgo.It(t.itDescr, func(ctx context.Context) {
 					pod = createPodUsingNfs(ctx, f, c, ns, nfsIP, t.podCmd)
 
@@ -494,7 +489,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the kubelet logs
 		*/
 
-		ginkgo.It("should return the kubelet logs ", func(ctx context.Context) {
+		ginkgo.It("should return the kubelet logs", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -642,7 +637,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 })
 
-var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, func() {
+var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, framework.WithFeatureGate(features.PodLogsQuerySplitStreams), func() {
 	var (
 		c  clientset.Interface
 		ns string

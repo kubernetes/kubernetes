@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -27,13 +26,16 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 var timeStamp = time.Now()
 
 type fakeWinNodeStatsClient struct{}
 
-func (f fakeWinNodeStatsClient) startMonitoring() error {
+func (f fakeWinNodeStatsClient) startMonitoring(logger klog.Logger) error {
 	return nil
 }
 
@@ -53,7 +55,7 @@ func (f fakeWinNodeStatsClient) getNodeInfo() nodeInfo {
 		memoryPhysicalCapacityBytes: 1.6e+10,
 	}
 }
-func (f fakeWinNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (f fakeWinNodeStatsClient) getMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	return &cadvisorapi.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 1.6e+10,
@@ -114,9 +116,10 @@ func TestWinContainerInfos(t *testing.T) {
 }
 
 func TestWinMachineInfo(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	c := getClient(t)
 
-	machineInfo, err := c.WinMachineInfo()
+	machineInfo, err := c.WinMachineInfo(logger)
 	assert.NoError(t, err)
 	assert.Equal(t, machineInfo, &cadvisorapi.MachineInfo{
 		NumCores:       4,
@@ -155,8 +158,9 @@ func TestGetDirFsInfo(t *testing.T) {
 }
 
 func getClient(t *testing.T) Client {
+	logger, _ := ktesting.NewTestContext(t)
 	f := fakeWinNodeStatsClient{}
-	c, err := newClient(f)
+	c, err := newClient(logger, f)
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	return c

@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -273,7 +274,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		})
 		return err
 	}()
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodDisruptionBudget %q due to conflicts", pdbName), 10)
 	}
 	if err != nil {
@@ -427,14 +428,43 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 		return createTooManyRequestsError(pdb.Name)
 	}
 	if pdb.Status.DisruptionsAllowed < 0 {
-		return errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("pdb disruptions allowed is negative"))
+		err := errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, goerrors.New("pdb disruptions allowed is negative"))
+		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{
+			Type:    policyv1.DisruptionBudgetCause,
+			Message: fmt.Sprintf("The disruption budget %s does not allow evicting pods currently: pdb disruptions allowed is negative", pdb.Name),
+		})
+		return err
 	}
 	if len(pdb.Status.DisruptedPods) > MaxDisruptedPodSize {
-		return errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("DisruptedPods map too big - too many evictions not confirmed by PDB controller"))
+		err := errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, goerrors.New("DisruptedPods map too big - too many evictions not confirmed by PDB controller"))
+		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{
+			Type:    policyv1.DisruptionBudgetCause,
+			Message: fmt.Sprintf("The disruption budget %s does not allow evicting pods currently: too many pending evictions not confirmed by PDB controller", pdb.Name),
+		})
+		return err
 	}
 	if pdb.Status.DisruptionsAllowed == 0 {
 		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
-		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: policyv1.DisruptionBudgetCause, Message: fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy)})
+		condition := meta.FindStatusCondition(pdb.Status.Conditions, policyv1.DisruptionAllowedCondition)
+		var msg string
+		switch {
+		// check whether sync is failed first because DesiredHealthy and CurrentHealthy are not trustworthy when the sync is failed
+		case condition != nil && condition.Status == metav1.ConditionFalse && len(condition.Message) > 0 && condition.Reason == policyv1.SyncFailedReason:
+			msg = fmt.Sprintf("The disruption budget %s does not allow evicting pods currently because it failed sync: %s", pdb.Name, condition.Message)
+		case pdb.Status.CurrentHealthy <= pdb.Status.DesiredHealthy:
+			msg = fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy)
+		case condition != nil && condition.Status == metav1.ConditionFalse && len(condition.Message) > 0:
+			msg = fmt.Sprintf("The disruption budget %s does not allow evicting pods currently (%s): %s", pdb.Name, condition.Reason, condition.Message)
+		default:
+			msg = fmt.Sprintf("The disruption budget %s does not allow evicting pods currently", pdb.Name)
+		}
+		err.ErrStatus.Details.Causes = append(
+			err.ErrStatus.Details.Causes,
+			metav1.StatusCause{
+				Type:    policyv1.DisruptionBudgetCause,
+				Message: msg,
+			},
+		)
 		return err
 	}
 

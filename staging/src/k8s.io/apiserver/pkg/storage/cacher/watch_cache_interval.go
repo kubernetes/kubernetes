@@ -18,10 +18,10 @@ package cacher
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
 // watchCacheInterval serves as an abstraction over a source
@@ -118,29 +118,15 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-type sortableWatchCacheEvents []*watchCacheEvent
-
-func (s sortableWatchCacheEvents) Len() int {
-	return len(s)
-}
-
-func (s sortableWatchCacheEvents) Less(i, j int) bool {
-	return s[i].Key < s[j].Key
-}
-
-func (s sortableWatchCacheEvents) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, store storeIndexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 	if matchesSingle {
-		item, exists, err := store.GetByKey(key)
+		item, exists, err := indexer.GetByKey(key)
 		if err != nil {
 			return nil, err
 		}
@@ -149,11 +135,11 @@ func newCacheIntervalFromStore(resourceVersion uint64, store storeIndexer, key s
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems = store.List()
+		allItems = indexer.List()
 	}
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
 	for i, item := range allItems {
-		elem, ok := item.(*storeElement)
+		elem, ok := item.(*store.Element)
 		if !ok {
 			return nil, fmt.Errorf("not a storeElement: %v", elem)
 		}
@@ -167,7 +153,6 @@ func newCacheIntervalFromStore(resourceVersion uint64, store storeIndexer, key s
 		}
 		buffer.endIndex++
 	}
-	sort.Sort(sortableWatchCacheEvents(buffer.buffer))
 	ci := &watchCacheInterval{
 		startIndex: 0,
 		// Simulate that we already have all the events we're looking for.
@@ -242,6 +227,11 @@ func (wcib *watchCacheIntervalBuffer) next() (*watchCacheEvent, bool) {
 		return nil, false
 	}
 	next := wcib.buffer[wcib.startIndex]
+	// clean the unused event reference in the buffer. If this is not
+	// done, event if the watch event is aged out from the watch
+	// cache, it will not be GCed during the lifetime of the watcher
+	// that holds a reference to the buffer.
+	wcib.buffer[wcib.startIndex] = nil
 	wcib.startIndex++
 	return next, true
 }

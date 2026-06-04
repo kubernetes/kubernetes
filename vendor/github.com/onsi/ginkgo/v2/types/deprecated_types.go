@@ -113,7 +113,7 @@ type DeprecatedSpecFailure struct {
 
 type DeprecatedSpecMeasurement struct {
 	Name  string
-	Info  interface{}
+	Info  any
 	Order int
 
 	Results []float64

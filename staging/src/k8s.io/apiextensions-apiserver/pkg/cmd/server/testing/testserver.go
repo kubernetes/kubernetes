@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
@@ -162,13 +163,17 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	}
 	// If the local ComponentGlobalsRegistry is changed by the flags,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
-	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t.(featuregatetesting.TB), utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
+		featuregatetesting.SetFeatureGateVersionsDuringTest(t.(featuregatetesting.TB), utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
+	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
 		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
-			featuregatetesting.SetFeatureGateDuringTest(t.(featuregatetesting.TB), utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+			featureOverrides[f] = featureGate.Enabled(f)
 		}
+	}
+	if len(featureOverrides) > 0 {
+		featuregatetesting.SetFeatureGatesDuringTest(t.(featuregatetesting.TB), utilfeature.DefaultFeatureGate, featureOverrides)
 	}
 
 	if err := s.Complete(); err != nil {

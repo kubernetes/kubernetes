@@ -42,10 +42,10 @@ func Test(t *testing.T) {
 
 	st.Value(&structA).OldValue(&structA).ExpectValid()
 
-	st.Value(&structA).OldValue(&structB).ExpectInvalid(
-		field.Forbidden(field.NewPath("s"), "field is immutable"),
-		field.Forbidden(field.NewPath("i"), "field is immutable"),
-		field.Forbidden(field.NewPath("b"), "field is immutable"),
-		field.Forbidden(field.NewPath("f"), "field is immutable"),
-	)
+	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("s"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("i"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("b"), nil, "").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("f"), nil, "").WithOrigin("immutable"),
+	})
 }

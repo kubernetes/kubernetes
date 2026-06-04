@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -21,6 +20,7 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,7 +28,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -304,8 +303,8 @@ func checkPodPullingOverlap(podStartTime map[string]metav1.Time, podEndTime map[
 
 func prepareAndCleanup(ctx context.Context, f *framework.Framework) (testpods []*v1.Pod) {
 	// cuda images are > 2Gi and it will reduce the flaky rate
-	image1 := imageutils.GetE2EImage(imageutils.Httpd)
-	image2 := imageutils.GetE2EImage(imageutils.HttpdNew)
+	image1 := imageutils.GetE2EImage(imageutils.AgnhostPrev)
+	image2 := imageutils.GetE2EImage(imageutils.Agnhost)
 	node := getNodeName(ctx, f)
 
 	testpod := &v1.Pod{
@@ -357,7 +356,7 @@ type pulledStruct struct {
 func getDurationsFromPulledEventMsg(msg string) (*pulledStruct, error) {
 	splits := strings.Split(msg, " ")
 	if len(splits) != 13 {
-		return nil, errors.Errorf("pull event message should be spilted to 13: %d", len(splits))
+		return nil, fmt.Errorf("pull event message should be spilted to 13: %d", len(splits))
 	}
 	pulledDuration, err := time.ParseDuration(splits[5])
 	if err != nil {

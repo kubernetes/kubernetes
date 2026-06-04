@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 type cmdOption struct {
@@ -153,7 +153,7 @@ func genFlagResult(flags *pflag.FlagSet) []cmdOption {
 		// Todo, when we mark a shorthand is deprecated, but specify an empty message.
 		// The flag.ShorthandDeprecated is empty as the shorthand is deprecated.
 		// Using len(flag.ShorthandDeprecated) > 0 can't handle this, others are ok.
-		if !(len(flag.ShorthandDeprecated) > 0) && len(flag.Shorthand) > 0 {
+		if len(flag.ShorthandDeprecated) == 0 && len(flag.Shorthand) > 0 {
 			opt := cmdOption{
 				flag.Name,
 				flag.Shorthand,

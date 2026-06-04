@@ -101,6 +101,22 @@ var severityName = []string{
 	fatalLog:   "FATAL",
 }
 
+// sprintf is fmt.Sprintf.
+// These vars exist to make it possible to test that expensive format calls aren't made unnecessarily.
+var sprintf = fmt.Sprintf
+
+// sprint is fmt.Sprint.
+// These vars exist to make it possible to test that expensive format calls aren't made unnecessarily.
+var sprint = fmt.Sprint
+
+// sprintln is fmt.Sprintln.
+// These vars exist to make it possible to test that expensive format calls aren't made unnecessarily.
+var sprintln = fmt.Sprintln
+
+// exit is os.Exit.
+// This var exists to make it possible to test functions calling os.Exit.
+var exit = os.Exit
+
 // loggerT is the default logger used by grpclog.
 type loggerT struct {
 	m          []*log.Logger
@@ -111,7 +127,7 @@ type loggerT struct {
 func (g *loggerT) output(severity int, s string) {
 	sevStr := severityName[severity]
 	if !g.jsonFormat {
-		g.m[severity].Output(2, fmt.Sprintf("%v: %v", sevStr, s))
+		g.m[severity].Output(2, sevStr+": "+s)
 		return
 	}
 	// TODO: we can also include the logging component, but that needs more
@@ -123,55 +139,79 @@ func (g *loggerT) output(severity int, s string) {
 	g.m[severity].Output(2, string(b))
 }
 
+func (g *loggerT) printf(severity int, format string, args ...any) {
+	// Note the discard check is duplicated in each print func, rather than in
+	// output, to avoid the expensive Sprint calls.
+	// De-duplicating this by moving to output would be a significant performance regression!
+	if lg := g.m[severity]; lg.Writer() == io.Discard {
+		return
+	}
+	g.output(severity, sprintf(format, args...))
+}
+
+func (g *loggerT) print(severity int, v ...any) {
+	if lg := g.m[severity]; lg.Writer() == io.Discard {
+		return
+	}
+	g.output(severity, sprint(v...))
+}
+
+func (g *loggerT) println(severity int, v ...any) {
+	if lg := g.m[severity]; lg.Writer() == io.Discard {
+		return
+	}
+	g.output(severity, sprintln(v...))
+}
+
 func (g *loggerT) Info(args ...any) {
-	g.output(infoLog, fmt.Sprint(args...))
+	g.print(infoLog, args...)
 }
 
 func (g *loggerT) Infoln(args ...any) {
-	g.output(infoLog, fmt.Sprintln(args...))
+	g.println(infoLog, args...)
 }
 
 func (g *loggerT) Infof(format string, args ...any) {
-	g.output(infoLog, fmt.Sprintf(format, args...))
+	g.printf(infoLog, format, args...)
 }
 
 func (g *loggerT) Warning(args ...any) {
-	g.output(warningLog, fmt.Sprint(args...))
+	g.print(warningLog, args...)
 }
 
 func (g *loggerT) Warningln(args ...any) {
-	g.output(warningLog, fmt.Sprintln(args...))
+	g.println(warningLog, args...)
 }
 
 func (g *loggerT) Warningf(format string, args ...any) {
-	g.output(warningLog, fmt.Sprintf(format, args...))
+	g.printf(warningLog, format, args...)
 }
 
 func (g *loggerT) Error(args ...any) {
-	g.output(errorLog, fmt.Sprint(args...))
+	g.print(errorLog, args...)
 }
 
 func (g *loggerT) Errorln(args ...any) {
-	g.output(errorLog, fmt.Sprintln(args...))
+	g.println(errorLog, args...)
 }
 
 func (g *loggerT) Errorf(format string, args ...any) {
-	g.output(errorLog, fmt.Sprintf(format, args...))
+	g.printf(errorLog, format, args...)
 }
 
 func (g *loggerT) Fatal(args ...any) {
-	g.output(fatalLog, fmt.Sprint(args...))
-	os.Exit(1)
+	g.print(fatalLog, args...)
+	exit(1)
 }
 
 func (g *loggerT) Fatalln(args ...any) {
-	g.output(fatalLog, fmt.Sprintln(args...))
-	os.Exit(1)
+	g.println(fatalLog, args...)
+	exit(1)
 }
 
 func (g *loggerT) Fatalf(format string, args ...any) {
-	g.output(fatalLog, fmt.Sprintf(format, args...))
-	os.Exit(1)
+	g.printf(fatalLog, format, args...)
+	exit(1)
 }
 
 func (g *loggerT) V(l int) bool {
@@ -186,19 +226,42 @@ type LoggerV2Config struct {
 	FormatJSON bool
 }
 
+// combineLoggers returns a combined logger for both higher & lower severity logs,
+// or only one if the other is io.Discard.
+//
+// This uses io.Discard instead of io.MultiWriter when all loggers
+// are set to io.Discard. Both this package and the standard log package have
+// significant optimizations for io.Discard, which io.MultiWriter lacks (as of
+// this writing).
+func combineLoggers(lower, higher io.Writer) io.Writer {
+	if lower == io.Discard {
+		return higher
+	}
+	if higher == io.Discard {
+		return lower
+	}
+	return io.MultiWriter(lower, higher)
+}
+
 // NewLoggerV2 creates a new LoggerV2 instance with the provided configuration.
 // The infoW, warningW, and errorW writers are used to write log messages of
 // different severity levels.
 func NewLoggerV2(infoW, warningW, errorW io.Writer, c LoggerV2Config) LoggerV2 {
-	var m []*log.Logger
 	flag := log.LstdFlags
 	if c.FormatJSON {
 		flag = 0
 	}
-	m = append(m, log.New(infoW, "", flag))
-	m = append(m, log.New(io.MultiWriter(infoW, warningW), "", flag))
-	ew := io.MultiWriter(infoW, warningW, errorW) // ew will be used for error and fatal.
-	m = append(m, log.New(ew, "", flag))
-	m = append(m, log.New(ew, "", flag))
+
+	warningW = combineLoggers(infoW, warningW)
+	errorW = combineLoggers(errorW, warningW)
+
+	fatalW := errorW
+
+	m := []*log.Logger{
+		log.New(infoW, "", flag),
+		log.New(warningW, "", flag),
+		log.New(errorW, "", flag),
+		log.New(fatalW, "", flag),
+	}
 	return &loggerT{m: m, v: c.Verbosity, jsonFormat: c.FormatJSON}
 }

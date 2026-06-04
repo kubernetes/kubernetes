@@ -30,11 +30,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -58,20 +58,35 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	ginkgo.It("should have ipv4 and ipv6 internal node ip", func(ctx context.Context) {
-		// TODO (aramase) can switch to new function to get all nodes
+	// A dual-stack cluster should have at least one dual-stack node (though it may
+	// also have some single-stack IPv4 or single-stack IPv6 nodes for some use
+	// cases).
+	ginkgo.It("should have at least one dual-stack node", func(ctx context.Context) {
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 
+		var found bool
 		for _, node := range nodeList.Items {
-			// get all internal ips for node
-			internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
-
-			gomega.Expect(internalIPs).To(gomega.HaveLen(2))
-			// assert 2 ips belong to different families
-			if netutils.IsIPv4String(internalIPs[0]) == netutils.IsIPv4String(internalIPs[1]) {
-				framework.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
+			ginkgo.By(fmt.Sprintf("examining %s", node.Name))
+			var hasIPv4, hasIPv6 bool
+			for _, addr := range node.Status.Addresses {
+				if addr.Type != v1.NodeInternalIP && addr.Type != v1.NodeExternalIP {
+					continue
+				}
+				if netutils.IsIPv4String(addr.Address) {
+					hasIPv4 = true
+				} else if netutils.IsIPv6String(addr.Address) {
+					hasIPv6 = true
+				}
 			}
+			if hasIPv4 && hasIPv6 {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			framework.Failf("Could not find any schedulable node with both an IPv4 IP and an IPv6 IP")
 		}
 	})
 
@@ -273,7 +288,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoint belong to same ipfamily as service
-		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
+		validateEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv4 cluster ip", func(ctx context.Context) {
@@ -309,7 +324,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
+		validateEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv6 cluster ip", func(ctx context.Context) {
@@ -344,7 +359,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
+		validateEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv4,v6 cluster ip", func(ctx context.Context) {
@@ -380,7 +395,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
+		validateEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv6,v4 cluster ip", func(ctx context.Context) {
@@ -416,7 +431,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
+		validateEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
@@ -717,47 +732,17 @@ func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.
 	}
 }
 
-func validateEndpointsAndEndpointSlices(ctx context.Context, f *framework.Framework, svc *v1.Service, expectedIPFamilies []v1.IPFamily) {
-	var endpoint *v1.Endpoints
-	if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
-		var err error
-		endpoint, err = f.ClientSet.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-		return err == nil, nil
-	}); err != nil {
-		framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-	}
-	framework.Logf("Got endpoint %#v", endpoint)
-	validateEndpointsBelongToIPFamily(svc, endpoint, expectedIPFamilies[0] /* endpoint controller works on primary IP */)
-
-	var slices *discoveryv1.EndpointSliceList
-	if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
-		var err error
-		slices, err = f.ClientSet.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name})
-		if err != nil || len(slices.Items) < len(expectedIPFamilies) {
+func validateEndpointSlices(ctx context.Context, f *framework.Framework, svc *v1.Service, expectedIPFamilies []v1.IPFamily) {
+	var slices []discoveryv1.EndpointSlice
+	err := e2eendpointslice.WaitForEndpointSlices(ctx, f.ClientSet, svc.Namespace, svc.Name, 500*time.Millisecond, 10*time.Second, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+		if len(endpointSlices) < len(expectedIPFamilies) {
 			return false, nil
 		}
+		slices = endpointSlices
 		return true, nil
-	}); err != nil {
-		framework.Failf("List EndpointSlices for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-	}
-	framework.Logf("Got endpointslices %#v", slices)
-	validateEndpointSlicesBelongToIPFamilies(svc, slices.Items, expectedIPFamilies)
-}
+	})
+	framework.ExpectNoError(err, "could not validate EndpointSlices for service %s/%s", svc.Namespace, svc.Name)
 
-func validateEndpointsBelongToIPFamily(svc *v1.Service, endpoint *v1.Endpoints, expectedIPFamily v1.IPFamily) {
-	if len(endpoint.Subsets) == 0 {
-		framework.Failf("Endpoint has no subsets, cannot determine service ip family matches endpoints ip family for service %s/%s", svc.Namespace, svc.Name)
-	}
-	for _, ss := range endpoint.Subsets {
-		for _, e := range ss.Addresses {
-			if (expectedIPFamily == v1.IPv6Protocol) != netutils.IsIPv6String(e.IP) {
-				framework.Failf("service endpoint %s doesn't belong to %s ip family", e.IP, expectedIPFamily)
-			}
-		}
-	}
-}
-
-func validateEndpointSlicesBelongToIPFamilies(svc *v1.Service, slices []discoveryv1.EndpointSlice, expectedIPFamilies []v1.IPFamily) {
 	var wantIPv4, wantIPv6 bool
 	for _, family := range expectedIPFamilies {
 		if family == v1.IPv4Protocol {

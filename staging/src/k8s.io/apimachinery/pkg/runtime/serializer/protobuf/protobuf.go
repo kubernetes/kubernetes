@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/gogo/protobuf/proto"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -148,11 +146,13 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err):
-			pb, ok := into.(proto.Message)
+			unmarshaler, ok := into.(unmarshaler)
 			if !ok {
 				return nil, &actual, errNotMarshalable{reflect.TypeOf(into)}
 			}
-			if err := proto.Unmarshal(unk.Raw, pb); err != nil {
+			// top-level unmarshal resets before delegating unmarshaling to the object
+			unmarshaler.Reset()
+			if err := unmarshaler.Unmarshal(unk.Raw); err != nil {
 				return nil, &actual, err
 			}
 			return into, &actual, nil
@@ -251,7 +251,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.
 		_, err = w.Write(data[:prefixSize+uint64(i)])
 		return err
 
-	case proto.Marshaler:
+	case unbufferedMarshaller:
 		// this path performs extra allocations
 		data, err := t.Marshal()
 		if err != nil {
@@ -306,14 +306,25 @@ func copyKindDefaults(dst, src *schema.GroupVersionKind) {
 // bufferedMarshaller describes a more efficient marshalling interface that can avoid allocating multiple
 // byte buffers by pre-calculating the size of the final buffer needed.
 type bufferedMarshaller interface {
-	proto.Sizer
 	runtime.ProtobufMarshaller
 }
 
 // Like bufferedMarshaller, but is able to marshal backwards, which is more efficient since it doesn't call Size() as frequently.
 type bufferedReverseMarshaller interface {
-	proto.Sizer
 	runtime.ProtobufReverseMarshaller
+}
+
+type unbufferedMarshaller interface {
+	Marshal() ([]byte, error)
+}
+
+// unmarshaler is the subset of gogo Message and Unmarshaler used by unmarshal
+type unmarshaler interface {
+	// Reset() is called on the top-level message before unmarshaling,
+	// and clears all existing data from the message instance.
+	Reset()
+	// Unmarshal decodes from the start of the data into the message.
+	Unmarshal([]byte) error
 }
 
 // estimateUnknownSize returns the expected bytes consumed by a given runtime.Unknown
@@ -381,11 +392,13 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *schema.GroupVersionKind
 	types, _, err := s.typer.ObjectKinds(into)
 	switch {
 	case runtime.IsNotRegisteredError(err):
-		pb, ok := into.(proto.Message)
+		unmarshaler, ok := into.(unmarshaler)
 		if !ok {
 			return nil, actual, errNotMarshalable{reflect.TypeOf(into)}
 		}
-		if err := proto.Unmarshal(data, pb); err != nil {
+		// top-level unmarshal resets before delegating unmarshaling to the object
+		unmarshaler.Reset()
+		if err := unmarshaler.Unmarshal(data); err != nil {
 			return nil, actual, err
 		}
 		return into, actual, nil
@@ -419,11 +432,13 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 		return nil, actual, err
 	}
 
-	pb, ok := obj.(proto.Message)
+	unmarshaler, ok := obj.(unmarshaler)
 	if !ok {
 		return nil, actual, errNotMarshalable{reflect.TypeOf(obj)}
 	}
-	if err := proto.Unmarshal(data, pb); err != nil {
+	// top-level unmarshal resets before delegating unmarshaling to the object
+	unmarshaler.Reset()
+	if err := unmarshaler.Unmarshal(data); err != nil {
 		return nil, actual, err
 	}
 	if actual != nil {
@@ -519,7 +534,7 @@ func doEncode(obj any, w io.Writer, precomputedObjSize *int, memAlloc runtime.Me
 		}
 		return w.Write(data[:n])
 
-	case proto.Marshaler:
+	case unbufferedMarshaller:
 		// this path performs extra allocations
 		data, err := t.Marshal()
 		if err != nil {

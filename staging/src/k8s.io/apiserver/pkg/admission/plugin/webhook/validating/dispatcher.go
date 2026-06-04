@@ -262,7 +262,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	// Make the webhook request
 	client, err := invocation.Webhook.GetRESTClient(d.cm)
 	if err != nil {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewBadRequest("error getting REST client")}
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewInternalError(err)}
 	}
 	ctx, span := tracing.Start(ctx, "Call validating webhook",
 		attribute.String("configuration", invocation.Webhook.GetConfigurationName()),
@@ -306,7 +306,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se
 		} else {
-			status = apierrors.NewBadRequest("error calling webhook")
+			status = apierrors.NewServiceUnavailable("error calling webhook")
 		}
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("failed to call webhook: %w", err), Status: status}
 	}

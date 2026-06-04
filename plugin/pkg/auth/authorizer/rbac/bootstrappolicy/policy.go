@@ -66,6 +66,7 @@ const (
 	internalAPIServerGroup       = "internal.apiserver.k8s.io"
 	admissionRegistrationGroup   = "admissionregistration.k8s.io"
 	storageVersionMigrationGroup = "storagemigration.k8s.io"
+	schedulingGroup              = "scheduling.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -112,11 +113,13 @@ func viewRules() []rbacv1.PolicyRule {
 	rules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 			"services", "services/status", "endpoints", "persistentvolumeclaims", "persistentvolumeclaims/status", "configmaps").RuleOrDie(),
-		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings",
 			"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
 		// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
 		// indicator of which namespaces you have access to.
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Read...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 
@@ -143,6 +146,9 @@ func viewRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status", "resourceclaimtemplates").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
+	}
 	return rules
 }
 
@@ -155,8 +161,10 @@ func editRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
 		rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-			"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
+			"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
+
+		rbacv1helpers.NewRule(Write...).Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie(),
 
 		rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 			"statefulsets", "statefulsets/scale",
@@ -182,6 +190,9 @@ func editRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(resourceGroup).Resources("resourceclaims", "resourceclaimtemplates").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
+	}
 	return rules
 }
 
@@ -202,7 +213,7 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		// TODO: restrict to the bound node as creator in the NodeRestrictions admission plugin
-		rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+		rbacv1helpers.NewRule("create", "update", "patch").Groups(legacyGroup, eventsGroup).Resources("events").RuleOrDie(),
 
 		// Use the Node authorizer to limit get to pods related to the node, and to limit list/watch to field selectors related to the node.
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods").RuleOrDie(),
@@ -271,26 +282,36 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
 		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie())
 	}
+	// Kubelet needs to create arbitrary PodCertificateRequests to implement
+	// podCertificate volumes.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie())
+	}
 
 	return nodePolicyRules
 }
 
 // ClusterRoles returns the cluster roles to bootstrap an API server with
 func ClusterRoles() []rbacv1.ClusterRole {
-	monitoringRules := []rbacv1.PolicyRule{
-		rbacv1helpers.NewRule("get").URLs(
-			"/metrics", "/metrics/slis",
-			"/livez", "/readyz", "/healthz",
-			"/livez/*", "/readyz/*", "/healthz/*",
-		).RuleOrDie(),
+	monitoringURLs := []string{
+		"/metrics", "/metrics/slis",
+		"/livez", "/readyz", "/healthz",
+		"/livez/*", "/readyz/*", "/healthz/*",
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		monitoringRules = append(monitoringRules, rbacv1helpers.NewRule("get").URLs("/flagz").RuleOrDie())
+		monitoringURLs = append(monitoringURLs, "/flagz")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		monitoringRules = append(monitoringRules, rbacv1helpers.NewRule("get").URLs("/statusz").RuleOrDie())
+		monitoringURLs = append(monitoringURLs, "/statusz")
+	}
+
+	monitoringRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("get").URLs(monitoringURLs...).RuleOrDie(),
+
+		// Needed for kubelet metrics
+		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes/metrics").RuleOrDie(),
 	}
 
 	roles := []rbacv1.ClusterRole{
@@ -625,12 +646,26 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("deviceclasses").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
-			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
 		)
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+			kubeSchedulerRules = append(kubeSchedulerRules,
+				rbacv1helpers.NewRule("create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
+			kubeSchedulerRules = append(kubeSchedulerRules,
+				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
+			)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

@@ -17,6 +17,7 @@ package types
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 
@@ -44,7 +45,7 @@ func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.Int32:
 		switch typeDesc {
-		case jsonNullType:
+		case JSONNullType:
 			return structpb.NullValue_NULL_VALUE, nil
 		case nullReflectType:
 			return n, nil
@@ -54,18 +55,18 @@ func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case anyValueType:
 			// Convert to a JSON-null before packing to an Any field since the enum value for JSON
 			// null cannot be packed directly.
-			pb, err := n.ConvertToNative(jsonValueType)
+			pb, err := n.ConvertToNative(JSONValueType)
 			if err != nil {
 				return nil, err
 			}
 			return anypb.New(pb.(proto.Message))
-		case jsonValueType:
+		case JSONValueType:
 			return structpb.NewNullValue(), nil
 		case boolWrapperType, byteWrapperType, doubleWrapperType, floatWrapperType,
 			int32WrapperType, int64WrapperType, stringWrapperType, uint32WrapperType,
 			uint64WrapperType, durationValueType, timestampValueType, protoIfaceType:
 			return nil, nil
-		case jsonListValueType, jsonStructType:
+		case JSONListType, JSONStructType:
 			// skip handling
 		default:
 			if typeDesc.Implements(protoIfaceType) {
@@ -116,4 +117,8 @@ func (n Null) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (n Null) Value() any {
 	return structpb.NullValue_NULL_VALUE
+}
+
+func (n Null) format(sb *strings.Builder) {
+	sb.WriteString("null")
 }

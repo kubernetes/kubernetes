@@ -25,19 +25,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/api/resourceclaimspec"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"k8s.io/kubernetes/pkg/features"
 	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
 )
 
 // resourceClaimTemplateStrategy implements behavior for ResourceClaimTemplate objects
 type resourceClaimTemplateStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 	nsClient v1.NamespaceInterface
 }
@@ -45,7 +45,7 @@ type resourceClaimTemplateStrategy struct {
 // NewStrategy is the default logic that applies when creating and updating ResourceClaimTemplate objects.
 func NewStrategy(nsClient v1.NamespaceInterface) *resourceClaimTemplateStrategy {
 	return &resourceClaimTemplateStrategy{
-		legacyscheme.Scheme,
+		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,
 		nsClient,
 	}
@@ -66,6 +66,14 @@ func (s *resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtim
 	return append(allErrs, validation.ValidateResourceClaimTemplate(resourceClaimTemplate)...)
 }
 
+// DeclarativeValidationConfig supplies the same path-normalization rules used
+// by ResourceClaim, so the runtime mismatch comparator can pair v1beta1's
+// flattened request paths (e.g. spec.spec.devices.requests[i].tolerations) with
+// the handwritten paths under .exactly.* without false positives.
+func (*resourceClaimTemplateStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
+}
+
 func (*resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
@@ -73,7 +81,7 @@ func (*resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj 
 func (*resourceClaimTemplateStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*resourceClaimTemplateStrategy) AllowCreateOnUpdate() bool {
+func (*resourceClaimTemplateStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -92,7 +100,7 @@ func (*resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj,
 	return nil
 }
 
-func (*resourceClaimTemplateStrategy) AllowUnconditionalUpdate() bool {
+func (*resourceClaimTemplateStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -112,65 +120,9 @@ func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 }
 
 func dropDisabledFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate)
-	dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate)
-}
-
-func dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList) {
-		return
+	var oldClaimSpec *resource.ResourceClaimSpec
+	if oldClaimTemplate != nil {
+		oldClaimSpec = &oldClaimTemplate.Spec.Spec
 	}
-	if draPrioritizedListFeatureInUse(oldClaimTemplate) {
-		return
-	}
-
-	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		newClaimTemplate.Spec.Spec.Devices.Requests[i].FirstAvailable = nil
-	}
-}
-
-func draPrioritizedListFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
-	if claimTemplate == nil {
-		return false
-	}
-
-	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if len(request.FirstAvailable) > 0 {
-			return true
-		}
-	}
-
-	return false
-}
-
-func dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
-		// No need to drop anything.
-		return
-	}
-	if draAdminAccessFeatureInUse(oldClaimTemplate) {
-		// If anything was set in the past, then fields must not get
-		// dropped on potentially unrelated updates.
-		return
-	}
-
-	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		if newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly != nil {
-			newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
-		}
-	}
-}
-
-func draAdminAccessFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
-	if claimTemplate == nil {
-		return false
-	}
-
-	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
-			return true
-		}
-	}
-
-	return false
+	resourceclaimspec.DropDisabledFields(&newClaimTemplate.Spec.Spec, oldClaimSpec)
 }

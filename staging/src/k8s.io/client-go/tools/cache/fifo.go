@@ -47,7 +47,9 @@ type Queue interface {
 	// may return an ErrRequeue{inner} and in this case Pop will (a)
 	// return that (key, accumulator) association to the Queue as part
 	// of the atomic processing and (b) return the inner error from
-	// Pop.
+	// Pop. It is expected that the caller of Pop will be a single
+	// threaded consumer since otherwise it is possible for multiple
+	// PopProcessFuncs to be running simultaneously.
 	Pop(PopProcessFunc) (interface{}, error)
 
 	// HasSynced returns true if the first batch of keys have all been
@@ -56,23 +58,37 @@ type Queue interface {
 	// Update, or Delete; otherwise the first batch is empty.
 	HasSynced() bool
 
+	// HasSyncedChecker is done once the first batch of keys have all been
+	// popped.  The first batch of keys are those of the first Replace
+	// operation if that happened before any Add, AddIfNotPresent,
+	// Update, or Delete; otherwise the first batch is empty.
+	HasSyncedChecker() DoneChecker
+
 	// Close the queue
 	Close()
 }
 
-// Pop is helper function for popping from Queue.
-// WARNING: Do NOT use this function in non-test code to avoid races
-// unless you really really really really know what you are doing.
+// QueueWithBatch extends the Queue interface with support for batch processing.
 //
-// NOTE: This function is deprecated and may be removed in the future without
-// additional warning.
-func Pop(queue Queue) interface{} {
-	var result interface{}
-	queue.Pop(func(obj interface{}, isInInitialList bool) error {
-		result = obj
-		return nil
-	})
-	return result
+// In addition to the standard single-item Pop method, QueueWithBatch provides
+// PopBatch, which allows multiple items to be popped and processed together as
+// a batch. This can be used to improve processing efficiency when it is
+// beneficial to handle multiple queued keys or accumulators in a single
+// operation.
+// TODO: Consider merging this interface into Queue after feature gate GA
+type QueueWithBatch interface {
+	Queue
+
+	// PopBatch behaves similarly to Queue#Pop, but processes multiple keys
+	// as a batch. The implementation determines the batching strategy,
+	// such as the number of keys to include per batch. The ProcessBatchFunc
+	// is called when a batch is ready to be processed. The PopProcessFunc
+	// is called when a singleton item is ready to be processed. The
+	// ProcessBatchFunc and PopProcessFunc must do the same processing to
+	// ensure consistent behavior. It is expected that the caller of PopBatch
+	// will be a single threaded consumer since otherwise it is possible for
+	// multiple ProcessBatchFuncs/PopProcessFuncs to be running simultaneously.
+	PopBatch(processBatch ProcessBatchFunc, processSingle PopProcessFunc) error
 }
 
 // FIFO is a Queue in which (a) each accumulator is simply the most
@@ -100,6 +116,11 @@ type FIFO struct {
 	items map[string]interface{}
 	queue []string
 
+	// synced is initially an open channel. It gets closed (once!) by checkSynced
+	// as soon as the initial sync is considered complete.
+	synced       chan struct{}
+	syncedClosed bool
+
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
 	populated bool
@@ -117,7 +138,8 @@ type FIFO struct {
 }
 
 var (
-	_ = Queue(&FIFO{}) // FIFO is a Queue
+	_ = Queue(&FIFO{})       // FIFO is a Queue
+	_ = DoneChecker(&FIFO{}) // ... and implements DoneChecker.
 )
 
 // Close the queue.
@@ -136,8 +158,36 @@ func (f *FIFO) HasSynced() bool {
 	return f.hasSynced_locked()
 }
 
+// HasSyncedChecker is done if an Add/Update/Delete/AddIfNotPresent are called first,
+// or the first batch of items inserted by Replace() has been popped.
+func (f *FIFO) HasSyncedChecker() DoneChecker {
+	return f
+}
+
+// Name implements [DoneChecker.Name]
+func (f *FIFO) Name() string {
+	return "FIFO" // FIFO doesn't seem to be used outside of a few tests, so changing the NewFIFO API to pass in a name doesn't seem worth it.
+}
+
+// Done implements [DoneChecker.Done]
+func (f *FIFO) Done() <-chan struct{} {
+	return f.synced
+}
+
+// hasSynced_locked returns the result of a prior checkSynced call.
 func (f *FIFO) hasSynced_locked() bool {
-	return f.populated && f.initialPopulationCount == 0
+	return f.syncedClosed
+}
+
+// checkSynced checks whether the initial sync is completed.
+// It must be called whenever populated or initialPopulationCount change
+// while the mutex is still locked.
+func (f *FIFO) checkSynced() {
+	synced := f.populated && f.initialPopulationCount == 0
+	if synced && !f.syncedClosed {
+		f.syncedClosed = true
+		close(f.synced)
+	}
 }
 
 // Add inserts an item, and puts it in the queue. The item is only enqueued
@@ -150,6 +200,7 @@ func (f *FIFO) Add(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.checkSynced()
 	if _, exists := f.items[id]; !exists {
 		f.queue = append(f.queue, id)
 	}
@@ -174,6 +225,7 @@ func (f *FIFO) Delete(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.populated = true
+	f.checkSynced()
 	delete(f.items, id)
 	return err
 }
@@ -210,6 +262,8 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		f.queue = f.queue[1:]
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
+			// Must be done *after* process has completed.
+			defer f.checkSynced()
 		}
 		item, ok := f.items[id]
 		if !ok {
@@ -242,6 +296,7 @@ func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	if !f.populated {
 		f.populated = true
 		f.initialPopulationCount = len(items)
+		f.checkSynced()
 	}
 
 	f.items = items
@@ -280,6 +335,7 @@ func (f *FIFO) Resync() error {
 // process.
 func NewFIFO(keyFunc KeyFunc) *FIFO {
 	f := &FIFO{
+		synced:  make(chan struct{}),
 		items:   map[string]interface{}{},
 		queue:   []string{},
 		keyFunc: keyFunc,

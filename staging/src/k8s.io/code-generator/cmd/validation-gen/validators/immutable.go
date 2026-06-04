@@ -18,6 +18,8 @@ package validators
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -44,34 +46,23 @@ func (immutableTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	immutableValidator              = types.Name{Package: libValidationPkg, Name: "Immutable"}
-	immutableNonComparableValidator = types.Name{Package: libValidationPkg, Name: "ImmutableNonComparable"}
+	immutableValidator = types.Name{Package: libValidationPkg, Name: "Immutable"}
 )
 
-func (immutableTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
-	t := context.Type
-	for t.Kind == types.Pointer || t.Kind == types.Alias {
-		if t.Kind == types.Pointer {
-			t = t.Elem
-		} else if t.Kind == types.Alias {
-			t = t.Underlying
-		}
-	}
-	if t.IsComparable() {
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableValidator))
-	} else {
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableNonComparableValidator))
-	}
-
+	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.
+	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator).
+		WithEmits(Emission{field.ErrorTypeInvalid, "immutable", ""}))
 	return result, nil
 }
 
 func (itv immutableTagValidator) Docs() TagDoc {
 	return TagDoc{
-		Tag:         itv.TagName(),
-		Scopes:      itv.ValidScopes().UnsortedList(),
-		Description: "Indicates that a field may not be updated.",
+		Tag:            itv.TagName(),
+		StabilityLevel: TagStabilityLevelBeta,
+		Scopes:         sets.List(itv.ValidScopes()),
+		Description:    "Indicates that a field may not be updated.",
 	}
 }

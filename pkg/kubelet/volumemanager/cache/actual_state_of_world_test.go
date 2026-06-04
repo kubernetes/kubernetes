@@ -232,13 +232,12 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 
 	// Act
 	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          generatedVolumeName,
-		Mounter:             mounter,
-		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
-		VolumeSpec:          volumeSpec,
+		PodName:           podName,
+		PodUID:            pod.UID,
+		VolumeName:        generatedVolumeName,
+		Mounter:           mounter,
+		BlockVolumeMapper: mapper,
+		VolumeSpec:        volumeSpec,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	// Assert
@@ -307,13 +306,12 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	}
 
 	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          generatedVolumeName,
-		Mounter:             mounter,
-		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
-		VolumeSpec:          volumeSpec,
+		PodName:           podName,
+		PodUID:            pod.UID,
+		VolumeName:        generatedVolumeName,
+		Mounter:           mounter,
+		BlockVolumeMapper: mapper,
+		VolumeSpec:        volumeSpec,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {
@@ -415,13 +413,12 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	}
 
 	markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
-		PodName:             podName1,
-		PodUID:              pod1.UID,
-		VolumeName:          generatedVolumeName1,
-		Mounter:             mounter1,
-		BlockVolumeMapper:   mapper1,
-		OuterVolumeSpecName: volumeSpec1.Name(),
-		VolumeSpec:          volumeSpec1,
+		PodName:           podName1,
+		PodUID:            pod1.UID,
+		VolumeName:        generatedVolumeName1,
+		Mounter:           mounter1,
+		BlockVolumeMapper: mapper1,
+		VolumeSpec:        volumeSpec1,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts1)
 	if err != nil {
@@ -441,13 +438,12 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	}
 
 	markVolumeOpts2 := operationexecutor.MarkVolumeOpts{
-		PodName:             podName2,
-		PodUID:              pod2.UID,
-		VolumeName:          generatedVolumeName1,
-		Mounter:             mounter2,
-		BlockVolumeMapper:   mapper2,
-		OuterVolumeSpecName: volumeSpec2.Name(),
-		VolumeSpec:          volumeSpec2,
+		PodName:           podName2,
+		PodUID:            pod2.UID,
+		VolumeName:        generatedVolumeName1,
+		Mounter:           mounter2,
+		BlockVolumeMapper: mapper2,
+		VolumeSpec:        volumeSpec2,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts2)
 	if err != nil {
@@ -470,6 +466,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 // Test if volumes that were recorded to be read from disk during reconstruction
 // are handled correctly by the ASOW.
 func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name           string
 		opCallback     func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error
@@ -585,7 +582,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 				plugin, volumeSpec1)
 			require.NoError(t, err)
-			err = asw.AddAttachUncertainReconstructedVolume(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+			err = asw.AddAttachUncertainReconstructedVolume(logger, generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
 			if err != nil {
 				t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 			}
@@ -602,14 +599,13 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			}
 
 			markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
-				PodName:             podName1,
-				PodUID:              pod1.UID,
-				VolumeName:          generatedVolumeName1,
-				Mounter:             mounter1,
-				BlockVolumeMapper:   mapper1,
-				OuterVolumeSpecName: volumeSpec1.Name(),
-				VolumeSpec:          volumeSpec1,
-				VolumeMountState:    operationexecutor.VolumeMountUncertain,
+				PodName:           podName1,
+				PodUID:            pod1.UID,
+				VolumeName:        generatedVolumeName1,
+				Mounter:           mounter1,
+				BlockVolumeMapper: mapper1,
+				VolumeSpec:        volumeSpec1,
+				VolumeMountState:  operationexecutor.VolumeMountUncertain,
 			}
 			_, err = asw.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts1)
 			if err != nil {
@@ -686,13 +682,12 @@ func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
 	}
 
 	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          generatedVolumeName,
-		Mounter:             mounter,
-		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
-		VolumeSpec:          volumeSpec,
+		PodName:           podName,
+		PodUID:            pod.UID,
+		VolumeName:        generatedVolumeName,
+		Mounter:           mounter,
+		BlockVolumeMapper: mapper,
+		VolumeSpec:        volumeSpec,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {
@@ -793,13 +788,12 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	// Act
 	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          volumeName,
-		Mounter:             mounter,
-		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
-		VolumeSpec:          volumeSpec,
+		PodName:           podName,
+		PodUID:            pod.UID,
+		VolumeName:        volumeName,
+		Mounter:           mounter,
+		BlockVolumeMapper: mapper,
+		VolumeSpec:        volumeSpec,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	// Assert
@@ -929,7 +923,6 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 		VolumeName:          generatedVolumeName,
 		Mounter:             mounter,
 		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
 		VolumeSpec:          volumeSpec,
 		SELinuxMountContext: "system_u:object_r:container_file_t:s0:c0,c1",
 		VolumeMountState:    operationexecutor.VolumeMounted,
@@ -1043,13 +1036,12 @@ func TestUncertainVolumeMounts(t *testing.T) {
 	}
 
 	markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
-		PodName:             podName1,
-		PodUID:              pod1.UID,
-		VolumeName:          generatedVolumeName1,
-		Mounter:             mounter1,
-		OuterVolumeSpecName: volumeSpec1.Name(),
-		VolumeSpec:          volumeSpec1,
-		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+		PodName:          podName1,
+		PodUID:           pod1.UID,
+		VolumeName:       generatedVolumeName1,
+		Mounter:          mounter1,
+		VolumeSpec:       volumeSpec1,
+		VolumeMountState: operationexecutor.VolumeMountUncertain,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts1)
 	if err != nil {
@@ -1077,7 +1069,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("expected volume %s to be found in aws.GetPossiblyMountedVolumesForPod", volumeSpec1.Name())
 	}
 
-	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1, resource.Quantity{}, "")
+	volExists, _, _ := asw.PodExistsInVolume(logger, podName1, generatedVolumeName1, resource.Quantity{}, "")
 	if volExists {
 		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
@@ -1215,8 +1207,9 @@ func verifyPodExistsInVolumeAswWithSELinux(
 	expectedDevicePath string,
 	expectedSELinuxLabel string,
 	asw ActualStateOfWorld) {
+	logger, _ := ktesting.NewTestContext(t)
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, expectedSELinuxLabel)
+		asw.PodExistsInVolume(logger, expectedPodName, expectedVolumeName, resource.Quantity{}, expectedSELinuxLabel)
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1257,8 +1250,9 @@ func verifyPodDoesntExistInVolumeAsw(
 	volumeToCheck v1.UniqueVolumeName,
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
+	logger, _ := ktesting.NewTestContext(t)
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, "")
+		asw.PodExistsInVolume(logger, podToCheck, volumeToCheck, resource.Quantity{}, "")
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume did not return error. Expected: <error indicating volume does not exist> Actual: <%v>", err)
@@ -1288,8 +1282,8 @@ func verifyPodExistsInVolumeSELinuxMismatch(
 	volumeToCheck v1.UniqueVolumeName,
 	unexpectedSELinuxLabel string,
 	asw ActualStateOfWorld) {
-
-	podExistsInVolume, _, err := asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, unexpectedSELinuxLabel)
+	logger, _ := ktesting.NewTestContext(t)
+	podExistsInVolume, _, err := asw.PodExistsInVolume(logger, podToCheck, volumeToCheck, resource.Quantity{}, unexpectedSELinuxLabel)
 	if podExistsInVolume {
 		t.Errorf("expected Pod %s not to exists, but it does", podToCheck)
 	}

@@ -31,6 +31,7 @@ type JSON struct {
 	Omit      bool
 	Inline    bool
 	Omitempty bool
+	OmitZero  bool
 }
 
 func (t JSON) String() string {
@@ -41,8 +42,8 @@ func (t JSON) String() string {
 	if t.Omitempty {
 		tag += ",omitempty"
 	}
-	if t.Inline {
-		tag += ",inline"
+	if t.OmitZero {
+		tag += ",omitzero"
 	}
 	return tag
 }
@@ -53,8 +54,9 @@ func LookupJSON(m types.Member) (JSON, bool) {
 		return JSON{Omit: true}, true
 	}
 	name, opts := parse(tag)
-	inline := opts.Contains("inline")
+	inline := m.Embedded && name == ""
 	omitempty := opts.Contains("omitempty")
+	omitzero := opts.Contains("omitzero")
 	if !inline && name == "" {
 		name = m.Name
 	}
@@ -63,6 +65,7 @@ func LookupJSON(m types.Member) (JSON, bool) {
 		Omit:      false,
 		Inline:    inline,
 		Omitempty: omitempty,
+		OmitZero:  omitzero,
 	}, true
 }
 

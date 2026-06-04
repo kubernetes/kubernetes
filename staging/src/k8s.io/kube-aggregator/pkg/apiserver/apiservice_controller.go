@@ -118,7 +118,7 @@ func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}, handlerSy
 			}
 		}
 		return true, nil
-	}, stopCh); err == wait.ErrWaitTimeout {
+	}, stopCh); wait.Interrupted(err) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for proxy handler to initialize"))
 		return
 	} else if err != nil {

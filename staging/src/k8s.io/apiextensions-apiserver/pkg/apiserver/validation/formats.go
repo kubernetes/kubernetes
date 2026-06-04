@@ -60,6 +60,25 @@ var supportedVersionedFormats = []versionedFormats{
 			"datetime",     // a date time string like "2014-12-15T19:30:20.000Z" as defined by date-time in RFC3339
 		),
 	},
+	{
+		introducedVersion: version.MajorMinor(1, 34),
+		formats: sets.New(
+			// a short Kubernetes name, up to 63 characters in length, composed of alphanumeric
+			// characters and dashes, which cannot begin or end with a dash.
+			// k8s-short-name almost conforms to the definition of a label in DNS (RFC 1123),
+			// except that uppercase letters are not allowed.
+			"k8s-short-name",
+
+			// a long Kubernetes name, up to 253 characters in length, composed of dot-separated
+			// segments; each segment uses only alphanumerics and dashes (no
+			// leading/trailing).
+			// k8s-long-name almost conforms to the definition of a subdomain in DNS (RFC 1123),
+			// except that uppercase letters are not allowed, and there is no max length
+			// limit of 63 for each of the dot-separated DNS Labels that make up the
+			// subdomain.
+			"k8s-long-name",
+		),
+	},
 }
 
 // StripUnsupportedFormatsPostProcess sets unsupported formats to empty string.
@@ -77,13 +96,65 @@ func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *versio
 			return nil
 		}
 
-		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
-		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+		schemaType := ""
+		if len(s.Type) == 1 {
+			schemaType = s.Type[0]
+		}
+		switch schemaType {
+		case "", "string":
+			normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
+			if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+				s.Format = ""
+			}
+		case "integer":
+			if s.Format != "int32" && s.Format != "int64" {
+				s.Format = ""
+			}
+		case "number":
+			if s.Format != "float" && s.Format != "double" {
+				s.Format = ""
+			}
+		default:
+			// Format not supported on other types
 			s.Format = ""
 		}
 
 		return nil
 	}
+}
+
+// GetUnrecognizedFormats returns a list of unrecognized formats found in the given schema.
+// It uses the same source of truth as StripUnsupportedFormatsPostProcessorForVersion.
+func GetUnrecognizedFormats(schema *spec.Schema, compatibilityVersion *version.Version) []string {
+	var unrecognizedFormats []string
+	if len(schema.Format) == 0 {
+		return unrecognizedFormats
+	}
+
+	schemaType := ""
+	if len(schema.Type) == 1 {
+		schemaType = schema.Type[0]
+	}
+	switch schemaType {
+	case "", "string":
+		normalized := strings.ReplaceAll(schema.Format, "-", "") // go-openapi default format name normalization
+		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	case "integer":
+		if schema.Format != "int32" && schema.Format != "int64" {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	case "number":
+		if schema.Format != "float" && schema.Format != "double" {
+			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+		}
+	default:
+		// Format not supported on other types
+		unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+	}
+
+	return unrecognizedFormats
 }
 
 type versionedFormats struct {
@@ -120,8 +191,14 @@ func newFormatsAtVersion(ver *version.Version, versionedFormats []versionedForma
 		supported:            sets.New[string](),
 	}
 	for _, vf := range versionedFormats {
+		// go-openapi default format name normalization
+		normalized := sets.Set[string]{}
+		for format := range vf.formats {
+			normalized.Insert(strings.ReplaceAll(format, "-", ""))
+		}
+
 		if ver.AtLeast(vf.introducedVersion) {
-			result.supported = result.supported.Union(vf.formats)
+			result.supported = result.supported.Union(normalized)
 
 		}
 	}

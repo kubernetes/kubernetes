@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -37,39 +38,101 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*M1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
-			return Validate_M1(ctx, op, nil /* fldPath */, obj.(*M1), safe.Cast[*M1](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
-	})
-	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
-			return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
-	})
+	// type M1
+	scheme.AddValidationFunc(
+		(*M1)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_M1(
+					ctx, op, nil, /* fldPath */
+					obj.(*M1),
+					safe.Cast[*M1](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type T1
+	scheme.AddValidationFunc(
+		(*T1)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_T1(
+					ctx, op, nil, /* fldPath */
+					obj.(*T1),
+					safe.Cast[*T1](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
-func Validate_M1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *M1) (errs field.ErrorList) {
-	// field M1.S
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "M1.S")...)
+// Validate_M1 validates an instance of M1 according
+// to declarative validation rules in the API schema.
+func Validate_M1(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *M1) (errs field.ErrorList) {
+
+	{ // field M1.S
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "M1.S"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *M1) *string { return &oldObj.S }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *M1) *string {
+				return &oldObj.S
+			})
+		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
-func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
-	// field T1.LM1
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []M1) (errs field.ErrorList) {
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_M1)...)
+// Validate_T1 validates an instance of T1 according
+// to declarative validation rules in the API schema.
+func Validate_T1(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *T1) (errs field.ErrorList) {
+
+	{ // field T1.LM1
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []M1,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_M1); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("lm1"), obj.LM1, safe.Field(oldObj, func(oldObj *T1) []M1 { return oldObj.LM1 }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) []M1 {
+				return oldObj.LM1
+			})
+		errs = append(errs, fn(fldPath.Child("lm1"), obj.LM1, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

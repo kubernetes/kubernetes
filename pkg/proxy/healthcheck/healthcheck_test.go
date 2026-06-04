@@ -27,20 +27,21 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-base/metrics/testutil"
-
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
-
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/dump"
+	"k8s.io/utils/ptr"
 )
+
+const testNodeName = "test-node"
 
 type fakeListener struct {
 	openPorts sets.Set[string]
@@ -56,7 +57,7 @@ func (fake *fakeListener) hasPort(addr string) bool {
 	return fake.openPorts.Has(addr)
 }
 
-func (fake *fakeListener) Listen(_ context.Context, addrs ...string) (net.Listener, error) {
+func (fake *fakeListener) Listen(_ context.Context, network string, addrs ...string) (net.Listener, error) {
 	fake.openPorts.Insert(addrs...)
 	return &fakeNetListener{
 		parent: fake,
@@ -148,7 +149,7 @@ func TestServer(t *testing.T) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
 	proxyChecker := &fakeProxyHealthChecker{true}
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker, v1.IPv4Protocol)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -431,7 +432,16 @@ func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, 
 type nodeTweak func(n *v1.Node)
 
 func makeNode(tweaks ...nodeTweak) *v1.Node {
-	n := &v1.Node{}
+	n := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+		},
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{{
+				Type: v1.NodeInternalIP, Address: "192.168.0.1",
+			}},
+		},
+	}
 	for _, tw := range tweaks {
 		tw(n)
 	}
@@ -459,13 +469,26 @@ type serverTest struct {
 	tracking503 int
 }
 
+type testNodeManager struct {
+	node *v1.Node
+}
+
+func (t *testNodeManager) Node() *v1.Node {
+	return t.node
+}
+
+func (t *testNodeManager) update(node *v1.Node) {
+	t.node = node
+}
+
 func TestHealthzServer(t *testing.T) {
 	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	nodeManager := &testNodeManager{node: makeNode()}
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nodeManager)
 	server := hs.httpFactory.New(healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -481,7 +504,7 @@ func TestHealthzServer(t *testing.T) {
 	testProxyHealthUpdater(hs, hsTest, fakeClock, ptr.To(true), t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	hs.SyncNode(makeNode(tweakTainted("other")))
+	nodeManager.update(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -495,7 +518,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a ToBeDeletedTaint node
-	hs.SyncNode(makeNode(tweakTainted(ToBeDeletedTaint)))
+	nodeManager.update(makeNode(tweakTainted(ToBeDeletedTaint)))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -509,7 +532,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	hs.SyncNode(makeNode(tweakTainted("other")))
+	nodeManager.update(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -523,7 +546,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a deleted node
-	hs.SyncNode(makeNode(tweakDeleted()))
+	nodeManager.update(makeNode(tweakDeleted()))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -543,7 +566,8 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	nodeManager := &testNodeManager{node: makeNode()}
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nodeManager)
 	server := hs.httpFactory.New(livezHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -559,7 +583,7 @@ func TestLivezServer(t *testing.T) {
 	testProxyHealthUpdater(hs, hsTest, fakeClock, nil, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakTainted("other")))
+	nodeManager.update(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -572,7 +596,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakTainted(ToBeDeletedTaint)))
+	nodeManager.update(makeNode(tweakTainted(ToBeDeletedTaint)))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -585,7 +609,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakTainted("other")))
+	nodeManager.update(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -598,7 +622,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	hs.SyncNode(makeNode(tweakDeleted()))
+	nodeManager.update(makeNode(tweakDeleted()))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -948,7 +972,7 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
 	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker, v1.IPv4Protocol)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))

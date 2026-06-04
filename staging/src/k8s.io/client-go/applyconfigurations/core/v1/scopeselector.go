@@ -20,7 +20,11 @@ package v1
 
 // ScopeSelectorApplyConfiguration represents a declarative configuration of the ScopeSelector type for use
 // with apply.
+//
+// A scope selector represents the AND of the selectors represented
+// by the scoped-resource selector requirements.
 type ScopeSelectorApplyConfiguration struct {
+	// A list of scope selector requirements by scope of the resources.
 	MatchExpressions []ScopedResourceSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
 }
 

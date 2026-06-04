@@ -49,6 +49,10 @@ type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
 
+	// Time at which the container was started.
+	// This may be unset if the runtime does not provide it.
+	StartTime time.Time `json:"start_time,omitempty"`
+
 	// Metadata labels associated with this container.
 	Labels map[string]string `json:"labels,omitempty"`
 	// Metadata envs associated with this container. Only whitelisted envs are added.
@@ -187,6 +191,12 @@ func (s *ContainerSpec) Eq(b *ContainerSpec) bool {
 	// Creation within 1s of each other.
 	diff := s.CreationTime.Sub(b.CreationTime)
 	if (diff > time.Second) || (diff < -time.Second) {
+		return false
+	}
+
+	// Start time within 1s of each other.
+	startDiff := s.StartTime.Sub(b.StartTime)
+	if (startDiff > time.Second) || (startDiff < -time.Second) {
 		return false
 	}
 
@@ -329,6 +339,13 @@ type CpuCFS struct {
 	// Total time duration for which tasks in the cgroup have been throttled.
 	// Unit: nanoseconds.
 	ThrottledTime uint64 `json:"throttled_time"`
+
+	// Total number of periods when CPU burst occurs.
+	BurstsPeriods uint64 `json:"bursts_periods"`
+
+	// Total time duration when CPU burst occurs.
+	// Unit: nanoseconds.
+	BurstTime uint64 `json:"burst_time"`
 }
 
 // Cpu Aggregated scheduler statistics
@@ -374,6 +391,10 @@ type DiskIoStats struct {
 	IoWaitTime     []PerDiskStats `json:"io_wait_time,omitempty"`
 	IoMerged       []PerDiskStats `json:"io_merged,omitempty"`
 	IoTime         []PerDiskStats `json:"io_time,omitempty"`
+	IoCostUsage    []PerDiskStats `json:"io_cost_usage,omitempty"`
+	IoCostWait     []PerDiskStats `json:"io_cost_wait,omitempty"`
+	IoCostIndebt   []PerDiskStats `json:"io_cost_indebt,omitempty"`
+	IoCostIndelay  []PerDiskStats `json:"io_cost_indelay,omitempty"`
 	PSI            PSIStats       `json:"psi"`
 }
 
@@ -435,6 +456,13 @@ type MemoryStats struct {
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
 
 	PSI PSIStats `json:"psi"`
+
+	Events MemoryEvents `json:"events,omitempty"`
+}
+
+type MemoryEvents struct {
+	High uint64 `json:"high"`
+	Max  uint64 `json:"max"`
 }
 
 type CPUSetStats struct {
@@ -964,6 +992,11 @@ type ProcessStats struct {
 	Ulimits []UlimitSpec `json:"ulimits,omitempty"`
 }
 
+type Health struct {
+	// Health status of the container
+	Status string `json:"status"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time               `json:"timestamp"`
@@ -1003,6 +1036,8 @@ type ContainerStats struct {
 	CpuSet CPUSetStats `json:"cpuset,omitempty"`
 
 	OOMEvents uint64 `json:"oom_events,omitempty"`
+
+	Health Health `json:"health,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {
@@ -1097,6 +1132,9 @@ const (
 type EventData struct {
 	// Information about an OOM kill event.
 	OomKill *OomKillEventData `json:"oom,omitempty"`
+
+	// Information about a container deletion event.
+	ContainerDeletion *ContainerDeletionEventData `json:"container_deletion,omitempty"`
 }
 
 // Information related to an OOM kill instance
@@ -1106,4 +1144,14 @@ type OomKillEventData struct {
 
 	// The name of the killed process
 	ProcessName string `json:"process_name"`
+
+	// the constraint that triggered the OOM
+	Constraint string `json:"constraint"`
+}
+
+// Information related to a container deletion event
+type ContainerDeletionEventData struct {
+	// ExitCode is the exit code of the container.
+	// A value of -1 indicates the exit code was not available or not applicable.
+	ExitCode int `json:"exit_code"`
 }

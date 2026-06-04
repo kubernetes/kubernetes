@@ -53,7 +53,7 @@ import (
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -417,7 +417,7 @@ func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deploy
 			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(2),
+			Replicas: ptr.To[int32](2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",

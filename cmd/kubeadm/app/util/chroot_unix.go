@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -24,7 +23,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // Chroot chroot()s to the new path.

@@ -27,14 +27,20 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestGetPodFullName(t *testing.T) {
@@ -160,63 +166,6 @@ func TestMoreImportantPod(t *testing.T) {
 	}
 }
 
-func TestRemoveNominatedNodeName(t *testing.T) {
-	tests := []struct {
-		name                     string
-		currentNominatedNodeName string
-		newNominatedNodeName     string
-		expectedPatchRequests    int
-		expectedPatchData        string
-	}{
-		{
-			name:                     "Should make patch request to clear node name",
-			currentNominatedNodeName: "node1",
-			expectedPatchRequests:    1,
-			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
-		},
-		{
-			name:                     "Should not make patch request if nominated node is already cleared",
-			currentNominatedNodeName: "",
-			expectedPatchRequests:    0,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			actualPatchRequests := 0
-			var actualPatchData string
-			cs := &clientsetfake.Clientset{}
-			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				actualPatchRequests++
-				patch := action.(clienttesting.PatchAction)
-				actualPatchData = string(patch.GetPatch())
-				// For this test, we don't care about the result of the patched pod, just that we got the expected
-				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
-				return true, &v1.Pod{}, nil
-			})
-
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
-			}
-
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			if err := ClearNominatedNodeName(ctx, cs, pod); err != nil {
-				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
-			}
-
-			if actualPatchRequests != test.expectedPatchRequests {
-				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
-			}
-
-			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
-				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
-			}
-		})
-	}
-}
-
 func TestPatchPodStatus(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -226,6 +175,7 @@ func TestPatchPodStatus(t *testing.T) {
 		// (true means error is expected one.)
 		validateErr    func(goterr error) bool
 		statusToUpdate v1.PodStatus
+		nilOldStatus   bool
 	}{
 		{
 			name:   "Should update pod conditions successfully",
@@ -352,20 +302,44 @@ func TestPatchPodStatus(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:   "nil oldStatus patches successfully",
+			client: clientsetfake.NewClientset(),
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+			},
+			statusToUpdate: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionFalse,
+					},
+				},
+			},
+			nilOldStatus: true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
 			client := tc.client
 			_, err := client.CoreV1().Pods(tc.pod.Namespace).Create(context.TODO(), &tc.pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			err = PatchPodStatus(ctx, client, &tc.pod, &tc.statusToUpdate)
+			oldStatus := &tc.pod.Status
+			if tc.nilOldStatus {
+				oldStatus = nil
+			}
+			err = PatchPodStatus(ctx, client, tc.pod.Name, tc.pod.Namespace, oldStatus, &tc.statusToUpdate)
 			if err != nil && tc.validateErr == nil {
 				// shouldn't be error
 				t.Fatal(err)
@@ -384,6 +358,379 @@ func TestPatchPodStatus(t *testing.T) {
 
 			if diff := cmp.Diff(tc.statusToUpdate, retrievedPod.Status); diff != "" {
 				t.Errorf("unexpected pod status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPatchPodGroupStatus(t *testing.T) {
+	now := metav1.NewTime(time.Now().Truncate(time.Second))
+
+	tests := []struct {
+		name     string
+		podGroup schedulingv1alpha3.PodGroup
+		client   *clientsetfake.Clientset
+		// validateErr checks if error returned from PatchPodGroupStatus is expected one or not.
+		// (true means error is expected one.)
+		validateErr    func(goterr error) bool
+		statusToUpdate *schedulingv1alpha3.PodGroupStatus
+		nilOldStatus   bool
+	}{
+		{
+			name:   "Should update podgroup conditions successfully",
+			client: clientsetfake.NewClientset(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+			},
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.PodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name:   "no-op when status is unchanged",
+			client: clientsetfake.NewClientset(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+				Status: schedulingv1alpha3.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.PodGroupScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.PodGroupReasonUnschedulable,
+							Message:            "not enough capacity",
+							LastTransitionTime: now,
+						},
+					},
+				},
+			},
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.PodGroupReasonUnschedulable,
+						Message:            "not enough capacity",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name:   "nil newStatus returns nil",
+			client: clientsetfake.NewClientset(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+			},
+			statusToUpdate: nil,
+		},
+		{
+			name: "retry patch request when a 'connection refused' error is returned",
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+
+				reqcount := 0
+				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					defer func() { reqcount++ }()
+					if reqcount == 0 {
+						return true, &schedulingv1alpha3.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+					}
+					if reqcount == 1 {
+						return false, &schedulingv1alpha3.PodGroup{}, nil
+					}
+					return true, nil, errors.New("requests comes in more than three times.")
+				})
+
+				return client
+			}(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+			},
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.PodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name: "only 4 retries at most",
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+
+				reqcount := 0
+				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					defer func() { reqcount++ }()
+					if reqcount >= 4 {
+						return true, nil, errors.New("requests comes in more than four times.")
+					}
+					return true, &schedulingv1alpha3.PodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+				})
+
+				return client
+			}(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+			},
+			validateErr: net.IsConnectionRefused,
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.PodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name: "retry patch request when a conflict error is returned",
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+
+				reqcount := 0
+				client.PrependReactor("patch", "podgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					defer func() { reqcount++ }()
+					if reqcount == 0 {
+						return true, &schedulingv1alpha3.PodGroup{},
+							apierrors.NewConflict(schema.GroupResource{
+								Resource: "podgroups"}, "pg1",
+								errors.New("the object has been modified"))
+					}
+					if reqcount == 1 {
+						return false, &schedulingv1alpha3.PodGroup{}, nil
+					}
+					return true, nil, errors.New("requests comes in more than three times.")
+				})
+
+				return client
+			}(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+			},
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.PodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name:   "nil oldStatus patches successfully",
+			client: clientsetfake.NewClientset(),
+			podGroup: schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pg1",
+				},
+			},
+			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.PodGroupScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.PodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+			nilOldStatus: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := tc.client
+			_, err := client.SchedulingV1alpha3().PodGroups(tc.podGroup.Namespace).Create(ctx, &tc.podGroup, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			oldStatus := &tc.podGroup.Status
+			if tc.nilOldStatus {
+				oldStatus = nil
+			}
+			err = PatchPodGroupStatus(ctx, client, tc.podGroup.Name, tc.podGroup.Namespace, oldStatus, tc.statusToUpdate)
+			if err != nil && tc.validateErr == nil {
+				t.Fatal(err)
+			}
+			if tc.validateErr != nil {
+				if !tc.validateErr(err) {
+					t.Fatalf("Returned unexpected error: %v", err)
+				}
+				return
+			}
+
+			retrievedPG, err := client.SchedulingV1alpha3().PodGroups(tc.podGroup.Namespace).Get(ctx, tc.podGroup.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wantStatus := tc.podGroup.Status
+			if tc.statusToUpdate != nil {
+				wantStatus = *tc.statusToUpdate
+			}
+			if diff := cmp.Diff(wantStatus, retrievedPG.Status); diff != "" {
+				t.Errorf("unexpected podgroup status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestBindPod(t *testing.T) {
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod",
+			Namespace: "ns",
+		},
+		Target: v1.ObjectReference{
+			Name: "node",
+		},
+	}
+
+	validateNoErr := func(err error) bool { return err == nil }
+
+	tests := []struct {
+		name          string
+		errFunc       func() error
+		failCalls     int
+		expectedCalls int
+		validateErr   func(error) bool
+	}{
+		{
+			name:          "successful",
+			failCalls:     0,
+			expectedCalls: 1,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "no retry on conflict",
+			errFunc: func() error {
+				return apierrors.NewConflict(v1.Resource("pods"), "pod", errors.New("conflict"))
+			},
+			failCalls:     1,
+			expectedCalls: 1,
+			validateErr:   apierrors.IsConflict,
+		},
+		{
+			name: "retry on internal error and succeed",
+			errFunc: func() error {
+				return apierrors.NewInternalError(errors.New("internal"))
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "retry on service unavailable and succeed",
+			errFunc: func() error {
+				return apierrors.NewServiceUnavailable("service unavailable")
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "retry on connection refused and succeed",
+			errFunc: func() error {
+				return fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "no retry on not found",
+			errFunc: func() error {
+				return apierrors.NewNotFound(v1.Resource("pods"), "pod")
+			},
+			failCalls:     1,
+			expectedCalls: 1,
+			validateErr:   apierrors.IsNotFound,
+		},
+		{
+			name: "persistent internal error fails after retries",
+			errFunc: func() error {
+				return apierrors.NewInternalError(errors.New("internal"))
+			},
+			failCalls:     retry.DefaultBackoff.Steps,
+			expectedCalls: retry.DefaultBackoff.Steps,
+			validateErr:   apierrors.IsInternalError,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := clientsetfake.NewClientset()
+			calls := 0
+			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				createAction := action.(clienttesting.CreateActionImpl)
+				if createAction.Subresource != "binding" {
+					return false, nil, nil
+				}
+				calls++
+
+				if calls <= tc.failCalls {
+					return true, nil, tc.errFunc()
+				}
+
+				return true, nil, nil
+			})
+
+			err := BindPod(ctx, client, binding)
+
+			if !tc.validateErr(err) {
+				t.Errorf("BindPod() returned unexpected error: %v", err)
+			}
+
+			if calls != tc.expectedCalls {
+				t.Errorf("Expected %d calls to binding API, got %d", tc.expectedCalls, calls)
 			}
 		})
 	}
@@ -542,6 +889,235 @@ func Test_As_KMetadata(t *testing.T) {
 					t.Fatalf("expected error, but got nil")
 				}
 				return
+			}
+		})
+	}
+}
+
+func TestGetHostPorts(t *testing.T) {
+	tests := []struct {
+		pod  *v1.Pod
+		want []v1.ContainerPort
+	}{
+		{
+			pod:  nil,
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: nil,
+		},
+		{
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: []v1.ContainerPort{{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			}},
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: []v1.ContainerPort{{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			}},
+		},
+		{
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8003,
+						HostPort:      8003,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8004,
+						HostPort:      8004,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8005,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			want: []v1.ContainerPort{
+				{
+					ContainerPort: 8001,
+					HostPort:      8001,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8002,
+					HostPort:      8002,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8003,
+					HostPort:      8003,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8004,
+					HostPort:      8004,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8003,
+						HostPort:      8003,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8004,
+						HostPort:      8004,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8005,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8006,
+						HostPort:      8006,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8007,
+						HostPort:      8007,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8008,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			want: []v1.ContainerPort{
+				{
+					ContainerPort: 8004,
+					HostPort:      8004,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8006,
+					HostPort:      8006,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8007,
+					HostPort:      8007,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      9001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      9002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			want: []v1.ContainerPort{
+				{
+					ContainerPort: 8001,
+					HostPort:      9001,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8002,
+					HostPort:      9002,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			result := GetHostPorts(test.pod)
+			if diff := cmp.Diff(test.want, result); diff != "" {
+				t.Errorf("GetHostPorts() unexpected diff (-want,+got): %s", diff)
 			}
 		})
 	}

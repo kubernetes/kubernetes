@@ -80,3 +80,23 @@ func PrepareWatchListOptionsFromListOptions(listOptions metav1.ListOptions) (met
 
 	return watchListOptions, true, nil
 }
+
+type unSupportedWatchListSemantics interface {
+	IsWatchListSemanticsUnSupported() bool
+}
+
+// DoesClientNotSupportWatchListSemantics reports whether the given client
+// does NOT support WatchList semantics.
+//
+// A client does NOT support WatchList only if
+// it implements `IsWatchListSemanticsUnSupported` and that returns true.
+//
+// For an explanation of how WatchList works, see:
+// https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+func DoesClientNotSupportWatchListSemantics(client any) bool {
+	lw, ok := client.(unSupportedWatchListSemantics)
+	if !ok {
+		return false
+	}
+	return lw.IsWatchListSemanticsUnSupported()
+}

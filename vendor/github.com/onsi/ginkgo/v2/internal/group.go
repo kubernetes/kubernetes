@@ -110,21 +110,56 @@ func newGroup(suite *Suite) *group {
 	}
 }
 
+// initialReportForSpec constructs a new SpecReport right before running the spec.
 func (g *group) initialReportForSpec(spec Spec) types.SpecReport {
 	return types.SpecReport{
-		ContainerHierarchyTexts:     spec.Nodes.WithType(types.NodeTypeContainer).Texts(),
-		ContainerHierarchyLocations: spec.Nodes.WithType(types.NodeTypeContainer).CodeLocations(),
-		ContainerHierarchyLabels:    spec.Nodes.WithType(types.NodeTypeContainer).Labels(),
-		LeafNodeLocation:            spec.FirstNodeWithType(types.NodeTypeIt).CodeLocation,
-		LeafNodeType:                types.NodeTypeIt,
-		LeafNodeText:                spec.FirstNodeWithType(types.NodeTypeIt).Text,
-		LeafNodeLabels:              []string(spec.FirstNodeWithType(types.NodeTypeIt).Labels),
-		ParallelProcess:             g.suite.config.ParallelProcess,
-		RunningInParallel:           g.suite.isRunningInParallel(),
-		IsSerial:                    spec.Nodes.HasNodeMarkedSerial(),
-		IsInOrderedContainer:        !spec.Nodes.FirstNodeMarkedOrdered().IsZero(),
-		MaxFlakeAttempts:            spec.Nodes.GetMaxFlakeAttempts(),
-		MaxMustPassRepeatedly:       spec.Nodes.GetMaxMustPassRepeatedly(),
+		ContainerHierarchyTexts:                      spec.Nodes.WithType(types.NodeTypeContainer).Texts(),
+		ContainerHierarchyLocations:                  spec.Nodes.WithType(types.NodeTypeContainer).CodeLocations(),
+		ContainerHierarchyLabels:                     spec.Nodes.WithType(types.NodeTypeContainer).Labels(),
+		ContainerHierarchySemVerConstraints:          spec.Nodes.WithType(types.NodeTypeContainer).SemVerConstraints(),
+		ContainerHierarchyComponentSemVerConstraints: spec.Nodes.WithType(types.NodeTypeContainer).ComponentSemVerConstraints(),
+		LeafNodeLocation:                             spec.FirstNodeWithType(types.NodeTypeIt).CodeLocation,
+		LeafNodeType:                                 types.NodeTypeIt,
+		LeafNodeText:                                 spec.FirstNodeWithType(types.NodeTypeIt).Text,
+		LeafNodeLabels:                               []string(spec.FirstNodeWithType(types.NodeTypeIt).Labels),
+		LeafNodeSemVerConstraints:                    []string(spec.FirstNodeWithType(types.NodeTypeIt).SemVerConstraints),
+		LeafNodeComponentSemVerConstraints:           map[string][]string(spec.FirstNodeWithType(types.NodeTypeIt).ComponentSemVerConstraints),
+		ParallelProcess:                              g.suite.config.ParallelProcess,
+		RunningInParallel:                            g.suite.isRunningInParallel(),
+		IsSerial:                                     spec.Nodes.HasNodeMarkedSerial(),
+		IsInOrderedContainer:                         !spec.Nodes.FirstNodeMarkedOrdered().IsZero(),
+		MaxFlakeAttempts:                             spec.Nodes.GetMaxFlakeAttempts(),
+		MaxMustPassRepeatedly:                        spec.Nodes.GetMaxMustPassRepeatedly(),
+		SpecPriority:                                 spec.Nodes.GetSpecPriority(),
+	}
+}
+
+// constructionNodeReportForTreeNode constructs a new SpecReport right before invoking the body
+// of a container node during construction of the full tree.
+func constructionNodeReportForTreeNode(node *TreeNode) *types.ConstructionNodeReport {
+	var report types.ConstructionNodeReport
+	// Walk up the tree and set attributes accordingly.
+	addNodeToReportForNode(&report, node)
+	return &report
+}
+
+// addNodeToReportForNode is conceptually similar to initialReportForSpec and therefore placed here
+// although it doesn't do anything with a group.
+func addNodeToReportForNode(report *types.ConstructionNodeReport, node *TreeNode) {
+	if node.Parent != nil {
+		// First add the parent node, then the current one.
+		addNodeToReportForNode(report, node.Parent)
+	}
+	report.ContainerHierarchyTexts = append(report.ContainerHierarchyTexts, node.Node.Text)
+	report.ContainerHierarchyLocations = append(report.ContainerHierarchyLocations, node.Node.CodeLocation)
+	report.ContainerHierarchyLabels = append(report.ContainerHierarchyLabels, node.Node.Labels)
+	report.ContainerHierarchySemVerConstraints = append(report.ContainerHierarchySemVerConstraints, node.Node.SemVerConstraints)
+	report.ContainerHierarchyComponentSemVerConstraints = append(report.ContainerHierarchyComponentSemVerConstraints, node.Node.ComponentSemVerConstraints)
+	if node.Node.MarkedSerial {
+		report.IsSerial = true
+	}
+	if node.Node.MarkedOrdered {
+		report.IsInOrderedContainer = true
 	}
 }
 

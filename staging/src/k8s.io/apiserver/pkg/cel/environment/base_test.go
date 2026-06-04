@@ -32,10 +32,10 @@ import (
 // a cached environment is loaded for each MustBaseEnvSet call.
 func BenchmarkLoadBaseEnv(b *testing.B) {
 	ver := DefaultCompatibilityVersion()
-	MustBaseEnvSet(ver, true)
+	MustBaseEnvSet(ver)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		MustBaseEnvSet(ver, true)
+		MustBaseEnvSet(ver)
 	}
 }
 
@@ -44,7 +44,7 @@ func BenchmarkLoadBaseEnv(b *testing.B) {
 func BenchmarkLoadBaseEnvDifferentVersions(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		MustBaseEnvSet(version.MajorMinor(1, uint(i)), true)
+		MustBaseEnvSet(version.MajorMinor(1, uint(i)))
 	}
 }
 
@@ -124,7 +124,7 @@ func TestKnownLibraries(t *testing.T) {
 	for _, lib := range library.KnownLibraries() {
 		known.Insert(lib.LibraryName())
 	}
-	for _, libName := range MustBaseEnvSet(version.MajorMinor(1, 0), true).storedExpressions.Libraries() {
+	for _, libName := range MustBaseEnvSet(version.MajorMinor(1, 0)).storedExpressions.Libraries() {
 		if strings.HasPrefix(libName, "cel.lib") { // ignore core libs
 			continue
 		}

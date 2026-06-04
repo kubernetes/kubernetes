@@ -16,24 +16,35 @@
 package traceutil
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/zap"
 )
 
-const (
-	TraceKey     = "trace"
-	StartTimeKey = "startTime"
-)
+const instrumentationScope = "go.etcd.io/etcd"
+
+var Tracer trace.Tracer = noop.NewTracerProvider().Tracer(instrumentationScope)
+
+func Init(tp trace.TracerProvider) {
+	Tracer = tp.Tracer(instrumentationScope)
+}
+
+// TraceKey is used as a key of context for Trace.
+type TraceKey struct{}
+
+// StartTimeKey is used as a key of context for start time of operation.
+type StartTimeKey struct{}
 
 // Field is a kv pair to record additional details of the trace.
 type Field struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
 func (f *Field) format() string {
@@ -44,7 +55,7 @@ func writeFields(fields []Field) string {
 	if len(fields) == 0 {
 		return ""
 	}
-	var buf bytes.Buffer
+	var buf strings.Builder
 	buf.WriteString("{")
 	for _, f := range fields {
 		buf.WriteString(f.format())
@@ -71,7 +82,7 @@ type step struct {
 	isSubTraceEnd   bool
 }
 
-func New(op string, lg *zap.Logger, fields ...Field) *Trace {
+func newTrace(op string, lg *zap.Logger, fields ...Field) *Trace {
 	return &Trace{operation: op, lg: lg, startTime: time.Now(), fields: fields}
 }
 
@@ -81,10 +92,23 @@ func TODO() *Trace {
 }
 
 func Get(ctx context.Context) *Trace {
-	if trace, ok := ctx.Value(TraceKey).(*Trace); ok && trace != nil {
+	if trace, ok := ctx.Value(TraceKey{}).(*Trace); ok && trace != nil {
 		return trace
 	}
 	return TODO()
+}
+
+// EnsureTrace creates a new trace if needed and adds it to the context.
+func EnsureTrace(ctx context.Context, lg *zap.Logger, operation string, fields ...Field) (context.Context, *Trace) {
+	trace := Get(ctx)
+	if trace.IsEmpty() {
+		trace = newTrace(operation,
+			lg,
+			fields...,
+		)
+		ctx = context.WithValue(ctx, TraceKey{}, trace)
+	}
+	return ctx, trace
 }
 
 func (t *Trace) GetStartTime() time.Time {
@@ -176,47 +200,50 @@ func (t *Trace) logInfo(threshold time.Duration) (string, []zap.Field) {
 	endTime := time.Now()
 	totalDuration := endTime.Sub(t.startTime)
 	traceNum := rand.Int31()
-	msg := fmt.Sprintf("trace[%d] %s", traceNum, t.operation)
 
 	var steps []string
 	lastStepTime := t.startTime
 	for i := 0; i < len(t.steps); i++ {
-		step := t.steps[i]
+		tstep := t.steps[i]
 		// add subtrace common fields which defined at the beginning to each sub-steps
-		if step.isSubTraceStart {
+		if tstep.isSubTraceStart {
 			for j := i + 1; j < len(t.steps) && !t.steps[j].isSubTraceEnd; j++ {
-				t.steps[j].fields = append(step.fields, t.steps[j].fields...)
+				t.steps[j].fields = append(tstep.fields, t.steps[j].fields...)
 			}
 			continue
 		}
 		// add subtrace common fields which defined at the end to each sub-steps
-		if step.isSubTraceEnd {
+		if tstep.isSubTraceEnd {
 			for j := i - 1; j >= 0 && !t.steps[j].isSubTraceStart; j-- {
-				t.steps[j].fields = append(step.fields, t.steps[j].fields...)
+				t.steps[j].fields = append(tstep.fields, t.steps[j].fields...)
 			}
 			continue
 		}
 	}
 	for i := 0; i < len(t.steps); i++ {
-		step := t.steps[i]
-		if step.isSubTraceStart || step.isSubTraceEnd {
+		tstep := t.steps[i]
+		if tstep.isSubTraceStart || tstep.isSubTraceEnd {
 			continue
 		}
-		stepDuration := step.time.Sub(lastStepTime)
+		stepDuration := tstep.time.Sub(lastStepTime)
 		if stepDuration > threshold {
-			steps = append(steps, fmt.Sprintf("trace[%d] '%v' %s (duration: %v)",
-				traceNum, step.msg, writeFields(step.fields), stepDuration))
+			steps = append(steps, fmt.Sprintf("'%v' %s (duration: %v)",
+				tstep.msg, writeFields(tstep.fields), stepDuration))
 		}
-		lastStepTime = step.time
+		lastStepTime = tstep.time
 	}
 
-	fs := []zap.Field{zap.String("detail", writeFields(t.fields)),
+	fs := []zap.Field{
+		zap.Int32("trace_id", traceNum),
+		zap.String("operation", t.operation),
+		zap.String("detail", writeFields(t.fields)),
 		zap.Duration("duration", totalDuration),
 		zap.Time("start", t.startTime),
 		zap.Time("end", endTime),
 		zap.Strings("steps", steps),
-		zap.Int("step_count", len(steps))}
-	return msg, fs
+		zap.Int("step_count", len(steps)),
+	}
+	return "trace", fs
 }
 
 func (t *Trace) updateFieldIfExist(f Field) bool {

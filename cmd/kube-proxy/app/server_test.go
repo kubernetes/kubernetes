@@ -18,16 +18,32 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/server/statusz"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/configz"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
@@ -61,82 +77,22 @@ func (s *fakeProxyServerError) CleanupAndExit() error {
 	return errors.New("mocking error from ProxyServer.CleanupAndExit()")
 }
 
-func makeNodeWithAddress(name, primaryIP string) *v1.Node {
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Status: v1.NodeStatus{
-			Addresses: []v1.NodeAddress{},
-		},
-	}
-
-	if primaryIP != "" {
-		node.Status.Addresses = append(node.Status.Addresses,
-			v1.NodeAddress{Type: v1.NodeInternalIP, Address: primaryIP},
-		)
-	}
-
-	return node
+// fakeMux matches the statusz mux interface used by statusz.Install:
+// it needs Handle(path, handler) and ListedPaths().
+type fakeMux struct {
+	handlers map[string]http.Handler
+	paths    []string
 }
 
-// Test that getNodeIPs retries on failure
-func Test_getNodeIPs(t *testing.T) {
-	var chans [3]chan error
-
-	client := clientsetfake.NewSimpleClientset(
-		// node1 initially has no IP address.
-		makeNodeWithAddress("node1", ""),
-
-		// node2 initially has an invalid IP address.
-		makeNodeWithAddress("node2", "invalid-ip"),
-
-		// node3 initially does not exist.
-	)
-
-	for i := range chans {
-		chans[i] = make(chan error)
-		ch := chans[i]
-		nodeName := fmt.Sprintf("node%d", i+1)
-		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
-		go func() {
-			_, ctx := ktesting.NewTestContext(t)
-			ips := getNodeIPs(ctx, client, nodeName)
-			if len(ips) == 0 {
-				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
-			} else if ips[0].String() != expectIP {
-				ch <- fmt.Errorf("expected IP %s for %s but got %s", expectIP, nodeName, ips[0].String())
-			} else if len(ips) != 1 {
-				ch <- fmt.Errorf("expected IP %s for %s but got multiple IPs", expectIP, nodeName)
-			}
-			close(ch)
-		}()
-	}
-
-	// Give the goroutines time to fetch the bad/non-existent nodes, then fix them.
-	time.Sleep(1200 * time.Millisecond)
-
-	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
-		makeNodeWithAddress("node1", "192.168.0.1"),
-		metav1.UpdateOptions{},
-	)
-	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
-		makeNodeWithAddress("node2", "192.168.0.2"),
-		metav1.UpdateOptions{},
-	)
-	_, _ = client.CoreV1().Nodes().Create(context.TODO(),
-		makeNodeWithAddress("node3", "192.168.0.3"),
-		metav1.CreateOptions{},
-	)
-
-	// Ensure each getNodeIP completed as expected
-	for i := range chans {
-		err := <-chans[i]
-		if err != nil {
-			t.Error(err.Error())
-		}
+func newFakeMux(paths []string) *fakeMux {
+	return &fakeMux{
+		handlers: make(map[string]http.Handler),
+		paths:    paths,
 	}
 }
+
+func (m *fakeMux) Handle(path string, h http.Handler) { m.handlers[path] = h }
+func (m *fakeMux) ListedPaths() []string              { return m.paths }
 
 func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
@@ -643,4 +599,140 @@ func Test_checkBadIPConfig(t *testing.T) {
 			}
 		})
 	}
+}
+func TestStatuszRegistryReceivesListedPaths(t *testing.T) {
+	wantPaths := []string{"/livez", "/readyz", "/healthz", statusz.DefaultStatuszPath}
+	m := newFakeMux(wantPaths)
+
+	reg := statusz.NewRegistry(
+		compatibility.DefaultBuildEffectiveVersion(),
+		statusz.WithListedPaths(m.ListedPaths()),
+	)
+	statusz.Install(m, "kube-proxy", reg)
+
+	h, ok := m.handlers[statusz.DefaultStatuszPath]
+	if !ok {
+		t.Fatalf("statusz handler not installed at %q", statusz.DefaultStatuszPath)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, statusz.DefaultStatuszPath, nil)
+	req.Header.Add("Accept", "text/plain")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d; body:\n%s", rr.Code, rr.Body.String())
+	}
+
+	body := rr.Body.String()
+
+	// Look for the "Paths" line manually instead of regex
+	lines := strings.Split(body, "\n")
+	var foundPathsLine string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Paths") {
+			foundPathsLine = line
+			break
+		}
+	}
+	if foundPathsLine == "" {
+		t.Fatalf("failed to find Paths line in body:\n%s", body)
+	}
+
+	fields := strings.Fields(foundPathsLine)
+	if len(fields) < 2 {
+		t.Fatalf("unexpected format in Paths line: %q", foundPathsLine)
+	}
+	gotPaths := fields[1:]
+
+	// Use sets for order-independent comparison
+	wantSet := sets.New[string](wantPaths...)
+	gotSet := sets.New[string](gotPaths...)
+
+	if !wantSet.Equal(gotSet) {
+		t.Errorf("statusz listed paths mismatch.\nwant: %v\ngot:  %v\nbody:\n%s",
+			wantSet.UnsortedList(), gotSet.UnsortedList(), body)
+	}
+}
+
+func TestConfigz(t *testing.T) {
+	configz.Delete(kubeproxyconfig.GroupName)
+	cz, err := configz.New(kubeproxyconfig.GroupName)
+	if err != nil {
+		t.Fatalf("unable to register configz: %v", err)
+	}
+	defer configz.Delete(kubeproxyconfig.GroupName)
+
+	externalConfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	externalConfig.SetGroupVersionKind(kubeproxyconfigv1alpha1.SchemeGroupVersion.WithKind("KubeProxyConfiguration"))
+	if err := cz.Set(externalConfig); err != nil {
+		t.Fatalf("unable to set configz: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	configz.InstallHandler(mux)
+	s := httptest.NewServer(mux)
+	defer s.Close()
+
+	resp, err := http.Get(s.URL + "/configz")
+	if err != nil {
+		t.Fatalf("unable to GET /configz: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("unable to read response body: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want status 200, got %d", resp.StatusCode)
+	}
+
+	var configzResp map[string]unstructured.Unstructured
+	if err := json.Unmarshal(body, &configzResp); err != nil {
+		t.Fatalf("failed to unmarshal configz: %v", err)
+	}
+	cfg, ok := configzResp[kubeproxyconfig.GroupName]
+	if !ok {
+		t.Fatalf("configz missing %q key", kubeproxyconfig.GroupName)
+	}
+	if cfg.GetAPIVersion() != "kubeproxy.config.k8s.io/v1alpha1" {
+		t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+	}
+	if cfg.GetKind() != "KubeProxyConfiguration" {
+		t.Errorf("unexpected Kind: %s", cfg.GetKind())
+	}
+
+	// confirm that they expose public config type
+	var proxyConfig kubeproxyconfigv1alpha1.KubeProxyConfiguration
+	err = json.Unmarshal(body, &struct {
+		ComponentConfig *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"kubeproxy.config.k8s.io"`
+	}{ComponentConfig: &proxyConfig})
+	if err != nil {
+		t.Errorf("failed to deserialize into public config type: %v", err)
+	}
+}
+
+func TestKubeProxyNativeHistogramMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+	proxymetrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
+
+	proxymetrics.SyncProxyRulesLatency.WithLabelValues("4").Observe(0.001)
+	ts := httptest.NewServer(legacyregistry.Handler())
+	defer ts.Close()
+
+	histogramMetric := "kubeproxy_sync_proxy_rules_duration_seconds"
+	metrics, err := testutil.ScrapeMetricsProto(ts.URL+"/metrics", ts.Client())
+	if err != nil {
+		t.Fatalf("failed to scrape metrics: %v", err)
+	}
+	mf, ok := metrics[histogramMetric]
+	if !ok {
+		t.Fatalf("metric %q not found in kube-proxy metrics endpoint", histogramMetric)
+	}
+	testutil.AssertHasNativeHistogram(t, mf, map[string]string{"ip_family": "4"})
 }

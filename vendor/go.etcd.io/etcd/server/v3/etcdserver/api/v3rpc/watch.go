@@ -16,21 +16,27 @@ package v3rpc
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"math/rand"
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	"go.etcd.io/etcd/client/pkg/v3/verify"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/pkg/v3/traceutil"
 	"go.etcd.io/etcd/server/v3/auth"
 	"go.etcd.io/etcd/server/v3/etcdserver"
-	"go.etcd.io/etcd/server/v3/mvcc"
-
-	"go.uber.org/zap"
+	"go.etcd.io/etcd/server/v3/etcdserver/apply"
+	"go.etcd.io/etcd/server/v3/storage/mvcc"
 )
 
 const minWatchProgressInterval = 100 * time.Millisecond
@@ -41,11 +47,14 @@ type watchServer struct {
 	clusterID int64
 	memberID  int64
 
-	maxRequestBytes int
+	maxRequestBytes uint
 
-	sg        etcdserver.RaftStatusGetter
+	sg        apply.RaftStatusGetter
 	watchable mvcc.WatchableKV
 	ag        AuthGetter
+
+	// we want compile errors if new methods are added
+	pb.UnsafeWatchServer
 }
 
 // NewWatchServer returns a new watch server.
@@ -54,9 +63,9 @@ func NewWatchServer(s *etcdserver.EtcdServer) pb.WatchServer {
 		lg: s.Cfg.Logger,
 
 		clusterID: int64(s.Cluster().ID()),
-		memberID:  int64(s.ID()),
+		memberID:  int64(s.MemberID()),
 
-		maxRequestBytes: int(s.Cfg.MaxRequestBytes + grpcOverheadBytes),
+		maxRequestBytes: s.Cfg.MaxRequestBytesWithOverhead(),
 
 		sg:        s,
 		watchable: s.Watchable(),
@@ -124,9 +133,9 @@ type serverWatchStream struct {
 	clusterID int64
 	memberID  int64
 
-	maxRequestBytes int
+	maxRequestBytes uint
 
-	sg        etcdserver.RaftStatusGetter
+	sg        apply.RaftStatusGetter
 	watchable mvcc.WatchableKV
 	ag        AuthGetter
 
@@ -210,13 +219,13 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 	// revisited.
 	select {
 	case err = <-errc:
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			err = rpctypes.ErrGRPCWatchCanceled
 		}
 		close(sws.ctrlStream)
 	case <-stream.Context().Done():
 		err = stream.Context().Err()
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			err = rpctypes.ErrGRPCWatchCanceled
 		}
 	}
@@ -240,7 +249,7 @@ func (sws *serverWatchStream) isWatchPermitted(wcr *pb.WatchCreateRequest) error
 func (sws *serverWatchStream) recvLoop() error {
 	for {
 		req, err := sws.gRPCStream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -267,19 +276,35 @@ func (sws *serverWatchStream) recvLoop() error {
 				// support  >= key queries
 				creq.RangeEnd = []byte{}
 			}
+			if creq.StartRevision < 0 {
+				wr := &pb.WatchResponse{
+					Header:       sws.newResponseHeader(sws.watchStream.Rev()),
+					WatchId:      clientv3.InvalidWatchID,
+					Canceled:     true,
+					Created:      true,
+					CancelReason: rpctypes.ErrCompacted.Error(),
+				}
+
+				select {
+				case sws.ctrlStream <- wr:
+					continue
+				case <-sws.closec:
+					return nil
+				}
+			}
 
 			err := sws.isWatchPermitted(creq)
 			if err != nil {
 				var cancelReason string
-				switch err {
-				case auth.ErrInvalidAuthToken:
+				switch {
+				case errors.Is(err, auth.ErrInvalidAuthToken):
 					cancelReason = rpctypes.ErrGRPCInvalidAuthToken.Error()
-				case auth.ErrAuthOldRevision:
+				case errors.Is(err, auth.ErrAuthOldRevision):
 					cancelReason = rpctypes.ErrGRPCAuthOldRevision.Error()
-				case auth.ErrUserEmpty:
+				case errors.Is(err, auth.ErrUserEmpty):
 					cancelReason = rpctypes.ErrGRPCUserEmpty.Error()
 				default:
-					if err != auth.ErrPermissionDenied {
+					if !errors.Is(err, auth.ErrPermissionDenied) {
 						sws.lg.Error("unexpected error code", zap.Error(err))
 					}
 					cancelReason = rpctypes.ErrGRPCPermissionDenied.Error()
@@ -302,13 +327,16 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 
 			filters := FiltersFromRequest(creq)
+			ctx, _ := traceutil.Tracer.Start(sws.gRPCStream.Context(), "watch", trace.WithAttributes(
+				attribute.String("key", string(creq.Key)),
+				attribute.String("range_end", string(creq.RangeEnd)),
+				attribute.Int64("start_rev", creq.StartRevision),
+				attribute.Bool("progress_notify", creq.ProgressNotify),
+				attribute.Bool("prev_kv", creq.PrevKv),
+				attribute.Bool("fragment", creq.Fragment),
+			))
 
-			wsrev := sws.watchStream.Rev()
-			rev := creq.StartRevision
-			if rev == 0 {
-				rev = wsrev + 1
-			}
-			id, err := sws.watchStream.Watch(mvcc.WatchID(creq.WatchId), creq.Key, creq.RangeEnd, rev, filters...)
+			id, err := sws.watchStream.Watch(ctx, mvcc.WatchID(creq.WatchId), creq.Key, creq.RangeEnd, creq.StartRevision, filters...)
 			if err == nil {
 				sws.mu.Lock()
 				if creq.ProgressNotify {
@@ -326,7 +354,7 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 
 			wr := &pb.WatchResponse{
-				Header:   sws.newResponseHeader(wsrev),
+				Header:   sws.newResponseHeader(sws.watchStream.Rev()),
 				WatchId:  int64(id),
 				Created:  true,
 				Canceled: err != nil,
@@ -371,8 +399,9 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 		default:
 			// we probably should not shutdown the entire stream when
-			// receive an valid command.
+			// receive an invalid command.
 			// so just do nothing instead.
+			sws.lg.Sugar().Infof("invalid watch request type %T received in gRPC stream", uv)
 			continue
 		}
 	}
@@ -407,21 +436,21 @@ func (sws *serverWatchStream) sendLoop() {
 				return
 			}
 
-			// TODO: evs is []mvccpb.Event type
-			// either return []*mvccpb.Event from the mvcc package
-			// or define protocol buffer with []mvccpb.Event.
+			start := time.Now()
+
+			// TODO(fuweid): do we still need copy here?
 			evs := wresp.Events
 			events := make([]*mvccpb.Event, len(evs))
 			sws.mu.RLock()
 			needPrevKV := sws.prevKV[wresp.WatchID]
 			sws.mu.RUnlock()
 			for i := range evs {
-				events[i] = &evs[i]
+				events[i] = evs[i]
 				if needPrevKV && !IsCreateEvent(evs[i]) {
 					opt := mvcc.RangeOptions{Rev: evs[i].Kv.ModRevision - 1}
 					r, err := sws.watchable.Range(context.TODO(), evs[i].Kv.Key, nil, opt)
 					if err == nil && len(r.KVs) != 0 {
-						events[i].PrevKv = &(r.KVs[0])
+						events[i].PrevKv = r.KVs[0]
 					}
 				}
 			}
@@ -477,11 +506,15 @@ func (sws *serverWatchStream) sendLoop() {
 			}
 			sws.mu.Unlock()
 
+			totalDur := time.Since(start)
+			watchSendLoopWatchStreamDuration.Observe(totalDur.Seconds())
+			watchSendLoopWatchStreamDurationPerEvent.Observe(totalDur.Seconds() / float64(len(evs)))
+
 		case c, ok := <-sws.ctrlStream:
 			if !ok {
 				return
 			}
-
+			start := time.Now()
 			if err := sws.gRPCStream.Send(c); err != nil {
 				if isClientCtxErr(sws.gRPCStream.Context().Err(), err) {
 					sws.lg.Debug("failed to send watch control response to gRPC stream", zap.Error(err))
@@ -495,9 +528,7 @@ func (sws *serverWatchStream) sendLoop() {
 			// track id creation
 			wid := mvcc.WatchID(c.WatchId)
 
-			if !(!(c.Canceled && c.Created) || wid == clientv3.InvalidWatchID) {
-				panic(fmt.Sprintf("unexpected watchId: %d, wanted: %d, since both 'Canceled' and 'Created' are true", wid, clientv3.InvalidWatchID))
-			}
+			verify.Assert(!(c.Canceled && c.Created) || wid == clientv3.InvalidWatchID, "unexpected watchId: %d, wanted: %d, since both 'Canceled' and 'Created' are true", wid, clientv3.InvalidWatchID)
 
 			if c.Canceled && wid != clientv3.InvalidWatchID {
 				delete(ids, wid)
@@ -521,7 +552,11 @@ func (sws *serverWatchStream) sendLoop() {
 				delete(pending, wid)
 			}
 
+			watchSendLoopControlStreamDuration.Observe(time.Since(start).Seconds())
+
 		case <-progressTicker.C:
+			start := time.Now()
+
 			sws.mu.Lock()
 			for id, ok := range sws.progress {
 				if ok {
@@ -530,6 +565,7 @@ func (sws *serverWatchStream) sendLoop() {
 				sws.progress[id] = true
 			}
 			sws.mu.Unlock()
+			watchSendLoopProgressDuration.Observe(time.Since(start).Seconds())
 
 		case <-sws.closec:
 			return
@@ -537,30 +573,47 @@ func (sws *serverWatchStream) sendLoop() {
 	}
 }
 
-func IsCreateEvent(e mvccpb.Event) bool {
-	return e.Type == mvccpb.PUT && e.Kv.CreateRevision == e.Kv.ModRevision
+func IsCreateEvent(e *mvccpb.Event) bool {
+	return e.Type == mvccpb.Event_PUT && e.Kv.CreateRevision == e.Kv.ModRevision
 }
 
 func sendFragments(
 	wr *pb.WatchResponse,
-	maxRequestBytes int,
-	sendFunc func(*pb.WatchResponse) error) error {
+	maxRequestBytes uint,
+	sendFunc func(*pb.WatchResponse) error,
+) error {
 	// no need to fragment if total request size is smaller
 	// than max request limit or response contains only one event
-	if wr.Size() < maxRequestBytes || len(wr.Events) < 2 {
+	if uint(proto.Size(wr)) < maxRequestBytes || len(wr.Events) < 2 {
 		return sendFunc(wr)
 	}
 
-	ow := *wr
-	ow.Events = make([]*mvccpb.Event, 0)
-	ow.Fragment = true
-
 	var idx int
 	for {
-		cur := ow
+		// Keep this explicit field copy in sync with pb.WatchResponse.
+		// TestWatchResponseProtoFieldCount guards against missing new fields.
+		//
+		// Header is the same for all fragments from one response, so
+		// it is safe to reuse. However, we cannot reuse wr itself.
+		// sendFunc can enqueue the response and return immediately,
+		// so the actual send may happen later. Reusing wr would let
+		// mutations in the next loop iteration corrupt queued fragments.
+		//
+		// REF: https://github.com/grpc/grpc-go/issues/5857
+		cur := &pb.WatchResponse{
+			Header:          wr.Header,
+			WatchId:         wr.WatchId,
+			Created:         wr.Created,
+			Canceled:        wr.Canceled,
+			CompactRevision: wr.CompactRevision,
+			CancelReason:    wr.CancelReason,
+			Fragment:        true,
+			Events:          make([]*mvccpb.Event, 0),
+		}
+
 		for _, ev := range wr.Events[idx:] {
 			cur.Events = append(cur.Events, ev)
-			if len(cur.Events) > 1 && cur.Size() >= maxRequestBytes {
+			if len(cur.Events) > 1 && uint(proto.Size(cur)) >= maxRequestBytes {
 				cur.Events = cur.Events[:len(cur.Events)-1]
 				break
 			}
@@ -570,7 +623,7 @@ func sendFragments(
 			// last response has no more fragment
 			cur.Fragment = false
 		}
-		if err := sendFunc(&cur); err != nil {
+		if err := sendFunc(cur); err != nil {
 			return err
 		}
 		if !cur.Fragment {
@@ -595,12 +648,12 @@ func (sws *serverWatchStream) newResponseHeader(rev int64) *pb.ResponseHeader {
 	}
 }
 
-func filterNoDelete(e mvccpb.Event) bool {
-	return e.Type == mvccpb.DELETE
+func filterNoDelete(e *mvccpb.Event) bool {
+	return e.Type == mvccpb.Event_DELETE
 }
 
-func filterNoPut(e mvccpb.Event) bool {
-	return e.Type == mvccpb.PUT
+func filterNoPut(e *mvccpb.Event) bool {
+	return e.Type == mvccpb.Event_PUT
 }
 
 // FiltersFromRequest returns "mvcc.FilterFunc" from a given watch create request.

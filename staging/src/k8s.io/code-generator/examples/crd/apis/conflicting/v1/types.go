@@ -16,14 +16,17 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1alpha2 "k8s.io/code-generator/examples/crd/apis/gateway-api/v1alpha2"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TestType is a top-level type. A client is created for it.
 type TestType struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
@@ -37,7 +40,7 @@ type TestType struct {
 // TestTypeList is a top-level list type. The client methods for lists are automatically created.
 // You are not supposed to create a separate client for this one.
 type TestTypeList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
@@ -45,7 +48,12 @@ type TestTypeList struct {
 }
 
 type TestTypeStatus struct {
-	Blah string `json:"blah"`
+	Blah                    string `json:"blah"`
+	gwv1alpha2.PolicyStatus `json:""`
+}
+
+type TestTypeEmbeddedStatus struct {
+	Statuses []TestTypeEmbeddedStatus `json:"statuses"`
 }
 
 // TestEmbeddedType is a type intended to create conflicts with other embedded structs:

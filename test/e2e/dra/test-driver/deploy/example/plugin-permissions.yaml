@@ -17,7 +17,11 @@ rules:
   verbs: ["get"]
 - apiGroups: ["resource.k8s.io"]
   resources: ["resourceclaims/status"]
-  verbs: ["update"]
+  verbs: ["patch", "update"]
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceclaims/driver"]
+  verbs: ["associated-node:patch", "associated-node:update"]
+  resourceNames: ["dra-kubelet-plugin-driver-name"]
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get"]
@@ -50,7 +54,7 @@ spec:
   matchConstraints:
     resourceRules:
     - apiGroups:   ["resource.k8s.io"]
-      apiVersions: ["v1alpha3", "v1beta1"]
+      apiVersions: ["v1alpha3", "v1beta1", "v1beta2", "v1"]
       operations:  ["CREATE", "UPDATE", "DELETE"]
       resources:   ["resourceslices"]
   matchConditions:

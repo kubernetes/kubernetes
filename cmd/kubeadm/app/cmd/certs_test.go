@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -52,10 +51,9 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
 func TestCommandsGenerated(t *testing.T) {
@@ -104,10 +102,9 @@ func TestCommandsGenerated(t *testing.T) {
 }
 
 func TestRunRenewCommands(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
-	cfg := testutil.GetDefaultInternalConfig(t)
+	cfg := configutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = tmpDir
 
 	// Generate all the CA
@@ -281,7 +278,7 @@ func TestRunRenewCommands(t *testing.T) {
 			if len(test.Args) > 0 {
 				args = test.Args + " " + args
 			}
-			err := cmdtestutil.RunSubCommand(t, renewCmds, test.command, io.Discard, args)
+			err := runSubCommand(t, renewCmds, test.command, io.Discard, args)
 			// certs renew doesn't support positional Args
 			if (err != nil) != test.expectedError {
 				t.Errorf("failed to run renew commands, expected error: %t, actual error: %v", test.expectedError, err)
@@ -312,8 +309,7 @@ func TestRunRenewCommands(t *testing.T) {
 }
 
 func TestRunGenCSR(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	kubeConfigDir := filepath.Join(tmpDir, "kubernetes")
 	certDir := kubeConfigDir + "/pki"
@@ -404,8 +400,7 @@ kubernetesVersion: %s`,
 		kubeadmapiv1.SchemeGroupVersion.String(),
 		kubeadmconstants.MinimumControlPlaneVersion.String())
 
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	customConfigPath := tmpDir + "/kubeadm.conf"
 
@@ -489,15 +484,12 @@ kubernetesVersion: %s`,
 }
 
 func TestRunCmdCertsExpiration(t *testing.T) {
-	kdir := testutil.SetupTempDir(t)
+	kdir := t.TempDir()
 	defer func() {
-		if err := os.RemoveAll(kdir); err != nil {
-			t.Fatalf("Failed to teardown: %s", err)
-		}
 		clientSetFromFile = kubeconfigutil.ClientSetFromFile
 	}()
 
-	cfg := testutil.GetDefaultInternalConfig(t)
+	cfg := configutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = kdir
 
 	// Generate all the CA
@@ -697,7 +689,6 @@ kubernetesVersion: %s`,
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.brokenCertName != "" {
 				// remove the file to simulate a missing certificate
@@ -706,4 +697,16 @@ kubernetesVersion: %s`,
 			runTestCase(t, tc)
 		})
 	}
+}
+
+func runSubCommand(t *testing.T, subCmds []*cobra.Command, command string, output io.Writer, args ...string) error {
+	for _, cmd := range subCmds {
+		if cmd.Name() == command {
+			cmd.SetOut(output)
+			cmd.SetArgs(args)
+			return cmd.Execute()
+		}
+	}
+	t.Fatalf("Unable to find sub command %s", command)
+	return nil
 }

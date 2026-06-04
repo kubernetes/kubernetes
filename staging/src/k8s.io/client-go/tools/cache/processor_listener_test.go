@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +30,25 @@ const (
 	concurrencyLevel = 5
 )
 
+type mockSynced struct {
+	context.Context
+	cancel func()
+}
+
+func newMockSynced(tb testing.TB, synced bool) *mockSynced {
+	m := &mockSynced{}
+	m.Context, m.cancel = context.WithCancel(context.Background())
+	if synced {
+		m.cancel()
+	}
+	tb.Cleanup(m.cancel)
+	return m
+}
+
+func (m *mockSynced) Name() string {
+	return "mock"
+}
+
 func BenchmarkListener(b *testing.B) {
 	var notification addNotification
 
@@ -40,7 +60,7 @@ func BenchmarkListener(b *testing.B) {
 		AddFunc: func(obj interface{}) {
 			swg.Done()
 		},
-	}, 0, 0, time.Now(), 1024*1024, func() bool { return true })
+	}, 0, 0, time.Now(), 1024*1024, newMockSynced(b, true))
 	var wg wait.Group
 	defer wg.Wait()       // Wait for .run and .pop to stop
 	defer close(pl.addCh) // Tell .run and .pop to stop

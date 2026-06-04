@@ -2,15 +2,15 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 /*
-Package cbor is a modern CBOR codec (RFC 8949 & RFC 7049) with CBOR tags,
-Go struct tags (toarray/keyasint/omitempty), Core Deterministic Encoding,
+Package cbor is a modern CBOR codec (RFC 8949 & RFC 8742) with CBOR tags,
+Go struct tag options (toarray/keyasint/omitempty/omitzero), Core Deterministic Encoding,
 CTAP2, Canonical CBOR, float64->32->16, and duplicate map key detection.
 
 Encoding options allow "preferred serialization" by encoding integers and floats
 to their smallest forms (e.g. float16) when values fit.
 
-Struct tags like "keyasint", "toarray" and "omitempty" make CBOR data smaller
-and easier to use with structs.
+Struct tag options "keyasint", "toarray", "omitempty", and "omitzero" reduce encoding size
+and reduce programming effort.
 
 For example, "toarray" tag makes struct fields encode to CBOR array elements.  And
 "keyasint" makes a field encode to an element of CBOR map with specified int key.
@@ -23,11 +23,19 @@ The Quick Start guide is at https://github.com/fxamacker/cbor#quick-start
 
 Function signatures identical to encoding/json include:
 
-	Marshal, Unmarshal, NewEncoder, NewDecoder, (*Encoder).Encode, (*Decoder).Decode.
+	Marshal, Unmarshal, NewEncoder, NewDecoder, (*Encoder).Encode, (*Decoder).Decode
 
 Standard interfaces include:
 
-	BinaryMarshaler, BinaryUnmarshaler, Marshaler, and Unmarshaler.
+	BinaryMarshaler, BinaryUnmarshaler, Marshaler, and Unmarshaler
+
+Diagnostic functions translate CBOR data item into Diagnostic Notation:
+
+	Diagnose, DiagnoseFirst
+
+Functions that simplify using CBOR Sequences (RFC 8742) include:
+
+	UnmarshalFirst
 
 Custom encoding and decoding is possible by implementing standard interfaces for
 user-defined Go types.
@@ -50,19 +58,19 @@ Modes are intended to be reused and are safe for concurrent use.
 
 EncMode and DecMode Interfaces
 
-	    // EncMode interface uses immutable options and is safe for concurrent use.
-	    type EncMode interface {
+	// EncMode interface uses immutable options and is safe for concurrent use.
+	type EncMode interface {
 		Marshal(v interface{}) ([]byte, error)
 		NewEncoder(w io.Writer) *Encoder
 		EncOptions() EncOptions  // returns copy of options
-	    }
+	}
 
-	    // DecMode interface uses immutable options and is safe for concurrent use.
-	    type DecMode interface {
+	// DecMode interface uses immutable options and is safe for concurrent use.
+	type DecMode interface {
 		Unmarshal(data []byte, v interface{}) error
 		NewDecoder(r io.Reader) *Decoder
 		DecOptions() DecOptions  // returns copy of options
-	    }
+	}
 
 Using Default Encoding Mode
 
@@ -77,6 +85,16 @@ Using Default Decoding Mode
 
 	decoder := cbor.NewDecoder(r)
 	err = decoder.Decode(&v)
+
+Using Default Mode of UnmarshalFirst to Decode CBOR Sequences
+
+	// Decode the first CBOR data item and return remaining bytes:
+	rest, err = cbor.UnmarshalFirst(b, &v)   // decode []byte b to v
+
+Using Extended Diagnostic Notation (EDN) to represent CBOR data
+
+	// Translate the first CBOR data item into text and return remaining bytes.
+	text, rest, err = cbor.DiagnoseFirst(b)  // decode []byte b to text
 
 Creating and Using Encoding Modes
 
@@ -111,15 +129,20 @@ Decoding Options: https://github.com/fxamacker/cbor#decoding-options
 Struct tags like `cbor:"name,omitempty"` and `json:"name,omitempty"` work as expected.
 If both struct tags are specified then `cbor` is used.
 
-Struct tags like "keyasint", "toarray", and "omitempty" make it easy to use
+Struct tag options like "keyasint", "toarray", "omitempty", and "omitzero" make it easy to use
 very compact formats like COSE and CWT (CBOR Web Tokens) with structs.
+
+The "omitzero" option omits zero values from encoding, matching
+[stdlib encoding/json behavior](https://pkg.go.dev/encoding/json#Marshal).
+When specified in the `cbor` tag, the option is always honored.
+When specified in the `json` tag, the option is honored when building with Go 1.24+.
 
 For example, "toarray" makes struct fields encode to array elements.  And "keyasint"
 makes struct fields encode to elements of CBOR map with int keys.
 
 https://raw.githubusercontent.com/fxamacker/images/master/cbor/v2.0.0/cbor_easy_api.png
 
-Struct tags are listed at https://github.com/fxamacker/cbor#struct-tags-1
+Struct tag options are listed at https://github.com/fxamacker/cbor#struct-tags-1
 
 # Tests and Fuzzing
 

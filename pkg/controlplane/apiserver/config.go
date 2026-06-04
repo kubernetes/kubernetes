@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -40,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
@@ -47,14 +46,14 @@ import (
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
+	basecompatibility "k8s.io/component-base/compatibility"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
@@ -102,6 +101,11 @@ type Extra struct {
 	SystemNamespaces []string
 
 	VersionedInformers clientgoinformers.SharedInformerFactory
+
+	// Coordinated Leader Election timers
+	CoordinatedLeadershipLeaseDuration time.Duration
+	CoordinatedLeadershipRenewDeadline time.Duration
+	CoordinatedLeadershipRetryPeriod   time.Duration
 }
 
 // BuildGenericConfig takes the generic controlplane apiserver options and produces
@@ -126,7 +130,7 @@ func BuildGenericConfig(
 		return
 	}
 
-	if lastErr = s.SecureServing.ApplyTo(&genericConfig.SecureServing, &genericConfig.LoopbackClientConfig); lastErr != nil {
+	if lastErr = s.SecureServing.ApplyToConfig(genericConfig); lastErr != nil {
 		return
 	}
 
@@ -162,10 +166,8 @@ func BuildGenericConfig(
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
-			return
-		}
+	if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
+		return
 	}
 	// wrap the definitions to revert any changes from disabled features
 	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
@@ -183,11 +185,7 @@ func BuildGenericConfig(
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
-	} else {
-		s.Etcd.StorageConfig.Transport.TracerProvider = noopoteltrace.NewTracerProvider()
-	}
+	s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfigEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
@@ -283,6 +281,7 @@ func CreateConfig(
 ) {
 	proxyTransport := CreateProxyTransport()
 
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 	opts.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
 
@@ -302,10 +301,14 @@ func CreateConfig(
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			CoordinatedLeadershipLeaseDuration: opts.CoordinatedLeadershipLeaseDuration,
+			CoordinatedLeadershipRenewDeadline: opts.CoordinatedLeadershipRenewDeadline,
+			CoordinatedLeadershipRetryPeriod:   opts.CoordinatedLeadershipRetryPeriod,
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
 		var err error
 		config.PeerEndpointLeaseReconciler, err = CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
@@ -321,7 +324,9 @@ func CreateConfig(
 				opts.PeerAdvertiseAddress,
 				genericConfig.APIServerID,
 				config.Extra.PeerEndpointLeaseReconciler,
-				config.Generic.Serializer)
+				config.Generic.Serializer,
+				config.Generic.EgressSelector,
+			)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -351,6 +356,7 @@ func CreateConfig(
 	genericAdmissionConfig := controlplaneadmission.Config{
 		ExternalInformers:    versionedInformers,
 		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
+		APIResourceConfig:    storageFactory.APIResourceConfigSource,
 	}
 	genericInitializers, err := genericAdmissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
@@ -370,6 +376,7 @@ func CreateConfig(
 		clientgoExternalClient,
 		dynamicExternalClient,
 		utilfeature.DefaultFeatureGate,
+		compatibility.DefaultComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent),
 		append(genericInitializers, additionalInitializers...)...,
 	)
 	if err != nil {
@@ -378,7 +385,7 @@ func CreateConfig(
 
 	if len(opts.Authentication.ServiceAccounts.KeyFiles) > 0 {
 		// Load and set the public keys.
-		var pubKeys []interface{}
+		var pubKeys []any
 		for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
 			keys, err := keyutil.PublicKeysFromFile(f)
 			if err != nil {
@@ -391,7 +398,10 @@ func CreateConfig(
 			return nil, nil, fmt.Errorf("failed to set up public service account keys: %w", err)
 		}
 		config.ServiceAccountPublicKeysGetter = keysGetter
+	} else if opts.Authentication.ServiceAccounts.ExternalPublicKeysGetter != nil {
+		config.ServiceAccountPublicKeysGetter = opts.Authentication.ServiceAccounts.ExternalPublicKeysGetter
 	}
+
 	config.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
 	config.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
 

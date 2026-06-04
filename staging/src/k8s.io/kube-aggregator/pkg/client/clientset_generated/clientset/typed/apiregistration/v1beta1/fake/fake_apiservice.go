@@ -21,18 +21,19 @@ package fake
 import (
 	gentype "k8s.io/client-go/gentype"
 	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
-	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1"
+	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1beta1"
+	typedapiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1"
 )
 
 // fakeAPIServices implements APIServiceInterface
 type fakeAPIServices struct {
-	*gentype.FakeClientWithList[*v1beta1.APIService, *v1beta1.APIServiceList]
+	*gentype.FakeClientWithListAndApply[*v1beta1.APIService, *v1beta1.APIServiceList, *apiregistrationv1beta1.APIServiceApplyConfiguration]
 	Fake *FakeApiregistrationV1beta1
 }
 
-func newFakeAPIServices(fake *FakeApiregistrationV1beta1) apiregistrationv1beta1.APIServiceInterface {
+func newFakeAPIServices(fake *FakeApiregistrationV1beta1) typedapiregistrationv1beta1.APIServiceInterface {
 	return &fakeAPIServices{
-		gentype.NewFakeClientWithList[*v1beta1.APIService, *v1beta1.APIServiceList](
+		gentype.NewFakeClientWithListAndApply[*v1beta1.APIService, *v1beta1.APIServiceList, *apiregistrationv1beta1.APIServiceApplyConfiguration](
 			fake.Fake,
 			"",
 			v1beta1.SchemeGroupVersion.WithResource("apiservices"),

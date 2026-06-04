@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Build Kubernetes release images. This will build the server target binaries,
-# and create wrap them in Docker images, see `make release` for full releases
+# and wrap them in Docker images, see `make release` for full releases
 
 set -o errexit
 set -o nounset
@@ -36,9 +36,5 @@ if [[ -n "${KUBE_EXTRA_WHAT:-}" ]]; then
 fi
 
 kube::build::verify_prereqs
-kube::build::build_image
 kube::build::run_build_command make all WHAT="${CMD_TARGETS}" KUBE_BUILD_PLATFORMS="${KUBE_SERVER_PLATFORMS[*]}" DBG="${DBG:-}"
-
-kube::build::copy_output
-
 kube::release::build_server_images

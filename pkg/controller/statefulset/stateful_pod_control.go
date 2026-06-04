@@ -19,33 +19,34 @@ package statefulset
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 // StatefulPodControlObjectManager abstracts the manipulation of Pods and PVCs. The real controller implements this
 // with a clientset for writes and listers for reads; for tests we provide stubs.
 type StatefulPodControlObjectManager interface {
-	CreatePod(ctx context.Context, pod *v1.Pod) error
+	CreatePod(ctx context.Context, pod *v1.Pod, ss *apps.StatefulSet) error
 	GetPod(namespace, podName string) (*v1.Pod, error)
-	UpdatePod(pod *v1.Pod) error
+	UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error
 	DeletePod(pod *v1.Pod) error
-	CreateClaim(claim *v1.PersistentVolumeClaim) error
+	CreateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error
 	GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error)
-	UpdateClaim(claim *v1.PersistentVolumeClaim) error
+	UpdateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error
 }
 
 // StatefulPodControl defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -64,8 +65,9 @@ func NewStatefulPodControl(
 	podLister corelisters.PodLister,
 	claimLister corelisters.PersistentVolumeClaimLister,
 	recorder record.EventRecorder,
+	consistencyStore consistencyutil.ConsistencyStore,
 ) *StatefulPodControl {
-	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister}, recorder}
+	return &StatefulPodControl{&realStatefulPodControlObjectManager{client, podLister, claimLister, consistencyStore}, recorder}
 }
 
 // NewStatefulPodControlFromManager creates a StatefulPodControl using the given StatefulPodControlObjectManager and recorder.
@@ -75,13 +77,23 @@ func NewStatefulPodControlFromManager(om StatefulPodControlObjectManager, record
 
 // realStatefulPodControlObjectManager uses a clientset.Interface and listers.
 type realStatefulPodControlObjectManager struct {
-	client      clientset.Interface
-	podLister   corelisters.PodLister
-	claimLister corelisters.PersistentVolumeClaimLister
+	client           clientset.Interface
+	podLister        corelisters.PodLister
+	claimLister      corelisters.PersistentVolumeClaimLister
+	consistencyStore consistencyutil.ConsistencyStore
 }
 
-func (om *realStatefulPodControlObjectManager) CreatePod(ctx context.Context, pod *v1.Pod) error {
-	_, err := om.client.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+func (om *realStatefulPodControlObjectManager) CreatePod(ctx context.Context, pod *v1.Pod, ss *apps.StatefulSet) error {
+	pod, err := om.client.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			podGroupResource,
+			pod.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -89,8 +101,17 @@ func (om *realStatefulPodControlObjectManager) GetPod(namespace, podName string)
 	return om.podLister.Pods(namespace).Get(podName)
 }
 
-func (om *realStatefulPodControlObjectManager) UpdatePod(pod *v1.Pod) error {
-	_, err := om.client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+func (om *realStatefulPodControlObjectManager) UpdatePod(pod *v1.Pod, ss *apps.StatefulSet) error {
+	pod, err := om.client.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			podGroupResource,
+			pod.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -98,8 +119,17 @@ func (om *realStatefulPodControlObjectManager) DeletePod(pod *v1.Pod) error {
 	return om.client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 }
 
-func (om *realStatefulPodControlObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error {
-	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
+func (om *realStatefulPodControlObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error {
+	claim, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			persistentVolumeClaimGroupResource,
+			claim.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -107,8 +137,17 @@ func (om *realStatefulPodControlObjectManager) GetClaim(namespace, claimName str
 	return om.claimLister.PersistentVolumeClaims(namespace).Get(claimName)
 }
 
-func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error {
-	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim, ss *apps.StatefulSet) error {
+	claim, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+	if err == nil {
+		ssNamespacedName := types.NamespacedName{Namespace: ss.Namespace, Name: ss.Name}
+		om.consistencyStore.WroteAt(
+			ssNamespacedName,
+			ss.UID,
+			persistentVolumeClaimGroupResource,
+			claim.ResourceVersion,
+		)
+	}
 	return err
 }
 
@@ -119,17 +158,15 @@ func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.
 		return err
 	}
 	// If we created the PVCs attempt to create the Pod
-	err := spc.objectMgr.CreatePod(ctx, pod)
+	err := spc.objectMgr.CreatePod(ctx, pod, set)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		// Set PVC policy as much as is possible at this point.
-		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		}
+	// Set PVC policy as much as is possible at this point.
+	if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		spc.recordPodEvent("update", set, pod, err)
+		return err
 	}
 	spc.recordPodEvent("create", set, pod, err)
 	return err
@@ -155,19 +192,17 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 				return err
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
-			// and dirty the pod.
-			if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
+		// if the Pod's PVCs are not consistent with the StatefulSet's PVC deletion policy, update the PVC
+		// and dirty the pod.
+		if match, err := spc.ClaimsMatchRetentionPolicy(ctx, set, pod); err != nil {
+			spc.recordPodEvent("update", set, pod, err)
+			return err
+		} else if !match {
+			if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
-			} else if !match {
-				if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-					spc.recordPodEvent("update", set, pod, err)
-					return err
-				}
-				consistent = false
 			}
+			consistent = false
 		}
 
 		// if the Pod is not dirty, do nothing
@@ -178,7 +213,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
 
-		updateErr := spc.objectMgr.UpdatePod(pod)
+		updateErr := spc.objectMgr.UpdatePod(pod, set)
 		if updateErr == nil {
 			return nil
 		}
@@ -187,7 +222,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 			// make a copy so we don't mutate the shared cache
 			pod = updated.DeepCopy()
 		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated Pod %s/%s: %w", set.Namespace, pod.Name, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Error getting updated Pod from lister", "pod", klog.KRef(set.Namespace, pod.Name))
 		}
 
 		return updateErr
@@ -198,10 +233,17 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 	return err
 }
 
+// DeleteStatefulPod deletes a Pod. A NotFound is considered a successful response, since the
+// end result is the same: the pod is deleted.
 func (spc *StatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	err := spc.objectMgr.DeletePod(pod)
-	spc.recordPodEvent("delete", set, pod, err)
-	return err
+	if err := spc.objectMgr.DeletePod(pod); err != nil {
+		if !apierrors.IsNotFound(err) {
+			spc.recordPodEvent("delete", set, pod, err)
+			return err
+		}
+	}
+	spc.recordPodEvent("delete", set, pod, nil)
+	return nil
 }
 
 // ClaimsMatchRetentionPolicy returns false if the PVCs for pod are not consistent with set's PVC deletion policy.
@@ -218,7 +260,8 @@ func (spc *StatefulPodControl) ClaimsMatchRetentionPolicy(ctx context.Context, s
 		case apierrors.IsNotFound(err):
 			klog.FromContext(ctx).V(4).Info("Expected claim missing, continuing to pick up in next iteration", "PVC", klog.KObj(claim))
 		case err != nil:
-			return false, fmt.Errorf("Could not retrieve claim %s for %s when checking PVC deletion policy", claimName, pod.Name)
+			return false, fmt.Errorf(
+				"Could not retrieve claim %s for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:
 			if !isClaimOwnerUpToDate(logger, claim, set, pod) {
 				return false, nil
@@ -250,7 +293,7 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(ctx context.Cont
 			if !isClaimOwnerUpToDate(logger, claim, set, pod) {
 				claim = claim.DeepCopy() // Make a copy so we don't mutate the shared cache.
 				updateClaimOwnerRefForSetAndPod(logger, claim, set, pod)
-				if err := spc.objectMgr.UpdateClaim(claim); err != nil {
+				if err := spc.objectMgr.UpdateClaim(claim, set); err != nil {
 					return fmt.Errorf("could not update claim %s for delete policy ownerRefs: %w", claimName, err)
 				}
 			}
@@ -289,14 +332,14 @@ func (spc *StatefulPodControl) PodClaimIsStale(set *apps.StatefulSet, pod *v1.Po
 // have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, err error) {
 	if err == nil {
-		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		reason := fmt.Sprintf("Successful%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Pod %s in StatefulSet %s successful",
-			strings.ToLower(verb), pod.Name, set.Name)
+			cases.Title(language.English).String(verb), pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
-		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		reason := fmt.Sprintf("Failed%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Pod %s in StatefulSet %s failed error: %s",
-			strings.ToLower(verb), pod.Name, set.Name, err)
+			cases.Title(language.English).String(verb), pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
 	}
 }
@@ -306,14 +349,14 @@ func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet
 // reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim, err error) {
 	if err == nil {
-		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		reason := fmt.Sprintf("Successful%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Claim %s Pod %s in StatefulSet %s success",
-			strings.ToLower(verb), claim.Name, pod.Name, set.Name)
+			cases.Title(language.English).String(verb), claim.Name, pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
-		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		reason := fmt.Sprintf("Failed%s", cases.Title(language.English).String(verb))
 		message := fmt.Sprintf("%s Claim %s for Pod %s in StatefulSet %s failed error: %s",
-			strings.ToLower(verb), claim.Name, pod.Name, set.Name, err)
+			cases.Title(language.English).String(verb), claim.Name, pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
 	}
 }
@@ -323,13 +366,10 @@ func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.C
 	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 		return err
 	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		// Set PVC policy as much as is possible at this point.
-		if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
-			spc.recordPodEvent("update", set, pod, err)
-			return err
-		}
+	// Set PVC policy as much as is possible at this point.
+	if err := spc.UpdatePodClaimForRetentionPolicy(ctx, set, pod); err != nil {
+		spc.recordPodEvent("update", set, pod, err)
+		return err
 	}
 	return nil
 }
@@ -344,15 +384,15 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 		pvc, err := spc.objectMgr.GetClaim(claim.Namespace, claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
-			err := spc.objectMgr.CreateClaim(&claim)
+			err := spc.objectMgr.CreateClaim(&claim, set)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to create PVC %s: %s", claim.Name, err))
+				errs = append(errs, fmt.Errorf("failed to create PVC %s: %w", claim.Name, err))
 			}
 			if err == nil || !apierrors.IsAlreadyExists(err) {
 				spc.recordClaimEvent("create", set, pod, &claim, err)
 			}
 		case err != nil:
-			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
+			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %w", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
 		default:
 			if pvc.DeletionTimestamp != nil {

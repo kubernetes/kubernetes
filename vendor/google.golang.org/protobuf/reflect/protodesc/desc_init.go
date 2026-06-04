@@ -29,6 +29,7 @@ func (r descsByName) initEnumDeclarations(eds []*descriptorpb.EnumDescriptorProt
 			e.L2.Options = func() protoreflect.ProtoMessage { return opts }
 		}
 		e.L1.EditionFeatures = mergeEditionFeatures(parent, ed.GetOptions().GetFeatures())
+		e.L1.Visibility = int32(ed.GetVisibility())
 		for _, s := range ed.GetReservedName() {
 			e.L2.ReservedNames.List = append(e.L2.ReservedNames.List, protoreflect.Name(s))
 		}
@@ -70,6 +71,7 @@ func (r descsByName) initMessagesDeclarations(mds []*descriptorpb.DescriptorProt
 			return nil, err
 		}
 		m.L1.EditionFeatures = mergeEditionFeatures(parent, md.GetOptions().GetFeatures())
+		m.L1.Visibility = int32(md.GetVisibility())
 		if opts := md.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.MessageOptions)
 			m.L2.Options = func() protoreflect.ProtoMessage { return opts }
@@ -199,6 +201,7 @@ func (r descsByName) initExtensionDeclarations(xds []*descriptorpb.FieldDescript
 			return nil, err
 		}
 		x.L1.EditionFeatures = mergeEditionFeatures(parent, xd.GetOptions().GetFeatures())
+		x.L2.IsProto3Optional = xd.GetProto3Optional()
 		if opts := xd.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.FieldOptions)
 			x.L2.Options = func() protoreflect.ProtoMessage { return opts }

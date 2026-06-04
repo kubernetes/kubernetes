@@ -69,6 +69,10 @@ type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
 
+	// Time at which the container was started.
+	// This may be unset if the runtime does not provide it.
+	StartTime time.Time `json:"start_time,omitempty"`
+
 	// Other names by which the container is known within a certain namespace.
 	// This is unique within that namespace.
 	Aliases []string `json:"aliases,omitempty"`
@@ -192,6 +196,8 @@ type Percentiles struct {
 	Present bool `json:"present"`
 	// Average over the collected sample.
 	Mean uint64 `json:"mean"`
+	// Standard deviation of the collected sample.
+	Std uint64 `json:"std"`
 	// Max seen over the collected sample.
 	Max uint64 `json:"max"`
 	// 50th percentile over the collected sample.
@@ -200,6 +206,8 @@ type Percentiles struct {
 	Ninety uint64 `json:"ninety"`
 	// 95th percentile over the collected sample.
 	NinetyFive uint64 `json:"ninetyfive"`
+	// Number of samples used to calculate these percentiles.
+	Count uint64 `json:"count"`
 }
 
 type Usage struct {

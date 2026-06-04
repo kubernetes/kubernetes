@@ -36,13 +36,16 @@ const (
 	ProtoType     = `application/vnd.google.protobuf`
 	ProtoProtocol = `io.prometheus.client.MetricFamily`
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeProtoCompact) instead.
-	ProtoFmt                 = ProtoType + "; proto=" + ProtoProtocol + ";"
-	OpenMetricsType          = `application/openmetrics-text`
+	ProtoFmt        = ProtoType + "; proto=" + ProtoProtocol + ";"
+	OpenMetricsType = `application/openmetrics-text`
+	//nolint:revive // Allow for underscores.
 	OpenMetricsVersion_0_0_1 = "0.0.1"
+	//nolint:revive // Allow for underscores.
 	OpenMetricsVersion_1_0_0 = "1.0.0"
 
 	// The Content-Type values for the different wire protocols. Do not do direct
 	// comparisons to these constants, instead use the comparison functions.
+	//
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeUnknown) instead.
 	FmtUnknown Format = `<unknown>`
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeTextPlain) instead.
@@ -54,8 +57,10 @@ const (
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeProtoCompact) instead.
 	FmtProtoCompact Format = ProtoFmt + ` encoding=compact-text`
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeOpenMetrics) instead.
+	//nolint:revive // Allow for underscores.
 	FmtOpenMetrics_1_0_0 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_1_0_0 + `; charset=utf-8`
 	// Deprecated: Use expfmt.NewFormat(expfmt.TypeOpenMetrics) instead.
+	//nolint:revive // Allow for underscores.
 	FmtOpenMetrics_0_0_1 Format = OpenMetricsType + `; version=` + OpenMetricsVersion_0_0_1 + `; charset=utf-8`
 )
 
@@ -188,8 +193,8 @@ func (f Format) FormatType() FormatType {
 // Format contains a escaping=allow-utf-8 term, it will select NoEscaping. If a valid
 // "escaping" term exists, that will be used. Otherwise, the global default will
 // be returned.
-func (format Format) ToEscapingScheme() model.EscapingScheme {
-	for _, p := range strings.Split(string(format), ";") {
+func (f Format) ToEscapingScheme() model.EscapingScheme {
+	for _, p := range strings.Split(string(f), ";") {
 		toks := strings.Split(p, "=")
 		if len(toks) != 2 {
 			continue

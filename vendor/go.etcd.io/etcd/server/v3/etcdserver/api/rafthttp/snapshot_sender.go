@@ -17,25 +17,23 @@ package rafthttp
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/dustin/go-humanize"
+	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/httputil"
 	pioutil "go.etcd.io/etcd/pkg/v3/ioutil"
-	"go.etcd.io/etcd/raft/v3"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
-
-	"github.com/dustin/go-humanize"
-	"go.uber.org/zap"
+	"go.etcd.io/raft/v3"
 )
 
-var (
-	// timeout for reading snapshot response body
-	snapResponseReadTimeout = 5 * time.Second
-)
+// timeout for reading snapshot response body
+var snapResponseReadTimeout = 5 * time.Second
 
 type snapshotSender struct {
 	from, to types.ID
@@ -66,11 +64,11 @@ func newSnapshotSender(tr *Transport, picker *urlPicker, to types.ID, status *pe
 
 func (s *snapshotSender) stop() { close(s.stopc) }
 
-func (s *snapshotSender) send(merged snap.Message) {
+func (s *snapshotSender) send(merged *snap.Message) {
 	start := time.Now()
 
 	m := merged.Message
-	to := types.ID(m.To).String()
+	to := types.ID(m.GetTo()).String()
 
 	body := createSnapBody(s.tr.Logger, merged)
 	defer body.Close()
@@ -83,7 +81,7 @@ func (s *snapshotSender) send(merged snap.Message) {
 	if s.tr.Logger != nil {
 		s.tr.Logger.Info(
 			"sending database snapshot",
-			zap.Uint64("snapshot-index", m.Snapshot.Metadata.Index),
+			zap.Uint64("snapshot-index", m.Snapshot.Metadata.GetIndex()),
 			zap.String("remote-peer-id", to),
 			zap.Uint64("bytes", snapshotSizeVal),
 			zap.String("size", snapshotSize),
@@ -101,7 +99,7 @@ func (s *snapshotSender) send(merged snap.Message) {
 		if s.tr.Logger != nil {
 			s.tr.Logger.Warn(
 				"failed to send database snapshot",
-				zap.Uint64("snapshot-index", m.Snapshot.Metadata.Index),
+				zap.Uint64("snapshot-index", m.Snapshot.Metadata.GetIndex()),
 				zap.String("remote-peer-id", to),
 				zap.Uint64("bytes", snapshotSizeVal),
 				zap.String("size", snapshotSize),
@@ -111,28 +109,28 @@ func (s *snapshotSender) send(merged snap.Message) {
 
 		// errMemberRemoved is a critical error since a removed member should
 		// always be stopped. So we use reportCriticalError to report it to errorc.
-		if err == errMemberRemoved {
+		if errors.Is(err, errMemberRemoved) {
 			reportCriticalError(err, s.errorc)
 		}
 
 		s.picker.unreachable(u)
 		s.status.deactivate(failureType{source: sendSnap, action: "post"}, err.Error())
-		s.r.ReportUnreachable(m.To)
+		s.r.ReportUnreachable(m.GetTo())
 		// report SnapshotFailure to raft state machine. After raft state
 		// machine knows about it, it would pause a while and retry sending
 		// new snapshot message.
-		s.r.ReportSnapshot(m.To, raft.SnapshotFailure)
+		s.r.ReportSnapshot(m.GetTo(), raft.SnapshotFailure)
 		sentFailures.WithLabelValues(to).Inc()
 		snapshotSendFailures.WithLabelValues(to).Inc()
 		return
 	}
 	s.status.activate()
-	s.r.ReportSnapshot(m.To, raft.SnapshotFinish)
+	s.r.ReportSnapshot(m.GetTo(), raft.SnapshotFinish)
 
 	if s.tr.Logger != nil {
 		s.tr.Logger.Info(
 			"sent database snapshot",
-			zap.Uint64("snapshot-index", m.Snapshot.Metadata.Index),
+			zap.Uint64("snapshot-index", m.Snapshot.Metadata.GetIndex()),
 			zap.String("remote-peer-id", to),
 			zap.Uint64("bytes", snapshotSizeVal),
 			zap.String("size", snapshotSize),
@@ -169,7 +167,7 @@ func (s *snapshotSender) post(req *http.Request) (err error) {
 		// prevents from reading the body forever when the other side dies right after
 		// successfully receives the request body.
 		time.AfterFunc(snapResponseReadTimeout, func() { httputil.GracefulClose(resp) })
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		result <- responseAndError{resp, body, err}
 	}()
 
@@ -184,11 +182,11 @@ func (s *snapshotSender) post(req *http.Request) (err error) {
 	}
 }
 
-func createSnapBody(lg *zap.Logger, merged snap.Message) io.ReadCloser {
+func createSnapBody(lg *zap.Logger, merged *snap.Message) io.ReadCloser {
 	buf := new(bytes.Buffer)
 	enc := &messageEncoder{w: buf}
 	// encode raft message
-	if err := enc.encode(&merged.Message); err != nil {
+	if err := enc.encode(merged.Message); err != nil {
 		if lg != nil {
 			lg.Panic("failed to encode message", zap.Error(err))
 		}

@@ -19,14 +19,14 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/etcd/client/pkg/v3/types"
-	"go.etcd.io/etcd/raft/v3"
-	"go.etcd.io/etcd/raft/v3/raftpb"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
-	stats "go.etcd.io/etcd/server/v3/etcdserver/api/v2stats"
-
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
+
+	"go.etcd.io/etcd/client/pkg/v3/types"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	stats "go.etcd.io/etcd/server/v3/etcdserver/api/v2stats"
+	"go.etcd.io/raft/v3"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 const (
@@ -65,11 +65,11 @@ type Peer interface {
 	// and has no promise that the message will be received by the remote.
 	// When it fails to send message out, it will report the status to underlying
 	// raft.
-	send(m raftpb.Message)
+	send(m *raftpb.Message)
 
 	// sendSnap sends the merged snapshot message to the remote peer. Its behavior
 	// is similar to send.
-	sendSnap(m snap.Message)
+	sendSnap(m *snap.Message)
 
 	// update updates the urls of remote peer.
 	update(urls types.URLs)
@@ -118,8 +118,8 @@ type peer struct {
 	msgAppV2Reader *streamReader
 	msgAppReader   *streamReader
 
-	recvc chan raftpb.Message
-	propc chan raftpb.Message
+	recvc chan *raftpb.Message
+	propc chan *raftpb.Message
 
 	mu     sync.Mutex
 	paused bool
@@ -164,8 +164,8 @@ func startPeer(t *Transport, urls types.URLs, peerID types.ID, fs *stats.Followe
 		writer:         startStreamWriter(t.Logger, t.ID, peerID, status, fs, r),
 		pipeline:       pipeline,
 		snapSender:     newSnapshotSender(t, picker, peerID, status),
-		recvc:          make(chan raftpb.Message, recvBufSize),
-		propc:          make(chan raftpb.Message, maxPendingProposals),
+		recvc:          make(chan *raftpb.Message, recvBufSize),
+		propc:          make(chan *raftpb.Message, maxPendingProposals),
 		stopc:          make(chan struct{}),
 	}
 
@@ -233,7 +233,7 @@ func startPeer(t *Transport, urls types.URLs, peerID types.ID, fs *stats.Followe
 	return p
 }
 
-func (p *peer) send(m raftpb.Message) {
+func (p *peer) send(m *raftpb.Message) {
 	p.mu.Lock()
 	paused := p.paused
 	p.mu.Unlock()
@@ -246,40 +246,26 @@ func (p *peer) send(m raftpb.Message) {
 	select {
 	case writec <- m:
 	default:
-		p.r.ReportUnreachable(m.To)
+		p.r.ReportUnreachable(m.GetTo())
 		if isMsgSnap(m) {
-			p.r.ReportSnapshot(m.To, raft.SnapshotFailure)
+			p.r.ReportSnapshot(m.GetTo(), raft.SnapshotFailure)
 		}
-		if p.status.isActive() {
-			if p.lg != nil {
-				p.lg.Warn(
-					"dropped internal Raft message since sending buffer is full (overloaded network)",
-					zap.String("message-type", m.Type.String()),
-					zap.String("local-member-id", p.localID.String()),
-					zap.String("from", types.ID(m.From).String()),
-					zap.String("remote-peer-id", p.id.String()),
-					zap.String("remote-peer-name", name),
-					zap.Bool("remote-peer-active", p.status.isActive()),
-				)
-			}
-		} else {
-			if p.lg != nil {
-				p.lg.Warn(
-					"dropped internal Raft message since sending buffer is full (overloaded network)",
-					zap.String("message-type", m.Type.String()),
-					zap.String("local-member-id", p.localID.String()),
-					zap.String("from", types.ID(m.From).String()),
-					zap.String("remote-peer-id", p.id.String()),
-					zap.String("remote-peer-name", name),
-					zap.Bool("remote-peer-active", p.status.isActive()),
-				)
-			}
+		if p.lg != nil {
+			p.lg.Warn(
+				"dropped internal Raft message since sending buffer is full",
+				zap.String("message-type", m.GetType().String()),
+				zap.String("local-member-id", p.localID.String()),
+				zap.String("from", types.ID(m.GetFrom()).String()),
+				zap.String("remote-peer-id", p.id.String()),
+				zap.String("remote-peer-name", name),
+				zap.Bool("remote-peer-active", p.status.isActive()),
+			)
 		}
-		sentFailures.WithLabelValues(types.ID(m.To).String()).Inc()
+		sentFailures.WithLabelValues(types.ID(m.GetTo()).String()).Inc()
 	}
 }
 
-func (p *peer) sendSnap(m snap.Message) {
+func (p *peer) sendSnap(m *snap.Message) {
 	go p.snapSender.send(m)
 }
 
@@ -348,7 +334,7 @@ func (p *peer) stop() {
 
 // pick picks a chan for sending the given message. The picked chan and the picked chan
 // string name are returned.
-func (p *peer) pick(m raftpb.Message) (writec chan<- raftpb.Message, picked string) {
+func (p *peer) pick(m *raftpb.Message) (writec chan<- *raftpb.Message, picked string) {
 	var ok bool
 	// Considering MsgSnap may have a big size, e.g., 1G, and will block
 	// stream for a long time, only use one of the N pipelines to send MsgSnap.
@@ -362,6 +348,6 @@ func (p *peer) pick(m raftpb.Message) (writec chan<- raftpb.Message, picked stri
 	return p.pipeline.msgc, pipelineMsg
 }
 
-func isMsgApp(m raftpb.Message) bool { return m.Type == raftpb.MsgApp }
+func isMsgApp(m *raftpb.Message) bool { return m.GetType() == raftpb.MsgApp }
 
-func isMsgSnap(m raftpb.Message) bool { return m.Type == raftpb.MsgSnap }
+func isMsgSnap(m *raftpb.Message) bool { return m.GetType() == raftpb.MsgSnap }

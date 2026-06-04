@@ -1,5 +1,4 @@
 //go:build !linux
-// +build !linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -21,7 +20,10 @@ package cm
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 const (
@@ -47,7 +49,7 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	return nil
 }
 
@@ -71,6 +73,18 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 }
 
 // GetKubeletContainer returns the cgroup the kubelet will use
-func GetKubeletContainer(kubeletCgroups string) (string, error) {
+func GetKubeletContainer(logger klog.Logger, kubeletCgroups string) (string, error) {
 	return "", nil
+}
+
+func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	return nil
+}
+
+func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	return nil
+}
+
+func MemoryLimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
+	return nil
 }

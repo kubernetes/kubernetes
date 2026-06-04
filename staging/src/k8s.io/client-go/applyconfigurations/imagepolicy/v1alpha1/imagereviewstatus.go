@@ -20,9 +20,19 @@ package v1alpha1
 
 // ImageReviewStatusApplyConfiguration represents a declarative configuration of the ImageReviewStatus type for use
 // with apply.
+//
+// ImageReviewStatus is the result of the review for the pod creation request.
 type ImageReviewStatusApplyConfiguration struct {
-	Allowed          *bool             `json:"allowed,omitempty"`
-	Reason           *string           `json:"reason,omitempty"`
+	// Allowed indicates that all images were allowed to be run.
+	Allowed *bool `json:"allowed,omitempty"`
+	// Reason should be empty unless Allowed is false in which case it
+	// may contain a short description of what is wrong.  Kubernetes
+	// may truncate excessively long errors when displaying to the user.
+	Reason *string `json:"reason,omitempty"`
+	// AuditAnnotations will be added to the attributes object of the
+	// admission controller request using 'AddAnnotation'.  The keys should
+	// be prefix-less (i.e., the admission controller will add an
+	// appropriate prefix).
 	AuditAnnotations map[string]string `json:"auditAnnotations,omitempty"`
 }
 

@@ -11,12 +11,7 @@
           "requirements": {
             "description": "requirements is the parsed interpretation of a field selector. All requirements must be met for a resource instance to match the selector. Webhook implementations should handle requirements, but how to handle them is up to the webhook. Since requirements can only limit the request, it is safe to authorize as unlimited request if the requirements are not understood.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -34,12 +29,7 @@
           "requirements": {
             "description": "requirements is the parsed interpretation of a label selector. All requirements must be met for a resource instance to match the selector. Webhook implementations should handle requirements, but how to handle them is up to the webhook. Since requirements can only limit the request, it is safe to authorize as unlimited request if the requirements are not understood.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -65,7 +55,7 @@
               }
             ],
             "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -74,7 +64,7 @@
               }
             ],
             "default": {},
-            "description": "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
+            "description": "spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted."
           },
           "status": {
             "allOf": [
@@ -83,7 +73,7 @@
               }
             ],
             "default": {},
-            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+            "description": "status is filled in by the server and indicates whether the request is allowed or not"
           }
         },
         "required": [
@@ -102,11 +92,11 @@
         "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
         "properties": {
           "path": {
-            "description": "Path is the URL path of the request",
+            "description": "path is the URL path of the request",
             "type": "string"
           },
           "verb": {
-            "description": "Verb is the standard HTTP verb",
+            "description": "verb is the standard HTTP verb",
             "type": "string"
           }
         },
@@ -116,18 +106,16 @@
         "description": "NonResourceRule holds information that describes a rule for the non-resource",
         "properties": {
           "nonResourceURLs": {
-            "description": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
+            "description": "nonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "verbs": {
-            "description": "Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
+            "description": "verbs is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -148,10 +136,10 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.FieldSelectorAttributes"
               }
             ],
-            "description": "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default)."
+            "description": "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it."
           },
           "group": {
-            "description": "Group is the API Group of the Resource.  \"*\" means all.",
+            "description": "group is the API Group of the Resource.  \"*\" means all.",
             "type": "string"
           },
           "labelSelector": {
@@ -160,30 +148,30 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LabelSelectorAttributes"
               }
             ],
-            "description": "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default)."
+            "description": "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it."
           },
           "name": {
-            "description": "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+            "description": "name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
             "type": "string"
           },
           "namespace": {
-            "description": "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+            "description": "namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
             "type": "string"
           },
           "resource": {
-            "description": "Resource is one of the existing resource types.  \"*\" means all.",
+            "description": "resource is one of the existing resource types.  \"*\" means all.",
             "type": "string"
           },
           "subresource": {
-            "description": "Subresource is one of the existing resource types.  \"\" means none.",
+            "description": "subresource is one of the existing resource types.  \"\" means none.",
             "type": "string"
           },
           "verb": {
-            "description": "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+            "description": "verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
             "type": "string"
           },
           "version": {
-            "description": "Version is the API Version of the Resource.  \"*\" means all.",
+            "description": "version is the API Version of the Resource.  \"*\" means all.",
             "type": "string"
           }
         },
@@ -193,36 +181,32 @@
         "description": "ResourceRule is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
         "properties": {
           "apiGroups": {
-            "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
+            "description": "apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "resourceNames": {
-            "description": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
+            "description": "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "resources": {
-            "description": "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
+            "description": "resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "verbs": {
-            "description": "Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+            "description": "verbs is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -252,7 +236,7 @@
               }
             ],
             "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -261,7 +245,7 @@
               }
             ],
             "default": {},
-            "description": "Spec holds information about the request being evaluated.  user and groups must be empty"
+            "description": "spec holds information about the request being evaluated.  user and groups must be empty"
           },
           "status": {
             "allOf": [
@@ -270,7 +254,7 @@
               }
             ],
             "default": {},
-            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+            "description": "status is filled in by the server and indicates whether the request is allowed or not"
           }
         },
         "required": [
@@ -286,7 +270,7 @@
         ]
       },
       "io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec": {
-        "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+        "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
         "properties": {
           "nonResourceAttributes": {
             "allOf": [
@@ -294,7 +278,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceAttributes"
               }
             ],
-            "description": "NonResourceAttributes describes information for a non-resource access request"
+            "description": "nonResourceAttributes describes information for a non-resource access request"
           },
           "resourceAttributes": {
             "allOf": [
@@ -302,7 +286,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceAttributes"
               }
             ],
-            "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+            "description": "resourceAttributes describes information for a resource access request"
           }
         },
         "type": "object"
@@ -325,7 +309,7 @@
               }
             ],
             "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -334,7 +318,7 @@
               }
             ],
             "default": {},
-            "description": "Spec holds information about the request being evaluated."
+            "description": "spec holds information about the request being evaluated."
           },
           "status": {
             "allOf": [
@@ -343,7 +327,7 @@
               }
             ],
             "default": {},
-            "description": "Status is filled in by the server and indicates the set of actions a user can perform."
+            "description": "status is filled in by the server and indicates the set of actions a user can perform."
           }
         },
         "required": [
@@ -362,7 +346,7 @@
         "description": "SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.",
         "properties": {
           "namespace": {
-            "description": "Namespace to evaluate rules for. Required.",
+            "description": "namespace to evaluate rules for. Required.",
             "type": "string"
           }
         },
@@ -386,7 +370,7 @@
               }
             ],
             "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -395,7 +379,7 @@
               }
             ],
             "default": {},
-            "description": "Spec holds information about the request being evaluated"
+            "description": "spec holds information about the request being evaluated"
           },
           "status": {
             "allOf": [
@@ -404,7 +388,7 @@
               }
             ],
             "default": {},
-            "description": "Status is filled in by the server and indicates whether the request is allowed or not"
+            "description": "status is filled in by the server and indicates whether the request is allowed or not"
           }
         },
         "required": [
@@ -420,23 +404,21 @@
         ]
       },
       "io.k8s.api.authorization.v1.SubjectAccessReviewSpec": {
-        "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of ResourceAuthorizationAttributes and NonResourceAuthorizationAttributes must be set",
+        "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
         "properties": {
           "extra": {
             "additionalProperties": {
               "items": {
-                "default": "",
                 "type": "string"
               },
               "type": "array"
             },
-            "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+            "description": "extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
             "type": "object"
           },
           "groups": {
-            "description": "Groups is the groups you're testing for.",
+            "description": "groups is the groups you're testing for.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -448,7 +430,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceAttributes"
               }
             ],
-            "description": "NonResourceAttributes describes information for a non-resource access request"
+            "description": "nonResourceAttributes describes information for a non-resource access request"
           },
           "resourceAttributes": {
             "allOf": [
@@ -456,14 +438,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceAttributes"
               }
             ],
-            "description": "ResourceAuthorizationAttributes describes information for a resource access request"
+            "description": "resourceAttributes describes information for a resource access request"
           },
           "uid": {
-            "description": "UID information about the requesting user.",
+            "description": "uid information about the requesting user.",
             "type": "string"
           },
           "user": {
-            "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+            "description": "user is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
             "type": "string"
           }
         },
@@ -474,19 +456,19 @@
         "properties": {
           "allowed": {
             "default": false,
-            "description": "Allowed is required. True if the action would be allowed, false otherwise.",
+            "description": "allowed is required. True if the action would be allowed, false otherwise.",
             "type": "boolean"
           },
           "denied": {
-            "description": "Denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+            "description": "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
             "type": "boolean"
           },
           "evaluationError": {
-            "description": "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+            "description": "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
             "type": "string"
           },
           "reason": {
-            "description": "Reason is optional.  It indicates why a request was allowed or denied.",
+            "description": "reason is optional.  It indicates why a request was allowed or denied.",
             "type": "string"
           }
         },
@@ -499,36 +481,26 @@
         "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission, even if that list is incomplete.",
         "properties": {
           "evaluationError": {
-            "description": "EvaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
+            "description": "evaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
             "type": "string"
           },
           "incomplete": {
             "default": false,
-            "description": "Incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
+            "description": "incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
             "type": "boolean"
           },
           "nonResourceRules": {
-            "description": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+            "description": "nonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "resourceRules": {
-            "description": "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+            "description": "resourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -547,7 +519,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -575,7 +546,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -593,7 +563,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -631,12 +600,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -671,7 +635,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -704,7 +667,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -764,7 +726,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -794,7 +755,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -812,7 +772,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -821,12 +780,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -842,12 +796,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [

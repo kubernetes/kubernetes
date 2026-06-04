@@ -1,5 +1,4 @@
 //go:build !linux
-// +build !linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -17,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package staticpod contains utilities for managing the static pod.
 package staticpod
 
 import (

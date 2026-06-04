@@ -25,9 +25,13 @@ import (
 
 // NamedRuleWithOperationsApplyConfiguration represents a declarative configuration of the NamedRuleWithOperations type for use
 // with apply.
+//
+// NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
 type NamedRuleWithOperationsApplyConfiguration struct {
-	ResourceNames                           []string `json:"resourceNames,omitempty"`
-	v1.RuleWithOperationsApplyConfiguration `json:",inline"`
+	// resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+	ResourceNames []string `json:"resourceNames,omitempty"`
+	// RuleWithOperations is a tuple of Operations and Resources.
+	v1.RuleWithOperationsApplyConfiguration `json:""`
 }
 
 // NamedRuleWithOperationsApplyConfiguration constructs a declarative configuration of the NamedRuleWithOperations type for use with

@@ -305,6 +305,11 @@ func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, st
 	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
 }
 
+// WebhookRejectionGathererForTest exposes admission webhook rejection metric for access by unit test.
+func (m *AdmissionMetrics) WebhookRejectionGathererForTest() *metrics.CounterVec {
+	return m.webhookRejection
+}
+
 // ObserveWebhookFailOpen records validating or mutating webhook that fail open.
 func (m *AdmissionMetrics) ObserveWebhookFailOpen(ctx context.Context, name, stepType string) {
 	m.webhookFailOpen.WithContext(ctx).WithLabelValues(name, stepType).Inc()

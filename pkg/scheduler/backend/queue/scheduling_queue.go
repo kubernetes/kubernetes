@@ -15,13 +15,13 @@ limitations under the License.
 */
 
 // This file contains structures that implement scheduling queue types.
-// Scheduling queues hold pods waiting to be scheduled. This file implements a
+// Scheduling queues hold entities (which can be pods or pod groups) waiting to be scheduled. This file implements a
 // priority queue which has two sub queues and a additional data structure,
-// namely: activeQ, backoffQ and unschedulablePods.
-// - activeQ holds pods that are being considered for scheduling.
-// - backoffQ holds pods that moved from unschedulablePods and will move to
+// namely: activeQ, backoffQ and unschedulableEntities.
+// - activeQ holds entities that are being considered for scheduling.
+// - backoffQ holds entities that moved from unschedulableEntities and will move to
 //   activeQ when their backoff periods complete.
-// - unschedulablePods holds pods that were already attempted for scheduling and
+// - unschedulableEntities holds entities that were already attempted for scheduling and
 //   are currently determined to be unschedulable.
 
 package queue
@@ -30,25 +30,25 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	listersv1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -57,15 +57,15 @@ import (
 
 const (
 	// DefaultPodMaxInUnschedulablePodsDuration is the default value for the maximum
-	// time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods
-	// for longer than this value, the pod will be moved from unschedulablePods to
+	// time a pod can stay in unschedulableEntities. If a pod stays in unschedulableEntities
+	// for longer than this value, the pod will be moved from unschedulableEntities to
 	// backoffQ or activeQ. If this value is empty, the default value (5min)
 	// will be used.
 	DefaultPodMaxInUnschedulablePodsDuration time.Duration = 5 * time.Minute
 	// Scheduling queue names
-	activeQ           = "Active"
-	backoffQ          = "Backoff"
-	unschedulablePods = "Unschedulable"
+	activeQ        = "Active"
+	backoffQ       = "Backoff"
+	unschedulableQ = "Unschedulable"
 
 	preEnqueue = "PreEnqueue"
 )
@@ -86,40 +86,47 @@ const (
 // by the checking result.
 type PreEnqueueCheck func(pod *v1.Pod) bool
 
+// PodSigner creates a scheduling signature for a pod that represents its scheduling requirements.
+// The signature is used by the opportunistic batching feature (KEP-5598) to reuse scheduling decisions.
+// Returns nil if the pod is "unsignable" (some plugins cannot create a stable signature for it).
+type PodSigner func(ctx context.Context, pod *v1.Pod) fwk.PodSignature
+
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
-	framework.PodNominator
-	Add(logger klog.Logger, pod *v1.Pod)
+	fwk.PodNominator
+	Add(ctx context.Context, pod *v1.Pod)
 	// Activate moves the given pods to activeQ.
-	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// If a pod isn't found in unschedulableEntities or backoffQ and it's in-flight,
 	// the wildcard event is registered so that the pod will be requeued when it comes back.
-	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// But, if a pod isn't found in unschedulableEntities or backoffQ and it's not in-flight (i.e., completely unknown pod),
 	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
-	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
+	// AddUnschedulablePodIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
 	// returned by calling SchedulingCycle().
-	AddUnschedulableIfNotPresent(logger klog.Logger, pod *framework.QueuedPodInfo, podSchedulingCycle int64) error
+	AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error
+	// AddAttemptedPodGroupIfNeeded adds an attempted pod group back to scheduling queue.
+	// If there are no pending pods, it will not add the pod group back to the queue.
+	AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64) error
 	// SchedulingCycle returns the current number of scheduling cycle which is
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
 	SchedulingCycle() int64
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
-	Pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	Pop(logger klog.Logger) (framework.QueuedEntityInfo, error)
 	// Done must be called for pod returned by Pop. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
-	Update(logger klog.Logger, oldPod, newPod *v1.Pod)
-	Delete(pod *v1.Pod)
+	Update(ctx context.Context, oldPod, newPod *v1.Pod)
+	Delete(logger klog.Logger, pod *v1.Pod)
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
-	// We know currently some do, but we'll eventually remove them in favor of the scheduling queue hint.
-	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
+	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
-	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent)
+	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent)
 
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -127,32 +134,38 @@ type SchedulingQueue interface {
 	// Run starts the goroutines managing the queue.
 	Run(logger klog.Logger)
 
+	// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
+
 	// The following functions are supposed to be used only for testing or debugging.
-	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
+	GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
 	InFlightPods() []*v1.Pod
 	PodsInActiveQ() []*v1.Pod
 	// PodsInBackoffQ returns all the Pods in the backoffQ.
 	PodsInBackoffQ() []*v1.Pod
 	UnschedulablePods() []*v1.Pod
+	// PendingPodGroupPods returns all the pending pods waiting for their pod groups.
+	PendingPodGroupPods() []*v1.Pod
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
 func NewSchedulingQueue(
-	lessFn framework.LessFunc,
+	lessFn fwk.LessFunc,
 	informerFactory informers.SharedInformerFactory,
 	opts ...Option) SchedulingQueue {
 	return NewPriorityQueue(lessFn, informerFactory, opts...)
 }
 
 // PriorityQueue implements a scheduling queue.
-// The head of PriorityQueue is the highest priority pending pod. This structure
-// has two sub queues and a additional data structure, namely: activeQ,
-// backoffQ and unschedulablePods.
-//   - activeQ holds pods that are being considered for scheduling.
-//   - backoffQ holds pods that moved from unschedulablePods and will move to
+// The head of PriorityQueue is the highest priority pending entity (pod or pod group). This structure
+// has two sub queues and an additional data structure, namely: activeQ,
+// backoffQ and unschedulableEntities.
+//   - activeQ holds pods or pod groups that are being considered for scheduling.
+//   - backoffQ holds pods or pod groups that moved from unschedulableEntities and will move to
 //     activeQ when their backoff periods complete.
-//   - unschedulablePods holds pods that were already attempted for scheduling and
+//   - unschedulableEntities holds pods or pod groups that were already attempted for scheduling and
 //     are currently determined to be unschedulable.
 type PriorityQueue struct {
 	*nominator
@@ -165,46 +178,53 @@ type PriorityQueue struct {
 	// Correct locking order is: lock > activeQueue.lock > backoffQueue.lock > nominator.nLock.
 	lock sync.RWMutex
 
-	// the maximum time a pod can stay in the unschedulablePods.
+	// the maximum time a pod can stay in the unschedulableEntities.
 	podMaxInUnschedulablePodsDuration time.Duration
 
 	activeQ  activeQueuer
 	backoffQ backoffQueuer
-	// unschedulablePods holds pods that have been tried and determined unschedulable.
-	unschedulablePods *UnschedulablePods
-	// moveRequestCycle caches the sequence number of scheduling cycle when we
-	// received a move request. Unschedulable pods in and before this scheduling
-	// cycle will be put back to activeQueue if we were trying to schedule them
-	// when we received move request.
-	// TODO: this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
-	moveRequestCycle int64
+	// unschedulableEntities holds pods and pod groups that have been tried and determined unschedulable.
+	unschedulableEntities *unschedulableEntities
+	// pendingPodGroupPods stores all pending pods that wait for their corresponding pod group to be requeued.
+	pendingPodGroupPods *pendingPodGroupMemberPods
 
-	// preEnqueuePluginMap is keyed with profile name, valued with registered preEnqueue plugins.
-	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
+	// preEnqueuePluginMap is keyed with profile and plugin name, valued with registered preEnqueue plugins.
+	preEnqueuePluginMap map[string]map[string]fwk.PreEnqueuePlugin
 	// queueingHintMap is keyed with profile name, valued with registered queueing hint functions.
 	queueingHintMap QueueingHintMapPerProfile
+	// pluginToEventsMap shows which plugin is interested in which events.
+	pluginToEventsMap map[string][]fwk.ClusterEvent
 
 	nsLister listersv1.NamespaceLister
 
-	metricsRecorder metrics.MetricAsyncRecorder
+	metricsRecorder *metrics.MetricAsyncRecorder
 	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent int
 
-	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
-	isSchedulingQueueHintEnabled bool
+	// apiDispatcher is used for the methods that are expected to send API calls.
+	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
+	apiDispatcher fwk.APIDispatcher
+
+	// podSigners maps a profile name to a signing function for that profile.
+	podSigners map[string]PodSigner
+
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+	// isGenericWorkloadEnabled indicates whether the feature gate GenericWorkload is enabled.
+	isGenericWorkloadEnabled bool
+	// isOpportunisticBatchingEnabled indicates whether the OpportunisticBatching feature gate is enabled.
+	isOpportunisticBatchingEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
 type QueueingHintFunction struct {
 	PluginName     string
-	QueueingHintFn framework.QueueingHintFn
+	QueueingHintFn fwk.QueueingHintFn
 }
 
 // clusterEvent has the event and involved objects.
 type clusterEvent struct {
-	event framework.ClusterEvent
+	event fwk.ClusterEvent
 	// oldObj is the object that involved this event.
 	oldObj interface{}
 	// newObj is the object that involved this event.
@@ -217,10 +237,12 @@ type priorityQueueOptions struct {
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
 	podLister                         listersv1.PodLister
-	metricsRecorder                   metrics.MetricAsyncRecorder
+	metricsRecorder                   *metrics.MetricAsyncRecorder
 	pluginMetricsSamplePercent        int
-	preEnqueuePluginMap               map[string][]framework.PreEnqueuePlugin
+	preEnqueuePluginMap               map[string]map[string]fwk.PreEnqueuePlugin
 	queueingHintMap                   QueueingHintMapPerProfile
+	apiDispatcher                     fwk.APIDispatcher
+	podSigners                        map[string]PodSigner
 }
 
 // Option configures a PriorityQueue
@@ -265,7 +287,7 @@ func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
 type QueueingHintMapPerProfile map[string]QueueingHintMap
 
 // QueueingHintMap is keyed with ClusterEvent, valued with queueing hint functions registered for the event.
-type QueueingHintMap map[framework.ClusterEvent][]*QueueingHintFunction
+type QueueingHintMap map[fwk.ClusterEvent][]*QueueingHintFunction
 
 // WithQueueingHintMapPerProfile sets queueingHintMap for PriorityQueue.
 func WithQueueingHintMapPerProfile(m QueueingHintMapPerProfile) Option {
@@ -275,14 +297,14 @@ func WithQueueingHintMapPerProfile(m QueueingHintMapPerProfile) Option {
 }
 
 // WithPreEnqueuePluginMap sets preEnqueuePluginMap for PriorityQueue.
-func WithPreEnqueuePluginMap(m map[string][]framework.PreEnqueuePlugin) Option {
+func WithPreEnqueuePluginMap(m map[string]map[string]fwk.PreEnqueuePlugin) Option {
 	return func(o *priorityQueueOptions) {
 		o.preEnqueuePluginMap = m
 	}
 }
 
 // WithMetricsRecorder sets metrics recorder.
-func WithMetricsRecorder(recorder metrics.MetricAsyncRecorder) Option {
+func WithMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 	return func(o *priorityQueueOptions) {
 		o.metricsRecorder = recorder
 	}
@@ -292,6 +314,23 @@ func WithMetricsRecorder(recorder metrics.MetricAsyncRecorder) Option {
 func WithPluginMetricsSamplePercent(percent int) Option {
 	return func(o *priorityQueueOptions) {
 		o.pluginMetricsSamplePercent = percent
+	}
+}
+
+// WithAPIDispatcher sets the API dispatcher.
+func WithAPIDispatcher(apiDispatcher fwk.APIDispatcher) Option {
+	return func(o *priorityQueueOptions) {
+		o.apiDispatcher = apiDispatcher
+	}
+}
+
+// WithPodSigners sets the pod signing functions per scheduler profile.
+// Each profile can have its own signing function for computing pod signatures.
+// Pod signatures enable opportunistic batching (KEP-5598) by allowing the scheduler
+// to cache and reuse filtering/scoring results for identical pods.
+func WithPodSigners(signers map[string]PodSigner) Option {
+	return func(o *priorityQueueOptions) {
+		o.podSigners = signers
 	}
 }
 
@@ -310,14 +349,28 @@ func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.Queued
 	// Since this is only used for a lookup in the queue, we only need to set the Pod,
 	// and so we avoid creating a full PodInfo, which is expensive to instantiate frequently.
 	return &framework.QueuedPodInfo{
-		PodInfo:              &framework.PodInfo{Pod: pod},
-		UnschedulablePlugins: sets.New(plugins...),
+		PodInfo: &framework.PodInfo{Pod: pod},
+		QueueingParams: framework.QueueingParams{
+			UnschedulablePlugins: sets.New(plugins...),
+		},
+	}
+}
+
+// newQueuedPodGroupInfoForLookup builds a QueuedPodGroupInfo object for a lookup in the queue.
+func newQueuedPodGroupInfoForLookup(pod *v1.Pod) *framework.QueuedPodGroupInfo {
+	// Since this is only used for a lookup in the queue, we only need to set the PodGroupInfo namespace and name,
+	// and so we avoid creating a full QueuedPodGroupInfo, which is expensive to instantiate frequently.
+	return &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			Namespace: pod.Namespace,
+			Name:      *pod.Spec.SchedulingGroup.PodGroupName,
+		},
 	}
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
-	lessFn framework.LessFunc,
+	lessFn fwk.LessFunc,
 	informerFactory informers.SharedInformerFactory,
 	opts ...Option,
 ) *PriorityQueue {
@@ -329,33 +382,60 @@ func NewPriorityQueue(
 		opt(&options)
 	}
 
-	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
+	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
+	isOpportunisticBatchingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
+	lessConverted := convertLessFn(lessFn)
 
-	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
+	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
 	pq := &PriorityQueue{
 		clock:                             options.clock,
 		stop:                              make(chan struct{}),
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
-		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
+		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
+		pendingPodGroupPods:               newPendingPodGroupMemberPods(),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
+		pluginToEventsMap:                 buildEventMap(options.queueingHintMap),
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
-		moveRequestCycle:                  -1,
-		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
+		apiDispatcher:                     options.apiDispatcher,
+		podSigners:                        options.podSigners,
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
+		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
+		isOpportunisticBatchingEnabled:    isOpportunisticBatchingEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
 		backoffQPopper = backoffQ
 	}
-	pq.activeQ = newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder, backoffQPopper)
+	pq.activeQ = newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](lessConverted), metrics.NewActivePodsRecorder()), options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister)
 
 	return pq
+}
+
+// ConvertLessFn wraps fwk.LessFunc and converts it to take framework.QueuedEntityInfo as arguments.
+func convertLessFn(lessFn fwk.LessFunc) func(entity1, entity2 framework.QueuedEntityInfo) bool {
+	return func(entity1, entity2 framework.QueuedEntityInfo) bool {
+		return lessFn(entity1.(fwk.QueuedEntityInfo), entity2.(fwk.QueuedEntityInfo))
+	}
+}
+
+func buildEventMap(qHintMap QueueingHintMapPerProfile) map[string][]fwk.ClusterEvent {
+	eventMap := make(map[string][]fwk.ClusterEvent)
+
+	for _, hintMap := range qHintMap {
+		for event, qHints := range hintMap {
+			for _, qHint := range qHints {
+				eventMap[qHint.PluginName] = append(eventMap[qHint.PluginName], event)
+			}
+		}
+	}
+
+	return eventMap
 }
 
 // Run starts the goroutine to pump from backoffQ to activeQ
@@ -364,7 +444,7 @@ func (p *PriorityQueue) Run(logger klog.Logger) {
 		p.flushBackoffQCompleted(logger)
 	}, p.stop)
 	go wait.Until(func() {
-		p.flushUnschedulablePodsLeftover(logger)
+		p.flushUnschedulableEntitiesLeftover(logger)
 	}, 30*time.Second, p.stop)
 }
 
@@ -381,15 +461,15 @@ const (
 )
 
 // isEventOfInterest returns true if the event is of interest by some plugins.
-func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event framework.ClusterEvent) bool {
-	if event.IsWildCard() {
+func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event fwk.ClusterEvent) bool {
+	if framework.ClusterEventIsWildCard(event) {
 		// Wildcard event moves Pods that failed with any plugins.
 		return true
 	}
 
 	for _, hintMap := range p.queueingHintMap {
 		for eventToMatch := range hintMap {
-			if eventToMatch.Match(event) {
+			if framework.MatchClusterEvents(eventToMatch, event) {
 				// This event is interested by some plugins.
 				return true
 			}
@@ -401,22 +481,43 @@ func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event framework.Cl
 	return false
 }
 
+// isPodGroupMember returns true if the pod is a member of a pod group.
+func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
+	return p.isGenericWorkloadEnabled && pod.Spec.SchedulingGroup != nil
+}
+
+// isEntityWorthRequeuing calls isPodWorthRequeuing for all pods belonging to the entity and returns the highest queueing strategy.
+func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+	// For pod groups, if any pod is worth requeuing, the whole group is worth it.
+	// But we should prioritize higher strategies.
+	bestStrategy := queueSkip
+	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
+		if strategy > bestStrategy {
+			bestStrategy = strategy
+		}
+		if bestStrategy == queueImmediately {
+			return false
+		}
+		return true
+	})
+	return bestStrategy
+}
+
 // isPodWorthRequeuing calls QueueingHintFn of only plugins registered in pInfo.unschedulablePlugins and pInfo.PendingPlugins.
 //
 // If any of pInfo.PendingPlugins return Queue,
 // the scheduling queue is supposed to enqueue this Pod to activeQ, skipping backoffQ.
 // If any of pInfo.unschedulablePlugins return Queue,
 // the scheduling queue is supposed to enqueue this Pod to activeQ/backoffQ depending on the remaining backoff time of the Pod.
-// If all QueueingHintFns returns Skip, the scheduling queue enqueues the Pod back to unschedulable Pod pool
-// because no plugin changes the scheduling result via the event.
-func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	if rejectorPlugins.Len() == 0 {
 		logger.V(6).Info("Worth requeuing because no failed plugins", "pod", klog.KObj(pInfo.Pod))
 		return queueAfterBackoff
 	}
 
-	if event.IsWildCard() {
+	if framework.ClusterEventIsWildCard(event) {
 		// If the wildcard event has a Pod in newObj,
 		// that indicates that the event wants to be effective for the Pod only.
 		// Specifically, EventForceActivate could have a target Pod in newObj.
@@ -439,14 +540,14 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	hintMap, ok := p.queueingHintMap[pInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		// shouldn't reach here unless bug.
-		logger.Error(nil, "No QueueingHintMap is registered for this profile", "profile", pInfo.Pod.Spec.SchedulerName, "pod", klog.KObj(pInfo.Pod))
+		utilruntime.HandleErrorWithLogger(logger, nil, "No QueueingHintMap is registered for this profile", "profile", pInfo.Pod.Spec.SchedulerName, "pod", klog.KObj(pInfo.Pod))
 		return queueAfterBackoff
 	}
 
 	pod := pInfo.Pod
 	queueStrategy := queueSkip
 	for eventToMatch, hintfns := range hintMap {
-		if !eventToMatch.Match(event) {
+		if !framework.MatchClusterEvents(eventToMatch, event) {
 			continue
 		}
 
@@ -463,15 +564,15 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				// the Pod from being stuck in the unschedulable pod pool.
 				oldObjMeta, newObjMeta, asErr := util.As[klog.KMetadata](oldObj, newObj)
 				if asErr != nil {
-					logger.Error(err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod))
+					utilruntime.HandleErrorWithLogger(logger, err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod))
 				} else {
-					logger.Error(err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod), "oldObj", klog.KObj(oldObjMeta), "newObj", klog.KObj(newObjMeta))
+					utilruntime.HandleErrorWithLogger(logger, err, "QueueingHintFn returns error", "event", event, "plugin", hintfn.PluginName, "pod", klog.KObj(pod), "oldObj", klog.KObj(oldObjMeta), "newObj", klog.KObj(newObjMeta))
 				}
-				hint = framework.Queue
+				hint = fwk.Queue
 			}
 			p.metricsRecorder.ObserveQueueingHintDurationAsync(hintfn.PluginName, event.Label(), queueingHintToLabel(hint, err), metrics.SinceInSeconds(start))
 
-			if hint == framework.QueueSkip {
+			if hint == fwk.QueueSkip {
 				continue
 			}
 
@@ -499,15 +600,15 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 }
 
 // queueingHintToLabel converts a hint and an error from QHint to a label string.
-func queueingHintToLabel(hint framework.QueueingHint, err error) string {
+func queueingHintToLabel(hint fwk.QueueingHint, err error) string {
 	if err != nil {
 		return metrics.QueueingHintResultError
 	}
 
 	switch hint {
-	case framework.Queue:
+	case fwk.Queue:
 		return metrics.QueueingHintResultQueue
-	case framework.QueueSkip:
+	case fwk.QueueSkip:
 		return metrics.QueueingHintResultQueueSkip
 	}
 
@@ -515,14 +616,36 @@ func queueingHintToLabel(hint framework.QueueingHint, err error) string {
 	return ""
 }
 
-// runPreEnqueuePlugins iterates PreEnqueue function in each registered PreEnqueuePlugin.
-// It returns true if all PreEnqueue function run successfully; otherwise returns false
-// upon the first failure.
-// Note: we need to associate the failed plugin to `pInfo`, so that the pod can be moved back
+// runPreEnqueuePlugins iterates PreEnqueue function in each registered PreEnqueuePlugin,
+// and updates entity.GatingPlugin and entity.UnschedulablePlugins.
+// Note: we need to associate the failed plugin to `entity`, so that the entity can be moved back
 // to activeQ by related cluster event.
-func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framework.QueuedPodInfo) bool {
-	logger := klog.FromContext(ctx)
-	var s *framework.Status
+func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, entity framework.QueuedEntityInfo) {
+	var anyGatedPodInfo *framework.QueuedPodInfo
+	// Run PreEnqueue plugins for each pod, even if it could stop after the first being gated,
+	// as we need to populate any per-pod metrics.
+	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		p.runPreEnqueuePluginsForPod(ctx, pInfo)
+		if pInfo.Gated() {
+			// If any pod is gated, the whole entity is gated.
+			// Otherwise, such gated pod would have to be put in a separate entity object
+			// and tracked individually, complicating the flow.
+			anyGatedPodInfo = pInfo
+		}
+		return true
+	})
+	if anyGatedPodInfo != nil {
+		// Copying the gating plugin info only from a single pod is sufficient,
+		// because if the entity is a pod group, all pods should be ungated before the entire pod group can be ungated,
+		// including this pod.
+		entity.SetGatingPlugin(anyGatedPodInfo.QueueingParams.GatingPlugin, anyGatedPodInfo.QueueingParams.GatingPluginEvents)
+	} else {
+		entity.SetGatingPlugin("", nil)
+	}
+}
+
+func (p *PriorityQueue) runPreEnqueuePluginsForPod(ctx context.Context, pInfo *framework.QueuedPodInfo) {
+	var s *fwk.Status
 	pod := pInfo.Pod
 	startTime := p.clock.Now()
 	defer func() {
@@ -530,136 +653,238 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 	}()
 
 	shouldRecordMetric := rand.Intn(100) < p.pluginMetricsSamplePercent
+	gatingPlugin := pInfo.GatingPlugin
+	if gatingPlugin != "" {
+		// Run the gating plugin first
+		s := p.runPreEnqueuePlugin(ctx, p.preEnqueuePluginMap[pod.Spec.SchedulerName][gatingPlugin], pInfo, shouldRecordMetric)
+		if !s.IsSuccess() {
+			// No need to iterate other plugins
+			return
+		}
+	}
+
 	for _, pl := range p.preEnqueuePluginMap[pod.Spec.SchedulerName] {
-		s = p.runPreEnqueuePlugin(ctx, pl, pod, shouldRecordMetric)
-		if s.IsSuccess() {
+		if gatingPlugin != "" && pl.Name() == gatingPlugin {
+			// should be run already above.
 			continue
 		}
-		pInfo.UnschedulablePlugins.Insert(pl.Name())
-		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
-		if s.Code() == framework.Error {
-			logger.Error(s.AsError(), "Unexpected error running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name())
-		} else {
-			logger.V(4).Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)
+		s := p.runPreEnqueuePlugin(ctx, pl, pInfo, shouldRecordMetric)
+		if !s.IsSuccess() {
+			// No need to iterate other plugins
+			return
 		}
-		return false
 	}
-	return true
+	// all plugins passed
+	pInfo.GatingPlugin = ""
 }
 
-func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl framework.PreEnqueuePlugin, pod *v1.Pod, shouldRecordMetric bool) *framework.Status {
-	if !shouldRecordMetric {
-		return pl.PreEnqueue(ctx, pod)
-	}
+// runPreEnqueuePlugin runs the PreEnqueue plugin and update pInfo's fields accordingly if needed.
+func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl fwk.PreEnqueuePlugin, pInfo *framework.QueuedPodInfo, shouldRecordMetric bool) *fwk.Status {
+	pod := pInfo.Pod
 	startTime := p.clock.Now()
 	s := pl.PreEnqueue(ctx, pod)
-	p.metricsRecorder.ObservePluginDurationAsync(preEnqueue, pl.Name(), s.Code().String(), p.clock.Since(startTime).Seconds())
+	if shouldRecordMetric {
+		p.metricsRecorder.ObservePluginDurationAsync(preEnqueue, pl.Name(), s.Code().String(), p.clock.Since(startTime).Seconds())
+	}
+	if s.IsSuccess() {
+		// No need to change GatingPlugin; it's overwritten by the next PreEnqueue plugin if they gate this pod, or it's overwritten with an empty string if all PreEnqueue plugins pass.
+		return s
+	}
+	// Only increment metric and insert if not already incremented for this plugin
+	if !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
+		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
+	}
+	pInfo.UnschedulablePlugins.Insert(pl.Name())
+	pInfo.GatingPlugin = pl.Name()
+	pInfo.GatingPluginEvents = p.pluginToEventsMap[pInfo.GatingPlugin]
+	if s.Code() == fwk.Error {
+		utilruntime.HandleErrorWithContext(ctx, s.AsError(), "Unexpected error running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name())
+	} else {
+		klog.FromContext(ctx).V(4).Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)
+	}
+
 	return s
 }
 
-// moveToActiveQ tries to add the pod to the active queue.
-// If the pod doesn't pass PreEnqueue plugins, it gets added to unschedulablePods instead.
-// It returns a boolean flag to indicate whether the pod is added successfully.
-func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) bool {
-	gatedBefore := pInfo.Gated
-	// If SchedulerPopFromBackoffQ feature gate is enabled,
-	// PreEnqueue plugins were called when the pod was added to the backoffQ.
-	// Don't need to repeat it here when the pod is directly moved from the backoffQ.
-	if !p.isPopFromBackoffQEnabled || event != framework.BackoffComplete {
-		pInfo.Gated = !p.runPreEnqueuePlugins(context.Background(), pInfo)
-	}
-
-	added := false
-	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		if pInfo.Gated {
-			// Add the Pod to unschedulablePods if it's not passing PreEnqueuePlugins.
-			if unlockedActiveQ.has(pInfo) {
-				return
-			}
-			if p.backoffQ.has(pInfo) {
-				return
-			}
-			if p.unschedulablePods.get(pInfo.Pod) != nil {
-				return
-			}
-			p.unschedulablePods.addOrUpdate(pInfo, event)
-			logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulablePods)
-			return
-		}
-		if pInfo.InitialAttemptTimestamp == nil {
-			now := p.clock.Now()
-			pInfo.InitialAttemptTimestamp = &now
-		}
-
-		unlockedActiveQ.add(pInfo, event)
-		added = true
-
-		p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
-		p.backoffQ.delete(pInfo)
-		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
-		if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
-			p.AddNominatedPod(logger, pInfo.PodInfo, nil)
-		}
-	})
-	return added
+// AddNominatedPod adds the given pod to the nominator.
+// It locks the PriorityQueue to make sure it won't race with any other method.
+func (p *PriorityQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
+	p.lock.Lock()
+	p.nominator.addNominatedPod(logger, pi, nominatingInfo)
+	p.lock.Unlock()
 }
 
-// moveToBackoffQ tries to add the pod to the backoff queue.
-// If SchedulerPopFromBackoffQ feature gate is enabled and the pod doesn't pass PreEnqueue plugins, it gets added to unschedulablePods instead.
-// It returns a boolean flag to indicate whether the pod is added successfully.
-func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) bool {
+// moveToActiveQ tries to add the entity to the active queue.
+// If the entity doesn't pass PreEnqueue plugins, it gets added to unschedulableEntities instead.
+// movesFromBackoffQ should be set to true, if the entity directly moves from the backoffQ, so the PreEnqueue call can be skipped.
+// It returns a boolean flag to indicate whether the entity is added successfully.
+// Entity should be removed from the backoffQ before calling moveToActiveQ.
+// Note: it does not signal the Pop() method to wake up,
+// so the caller is responsible for calling activeQ.broadcast() after executing this method.
+func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.QueuedEntityInfo, event string, movesFromBackoffQ bool) bool {
+	gatedBefore := entity.Gated()
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
-	// PreEnqueue plugins are called on inserting pods to the backoffQ,
+	// PreEnqueue plugins were called when the entity was added to the backoffQ.
+	// Don't need to repeat it here when the entity is directly moved from the backoffQ.
+	skipPreEnqueue := p.isPopFromBackoffQEnabled && movesFromBackoffQ
+	if !skipPreEnqueue {
+		p.runPreEnqueuePlugins(context.Background(), entity)
+	}
+
+	if entity.Gated() {
+		if p.unschedulableEntities.get(entity) == nil {
+			logger.V(5).Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
+		}
+		p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
+		// Entity not moved to activeQ.
+		return false
+	}
+	now := p.clock.Now()
+	entity.SetInitialAttemptTimestamp(now)
+	p.unschedulableEntities.delete(entity, gatedBefore)
+
+	p.activeQ.add(logger, entity, event)
+	// Pod successfully moved to activeQ.
+	return true
+}
+
+// moveToBackoffQ tries to add the entity to the backoff queue.
+// If SchedulerPopFromBackoffQ feature gate is enabled and the entity doesn't pass PreEnqueue plugins, it gets added to unschedulableEntities instead.
+// It returns a boolean flag to indicate whether the entity is added successfully.
+func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.QueuedEntityInfo, event string) bool {
+	gatedBefore := entity.Gated()
+	// If SchedulerPopFromBackoffQ feature gate is enabled,
+	// PreEnqueue plugins are called on inserting entities to the backoffQ,
 	// not to call them again on popping out.
 	if p.isPopFromBackoffQEnabled {
-		pInfo.Gated = !p.runPreEnqueuePlugins(context.Background(), pInfo)
-		if pInfo.Gated {
-			if p.unschedulablePods.get(pInfo.Pod) == nil {
-				p.unschedulablePods.addOrUpdate(pInfo, event)
-				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulablePods)
+		p.runPreEnqueuePlugins(context.Background(), entity)
+		if entity.Gated() {
+			if uInfo := p.unschedulableEntities.get(entity); uInfo == nil {
+				logger.V(5).Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
 			}
+			p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
 			return false
 		}
 	}
-	p.backoffQ.add(logger, pInfo, event)
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQ)
+	p.unschedulableEntities.delete(entity, gatedBefore)
+
+	p.backoffQ.add(logger, entity, event)
 	return true
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
 // is added so there is no chance the pod is already in active/unschedulable/backoff queues
-func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) {
+func (p *PriorityQueue) Add(ctx context.Context, pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	pInfo := p.newQueuedPodInfo(pod)
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label()); added {
+	p.addPod(ctx, pod)
+}
+
+// addPod adds a pod to the active queue, unless it's a pod group member,
+// in which case it's added to its queued pod group.
+func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
+	logger := klog.FromContext(ctx)
+	pInfo := p.newQueuedPodInfo(ctx, pod)
+	// addNominatedPod is called here unconditionally to ensure that the nomination of the added pod
+	// (even if gated, and thus not entering activeQ) is properly recorded in the nominator.
+	// Furthermore, this must be called before moveToActiveQ to prevent a potential data race,
+	// where an active scheduler loop could pop and process the pod before its nomination is recorded.
+	p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
+	if p.isPodGroupMember(pod) {
+		p.addPodGroupMember(logger, pInfo)
+		return
+	}
+	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
 		p.activeQ.broadcast()
 	}
 }
 
+// addPodGroupMember adds pInfo as a member of its pod group into the scheduling queue.
+func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.QueuedPodInfo) {
+	if added := p.addToPodGroupIfExists(logger, pInfo); added {
+		return
+	}
+	pgInfoLookup := newQueuedPodGroupInfoForLookup(pInfo.Pod)
+	if p.activeQ.isLastPoppedEntity(pgInfoLookup) {
+		// If the last popped entity is the matching pod group, add the pod to the pending pod group pods,
+		// so it will be added to the pod group when it's requeued.
+		p.pendingPodGroupPods.add(pgInfoLookup, pInfo)
+		logger.V(5).Info("Pod added to pending pod group pods, waiting for its pod group to be requeued", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
+	} else {
+		// Create a new group as it's the first member pod in the queue.
+		pgInfo := p.newQueuedPodGroupInfo(pInfo)
+		if added := p.moveToActiveQ(logger, pgInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
+			p.activeQ.broadcast()
+		}
+		logger.V(5).Info("Pod added to new pod group info", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
+	}
+}
+
+// deleteFromAnyQueue deletes an entity from any queue it may be in and returns
+// the entity and the queueing strategy (matching the queue where the entity was found).
+// If the entity is not found, it returns nil entity.
+func (p *PriorityQueue) deleteFromAnyQueue(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, queueingStrategy) {
+	if entity := p.activeQ.delete(entityLookup); entity != nil {
+		return entity, queueImmediately
+	}
+	if entity := p.backoffQ.delete(entityLookup); entity != nil {
+		return entity, queueAfterBackoff
+	}
+	if entity := p.unschedulableEntities.get(entityLookup); entity != nil {
+		p.unschedulableEntities.delete(entity, entity.Gated())
+		return entity, queueSkip
+	}
+	return nil, queueSkip
+}
+
+// addToPodGroupIfExists tries to add pInfo as a member of its pod group into the scheduling queue.
+// It returns true if pInfo was added to an existing pod group.
+func (p *PriorityQueue) addToPodGroupIfExists(logger klog.Logger, pInfo *framework.QueuedPodInfo) bool {
+	pgInfoLookup := newQueuedPodGroupInfoForLookup(pInfo.Pod)
+
+	entity, strategy := p.deleteFromAnyQueue(pgInfoLookup)
+	if entity == nil {
+		return false
+	}
+	pgInfo := entity.(*framework.QueuedPodGroupInfo)
+
+	pgInfo.AddPod(pInfo)
+	queue := p.requeueEntityWithQueueingStrategy(logger, pgInfo, strategy, framework.EventUnscheduledPodAdd.Label())
+	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+		p.activeQ.broadcast()
+	}
+	logger.V(5).Info("Pod added to existing pod group info", "podGroup", klog.KObj(pgInfo), "pod", klog.KObj(pInfo), "queue", queue)
+	return true
+}
+
 // Activate moves the given pods to activeQ.
-// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+// If a pod isn't found in unschedulableEntities or backoffQ and it's in-flight,
 // the wildcard event is registered so that the pod will be requeued when it comes back.
-// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+// But, if a pod isn't found in unschedulableEntities or backoffQ and it's not in-flight (i.e., completely unknown pod),
 // Activate would ignore the pod.
+// If activating a pod that is a member of a pod group, the whole pod group is activated.
 func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	activated := false
 	for _, pod := range pods {
-		if p.activate(logger, pod) {
+		var entityLookup framework.QueuedEntityInfo
+		if p.isPodGroupMember(pod) {
+			entityLookup = newQueuedPodGroupInfoForLookup(pod)
+		} else {
+			entityLookup = newQueuedPodInfoForLookup(pod)
+		}
+		if p.activate(logger, entityLookup) {
 			activated = true
 			continue
 		}
 
-		// If this pod is in-flight, register the activation event (for when QHint is enabled) or update moveRequestCycle (for when QHints is disabled)
-		// so that the pod will be requeued when it comes back.
+		// If this pod is in-flight, register the activation event so that the pod will be requeued when it comes back.
 		// Specifically in the in-tree plugins, this is for the scenario with the preemption plugin
 		// where the async preemption API calls are all done or fail at some point before the Pod comes back to the queue.
-		p.activeQ.addEventsIfPodInFlight(nil, pod, []framework.ClusterEvent{framework.EventForceActivate})
-		p.moveRequestCycle = p.activeQ.schedulingCycle()
+		p.activeQ.addEventsIfPodInFlight(nil, pod, []fwk.ClusterEvent{framework.EventForceActivate})
 	}
 
 	if activated {
@@ -667,32 +892,27 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	}
 }
 
-func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
-	var pInfo *framework.QueuedPodInfo
-	// Verify if the pod is present in unschedulablePods or backoffQ.
-	if pInfo = p.unschedulablePods.get(pod); pInfo == nil {
-		// If the pod doesn't belong to unschedulablePods or backoffQ, don't activate it.
-		// The pod can be already in activeQ.
-		var exists bool
-		pInfo, exists = p.backoffQ.get(newQueuedPodInfoForLookup(pod))
-		if !exists {
+func (p *PriorityQueue) activate(logger klog.Logger, entityLookup framework.QueuedEntityInfo) bool {
+	var entity framework.QueuedEntityInfo
+	var movesFromBackoffQ bool
+	// Verify if the entity is present in unschedulableEntities or backoffQ.
+	if entity = p.unschedulableEntities.get(entityLookup); entity == nil {
+		// Entity may be present in the backoffQ. Try to delete the entity from the backoffQ now
+		// to make sure it won't be popped from the backoffQ just before moving it to the activeQ.
+		if entity = p.backoffQ.delete(entityLookup); entity == nil {
+			// Entity is not present in the backoffQ. Don't activate it.
 			return false
 		}
-		// Delete pod from the backoffQ now to make sure it won't be popped from the backoffQ
-		// just before moving it to the activeQ
-		if deleted := p.backoffQ.delete(pInfo); !deleted {
-			// Pod was popped from the backoffQ in the meantime. Don't activate it.
-			return false
-		}
+		movesFromBackoffQ = true
 	}
 
-	if pInfo == nil {
+	if entity == nil {
 		// Redundant safe check. We shouldn't reach here.
-		logger.Error(nil, "Internal error: cannot obtain pInfo")
+		utilruntime.HandleErrorWithLogger(logger, nil, "Internal error: cannot obtain entity")
 		return false
 	}
 
-	return p.moveToActiveQ(logger, pInfo, framework.ForceActivate)
+	return p.moveToActiveQ(logger, entity, framework.ForceActivate, movesFromBackoffQ)
 }
 
 // SchedulingCycle returns current scheduling cycle.
@@ -712,7 +932,7 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 
 	events, err := p.activeQ.clusterEventsForPod(logger, pInfo)
 	if err != nil {
-		logger.Error(err, "Error getting cluster events for pod", "pod", klog.KObj(pInfo.Pod))
+		utilruntime.HandleErrorWithLogger(logger, err, "Error getting cluster events for pod", "pod", klog.KObj(pInfo.Pod))
 		return queueAfterBackoff
 	}
 
@@ -741,59 +961,22 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	return queueingStrategy
 }
 
-// addUnschedulableIfNotPresentWithoutQueueingHint inserts a pod that cannot be scheduled into
-// the queue, unless it is already in the queue. Normally, PriorityQueue puts
-// unschedulable pods in `unschedulablePods`. But if there has been a recent move
-// request, then the pod is put in `backoffQ`.
-// TODO: This function is called only when p.isSchedulingQueueHintEnabled is false,
-// and this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
-func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
-	pod := pInfo.Pod
-	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
-
-	// When the queueing hint is enabled, they are used differently.
-	// But, we use all of them as UnschedulablePlugins when the queueing hint isn't enabled so that we don't break the old behaviour.
-	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
-
-	// If a move request has been received, move it to the BackoffQ, otherwise move
-	// it to unschedulablePods.
-	for plugin := range rejectorPlugins {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
-	}
-	if p.moveRequestCycle >= podSchedulingCycle || len(rejectorPlugins) == 0 {
-		// Two cases to move a Pod to the active/backoff queue:
-		// - The Pod is rejected by some plugins, but a move request is received after this Pod's scheduling cycle is started.
-		//   In this case, the received event may be make Pod schedulable and we should retry scheduling it.
-		// - No unschedulable plugins are associated with this Pod,
-		//   meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
-		//   In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
-		if added := p.moveToBackoffQ(logger, pInfo, framework.ScheduleAttemptFailure); added {
-			if p.isPopFromBackoffQEnabled {
-				p.activeQ.broadcast()
-			}
-		}
-	} else {
-		p.unschedulablePods.addOrUpdate(pInfo, framework.ScheduleAttemptFailure)
-		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", unschedulablePods)
-	}
-
-	return nil
-}
-
-// AddUnschedulableIfNotPresent inserts a pod that cannot be scheduled into
-// the queue, unless it is already in the queue. Normally, PriorityQueue puts
-// unschedulable pods in `unschedulablePods`. But if there has been a recent move
-// request, then the pod is put in `backoffQ`.
-func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+// AddUnschedulablePodIfNotPresent inserts a pod that cannot be scheduled into
+// the queue, unless it is already in the queue.
+func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	// In any case, this Pod will be moved back to the queue and we should call Done.
-	defer p.Done(pInfo.Pod.UID)
+	calledDone := false
+	defer func() {
+		if !calledDone {
+			p.Done(pInfo.Pod.UID)
+		}
+	}()
 
 	pod := pInfo.Pod
-	if p.unschedulablePods.get(pod) != nil {
+	if p.unschedulableEntities.get(pInfo) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
 	}
 
@@ -804,16 +987,35 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		return fmt.Errorf("Pod %v is already present in the backoff queue", klog.KObj(pod))
 	}
 
-	if !p.isSchedulingQueueHintEnabled {
-		// fall back to the old behavior which doesn't depend on the queueing hint.
-		return p.addUnschedulableWithoutQueueingHint(logger, pInfo, podSchedulingCycle)
+	if len(pInfo.UnschedulablePlugins) == 0 && len(pInfo.PendingPlugins) == 0 {
+		// This Pod came back because of some unexpected errors (e.g., a network issue).
+		pInfo.ConsecutiveErrorsCount++
+	} else {
+		// This Pod is rejected by some plugins, not coming back due to unexpected errors (e.g., a network issue)
+		pInfo.UnschedulableCount++
+		// We should reset the error count because the error is gone.
+		pInfo.ConsecutiveErrorsCount = 0
 	}
-
 	// Refresh the timestamp since the pod is re-added.
 	pInfo.Timestamp = p.clock.Now()
+	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
+	// removing the cached backoff time.
+	pInfo.BackoffExpiration = time.Time{}
+	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
+	pInfo.WasFlushedFromUnschedulable = false
 
-	// If a move request has been received, move it to the BackoffQ, otherwise move
-	// it to unschedulablePods.
+	if p.isPodGroupMember(pod) {
+		// Done has to be called before adding the unschedulable pod group member.
+		// Otherwise, a race can happen when the pod is added to an active pod group,
+		// and the Pop sees the pod being not Done'd.
+		p.Done(pInfo.Pod.UID)
+		calledDone = true
+		// When the pod is a pod group member, process it in that context.
+		p.addUnschedulablePodGroupMember(logger, pInfo)
+		return nil
+	}
+
+	p.activeQ.clearPoppedEntity()
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	for plugin := range rejectorPlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
@@ -823,10 +1025,98 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	schedulingHint := p.determineSchedulingHintForInFlightPod(logger, pInfo)
 
 	// In this case, we try to requeue this Pod to activeQ/backoffQ.
-	queue := p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, framework.ScheduleAttemptFailure)
+	queue := p.requeueEntityWithQueueingStrategy(logger, pInfo, schedulingHint, framework.ScheduleAttemptFailure)
 	logger.V(3).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", podSchedulingCycle, "hint", schedulingHint, "unschedulable plugins", rejectorPlugins)
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		// When the Pod is moved to activeQ, need to let p.cond know so that the Pod will be pop()ed out.
+		p.activeQ.broadcast()
+	}
+
+	return nil
+}
+
+// addUnschedulablePodGroupMember adds pInfo as a member of its pod group into the scheduling queue.
+func (p *PriorityQueue) addUnschedulablePodGroupMember(logger klog.Logger, pInfo *framework.QueuedPodInfo) {
+	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
+	for plugin := range rejectorPlugins {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+	}
+
+	// Pod should be just re-added to the scheduling queue, because the queued pod group
+	// can be in any state. addPodGroupMember handles all possible cases.
+	p.addPodGroupMember(logger, pInfo)
+}
+
+// AddAttemptedPodGroupIfNeeded adds an attempted pod group back to scheduling queue.
+// If there are no pending pods, it will not add the pod group back to the queue.
+// Should be called synchronously to the pod group scheduling cycle.
+func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if p.unschedulableEntities.get(pgInfo) != nil {
+		return fmt.Errorf("pod group %v is already present in unschedulable queue", klog.KObj(pgInfo))
+	}
+
+	if p.activeQ.has(pgInfo) {
+		return fmt.Errorf("pod group %v is already present in the active queue", klog.KObj(pgInfo))
+	}
+	if p.backoffQ.has(pgInfo) {
+		return fmt.Errorf("pod group %v is already present in the backoff queue", klog.KObj(pgInfo))
+	}
+
+	p.activeQ.clearPoppedEntity()
+	// Get the pending pods and put them into the pod group.
+	pendingPods := p.pendingPodGroupPods.get(pgInfo)
+	if len(pendingPods) == 0 {
+		// No pending pods, nothing to requeue.
+		return nil
+	}
+	pgInfo.SetPods(pendingPods)
+	p.pendingPodGroupPods.clear(pgInfo)
+
+	hasErrorPods := false
+	pgInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		if pInfo.UnschedulablePlugins.Len() == 0 && pInfo.PendingPlugins.Len() == 0 {
+			hasErrorPods = true
+			return false
+		}
+		return true
+	})
+	if hasErrorPods {
+		// This Pod group came back because of some unexpected errors (e.g., a network issue).
+		pgInfo.ConsecutiveErrorsCount++
+	} else {
+		// This Pod group is rejected by some plugins, not coming back due to unexpected errors (e.g., a network issue)
+		pgInfo.UnschedulableCount++
+		// We should reset the error count because the error is gone.
+		pgInfo.ConsecutiveErrorsCount = 0
+	}
+	// Refresh the timestamp since the pod is re-added.
+	pgInfo.Timestamp = p.clock.Now()
+	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
+	// removing the cached backoff time.
+	pgInfo.BackoffExpiration = time.Time{}
+	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
+	pgInfo.WasFlushedFromUnschedulable = false
+
+	rejectorPlugins := pgInfo.UnschedulablePlugins.Union(pgInfo.PendingPlugins)
+
+	// Try to requeue this pod group to activeQ or backoffQ.
+	// If the PreEnqueue fails for this pod group, it will be moved to the unschedulableEntities.
+	queue := unschedulableQ
+	if p.backoffQ.isEntityBackingoff(pgInfo) {
+		if added := p.moveToBackoffQ(logger, pgInfo, framework.ScheduleAttemptFailure); added {
+			queue = backoffQ
+		}
+	} else {
+		if added := p.moveToActiveQ(logger, pgInfo, framework.ScheduleAttemptFailure, false); added {
+			queue = activeQ
+		}
+	}
+	logger.V(3).Info("Pod group moved to an internal scheduling queue", "podGroup", klog.KObj(pgInfo), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", schedulingCycle, "unschedulable plugins", rejectorPlugins)
+	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+		// When the Pod group is moved to activeQ, need to let p.cond know so that the Pod will be pop()ed out.
 		p.activeQ.broadcast()
 	}
 
@@ -840,7 +1130,7 @@ func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 	activated := false
 	podsCompletedBackoff := p.backoffQ.popAllBackoffCompleted(logger)
 	for _, pInfo := range podsCompletedBackoff {
-		if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete); added {
+		if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete, true); added {
 			activated = true
 		}
 	}
@@ -849,23 +1139,25 @@ func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 	}
 }
 
-// flushUnschedulablePodsLeftover moves pods which stay in unschedulablePods
+// flushUnschedulableEntitiesLeftover moves entities which stay in unschedulableEntities
 // longer than podMaxInUnschedulablePodsDuration to backoffQ or activeQ.
-func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
+func (p *PriorityQueue) flushUnschedulableEntitiesLeftover(logger klog.Logger) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	var podsToMove []*framework.QueuedPodInfo
+	var entitiesToMove []framework.QueuedEntityInfo
 	currentTime := p.clock.Now()
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		lastScheduleTime := pInfo.Timestamp
+	for _, entity := range p.unschedulableEntities.entityInfoMap {
+		lastScheduleTime := entity.GetTimestamp()
+		// TODO(macsko): Once the PodGroups support queueing hints, we may want to extend the max duration for PodGroups.
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
-			podsToMove = append(podsToMove, pInfo)
+			entity.SetWasFlushedFromUnschedulable(true)
+			entitiesToMove = append(entitiesToMove, entity)
 		}
 	}
 
-	if len(podsToMove) > 0 {
-		p.movePodsToActiveOrBackoffQueue(logger, podsToMove, framework.EventUnschedulableTimeout, nil, nil)
+	if len(entitiesToMove) > 0 {
+		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil)
 	}
 }
 
@@ -874,155 +1166,208 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // increments scheduling cycle when a pod is popped.
 // Note: This method should NOT be locked by the p.lock at any moment,
 // as it would lead to scheduling throughput degradation.
-func (p *PriorityQueue) Pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
+func (p *PriorityQueue) Pop(logger klog.Logger) (framework.QueuedEntityInfo, error) {
 	return p.activeQ.pop(logger)
 }
 
 // Done must be called for pod returned by Pop. This allows the queue to
 // keep track of which pods are currently being processed.
 func (p *PriorityQueue) Done(pod types.UID) {
-	if !p.isSchedulingQueueHintEnabled {
-		// do nothing if schedulingQueueHint is disabled.
-		// In that case, we don't have inFlightPods and inFlightEvents.
-		return
-	}
 	p.activeQ.done(pod)
 }
 
 func (p *PriorityQueue) InFlightPods() []*v1.Pod {
-	if !p.isSchedulingQueueHintEnabled {
-		// do nothing if schedulingQueueHint is disabled.
-		// In that case, we don't have inFlightPods and inFlightEvents.
-		return nil
-	}
 	return p.activeQ.listInFlightPods()
 }
 
-// isPodUpdated checks if the pod is updated in a way that it may have become
-// schedulable. It drops status of the pod and compares it with old version,
-// except for pod.status.resourceClaimStatuses: changing that may have an
-// effect on scheduling.
-func isPodUpdated(oldPod, newPod *v1.Pod) bool {
-	strip := func(pod *v1.Pod) *v1.Pod {
-		p := pod.DeepCopy()
-		p.ResourceVersion = ""
-		p.Generation = 0
-		p.Status = v1.PodStatus{
-			ResourceClaimStatuses: pod.Status.ResourceClaimStatuses,
-		}
-		p.ManagedFields = nil
-		p.Finalizers = nil
-		return p
-	}
-	return !reflect.DeepEqual(strip(oldPod), strip(newPod))
-}
-
 // Update updates a pod in the active or backoff queue if present. Otherwise, it removes
-// the item from the unschedulable queue if pod is updated in a way that it may
+// the entity from the unschedulable queue if pod is updated in a way that it may
 // become schedulable and adds the updated one to the active queue.
 // If pod is not present in any of the queues, it is added to the active queue.
-func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
+func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	logger := klog.FromContext(ctx)
 
-	var events []framework.ClusterEvent
-	if p.isSchedulingQueueHintEnabled {
-		events = framework.PodSchedulingPropertiesChange(newPod, oldPod)
+	// Because the pod itself is being updated here, events are associated with the resource TargetPod.
+	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
+
+	var entityLookup framework.QueuedEntityInfo
+	if p.isPodGroupMember(oldPod) {
+		entityLookup = newQueuedPodGroupInfoForLookup(oldPod)
+	} else {
+		entityLookup = newQueuedPodInfoForLookup(oldPod)
+	}
+
+	updated := false
+	// Run the following code under the activeQ lock to make sure that in the meantime entity is not popped from either activeQ or backoffQ.
+	// This way, the event will be registered or the entity will be updated consistently.
+	// Locking only the part of Update method is sufficient, because in the other part the entity is in the unschedulableEntities,
+	// which is protected by p.lock anyway.
+	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
 		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
 		// Record this Pod update because
 		// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
 		// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
 		// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
-		if exists := p.activeQ.addEventsIfPodInFlight(oldPod, newPod, events); exists {
-			logger.V(6).Info("The pod doesn't be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
+		if exists := unlockedActiveQ.addEventsIfPodInFlight(oldPod, newPod, events); exists {
+			logger.V(6).Info("The pod doesn't need to be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
+			updated = true
 			return
 		}
-	}
-
-	if oldPod != nil {
-		oldPodInfo := newQueuedPodInfoForLookup(oldPod)
-		// If the pod is already in the active queue, just update it there.
-		if pInfo := p.activeQ.update(newPod, oldPodInfo); pInfo != nil {
+		// If the entity is already in the active queue, just update the pod there.
+		if pInfo := unlockedActiveQ.update(newPod, entityLookup); pInfo != nil {
 			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			pInfo.PodSignature = p.signPod(ctx, newPod)
+			updated = true
 			return
 		}
 
-		// If the pod is in the backoff queue, update it there.
-		if pInfo := p.backoffQ.update(newPod, oldPodInfo); pInfo != nil {
+		// If the entity is in the backoff queue, update the pod there.
+		if pInfo := p.backoffQ.update(newPod, entityLookup); pInfo != nil {
 			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			pInfo.PodSignature = p.signPod(ctx, newPod)
+			updated = true
 			return
 		}
+	})
+
+	if updated {
+		return
 	}
 
 	// If the pod is in the unschedulable queue, updating it may make it schedulable.
-	if pInfo := p.unschedulablePods.get(newPod); pInfo != nil {
-		_ = pInfo.Update(newPod)
-		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-		gated := pInfo.Gated
-		if p.isSchedulingQueueHintEnabled {
-			// When unscheduled Pods are updated, we check with QueueingHint
-			// whether the update may make the pods schedulable.
-			// Plugins have to implement a QueueingHint for Pod/Update event
-			// if the rejection from them could be resolved by updating unscheduled Pods itself.
-			for _, evt := range events {
-				hint := p.isPodWorthRequeuing(logger, pInfo, evt, oldPod, newPod)
-				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, evt.Label())
-				if queue != unschedulablePods {
-					logger.V(5).Info("Pod moved to an internal scheduling queue because the Pod is updated", "pod", klog.KObj(newPod), "event", evt.Label(), "queue", queue)
-					p.unschedulablePods.delete(pInfo.Pod, gated)
-				}
-				if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
-					p.activeQ.broadcast()
-					break
-				}
-			}
+	if entity := p.unschedulableEntities.get(entityLookup); entity != nil {
+		pInfo, err := entity.Update(newPod)
+		if err != nil {
+			logger.Error(err, "Failed to update pod in an entity", "type", entity.Type(), "entity", klog.KObj(entity), "pod", klog.KObj(newPod))
+			// Handle this case gracefully by adding the newPod to the queue.
+			p.addPod(ctx, newPod)
 			return
 		}
-		if isPodUpdated(oldPod, newPod) {
-			// Pod might have completed its backoff time while being in unschedulablePods,
-			// so we should check isPodBackingoff before moving the pod to backoffQ.
-			if p.backoffQ.isPodBackingoff(pInfo) {
-				if added := p.moveToBackoffQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label()); added {
-					p.unschedulablePods.delete(pInfo.Pod, gated)
-					if p.isPopFromBackoffQEnabled {
-						p.activeQ.broadcast()
-					}
-				}
+		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+		pInfo.PodSignature = p.signPod(ctx, newPod)
+
+		// When unscheduled Pods are updated, we check with QueueingHint
+		// whether the update may make the entities schedulable.
+		// Plugins have to implement a QueueingHint for Pod/Update event
+		// if the rejection from them could be resolved by updating unscheduled Pods itself.
+		for _, evt := range events {
+			// Here, the entityRef is captured for logging, to prevent a data race that can occur in the logger below,
+			// where a pod re-queued to activeQ in requeueEntityWithQueueingStrategy is popped and processed quickly enough,
+			// so the write in its failure handler overwrites the pod object in PodInfo, which is accessed for logging.
+			entityRef := klog.KObj(entity)
+			hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod)
+			queue := p.requeueEntityWithQueueingStrategy(logger, entity, hint, evt.Label())
+			if queue != unschedulableQ {
+				logger.V(5).Info("Entity moved to an internal scheduling queue because the Pod is updated", "type", entity.Type(), "entity", entityRef, "pod", klog.KObj(newPod), "event", evt.Label(), "queue", queue)
+			}
+			if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+				p.activeQ.broadcast()
+				break
+			}
+		}
+		return
+	} else if p.isPodGroupMember(newPod) {
+		pgInfoLookup := entityLookup.(*framework.QueuedPodGroupInfo)
+		if p.pendingPodGroupPods.has(pgInfoLookup) {
+			if updated := p.pendingPodGroupPods.update(pgInfoLookup, newPod); updated {
 				return
 			}
+		}
+	}
+	// If the entity is not in any of the queues, we add it.
+	p.addPod(ctx, newPod)
+}
 
-			if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label()); added {
-				p.activeQ.broadcast()
-			}
+// decreaseUnschedulableReasonMetric decreases the metrics for the rejector plugins
+// which are both UnschedulablePlugins and PendingPlugins.
+func decreaseUnschedulableReasonMetric(entity framework.QueuedEntityInfo) {
+	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+		}
+		return true
+	})
+}
+
+// Delete deletes the entity from activeQ, backoffQ or unschedulableEntities.
+// It assumes the pod is only in one structure.
+func (p *PriorityQueue) Delete(logger klog.Logger, pod *v1.Pod) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.DeleteNominatedPodIfExists(pod)
+	if p.isPodGroupMember(pod) {
+		p.deletePodGroupMember(logger, pod)
+	} else {
+		p.deletePod(pod)
+	}
+}
+
+// deletePodGroupMember removes a pod from its pod group in the queue.
+// If the pod group is empty after removal, the pod group is removed from the queue.
+func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
+	pgInfoLookup := newQueuedPodGroupInfoForLookup(pod)
+
+	entity, strategy := p.deleteFromAnyQueue(pgInfoLookup)
+	if entity == nil {
+		pgInfoLookup := newQueuedPodGroupInfoForLookup(pod)
+		pInfo := p.pendingPodGroupPods.delete(pgInfoLookup, pod)
+		if pInfo == nil {
 			return
 		}
-
-		// Pod update didn't make it schedulable, keep it in the unschedulable queue.
-		p.unschedulablePods.addOrUpdate(pInfo, framework.EventUnscheduledPodUpdate.Label())
+		// Drop metric for deleted pod.
+		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+		}
+		logger.V(5).Info("Pod deleted from pending pod group info", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
 		return
 	}
-	// If pod is not in any of the queues, we put it in the active queue.
-	pInfo := p.newQueuedPodInfo(newPod)
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label()); added {
+	pgInfo := entity.(*framework.QueuedPodGroupInfo)
+
+	pInfo := pgInfo.RemovePod(pod)
+	if pInfo != nil {
+		// Drop metric for deleted pod.
+		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+		}
+		logger.V(5).Info("Pod deleted from existing pod group info", "podGroup", klog.KObj(pgInfo), "pod", klog.KObj(pInfo))
+	}
+	if len(pgInfo.QueuedPodInfos) == 0 {
+		// The pod group is empty, so don't add it back to any queue.
+		return
+	}
+
+	queue := p.requeueEntityWithQueueingStrategy(logger, pgInfo, strategy, framework.EventUnscheduledPodAdd.Label())
+	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		p.activeQ.broadcast()
 	}
 }
 
-// Delete deletes the item from either of the two queues. It assumes the pod is
-// only in one queue.
-func (p *PriorityQueue) Delete(pod *v1.Pod) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	p.DeleteNominatedPodIfExists(pod)
-	pInfo := newQueuedPodInfoForLookup(pod)
-	if err := p.activeQ.delete(pInfo); err == nil {
+// deletePod removes an individual pod from the queue.
+func (p *PriorityQueue) deletePod(pod *v1.Pod) {
+	pInfoLookup := newQueuedPodInfoForLookup(pod)
+
+	// Check activeQ
+	if entity := p.activeQ.delete(pInfoLookup); entity != nil {
+		// Drop metric for deleted pod.
+		decreaseUnschedulableReasonMetric(entity)
 		return
 	}
-	if deleted := p.backoffQ.delete(pInfo); deleted {
+
+	// Check backoffQ
+	if entity := p.backoffQ.delete(pInfoLookup); entity != nil {
+		// Drop metric for deleted pod.
+		decreaseUnschedulableReasonMetric(entity)
 		return
 	}
-	if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
-		p.unschedulablePods.delete(pod, pInfo.Gated)
+
+	// Check unschedulableEntities
+	if entity := p.unschedulableEntities.get(pInfoLookup); entity != nil {
+		p.unschedulableEntities.delete(pInfoLookup, entity.Gated())
+		// Drop metric for deleted pod.
+		decreaseUnschedulableReasonMetric(entity)
 	}
 }
 
@@ -1033,136 +1378,126 @@ func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 
 	// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
 	// because Pod related events shouldn't make Pods that rejected by single-node scheduling requirement schedulable.
-	p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, pod), framework.EventAssignedPodAdd, nil, pod)
+	p.moveEntitiesToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, pod), framework.EventAssignedPodAdd, nil, pod)
 	p.lock.Unlock()
 }
 
 // AssignedPodUpdated is called when a bound pod is updated. Change of labels
 // may make pending pods with matching affinity terms schedulable.
-func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent) {
+func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent) {
 	p.lock.Lock()
-	if (framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodScaleDown}.Match(event)) {
+	if (framework.MatchClusterEvents(fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, event)) {
 		// In this case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
 		// because Pod related events may make Pods that were rejected by NodeResourceFit schedulable.
 		p.moveAllToActiveOrBackoffQueue(logger, event, oldPod, newPod, nil)
 	} else {
 		// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
 		// because Pod related events only make Pods rejected by cross topology term schedulable.
-		p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, newPod), event, oldPod, newPod)
+		p.moveEntitiesToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, newPod), event, oldPod, newPod)
 	}
 	p.lock.Unlock()
 }
 
 // NOTE: this function assumes a lock has been acquired in the caller.
-// moveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.
+// moveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
 // This function adds all pods and then signals the condition variable to ensure that
-// if Pop() is waiting for an item, it receives the signal after all the pods are in the
+// if Pop() is waiting for an entity, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
-func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
-		// Return early before iterating all pods in unschedulablePods for preCheck.
+		// Return early before iterating all entities in unschedulableEntities for preCheck.
 		return
 	}
 
-	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		if preCheck == nil || preCheck(pInfo.Pod) {
-			unschedulablePods = append(unschedulablePods, pInfo)
-		}
+	unschedulableEntities := make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
+	for _, entity := range p.unschedulableEntities.entityInfoMap {
+		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			if preCheck == nil || preCheck(pInfo.Pod) {
+				unschedulableEntities = append(unschedulableEntities, entity)
+				return false
+			}
+			return true
+		})
 	}
-	p.movePodsToActiveOrBackoffQueue(logger, unschedulablePods, event, oldObj, newObj)
+	p.moveEntitiesToActiveOrBackoffQueue(logger, unschedulableEntities, event, oldObj, newObj)
 }
 
-// MoveAllToActiveOrBackoffQueue moves all pods from unschedulablePods to activeQ or backoffQ.
+// MoveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
 // This function adds all pods and then signals the condition variable to ensure that
 // if Pop() is waiting for an item, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
-func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
 }
 
-// requeuePodViaQueueingHint tries to requeue Pod to activeQ, backoffQ or unschedulable pod pool based on schedulingHint.
-// It returns the queue name Pod goes.
+// requeueEntityWithQueueingStrategy tries to requeue entity to activeQ, backoffQ or unschedulable pod pool based on schedulingHint.
+// It returns the queue name entity goes.
 //
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, strategy queueingStrategy, event string) string {
+func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, entity framework.QueuedEntityInfo, strategy queueingStrategy, event string) string {
 	if strategy == queueSkip {
-		p.unschedulablePods.addOrUpdate(pInfo, event)
-		return unschedulablePods
+		// Current Gate status is required for already exisiting entities. For new entities, this parameter is ignored/unused by addPod/addPodGroup.
+		p.unschedulableEntities.addOrUpdate(entity, entity.Gated(), event)
+		return unschedulableQ
 	}
 
-	// Pod might have completed its backoff time while being in unschedulablePods,
-	// so we should check isPodBackingoff before moving the pod to backoffQ.
-	if strategy == queueAfterBackoff && p.backoffQ.isPodBackingoff(pInfo) {
-		if added := p.moveToBackoffQ(logger, pInfo, event); added {
+	// Entity might have completed its backoff time while being in unschedulableEntities,
+	// so we should check isEntityBackingoff before moving the entity to backoffQ.
+	if strategy == queueAfterBackoff && p.backoffQ.isEntityBackingoff(entity) {
+		if added := p.moveToBackoffQ(logger, entity, event); added {
 			return backoffQ
 		}
-		return unschedulablePods
+		return unschedulableQ
 	}
 
-	// Reach here if schedulingHint is QueueImmediately, or schedulingHint is Queue but the pod is not backing off.
-	if added := p.moveToActiveQ(logger, pInfo, event); added {
+	// Reach here if schedulingHint is QueueImmediately, or schedulingHint is Queue but the entity is not backing off.
+	if added := p.moveToActiveQ(logger, entity, event, false); added {
 		return activeQ
 	}
-	// Pod is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.
-	return unschedulablePods
+	// Entity is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.
+	return unschedulableQ
 }
 
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
+func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		return
 	}
 
 	activated := false
-	for _, pInfo := range podInfoList {
-		// When handling events takes time, a scheduling throughput gets impacted negatively
-		// because of a shared lock within PriorityQueue, which Pop() also requires.
-		//
-		// Scheduling-gated Pods never get schedulable with any events,
-		// except the Pods themselves got updated, which isn't handled by movePodsToActiveOrBackoffQueue.
-		// So, we can skip them early here so that they don't go through isPodWorthRequeuing,
-		// which isn't fast enough to keep a sufficient scheduling throughput
-		// when the number of scheduling-gated Pods in unschedulablePods is large.
-		// https://github.com/kubernetes/kubernetes/issues/124384
-		// This is a hotfix for this issue, which might be changed
-		// once we have a better general solution for the shared lock issue.
-		//
-		// Note that we cannot skip all pInfo.Gated Pods here
-		// because PreEnqueue plugins apart from the scheduling gate plugin may change the gating status
-		// with these events.
-		if pInfo.Gated && pInfo.UnschedulablePlugins.Has(names.SchedulingGates) {
+	for _, entity := range entityInfoList {
+		// As an optimization, we avoid re-evaluating gated entities for events unrelated to their gating plugin.
+		// However, wildcard events (e.g., periodic flushes) always trigger re-evaluation to entities pods don't
+		// get stuck due to incomplete or incorrect queueing hints.
+		if entity.Gated() && !framework.ClusterEventIsWildCard(event) && !framework.MatchAnyClusterEvent(event, entity.GetGatingPluginEvents()) {
+			// This event doesn't interest the gating plugin of this Pod,
+			// which means this event never moves this Pod to activeQ.
 			continue
 		}
 
-		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
+		schedulingHint := p.isEntityWorthRequeuing(logger, entity, event, oldObj, newObj)
 		if schedulingHint == queueSkip {
-			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
-			logger.V(5).Info("Event is not making pod schedulable", "pod", klog.KObj(pInfo.Pod), "event", event.Label())
+			// QueueingHintFn determined that this entity isn't worth putting to activeQ or backoffQ by this event.
+			logger.V(5).Info("Event is not making entity schedulable", "type", entity.Type(), "entity", entity, "event", event.Label())
 			continue
 		}
 
-		p.unschedulablePods.delete(pInfo.Pod, pInfo.Gated)
-		queue := p.requeuePodViaQueueingHint(logger, pInfo, schedulingHint, event.Label())
-		logger.V(4).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event.Label(), "queue", queue, "hint", schedulingHint)
+		p.unschedulableEntities.delete(entity, entity.Gated())
+		queue := p.requeueEntityWithQueueingStrategy(logger, entity, schedulingHint, event.Label())
 		if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 			activated = true
 		}
 	}
 
-	p.moveRequestCycle = p.activeQ.schedulingCycle()
-
-	if p.isSchedulingQueueHintEnabled {
-		// AddUnschedulableIfNotPresent might get called for in-flight Pods later, and in
-		// AddUnschedulableIfNotPresent we need to know whether events were
-		// observed while scheduling them.
-		if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
-			logger.V(5).Info("Event received while pods are in flight", "event", event.Label())
-		}
+	// AddUnschedulablePodIfNotPresent might get called for in-flight Pods later, and in
+	// AddUnschedulablePodIfNotPresent we need to know whether events were
+	// observed while scheduling them.
+	if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
+		logger.V(5).Info("Event received while entities are in flight", "event", event.Label())
 	}
 
 	if activated {
@@ -1174,26 +1509,31 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 // - have any affinity term that matches "pod".
 // - rejected by PodTopologySpread plugin.
 // NOTE: this function assumes lock has been acquired in caller.
-func (p *PriorityQueue) getUnschedulablePodsWithCrossTopologyTerm(logger klog.Logger, pod *v1.Pod) []*framework.QueuedPodInfo {
+func (p *PriorityQueue) getUnschedulablePodsWithCrossTopologyTerm(logger klog.Logger, pod *v1.Pod) []framework.QueuedEntityInfo {
 	nsLabels := interpodaffinity.GetNamespaceLabelsSnapshot(logger, pod.Namespace, p.nsLister)
 
-	var podsToMove []*framework.QueuedPodInfo
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		if pInfo.UnschedulablePlugins.Has(podtopologyspread.Name) && pod.Namespace == pInfo.Pod.Namespace {
-			// This Pod may be schedulable now by this Pod event.
-			podsToMove = append(podsToMove, pInfo)
-			continue
-		}
-
-		for _, term := range pInfo.RequiredAffinityTerms {
-			if term.Matches(pod, nsLabels) {
-				podsToMove = append(podsToMove, pInfo)
-				break
+	var entitiesToMove []framework.QueuedEntityInfo
+	for _, entity := range p.unschedulableEntities.entityInfoMap {
+		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			if pInfo.UnschedulablePlugins.Has(podtopologyspread.Name) && pod.Namespace == pInfo.Pod.Namespace {
+				// This Pod may be schedulable now by this Pod event.
+				// Any pod matches for an entity, can move to the next entity.
+				entitiesToMove = append(entitiesToMove, entity)
+				return false
 			}
-		}
+
+			for _, term := range pInfo.RequiredAffinityTerms {
+				if term.Matches(pod, nsLabels) {
+					// Any pod matches for an entity, can move to the next entity.
+					entitiesToMove = append(entitiesToMove, entity)
+					return false
+				}
+			}
+			return true
+		})
 	}
 
-	return podsToMove
+	return entitiesToMove
 }
 
 // PodsInActiveQ returns all the Pods in the activeQ.
@@ -1208,42 +1548,80 @@ func (p *PriorityQueue) PodsInBackoffQ() []*v1.Pod {
 
 // UnschedulablePods returns all the pods in unschedulable state.
 func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 	var result []*v1.Pod
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		result = append(result, pInfo.Pod)
+	for _, entity := range p.unschedulableEntities.entityInfoMap {
+		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			result = append(result, pInfo.Pod)
+			return true
+		})
 	}
 	return result
 }
 
-var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
+// PendingPodGroupPods returns all the pending pods waiting for their pod groups.
+func (p *PriorityQueue) PendingPodGroupPods() []*v1.Pod {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	var result []*v1.Pod
+	for _, pInfos := range p.pendingPodGroupPods.podGroupToPods {
+		for _, pInfo := range pInfos {
+			result = append(result, pInfo.Pod)
+		}
+	}
+	return result
+}
 
-// GetPod searches for a pod in the activeQ, backoffQ, and unschedulablePods.
-func (p *PriorityQueue) GetPod(name, namespace string) (pInfo *framework.QueuedPodInfo, ok bool) {
+// GetPod searches for a pod in the activeQ, backoffQ, and unschedulableEntities.
+func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	pInfoLookup := &framework.QueuedPodInfo{
-		PodInfo: &framework.PodInfo{
-			Pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-			},
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			SchedulingGroup: schedulingGroup,
 		},
 	}
-	if pInfo, ok = p.backoffQ.get(pInfoLookup); ok {
-		return pInfo, true
-	}
-	if pInfo = p.unschedulablePods.get(pInfoLookup.Pod); pInfo != nil {
-		return pInfo, true
+	var pInfo *framework.QueuedPodInfo
+	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+		pInfo = p.getPod(pod, unlockedActiveQ)
+	})
+	return pInfo, pInfo != nil
+}
+
+func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActiveQueueReader) *framework.QueuedPodInfo {
+	var entityLookup framework.QueuedEntityInfo
+	if p.isPodGroupMember(podLookup) {
+		entityLookup = newQueuedPodGroupInfoForLookup(podLookup)
+	} else {
+		entityLookup = newQueuedPodInfoForLookup(podLookup)
 	}
 
-	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
-		pInfo, ok = unlockedActiveQ.get(pInfoLookup)
+	entity := p.getEntityFromAnyQueue(unlockedActiveQ, entityLookup)
+	if entity == nil {
+		if !p.isPodGroupMember(podLookup) {
+			return nil
+		}
+		return p.pendingPodGroupPods.getPod(entityLookup, podLookup)
+	}
+	var foundPodInfo *framework.QueuedPodInfo
+	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		if pInfo.Pod.Name == podLookup.Name && pInfo.Pod.Namespace == podLookup.Namespace {
+			foundPodInfo = pInfo
+			return false
+		}
+		return true
 	})
-	return
+	return foundPodInfo
 }
+
+var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulableEntities:%v"
+var pendingPodsExtendedSummary = "activeQ:%v; backoffQ:%v; unschedulableEntities:%v; pendingPodGroupMemberPods:%v"
 
 // PendingPods returns all the pending pods in the queue; accompanied by a debugging string
 // recording showing the number of pods in each queue respectively.
@@ -1256,33 +1634,65 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	backoffQPods := p.PodsInBackoffQ()
 	backoffQLen := len(backoffQPods)
 	result = append(result, backoffQPods...)
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		result = append(result, pInfo.Pod)
+	unschedulablePodsLen := 0
+	for _, entity := range p.unschedulableEntities.entityInfoMap {
+		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			result = append(result, pInfo.Pod)
+			unschedulablePodsLen++
+			return true
+		})
 	}
-	return result, fmt.Sprintf(pendingPodsSummary, activeQLen, backoffQLen, len(p.unschedulablePods.podInfoMap))
+	if !p.isGenericWorkloadEnabled {
+		return result, fmt.Sprintf(pendingPodsSummary, activeQLen, backoffQLen, unschedulablePodsLen)
+	}
+	pendingPodGroupPodsLen := p.pendingPodGroupPods.len()
+	return result, fmt.Sprintf(pendingPodsExtendedSummary, activeQLen, backoffQLen, unschedulablePodsLen, pendingPodGroupPodsLen)
+}
+
+// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
+// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
+	// Don't store anything in the cache. This might be extended in the next releases.
+	onFinish := make(chan error, 1)
+	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
+	if fwk.IsUnexpectedError(err) {
+		return onFinish, err
+	}
+	return onFinish, nil
 }
 
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
 func (p *PriorityQueue) nominatedPodToInfo(np podRef, unlockedActiveQ unlockedActiveQueueReader) *framework.PodInfo {
 	pod := np.toPod()
-	pInfoLookup := newQueuedPodInfoForLookup(pod)
-
-	queuedPodInfo, exists := unlockedActiveQ.get(pInfoLookup)
-	if exists {
-		return queuedPodInfo.PodInfo
+	pInfo := p.getPod(pod, unlockedActiveQ)
+	if pInfo != nil {
+		return pInfo.PodInfo
 	}
-
-	queuedPodInfo = p.unschedulablePods.get(pod)
-	if queuedPodInfo != nil {
-		return queuedPodInfo.PodInfo
-	}
-
-	queuedPodInfo, exists = p.backoffQ.get(pInfoLookup)
-	if exists {
-		return queuedPodInfo.PodInfo
-	}
-
 	return &framework.PodInfo{Pod: pod}
+}
+
+// getEntityFromAnyQueue returns an entity from the activeQ, backoffQ, or unschedulableEntities.
+// Returns nil if the entity is not found in any queue.
+// The appropriate metric for the entity is also returned.
+// Note: In case the caller modifies the size of the entity, it should update the queue metric itself to match the new size.
+func (p *PriorityQueue) getEntityFromAnyQueue(unlockedActiveQ unlockedActiveQueueReader, entityLookup framework.QueuedEntityInfo) framework.QueuedEntityInfo {
+	existing, ok := unlockedActiveQ.get(entityLookup)
+	if ok {
+		return existing
+	}
+	existing, ok = p.backoffQ.get(entityLookup)
+	if ok {
+		return existing
+	}
+	if existing = p.unschedulableEntities.get(entityLookup); existing != nil {
+		if existing.Gated() {
+			return existing
+		}
+		return existing
+	}
+	return nil
 }
 
 // Close closes the priority queue.
@@ -1297,12 +1707,14 @@ func (p *PriorityQueue) Close() {
 // NominatedPodsForNode returns a copy of pods that are nominated to run on the given node,
 // but they are waiting for other pods to be removed from the node.
 // CAUTION: Make sure you don't call this function while taking any queue's lock in any scenario.
-func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
+func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	nominatedPods := p.nominator.nominatedPodsForNode(nodeName)
-
-	pods := make([]*framework.PodInfo, len(nominatedPods))
+	if len(nominatedPods) == 0 {
+		return []fwk.PodInfo{}
+	}
+	pods := make([]fwk.PodInfo, len(nominatedPods))
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 		for i, np := range nominatedPods {
 			pods[i] = p.nominatedPodToInfo(np, unlockedActiveQ).DeepCopy()
@@ -1311,91 +1723,60 @@ func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*framework.PodIn
 	return pods
 }
 
+// signPod computes the scheduling signature for the given pod when OpportunisticBatching is enabled.
+// The signature is used to cache and reuse scheduling results for identical pods.
+func (p *PriorityQueue) signPod(ctx context.Context, pod *v1.Pod) fwk.PodSignature {
+	if !p.isOpportunisticBatchingEnabled {
+		return nil
+	}
+
+	if p.podSigners == nil {
+		return nil
+	}
+
+	signer, ok := p.podSigners[pod.Spec.SchedulerName]
+	if !ok {
+		utilruntime.HandleErrorWithContext(ctx, nil, "No signer registered for scheduler profile", "pod", klog.KObj(pod), "schedulerName", pod.Spec.SchedulerName)
+		return nil
+	}
+
+	return signer(ctx, pod)
+}
+
 // newQueuedPodInfo builds a QueuedPodInfo object.
-func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
+func (p *PriorityQueue) newQueuedPodInfo(ctx context.Context, pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
 	now := p.clock.Now()
 	// ignore this err since apiserver doesn't properly validate affinity terms
 	// and we can't fix the validation for backwards compatibility.
 	podInfo, _ := framework.NewPodInfo(pod)
 	return &framework.QueuedPodInfo{
-		PodInfo:                 podInfo,
-		Timestamp:               now,
-		InitialAttemptTimestamp: nil,
-		UnschedulablePlugins:    sets.New(plugins...),
+		PodInfo: podInfo,
+		QueueingParams: framework.QueueingParams{
+			Timestamp:               now,
+			InitialAttemptTimestamp: nil,
+			UnschedulablePlugins:    sets.New(plugins...),
+		},
+		PodSignature: p.signPod(ctx, pod),
 	}
 }
 
-// UnschedulablePods holds pods that cannot be scheduled. This data structure
-// is used to implement unschedulablePods.
-type UnschedulablePods struct {
-	// podInfoMap is a map key by a pod's full-name and the value is a pointer to the QueuedPodInfo.
-	podInfoMap map[string]*framework.QueuedPodInfo
-	keyFunc    func(*v1.Pod) string
-	// unschedulableRecorder/gatedRecorder updates the counter when elements of an unschedulablePodsMap
-	// get added or removed, and it does nothing if it's nil.
-	unschedulableRecorder, gatedRecorder metrics.MetricRecorder
-}
-
-// addOrUpdate adds a pod to the unschedulable podInfoMap.
-// The event should show which event triggered the addition and is used for the metric recording.
-func (u *UnschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, event string) {
-	podID := u.keyFunc(pInfo.Pod)
-	if _, exists := u.podInfoMap[podID]; !exists {
-		if pInfo.Gated && u.gatedRecorder != nil {
-			u.gatedRecorder.Inc()
-		} else if !pInfo.Gated && u.unschedulableRecorder != nil {
-			u.unschedulableRecorder.Inc()
-		}
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Inc()
-	}
-	u.podInfoMap[podID] = pInfo
-}
-
-// delete deletes a pod from the unschedulable podInfoMap.
-// The `gated` parameter is used to figure out which metric should be decreased.
-func (u *UnschedulablePods) delete(pod *v1.Pod, gated bool) {
-	podID := u.keyFunc(pod)
-	if _, exists := u.podInfoMap[podID]; exists {
-		if gated && u.gatedRecorder != nil {
-			u.gatedRecorder.Dec()
-		} else if !gated && u.unschedulableRecorder != nil {
-			u.unschedulableRecorder.Dec()
-		}
-	}
-	delete(u.podInfoMap, podID)
-}
-
-// get returns the QueuedPodInfo if a pod with the same key as the key of the given "pod"
-// is found in the map. It returns nil otherwise.
-func (u *UnschedulablePods) get(pod *v1.Pod) *framework.QueuedPodInfo {
-	podKey := u.keyFunc(pod)
-	if pInfo, exists := u.podInfoMap[podKey]; exists {
-		return pInfo
-	}
-	return nil
-}
-
-// clear removes all the entries from the unschedulable podInfoMap.
-func (u *UnschedulablePods) clear() {
-	u.podInfoMap = make(map[string]*framework.QueuedPodInfo)
-	if u.unschedulableRecorder != nil {
-		u.unschedulableRecorder.Clear()
-	}
-	if u.gatedRecorder != nil {
-		u.gatedRecorder.Clear()
+// newQueuedPodGroupInfo builds a QueuedPodGroupInfo object.
+func (p *PriorityQueue) newQueuedPodGroupInfo(podInfo *framework.QueuedPodInfo) *framework.QueuedPodGroupInfo {
+	return &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			Namespace:       podInfo.Pod.Namespace,
+			Name:            *podInfo.Pod.Spec.SchedulingGroup.PodGroupName,
+			UnscheduledPods: []*v1.Pod{podInfo.Pod},
+		},
+		QueuedPodInfos: []*framework.QueuedPodInfo{podInfo},
+		QueueingParams: framework.QueueingParams{
+			Timestamp:               podInfo.Timestamp,
+			InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
+		},
 	}
 }
 
-// newUnschedulablePods initializes a new object of UnschedulablePods.
-func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRecorder) *UnschedulablePods {
-	return &UnschedulablePods{
-		podInfoMap:            make(map[string]*framework.QueuedPodInfo),
-		keyFunc:               util.GetPodFullName,
-		unschedulableRecorder: unschedulableRecorder,
-		gatedRecorder:         gatedRecorder,
-	}
-}
-
-func podInfoKeyFunc(pInfo *framework.QueuedPodInfo) string {
-	return cache.NewObjectName(pInfo.Pod.Namespace, pInfo.Pod.Name).String()
+// queuedEntityKeyFunc returns a unique key for a queued entity based on its type, namespace, and name.
+func queuedEntityKeyFunc(obj framework.QueuedEntityInfo) string {
+	return fmt.Sprintf("%s/%s/%s", obj.Type(), obj.GetNamespace(), obj.GetName())
 }

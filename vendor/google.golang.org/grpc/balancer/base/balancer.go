@@ -41,7 +41,7 @@ func (bb *baseBuilder) Build(cc balancer.ClientConn, _ balancer.BuildOptions) ba
 		cc:            cc,
 		pickerBuilder: bb.pickerBuilder,
 
-		subConns: resolver.NewAddressMap(),
+		subConns: resolver.NewAddressMapV2[balancer.SubConn](),
 		scStates: make(map[balancer.SubConn]connectivity.State),
 		csEvltr:  &balancer.ConnectivityStateEvaluator{},
 		config:   bb.config,
@@ -65,7 +65,7 @@ type baseBalancer struct {
 	csEvltr *balancer.ConnectivityStateEvaluator
 	state   connectivity.State
 
-	subConns *resolver.AddressMap
+	subConns *resolver.AddressMapV2[balancer.SubConn]
 	scStates map[balancer.SubConn]connectivity.State
 	picker   balancer.Picker
 	config   Config
@@ -100,7 +100,7 @@ func (b *baseBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
 	// Successful resolution; clear resolver error and ensure we return nil.
 	b.resolverErr = nil
 	// addrsSet is the set converted from addrs, it's used for quick lookup of an address.
-	addrsSet := resolver.NewAddressMap()
+	addrsSet := resolver.NewAddressMapV2[any]()
 	for _, a := range s.ResolverState.Addresses {
 		addrsSet.Set(a, nil)
 		if _, ok := b.subConns.Get(a); !ok {
@@ -121,9 +121,7 @@ func (b *baseBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
 			sc.Connect()
 		}
 	}
-	for _, a := range b.subConns.Keys() {
-		sci, _ := b.subConns.Get(a)
-		sc := sci.(balancer.SubConn)
+	for a, sc := range b.subConns.All() {
 		// a was removed by resolver.
 		if _, ok := addrsSet.Get(a); !ok {
 			sc.Shutdown()
@@ -172,9 +170,7 @@ func (b *baseBalancer) regeneratePicker() {
 	readySCs := make(map[balancer.SubConn]SubConnInfo)
 
 	// Filter out all ready SCs from full subConn map.
-	for _, addr := range b.subConns.Keys() {
-		sci, _ := b.subConns.Get(addr)
-		sc := sci.(balancer.SubConn)
+	for addr, sc := range b.subConns.All() {
 		if st, ok := b.scStates[sc]; ok && st == connectivity.Ready {
 			readySCs[sc] = SubConnInfo{Address: addr}
 		}

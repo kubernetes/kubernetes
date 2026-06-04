@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type policyMergeTestCase struct {
@@ -1273,6 +1274,8 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 }
 
 func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	for _, tc := range tcases {
 		var providersHints []map[string][]TopologyHint
 		for _, provider := range tc.hp {
@@ -1280,7 +1283,7 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 			providersHints = append(providersHints, hints)
 		}
 
-		actual, _ := policy.Merge(providersHints)
+		actual, _ := policy.Merge(logger, providersHints)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("%v: Expected Topology Hint to be %v, got %v:", tc.name, tc.expected, actual)
 		}

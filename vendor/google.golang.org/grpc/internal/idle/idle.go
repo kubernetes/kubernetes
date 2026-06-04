@@ -21,7 +21,6 @@
 package idle
 
 import (
-	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -33,15 +32,15 @@ var timeAfterFunc = func(d time.Duration, f func()) *time.Timer {
 	return time.AfterFunc(d, f)
 }
 
-// Enforcer is the functionality provided by grpc.ClientConn to enter
-// and exit from idle mode.
-type Enforcer interface {
-	ExitIdleMode() error
+// ClientConn is the functionality provided by grpc.ClientConn to enter and exit
+// from idle mode.
+type ClientConn interface {
+	ExitIdleMode()
 	EnterIdleMode()
 }
 
-// Manager implements idleness detection and calls the configured Enforcer to
-// enter/exit idle mode when appropriate.  Must be created by NewManager.
+// Manager implements idleness detection and calls the ClientConn to enter/exit
+// idle mode when appropriate. Must be created by NewManager.
 type Manager struct {
 	// State accessed atomically.
 	lastCallEndTime           int64 // Unix timestamp in nanos; time when the most recent RPC completed.
@@ -51,8 +50,8 @@ type Manager struct {
 
 	// Can be accessed without atomics or mutex since these are set at creation
 	// time and read-only after that.
-	enforcer Enforcer // Functionality provided by grpc.ClientConn.
-	timeout  time.Duration
+	cc      ClientConn // Functionality provided by grpc.ClientConn.
+	timeout time.Duration
 
 	// idleMu is used to guarantee mutual exclusion in two scenarios:
 	// - Opposing intentions:
@@ -72,9 +71,9 @@ type Manager struct {
 
 // NewManager creates a new idleness manager implementation for the
 // given idle timeout.  It begins in idle mode.
-func NewManager(enforcer Enforcer, timeout time.Duration) *Manager {
+func NewManager(cc ClientConn, timeout time.Duration) *Manager {
 	return &Manager{
-		enforcer:         enforcer,
+		cc:               cc,
 		timeout:          timeout,
 		actuallyIdle:     true,
 		activeCallsCount: -math.MaxInt32,
@@ -127,7 +126,7 @@ func (m *Manager) handleIdleTimeout() {
 
 	// Now that we've checked that there has been no activity, attempt to enter
 	// idle mode, which is very likely to succeed.
-	if m.tryEnterIdleMode() {
+	if m.tryEnterIdleMode(true) {
 		// Successfully entered idle mode. No timer needed until we exit idle.
 		return
 	}
@@ -142,10 +141,13 @@ func (m *Manager) handleIdleTimeout() {
 // that, it performs a last minute check to ensure that no new RPC has come in,
 // making the channel active.
 //
+// checkActivity controls if a check for RPC activity, since the last time the
+// idle_timeout fired, is made.
+
 // Return value indicates whether or not the channel moved to idle mode.
 //
 // Holds idleMu which ensures mutual exclusion with exitIdleMode.
-func (m *Manager) tryEnterIdleMode() bool {
+func (m *Manager) tryEnterIdleMode(checkActivity bool) bool {
 	// Setting the activeCallsCount to -math.MaxInt32 indicates to OnCallBegin()
 	// that the channel is either in idle mode or is trying to get there.
 	if !atomic.CompareAndSwapInt32(&m.activeCallsCount, 0, -math.MaxInt32) {
@@ -166,7 +168,7 @@ func (m *Manager) tryEnterIdleMode() bool {
 		atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
 		return false
 	}
-	if atomic.LoadInt32(&m.activeSinceLastTimerCheck) == 1 {
+	if checkActivity && atomic.LoadInt32(&m.activeSinceLastTimerCheck) == 1 {
 		// A very short RPC could have come in (and also finished) after we
 		// checked for calls count and activity in handleIdleTimeout(), but
 		// before the CAS operation. So, we need to check for activity again.
@@ -177,44 +179,37 @@ func (m *Manager) tryEnterIdleMode() bool {
 	// No new RPCs have come in since we set the active calls count value to
 	// -math.MaxInt32. And since we have the lock, it is safe to enter idle mode
 	// unconditionally now.
-	m.enforcer.EnterIdleMode()
+	m.cc.EnterIdleMode()
 	m.actuallyIdle = true
 	return true
 }
 
 // EnterIdleModeForTesting instructs the channel to enter idle mode.
 func (m *Manager) EnterIdleModeForTesting() {
-	m.tryEnterIdleMode()
+	m.tryEnterIdleMode(false)
 }
 
 // OnCallBegin is invoked at the start of every RPC.
-func (m *Manager) OnCallBegin() error {
+func (m *Manager) OnCallBegin() {
 	if m.isClosed() {
-		return nil
+		return
 	}
 
 	if atomic.AddInt32(&m.activeCallsCount, 1) > 0 {
 		// Channel is not idle now. Set the activity bit and allow the call.
 		atomic.StoreInt32(&m.activeSinceLastTimerCheck, 1)
-		return nil
+		return
 	}
 
 	// Channel is either in idle mode or is in the process of moving to idle
 	// mode. Attempt to exit idle mode to allow this RPC.
-	if err := m.ExitIdleMode(); err != nil {
-		// Undo the increment to calls count, and return an error causing the
-		// RPC to fail.
-		atomic.AddInt32(&m.activeCallsCount, -1)
-		return err
-	}
-
+	m.ExitIdleMode()
 	atomic.StoreInt32(&m.activeSinceLastTimerCheck, 1)
-	return nil
 }
 
-// ExitIdleMode instructs m to call the enforcer's ExitIdleMode and update m's
+// ExitIdleMode instructs m to call the ClientConn's ExitIdleMode and update its
 // internal state.
-func (m *Manager) ExitIdleMode() error {
+func (m *Manager) ExitIdleMode() {
 	// Holds idleMu which ensures mutual exclusion with tryEnterIdleMode.
 	m.idleMu.Lock()
 	defer m.idleMu.Unlock()
@@ -231,12 +226,10 @@ func (m *Manager) ExitIdleMode() error {
 		//   m.ExitIdleMode.
 		//
 		// In any case, there is nothing to do here.
-		return nil
+		return
 	}
 
-	if err := m.enforcer.ExitIdleMode(); err != nil {
-		return fmt.Errorf("failed to exit idle mode: %w", err)
-	}
+	m.cc.ExitIdleMode()
 
 	// Undo the idle entry process. This also respects any new RPC attempts.
 	atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
@@ -244,7 +237,23 @@ func (m *Manager) ExitIdleMode() error {
 
 	// Start a new timer to fire after the configured idle timeout.
 	m.resetIdleTimerLocked(m.timeout)
-	return nil
+}
+
+// UnsafeSetNotIdle instructs the Manager to update its internal state to
+// reflect the reality that the channel is no longer in IDLE mode.
+//
+// N.B. This method is intended only for internal use by the gRPC client
+// when it exits IDLE mode **manually** from `Dial`. The callsite must ensure:
+//   - The channel was **actually in IDLE mode** immediately prior to the call.
+//   - There is **no concurrent activity** that could cause the channel to exit
+//     IDLE mode *naturally* at the same time.
+func (m *Manager) UnsafeSetNotIdle() {
+	m.idleMu.Lock()
+	defer m.idleMu.Unlock()
+
+	atomic.AddInt32(&m.activeCallsCount, math.MaxInt32)
+	m.actuallyIdle = false
+	m.resetIdleTimerLocked(m.timeout)
 }
 
 // OnCallEnd is invoked at the end of every RPC.

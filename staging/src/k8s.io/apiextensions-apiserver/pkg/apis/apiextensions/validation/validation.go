@@ -92,8 +92,7 @@ func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.Cu
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
 		requireMapListKeysMapSetValidation:       true,
-		// strictCost is always true to enforce cost limits.
-		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
 		// allowInvalidCABundle is set to true since the CRD is not established yet.
 		allowInvalidCABundle: true,
 	}
@@ -145,6 +144,10 @@ type validationOptions struct {
 	// allowInvalidCABundle allows an invalid conversion webhook CABundle on update only if the existing CABundle is invalid.
 	// An invalid CABundle is also permitted on create and before a CRD is in an Established=True condition.
 	allowInvalidCABundle bool
+
+	// allowTooManySelectableFields allows more than the MaxSelectableFields on update only if the existing
+	// selectable field count is more than the max selectable fields and the selectable fields are unchanged.
+	allowTooManySelectableFields map[string]bool
 }
 
 type preexistingExpressions struct {
@@ -237,9 +240,9 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
 		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
-		// strictCost is always true to enforce cost limits.
-		celEnvironmentSet:    environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
-		allowInvalidCABundle: allowInvalidCABundle(oldObj),
+		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+		allowInvalidCABundle:                     allowInvalidCABundle(oldObj),
+		allowTooManySelectableFields:             findTooManySelectableFieldsAllowed(obj, oldObj),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }
@@ -304,13 +307,13 @@ func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiex
 
 	if len(version.SelectableFields) > 0 {
 		if version.Schema == nil || version.Schema.OpenAPIV3Schema == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "selectableFields may only be set when version.schema.openAPIV3Schema is not included"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "may only be set when `version.schema.openAPIV3Schema` is not included"))
 		} else {
 			schema, err := structuralschema.NewStructural(version.Schema.OpenAPIV3Schema)
 			if err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("schema.openAPIV3Schema"), "", err.Error()))
 			}
-			allErrs = append(allErrs, ValidateCustomResourceSelectableFields(version.SelectableFields, schema, fldPath.Child("selectableFields"))...)
+			allErrs = append(allErrs, ValidateCustomResourceSelectableFields(version.SelectableFields, schema, fldPath.Child("selectableFields"), opts, version.Name)...)
 		}
 	}
 	return allErrs
@@ -370,7 +373,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
 			for i, v := range spec.Versions {
 				if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
-					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), "schemas are required"))
+					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), ""))
 				}
 			}
 		}
@@ -477,14 +480,14 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 
 	if len(spec.SelectableFields) > 0 {
 		if spec.Validation == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "selectableFields may only be set when validations.schema is included"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "may only be set when validations.schema is included"))
 		} else {
 			schema, err := structuralschema.NewStructural(spec.Validation.OpenAPIV3Schema)
 			if err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("schema.openAPIV3Schema"), "", err.Error()))
 			}
 
-			allErrs = append(allErrs, ValidateCustomResourceSelectableFields(spec.SelectableFields, schema, fldPath.Child("selectableFields"))...)
+			allErrs = append(allErrs, ValidateCustomResourceSelectableFields(spec.SelectableFields, schema, fldPath.Child("selectableFields"), opts, "")...)
 		}
 	}
 
@@ -563,6 +566,34 @@ func allowInvalidCABundle(oldCRD *apiextensions.CustomResourceDefinition) bool {
 		return false
 	}
 	return len(webhook.ValidateCABundle(field.NewPath("caBundle"), oldConversion.WebhookClientConfig.CABundle)) > 0
+}
+
+// findTooManySelectableFieldsAllowed returns a struct indicating which selectable field sets are allowed to be invalid.
+// A set of selectable fields is allowed to be invalid if the existing custom resource definition has more
+// selectable fields than MaxSelectableFields and the selectable fields are unchanged.
+func findTooManySelectableFieldsAllowed(obj *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) map[string]bool {
+	result := map[string]bool{}
+
+	if len(oldCRD.Spec.SelectableFields) > MaxSelectableFields && apiequality.Semantic.DeepEqual(obj.Spec.SelectableFields, oldCRD.Spec.SelectableFields) {
+		result[""] = true
+	}
+
+	oldVersions := make(map[string]*apiextensions.CustomResourceDefinitionVersion, len(oldCRD.Spec.Versions))
+	for _, v := range oldCRD.Spec.Versions {
+		oldVersions[v.Name] = &v // +k8s:verify-mutation:reason=clone
+	}
+
+	for _, v := range obj.Spec.Versions {
+		oldV, ok := oldVersions[v.Name]
+		if !ok {
+			continue
+		}
+		if len(oldV.SelectableFields) > MaxSelectableFields && apiequality.Semantic.DeepEqual(v.SelectableFields, oldV.SelectableFields) {
+			result[v.Name] = true
+		}
+	}
+
+	return result
 }
 
 // hasValidConversionReviewVersion return true if there is a valid version or if the list is empty.
@@ -813,7 +844,7 @@ func ValidateCustomResourceColumnDefinition(col *apiextensions.CustomResourceCol
 	return allErrs
 }
 
-func ValidateCustomResourceSelectableFields(selectableFields []apiextensions.SelectableField, schema *structuralschema.Structural, fldPath *field.Path) (allErrs field.ErrorList) {
+func ValidateCustomResourceSelectableFields(selectableFields []apiextensions.SelectableField, schema *structuralschema.Structural, fldPath *field.Path, opts validationOptions, version string) (allErrs field.ErrorList) {
 	uniqueSelectableFields := sets.New[string]()
 	for i, selectableField := range selectableFields {
 		indexFldPath := fldPath.Index(i)
@@ -840,7 +871,7 @@ func ValidateCustomResourceSelectableFields(selectableFields []apiextensions.Sel
 		}
 	}
 	uniqueSelectableFieldCount := uniqueSelectableFields.Len()
-	if uniqueSelectableFieldCount > MaxSelectableFields {
+	if uniqueSelectableFieldCount > MaxSelectableFields && !opts.allowTooManySelectableFields[version] {
 		allErrs = append(allErrs, field.TooMany(fldPath, uniqueSelectableFieldCount, MaxSelectableFields))
 	}
 	return allErrs
@@ -1203,9 +1234,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			if len(trimmedRule) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), "rule is not specified"))
 			} else if len(rule.Message) > 0 && len(trimmedMsg) == 0 {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must be non-empty if specified"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "must be non-empty if specified"))
 			} else if hasNewlines(trimmedMsg) {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must not contain line breaks"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "must not contain line breaks"))
 			} else if hasNewlines(trimmedRule) && len(trimmedMsg) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), "message must be specified if rule contains line breaks"))
 			}
@@ -1217,14 +1248,14 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			}
 			trimmedFieldPath := strings.TrimSpace(rule.FieldPath)
 			if len(rule.FieldPath) > 0 && len(trimmedFieldPath) == 0 {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be non-empty if specified"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "must be non-empty if specified"))
 			}
 			if hasNewlines(rule.FieldPath) {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must not contain line breaks"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "must not contain line breaks"))
 			}
 			if len(rule.FieldPath) > 0 {
 				if !pathValid(schema, rule.FieldPath) {
-					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be a valid path"))
+					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "must be a valid path"))
 				}
 
 			}

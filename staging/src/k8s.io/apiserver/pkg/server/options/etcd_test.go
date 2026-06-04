@@ -17,7 +17,10 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -59,7 +63,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 			expectErr: "--etcd-servers must be specified",
@@ -83,7 +86,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 			expectErr: "--storage-backend invalid, allowed values: etcd3. If not specified, it will default to 'etcd3'",
@@ -107,7 +109,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events/http://127.0.0.1:4002"},
 			},
 			expectErr: "--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated",
@@ -132,7 +133,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers:                 1,
 				EnableGarbageCollection:                 true,
 				EnableWatchCache:                        true,
-				DefaultWatchCacheSize:                   100,
 				EtcdServersOverrides:                    []string{"/events#http://127.0.0.1:4002"},
 			},
 			expectErr: "--encryption-provider-config-automatic-reload must be set with --encryption-provider-config",
@@ -156,7 +156,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 		},
@@ -375,11 +374,12 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 
 func TestReadinessCheck(t *testing.T) {
 	testCases := []struct {
-		name              string
-		wantReadyzChecks  []string
-		wantHealthzChecks []string
-		wantLivezChecks   []string
-		skipHealth        bool
+		name                 string
+		wantReadyzChecks     []string
+		wantHealthzChecks    []string
+		wantLivezChecks      []string
+		skipHealth           bool
+		etcdServersOverrides []string
 	}{
 		{
 			name:              "Readyz should have etcd-readiness check",
@@ -394,6 +394,37 @@ func TestReadinessCheck(t *testing.T) {
 			wantLivezChecks:   nil,
 			skipHealth:        true,
 		},
+		{
+			name:                 "Health checks should not have duplicated servers from etcd-servers-overrides",
+			wantReadyzChecks:     []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0"},
+			wantHealthzChecks:    []string{"etcd", "etcd-override-0"},
+			wantLivezChecks:      []string{"etcd", "etcd-override-0"},
+			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s1.com;s2.com"},
+		},
+		{
+			name: "Health checks should not have duplicated servers from etcd-servers-overrides " +
+				"if servers are provided in different orders",
+			wantReadyzChecks:     []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0"},
+			wantHealthzChecks:    []string{"etcd", "etcd-override-0"},
+			wantLivezChecks:      []string{"etcd", "etcd-override-0"},
+			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s2.com;s1.com"},
+		},
+		{
+			name: "Health checks should allow multiple overrides in etcd-servers-overrides",
+			wantReadyzChecks: []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0",
+				"etcd-override-1", "etcd-override-readiness-1"},
+			wantHealthzChecks:    []string{"etcd", "etcd-override-0", "etcd-override-1"},
+			wantLivezChecks:      []string{"etcd", "etcd-override-0", "etcd-override-1"},
+			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s3.com;s4.com"},
+		},
+		{
+			name: "Health checks should allow multiple overrides in etcd-servers-overrides if servers overlap between overrides",
+			wantReadyzChecks: []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0",
+				"etcd-override-1", "etcd-override-readiness-1"},
+			wantHealthzChecks:    []string{"etcd", "etcd-override-0", "etcd-override-1"},
+			wantLivezChecks:      []string{"etcd", "etcd-override-0", "etcd-override-1"},
+			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s2.com;s3.com"},
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -402,7 +433,7 @@ func TestReadinessCheck(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			serverConfig := server.NewConfig(codecs)
-			etcdOptions := &EtcdOptions{SkipHealthEndpoints: tc.skipHealth}
+			etcdOptions := &EtcdOptions{SkipHealthEndpoints: tc.skipHealth, EtcdServersOverrides: tc.etcdServersOverrides}
 			if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 				t.Fatalf("Failed to add healthz error: %v", err)
 			}
@@ -444,4 +475,164 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	if restOptions.StorageConfig.StorageObjectCountTracker != serverConfig.StorageObjectCountTracker {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
 	}
+}
+
+func TestMonitorCache(t *testing.T) {
+	setCreateMonitor := func(t *testing.T, fn func(storagebackend.Config) (metrics.Monitor, error)) {
+		t.Helper()
+		original := createMonitor
+		createMonitor = fn
+		t.Cleanup(func() {
+			createMonitor = original
+		})
+	}
+
+	newTestCache := func(t *testing.T) *monitorCache {
+		t.Helper()
+		stopCh := make(chan struct{})
+		t.Cleanup(func() { close(stopCh) })
+		cache, err := newMonitorCache(&SimpleStorageFactory{}, stopCh)
+		if err != nil {
+			t.Fatalf("newMonitorCache() returned error: %v", err)
+		}
+		return cache
+	}
+
+	testCases := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "reuses cached monitors on subsequent get calls",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				monitor := &fakeMonitor{}
+				var createCalls atomic.Int32
+
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					createCalls.Add(1)
+					return monitor, nil
+				})
+
+				first, err := cache.get()
+				if err != nil {
+					t.Fatalf("first get() returned error: %v", err)
+				}
+				second, err := cache.get()
+				if err != nil {
+					t.Fatalf("second get() returned error: %v", err)
+				}
+
+				if got := createCalls.Load(); got != 1 {
+					t.Fatalf("expected createMonitor to be called once, got %d", got)
+				}
+				if len(first) != 1 || len(second) != 1 {
+					t.Fatalf("expected exactly one monitor from each call, got %d and %d", len(first), len(second))
+				}
+				if first[0] != monitor || second[0] != monitor {
+					t.Fatal("expected both calls to return the cached monitor instance")
+				}
+			},
+		},
+		{
+			name: "returns error when get is called after cache is closed",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				monitor := &fakeMonitor{}
+
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					return monitor, nil
+				})
+
+				if _, err := cache.get(); err != nil {
+					t.Fatalf("initial get() returned error: %v", err)
+				}
+
+				cache.close()
+
+				if got := monitor.closeCalls.Load(); got != 1 {
+					t.Fatalf("expected close to be called once, got %d", got)
+				}
+				if _, err := cache.get(); err == nil || err.Error() != "monitor cache is closed" {
+					t.Fatalf("expected closed-cache error, got %v", err)
+				}
+			},
+		},
+		{
+			name: "concurrent get calls all return the first initialized monitors",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				monitor := &fakeMonitor{}
+				initStarted := make(chan struct{})
+				allowInit := make(chan struct{})
+				var createCalls atomic.Int32
+
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					if createCalls.Add(1) == 1 {
+						close(initStarted)
+					}
+					<-allowInit
+					return monitor, nil
+				})
+
+				const numGoroutines = 10
+				start := make(chan struct{})
+				results := make(chan []metrics.Monitor, numGoroutines)
+				errs := make(chan error, numGoroutines)
+				var wg sync.WaitGroup
+				wg.Add(numGoroutines)
+
+				for range numGoroutines {
+					go func() {
+						defer wg.Done()
+						<-start
+						got, err := cache.get()
+						results <- got
+						errs <- err
+					}()
+				}
+
+				close(start)
+				<-initStarted
+				close(allowInit)
+				wg.Wait()
+
+				if got := createCalls.Load(); got != 1 {
+					t.Fatalf("expected createMonitor to be called once, got %d", got)
+				}
+				if len(cache.monitors) != 1 || cache.monitors[0] != monitor {
+					t.Fatal("expected the initialized monitor to be cached")
+				}
+
+				for range numGoroutines {
+					if err := <-errs; err != nil {
+						t.Fatalf("get() returned error: %v", err)
+					}
+					got := <-results
+					if len(got) != 1 || got[0] != monitor {
+						t.Fatal("expected all goroutines to receive the same cached monitor")
+					}
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.test(t)
+		})
+	}
+}
+
+type fakeMonitor struct {
+	closeCalls atomic.Int32
+}
+
+func (f *fakeMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, error) {
+	return metrics.StorageMetrics{}, nil
+}
+
+func (f *fakeMonitor) Close() error {
+	f.closeCalls.Add(1)
+	return nil
 }

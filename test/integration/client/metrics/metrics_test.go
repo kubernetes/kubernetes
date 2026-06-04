@@ -44,8 +44,10 @@ import (
 
 // regression test for https://issues.k8s.io/117258
 func TestAPIServerTransportMetrics(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
 
 	// reset default registry metrics
 	legacyregistry.Reset()
@@ -88,7 +90,7 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 
 	requests := 30
 	errors := 0
-	for i := 0; i < requests; i++ {
+	for i := range requests {
 		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(context.Background(), "v1alpha1.wardle.example.com", metav1.GetOptions{})
 		if err != nil {
 			t.Fatal(err)

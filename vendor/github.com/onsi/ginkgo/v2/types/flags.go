@@ -92,7 +92,7 @@ func (gfs GinkgoFlagSections) Lookup(key string) (GinkgoFlagSection, bool) {
 
 type GinkgoFlagSet struct {
 	flags    GinkgoFlags
-	bindings interface{}
+	bindings any
 
 	sections            GinkgoFlagSections
 	extraGoFlagsSection GinkgoFlagSection
@@ -101,7 +101,7 @@ type GinkgoFlagSet struct {
 }
 
 // Call NewGinkgoFlagSet to create GinkgoFlagSet that creates and binds to it's own *flag.FlagSet
-func NewGinkgoFlagSet(flags GinkgoFlags, bindings interface{}, sections GinkgoFlagSections) (GinkgoFlagSet, error) {
+func NewGinkgoFlagSet(flags GinkgoFlags, bindings any, sections GinkgoFlagSections) (GinkgoFlagSet, error) {
 	return bindFlagSet(GinkgoFlagSet{
 		flags:    flags,
 		bindings: bindings,
@@ -110,7 +110,7 @@ func NewGinkgoFlagSet(flags GinkgoFlags, bindings interface{}, sections GinkgoFl
 }
 
 // Call NewGinkgoFlagSet to create GinkgoFlagSet that extends an existing *flag.FlagSet
-func NewAttachedGinkgoFlagSet(flagSet *flag.FlagSet, flags GinkgoFlags, bindings interface{}, sections GinkgoFlagSections, extraGoFlagsSection GinkgoFlagSection) (GinkgoFlagSet, error) {
+func NewAttachedGinkgoFlagSet(flagSet *flag.FlagSet, flags GinkgoFlags, bindings any, sections GinkgoFlagSections, extraGoFlagsSection GinkgoFlagSection) (GinkgoFlagSet, error) {
 	return bindFlagSet(GinkgoFlagSet{
 		flags:               flags,
 		bindings:            bindings,
@@ -210,6 +210,24 @@ func bindFlagSet(f GinkgoFlagSet, flagSet *flag.FlagSet) (GinkgoFlagSet, error) 
 
 func (f GinkgoFlagSet) IsZero() bool {
 	return f.flagSet == nil
+}
+
+func (f GinkgoFlagSet) Completion(arg string) map[string]string {
+	if f.IsZero() {
+		return nil
+	}
+	prefix := strings.TrimLeft(arg, "-")
+	dash := arg[:len(arg)-len(prefix)]
+	if len(dash) < 1 || len(dash) > 3 {
+		return nil
+	}
+	result := make(map[string]string, len(f.flags))
+	for _, flag := range f.flags {
+		if flag.Name != "" && strings.HasPrefix(flag.Name, prefix) {
+			result[dash+flag.Name] = flag.Usage
+		}
+	}
+	return result
 }
 
 func (f GinkgoFlagSet) WasSet(name string) bool {
@@ -335,7 +353,7 @@ func (f GinkgoFlagSet) substituteUsage() {
 	fmt.Fprintln(f.flagSet.Output(), f.Usage())
 }
 
-func valueAtKeyPath(root interface{}, keyPath string) (reflect.Value, bool) {
+func valueAtKeyPath(root any, keyPath string) (reflect.Value, bool) {
 	if len(keyPath) == 0 {
 		return reflect.Value{}, false
 	}
@@ -433,7 +451,7 @@ func (ssv stringSliceVar) Set(s string) error {
 }
 
 // given a set of GinkgoFlags and bindings, generate flag arguments suitable to be passed to an application with that set of flags configured.
-func GenerateFlagArgs(flags GinkgoFlags, bindings interface{}) ([]string, error) {
+func GenerateFlagArgs(flags GinkgoFlags, bindings any) ([]string, error) {
 	result := []string{}
 	for _, flag := range flags {
 		name := flag.ExportAs

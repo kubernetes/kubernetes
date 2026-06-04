@@ -48,7 +48,7 @@ var _ = SIGDescribe("ImageCredentialProvider", feature.KubeletCredentialProvider
 		Testname: Test kubelet image pull with external credential provider plugins
 		Description: Create Pod with an image from a private registry. This test assumes that the kubelet credential provider plugin is enabled for the registry hosting imageutils.AgnhostPrivate.
 	*/
-	ginkgo.It("should be able to create pod with image credentials fetched from external credential provider ", func(ctx context.Context) {
+	ginkgo.It("should be able to create pod with image credentials fetched from external credential provider", func(ctx context.Context) {
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		name := "pod-auth-image-" + string(uuid.NewUUID())
 

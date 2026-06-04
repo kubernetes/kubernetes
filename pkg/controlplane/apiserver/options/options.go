@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
+	"k8s.io/apiserver/pkg/server/flagz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/util/keyutil"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	netutil "k8s.io/utils/net"
 
@@ -92,6 +92,10 @@ type Options struct {
 	SystemNamespaces []string
 
 	ServiceAccountSigningEndpoint string
+
+	CoordinatedLeadershipLeaseDuration time.Duration
+	CoordinatedLeadershipRenewDeadline time.Duration
+	CoordinatedLeadershipRetryPeriod   time.Duration
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -125,6 +129,9 @@ func NewOptions() *Options {
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
+		CoordinatedLeadershipLeaseDuration:  15 * time.Second,
+		CoordinatedLeadershipRenewDeadline:  10 * time.Second,
+		CoordinatedLeadershipRetryPeriod:    2 * time.Second,
 	}
 
 	// Overwrite the default for storage data format.
@@ -157,8 +164,6 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
-	fs.MarkDeprecated("enable-logs-handler", "Log handler functionality is deprecated") //nolint:errcheck
-	fs.Lookup("enable-logs-handler").Hidden = false
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
@@ -202,6 +207,13 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningEndpoint, "service-account-signing-endpoint", s.ServiceAccountSigningEndpoint, ""+
 		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
+
+	fs.DurationVar(&s.CoordinatedLeadershipLeaseDuration, "coordinated-leadership-lease-duration", s.CoordinatedLeadershipLeaseDuration,
+		"The duration of the lease used for Coordinated Leader Election.")
+	fs.DurationVar(&s.CoordinatedLeadershipRenewDeadline, "coordinated-leadership-renew-deadline", s.CoordinatedLeadershipRenewDeadline,
+		"The deadline for renewing a coordinated leader election lease.")
+	fs.DurationVar(&s.CoordinatedLeadershipRetryPeriod, "coordinated-leadership-retry-period", s.CoordinatedLeadershipRetryPeriod,
+		"The period for retrying to renew a coordinated leader election lease.")
 }
 
 func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {

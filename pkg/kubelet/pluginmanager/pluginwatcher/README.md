@@ -22,6 +22,58 @@ should end with a DNS domain that is unique for the plugin. Each time a plugin
 starts, it has to delete old sockets if they exist and listen anew under the
 same filename.
 
+## Monitoring Plugin Connection
+
+**Warning**: Monitoring the plugin connection is only supported
+for DRA at the moment.
+
+The Kubelet monitors the gRPC connection to a plugin's **service socket** using
+a [gRPC stats handler](https://github.com/grpc/grpc-go/blob/master/examples/features/stats_monitoring/README.md).
+
+This enables the Kubelet to:
+- Detect when the plugin process has crashed, exited, or restarted
+- Trigger cleanup of the plugin’s resources on connection drop
+- Cancel pending cleanup if the connection is restored
+
+
+The **registration socket** is used by the plugin manager. It registers the
+plugin when registration socket is created by the plugin and the GetInfo gRPC
+call succeeds. It  deregisters the plugin when the socket is removed.
+The plugin should be ready to handle gRPC requests over the **service socket**
+that it returned in response to the GetInfo call because the kubelet might try
+to use the service immediately. Monitoring this service socket is therefore
+more accurate for detecting the real availability of the plugin.
+
+### How It Works
+
+Internally, the plugin client configures a gRPC stats handler to observe
+`ConnBegin` and `ConnEnd` events on the service socket connection. The
+connection is established over a Unix Domain Socket, which provides reliable
+semantics - if the connection drops, it definitively indicates that the plugin
+closed its end (e.g., due to crash or shutdown).
+
+1. During plugin registration, the Kubelet connects to plugin's
+   **service socket** and attaches the stats handler.
+2. A long-lived gRPC connection is established and actively monitored.
+3. If the plugin process exits and the connection drops, the stats
+   handler observes a `ConnEnd` event.
+4. This triggers a check whether cleanup is necessary: as long as at
+   least one gRPC connection is connected, the plugin is usable and
+   no cleanup is required.
+5. A gRPC reconnect is initiated immediately after connection loss.
+6. When the plugin resumes serving on the same service socket, the connection
+   is re-established and a `ConnBegin` event is observed.
+7. This cancels any in-progress resource cleanup and restores communication.
+
+### Key Properties
+
+- The plugin is **not** deregistered when the connection drops.
+- This model supports multi-container plugin deployments (e.g., CSI-style
+  sidecar setups) where the service container may restart independently of
+  the registrar container.
+- Cleanup is only executed if the connection is not restored before a
+  grace period expires.
+
 ## Seamless Upgrade
 
 To avoid downtime of a plugin on a node, it would be nice to support running an

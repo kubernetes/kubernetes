@@ -44,17 +44,17 @@ Record takes all the decorators that experiment.RecordDuration takes (e.g. Annot
 
 Note that Record does not Reset the Stopwatch.  It does, however, return the Stopwatch so the following pattern is common:
 
-    stopwatch := experiment.NewStopwatch()
-    // first expensive operation
-    stopwatch.Record("first operation").Reset() //records the duration of the first operation and resets the stopwatch.
-    // second expensive operation
-    stopwatch.Record("second operation").Reset() //records the duration of the second operation and resets the stopwatch.
+	stopwatch := experiment.NewStopwatch()
+	// first expensive operation
+	stopwatch.Record("first operation").Reset() //records the duration of the first operation and resets the stopwatch.
+	// second expensive operation
+	stopwatch.Record("second operation").Reset() //records the duration of the second operation and resets the stopwatch.
 
 omitting the Reset() after the first operation would cause the duration recorded for the second operation to include the time elapsed by both the first _and_ second operations.
 
 The Stopwatch must be running (i.e. not paused) when Record is called.
 */
-func (s *Stopwatch) Record(name string, args ...interface{}) *Stopwatch {
+func (s *Stopwatch) Record(name string, args ...any) *Stopwatch {
 	if !s.running {
 		panic("stopwatch is not running - call Resume or Reset before calling Record")
 	}
@@ -80,16 +80,15 @@ Note: You must call Resume() before you can Record() subsequent measurements.
 
 For example:
 
-    stopwatch := experiment.NewStopwatch()
-    // first expensive operation
-    stopwatch.Record("first operation").Reset()
-    // second expensive operation - part 1
-    stopwatch.Pause()
-    // something expensive that we don't care about
-    stopwatch.Resume()
-    // second expensive operation - part 2
-    stopwatch.Record("second operation").Reset() // the recorded duration captures the time elapsed during parts 1 and 2 of the second expensive operation, but not the bit in between
-
+	stopwatch := experiment.NewStopwatch()
+	// first expensive operation
+	stopwatch.Record("first operation").Reset()
+	// second expensive operation - part 1
+	stopwatch.Pause()
+	// something expensive that we don't care about
+	stopwatch.Resume()
+	// second expensive operation - part 2
+	stopwatch.Record("second operation").Reset() // the recorded duration captures the time elapsed during parts 1 and 2 of the second expensive operation, but not the bit in between
 
 The Stopwatch must be running when Pause is called.
 */

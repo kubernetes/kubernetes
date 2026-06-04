@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	utiltesting "k8s.io/client-go/util/testing"
 	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -125,13 +126,17 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	// If the local ComponentGlobalsRegistry is changed by configFuncs,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
-	if !featureGate.EmulationVersion().EqualTo(feature.DefaultMutableFeatureGate.EmulationVersion()) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	if !featureGate.EmulationVersion().EqualTo(feature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(feature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
+		featuregatetesting.SetFeatureGateVersionsDuringTest(t, feature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
+	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range feature.DefaultMutableFeatureGate.GetAll() {
 		if featureGate.Enabled(f) != feature.DefaultFeatureGate.Enabled(f) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, f, featureGate.Enabled(f))
+			featureOverrides[f] = featureGate.Enabled(f)
 		}
+	}
+	if len(featureOverrides) > 0 {
+		featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featureOverrides)
 	}
 	feature.DefaultMutableFeatureGate.AddMetrics()
 

@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -24,7 +23,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // OpenRCInitSystem defines openrc

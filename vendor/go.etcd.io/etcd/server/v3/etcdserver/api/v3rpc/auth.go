@@ -18,11 +18,14 @@ import (
 	"context"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
+	"go.etcd.io/etcd/server/v3/auth"
 	"go.etcd.io/etcd/server/v3/etcdserver"
 )
 
 type AuthServer struct {
 	authenticator etcdserver.Authenticator
+	// we want compile errors if new methods are added
+	pb.UnsafeAuthServer
 }
 
 func NewAuthServer(s *etcdserver.EtcdServer) *AuthServer {
@@ -163,4 +166,40 @@ func (as *AuthServer) UserChangePassword(ctx context.Context, r *pb.AuthUserChan
 		return nil, togRPCError(err)
 	}
 	return resp, nil
+}
+
+type AuthGetter interface {
+	AuthInfoFromCtx(ctx context.Context) (*auth.AuthInfo, error)
+	AuthStore() auth.AuthStore
+}
+
+type AuthAdmin struct {
+	ag AuthGetter
+}
+
+// isPermitted verifies the user has admin privilege.
+// Only users with "root" role are permitted.
+func (aa *AuthAdmin) isPermitted(ctx context.Context) error {
+	authInfo, err := aa.ag.AuthInfoFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	return aa.ag.AuthStore().IsAdminPermitted(authInfo)
+}
+
+func (aa *AuthAdmin) requireAuthInfo(ctx context.Context) error {
+	if !aa.ag.AuthStore().IsAuthEnabled() {
+		return nil
+	}
+
+	authInfo, err := aa.ag.AuthInfoFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	if authInfo == nil {
+		return auth.ErrUserEmpty
+	}
+	return nil
 }

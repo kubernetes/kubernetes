@@ -25,6 +25,7 @@ import (
 // MetricRecorder represents a metric recorder which takes action when the
 // metric Inc(), Dec() and Clear()
 type MetricRecorder interface {
+	Add(int)
 	Inc()
 	Dec()
 	Clear()
@@ -63,6 +64,11 @@ func NewGatedPodsRecorder() *PendingPodsRecorder {
 	return &PendingPodsRecorder{
 		recorder: GatedPods(),
 	}
+}
+
+// Add adds a value to the metric, in an atomic way
+func (r *PendingPodsRecorder) Add(val int) {
+	r.recorder.Add(float64(val))
 }
 
 // Inc increases a metric counter by 1, in an atomic way
@@ -136,6 +142,12 @@ func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-ch
 	}
 	go recorder.run()
 	return recorder
+}
+
+// ObserveFrameworkExtensionPointDurationAsync observes the framework_extension_point_duration_seconds metric.
+// The metric will be flushed to Prometheus asynchronously.
+func (r *MetricAsyncRecorder) ObserveFrameworkExtensionPointDurationAsync(extensionPoint, status, profileName string, value float64) {
+	r.observeMetricAsync(FrameworkExtensionPointDuration, value, extensionPoint, status, profileName)
 }
 
 // ObservePluginDurationAsync observes the plugin_execution_duration_seconds metric.

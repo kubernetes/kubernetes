@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
 type fcAttacher struct {
@@ -57,7 +58,7 @@ func (plugin *fcPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 }
 
 func (plugin *fcPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	mounter := plugin.host.GetMounter()
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
@@ -74,7 +75,9 @@ func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	return volumesAttachedCheck, nil
 }
 
-func (plugin *fcPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+func (plugin *fcPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
+}
 
 func (attacher *fcAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	mounter, err := volumeSpecToMounter(spec, attacher.host)
@@ -97,7 +100,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 }
 
 func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
-	mounter := attacher.host.GetMounter(fcPluginName)
+	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -123,7 +126,7 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
 	}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}
+		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: exec.New()}
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
@@ -146,7 +149,7 @@ var _ volume.DeviceUnmounter = &fcDetacher{}
 
 func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
-		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
+		mounter: plugin.host.GetMounter(),
 		manager: &fcUtil{},
 		host:    plugin.host,
 	}, nil
@@ -178,7 +181,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 		return nil
 	}
 
-	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
+	unMounter := volumeSpecToUnmounter(detacher.mounter)
 	// The device is unmounted now. If UnmountDevice was retried, GetDeviceNameFromMount
 	// won't find any mount and won't return DetachDisk below.
 	// Therefore implement our own retry mechanism here.
@@ -247,19 +250,19 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 		fsType:       fc.FSType,
 		volumeMode:   volumeMode,
 		readOnly:     readOnly,
-		mounter:      volumeutil.NewSafeFormatAndMountFromHost(fcPluginName, host),
+		mounter:      mount.NewSafeFormatAndMount(host.GetMounter(), exec.New()),
 		deviceUtil:   volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 		mountOptions: volumeutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
-func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost) *fcDiskUnmounter {
+func volumeSpecToUnmounter(mounter mount.Interface) *fcDiskUnmounter {
 	return &fcDiskUnmounter{
 		fcDisk: &fcDisk{
 			io: &osIOHandler{},
 		},
 		mounter:    mounter,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
-		exec:       host.GetExec(fcPluginName),
+		exec:       exec.New(),
 	}
 }

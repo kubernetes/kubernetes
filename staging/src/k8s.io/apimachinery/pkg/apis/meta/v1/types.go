@@ -92,6 +92,26 @@ type ListMeta struct {
 	// should not rely on the remainingItemCount to be set or to be exact.
 	// +optional
 	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
+
+	// shardInfo is set when the list is a filtered subset of the full collection,
+	// as selected by a shard selector on the request. It echoes back the selector
+	// so clients can verify which shard they received and merge sharded responses.
+	// Clients should not cache sharded list responses as a full representation
+	// of the collection.
+	//
+	// This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+	// +featureGate=ShardedListAndWatch
+	// +optional
+	ShardInfo *ShardInfo `json:"shardInfo,omitempty" protobuf:"bytes,5,opt,name=shardInfo"`
+}
+
+// ShardInfo describes the shard selector that was applied to produce a list response.
+// Its presence on a list response indicates the list is a filtered subset.
+type ShardInfo struct {
+	// selector is the shard selector string from the request, echoed back so clients
+	// can verify which shard they received and merge responses from multiple shards.
+	// +required
+	Selector string `json:"selector" protobuf:"bytes,1,opt,name=selector"`
 }
 
 // Field path constants that are specific to the internal API
@@ -185,7 +205,7 @@ type ObjectMeta struct {
 	// Null for lists.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
-	CreationTimestamp Time `json:"creationTimestamp,omitempty" protobuf:"bytes,8,opt,name=creationTimestamp"`
+	CreationTimestamp Time `json:"creationTimestamp,omitempty,omitzero" protobuf:"bytes,8,opt,name=creationTimestamp"`
 
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
@@ -324,7 +344,7 @@ type OwnerReference struct {
 
 // ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// A selector to restrict the list of returned objects by their labels.
 	// Defaults to everything.
@@ -430,6 +450,38 @@ type ListOptions struct {
 	// compatibility reasons) and to false otherwise.
 	// +optional
 	SendInitialEvents *bool `json:"sendInitialEvents,omitempty" protobuf:"varint,11,opt,name=sendInitialEvents"`
+
+	// shardSelector restricts the list of returned objects using a CEL-based
+	// shard selector expression. The format uses the shardRange() function
+	// combined with || (logical OR) to specify one or more hash ranges:
+	//
+	//   shardRange(object.metadata.uid, '0x0', '0x8000000000000000')
+	//   shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')
+	//
+	// Field paths use CEL-style object-rooted syntax (e.g. "object.metadata.uid"),
+	// NOT the fieldSelector format ("metadata.uid"). Currently supported paths:
+	//   - object.metadata.uid
+	//   - object.metadata.namespace
+	//
+	// hexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix,
+	// defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a
+	// hash space. The full range is [0x0, 0x10000000000000000), where the exclusive
+	// upper bound equals 2^64.
+	//
+	// Examples:
+	//   2-shard split:
+	//     shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')
+	//     shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')
+	//   4-shard split:
+	//     shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')
+	//     shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')
+	//     shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')
+	//     shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')
+	//
+	// This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+	// +featureGate=ShardedListAndWatch
+	// +optional
+	ShardSelector string `json:"shardSelector,omitempty" protobuf:"bytes,15,opt,name=shardSelector"`
 }
 
 const (
@@ -439,20 +491,6 @@ const (
 	//
 	// The annotation is added to a "Bookmark" event.
 	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
-
-	// InitialEventsListBlueprintAnnotationKey is the name of the key
-	// where an empty, versioned list is encoded in the requested format
-	// (e.g., protobuf, JSON, CBOR), then base64-encoded and stored as a string.
-	//
-	// This encoding matches the request encoding format, which may be
-	// protobuf, JSON, CBOR, or others, depending on what the client requested.
-	// This ensures that the reconstructed list can be processed through the
-	// same decoder chain that would handle a standard LIST call response.
-	//
-	// The annotation is added to a "Bookmark" event and is used by clients
-	// to guarantee the format consistency when reconstructing
-	// the list during WatchList processing.
-	InitialEventsListBlueprintAnnotationKey = "kubernetes.io/initial-events-list-blueprint"
 )
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
@@ -479,7 +517,7 @@ const (
 
 // GetOptions is the standard query options to the standard REST get call.
 type GetOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// resourceVersion sets a constraint on what resource versions a request may be served from.
 	// See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
 	// details.
@@ -519,7 +557,7 @@ const (
 
 // DeleteOptions may be provided when deleting an API object.
 type DeleteOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// The duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
@@ -591,7 +629,7 @@ const (
 
 // CreateOptions may be provided when creating an API object.
 type CreateOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -636,7 +674,7 @@ type CreateOptions struct {
 // PatchOptions may be provided when patching an API object.
 // PatchOptions is meant to be a superset of UpdateOptions.
 type PatchOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -688,7 +726,7 @@ type PatchOptions struct {
 // ApplyOptions is equivalent to PatchOptions. It is provided as a convenience with documentation
 // that speaks specifically to how the options fields relate to apply.
 type ApplyOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -721,7 +759,7 @@ func (o ApplyOptions) ToPatchOptions() PatchOptions {
 // UpdateOptions may be provided when updating an API object.
 // All fields in UpdateOptions should also be present in PatchOptions.
 type UpdateOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
@@ -773,7 +811,7 @@ type Preconditions struct {
 
 // Status is a return value for calls that don't return other objects.
 type Status struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -798,7 +836,6 @@ type Status struct {
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
 	// +optional
-	// +listType=atomic
 	Details *StatusDetails `json:"details,omitempty" protobuf:"bytes,5,opt,name=details"`
 	// Suggested HTTP return code for this status, 0 if not set.
 	// +optional
@@ -1094,7 +1131,7 @@ const (
 
 // List holds a list of objects, which may not be known by the server.
 type List struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -1110,7 +1147,7 @@ type List struct {
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type APIVersions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// versions are the api versions that are available.
 	// +listType=atomic
 	Versions []string `json:"versions" protobuf:"bytes,1,rep,name=versions"`
@@ -1130,7 +1167,7 @@ type APIVersions struct {
 // APIGroupList is a list of APIGroup, to allow clients to discover the API at
 // /apis.
 type APIGroupList struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// groups is a list of APIGroup.
 	// +listType=atomic
 	Groups []APIGroup `json:"groups" protobuf:"bytes,1,rep,name=groups"`
@@ -1141,7 +1178,7 @@ type APIGroupList struct {
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
 type APIGroup struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// name is the name of the group.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// versions are the versions supported in this group.
@@ -1236,7 +1273,7 @@ func (vs Verbs) String() string {
 // resources supported in a specific group and version, and if the resource
 // is namespaced.
 type APIResourceList struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// groupVersion is the group and version this APIResourceList is for.
 	GroupVersion string `json:"groupVersion" protobuf:"bytes,1,opt,name=groupVersion"`
 	// resources contains the name of the resources and if they are namespaced.
@@ -1399,27 +1436,6 @@ const (
 	ManagedFieldsOperationUpdate ManagedFieldsOperationType = "Update"
 )
 
-// FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.
-//
-// Each key is either a '.' representing the field itself, and will always map to an empty set,
-// or a string representing a sub-field or item. The string will follow one of these four formats:
-// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
-// 'v:<value>', where <value> is the exact json formatted value of a list item
-// 'i:<index>', where <index> is position of a item in a list
-// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
-// If a key maps to an empty Fields value, the field that key represents is part of the set.
-//
-// The exact format is defined in sigs.k8s.io/structured-merge-diff
-// +protobuf.options.(gogoproto.goproto_stringer)=false
-type FieldsV1 struct {
-	// Raw is the underlying serialization of this object.
-	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=Raw"`
-}
-
-func (f FieldsV1) String() string {
-	return string(f.Raw)
-}
-
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf
 //   generation to support a meta type that can accept any valid JSON. This can be introduced
 //   in a v1 because clients a) receive an error if they try to access proto today, and b)
@@ -1430,7 +1446,7 @@ func (f FieldsV1) String() string {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +protobuf=false
 type Table struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -1549,7 +1565,7 @@ const (
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 
 	// NoHeaders is only exposed for internal callers. It is not included in our OpenAPI definitions
 	// and may be removed as a field in a future release.
@@ -1566,7 +1582,7 @@ type TableOptions struct {
 // to get access to a particular ObjectMeta schema without knowing the details of the version.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadata struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -1576,7 +1592,7 @@ type PartialObjectMetadata struct {
 // PartialObjectMetadataList contains a list of objects containing only their metadata
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadataList struct {
-	TypeMeta `json:",inline"`
+	TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional

@@ -219,7 +219,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.17.1
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -262,7 +262,7 @@ spec:
               name: dev-dir
 
         - name: csi-external-health-monitor-controller
-          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.12.1
+          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.17.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -276,11 +276,12 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.16.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock
+            - --http-endpoint=:9809
           securityContext:
             # This is necessary only for systems with SELinux, where
             # non-privileged sidecar containers cannot access unix domain socket
@@ -292,6 +293,18 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+          ports:
+            - containerPort: 9809
+              name: healthz
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 30
+            timeoutSeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
@@ -304,13 +317,13 @@ spec:
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: registry.k8s.io/sig-storage/livenessprobe:v2.15.0
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.18.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
 
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.8.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.11.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -324,7 +337,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.2.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -340,7 +353,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+          image: registry.k8s.io/sig-storage/csi-resizer:v2.1.0
           args:
             - -v=5
             - -csi-address=/csi/csi.sock
@@ -354,7 +367,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.5.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock

@@ -47,7 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilptr "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestCollectDataWithSecret(t *testing.T) {
@@ -260,7 +260,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 				Name:      tc.name,
 			}
 
-			source := makeProjection(tc.name, utilptr.Int32Ptr(tc.mode), "secret")
+			source := makeProjection(tc.name, ptr.To[int32](tc.mode), "secret")
 			source.Sources[0].Secret.Items = tc.mappings
 			source.Sources[0].Secret.Optional = &tc.optional
 
@@ -509,7 +509,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				Name:      tc.name,
 			}
 
-			source := makeProjection(tc.name, utilptr.Int32Ptr(tc.mode), "configMap")
+			source := makeProjection(tc.name, ptr.To[int32](tc.mode), "configMap")
 			source.Sources[0].ConfigMap.Items = tc.mappings
 			source.Sources[0].ConfigMap.Optional = &tc.optional
 
@@ -683,7 +683,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			source := makeProjection("", utilptr.Int32Ptr(tc.mode), "downwardAPI")
+			source := makeProjection("", ptr.To[int32](tc.mode), "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
 			client := fake.NewSimpleClientset(tc.pod)
@@ -743,7 +743,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:        "good service account",
 			audience:    "https://example.com",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: ptr.To[int32](0644),
 			path:        "token",
 			expiration:  &minute,
 
@@ -754,7 +754,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:        "good service account other path",
 			audience:    "https://example.com",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: ptr.To[int32](0644),
 			path:        "other-token",
 			expiration:  &minute,
 			wantPayload: map[string]util.FileProjection{
@@ -763,7 +763,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "good service account defaults audience",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: ptr.To[int32](0644),
 			path:        "token",
 			expiration:  &minute,
 
@@ -773,7 +773,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "good service account defaults expiration",
-			defaultMode: utilptr.Int32Ptr(0644),
+			defaultMode: ptr.To[int32](0644),
 			path:        "token",
 
 			wantPayload: map[string]util.FileProjection{
@@ -787,21 +787,21 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "fsUser != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
-			fsUser:      utilptr.Int64Ptr(1000),
+			defaultMode: ptr.To[int32](0644),
+			fsUser:      ptr.To[int64](1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
 					Mode:   0600,
-					FsUser: utilptr.Int64Ptr(1000),
+					FsUser: ptr.To[int64](1000),
 				},
 			},
 		},
 		{
 			name:        "fsGroup != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
-			fsGroup:     utilptr.Int64Ptr(1000),
+			defaultMode: ptr.To[int32](0644),
+			fsGroup:     ptr.To[int64](1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
@@ -812,15 +812,15 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		},
 		{
 			name:        "fsUser != nil && fsGroup != nil",
-			defaultMode: utilptr.Int32Ptr(0644),
-			fsGroup:     utilptr.Int64Ptr(1000),
-			fsUser:      utilptr.Int64Ptr(1000),
+			defaultMode: ptr.To[int32](0644),
+			fsGroup:     ptr.To[int64](1000),
+			fsUser:      ptr.To[int64](1000),
 			path:        "token",
 			wantPayload: map[string]util.FileProjection{
 				"token": {
 					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
 					Mode:   0600,
-					FsUser: utilptr.Int64Ptr(1000),
+					FsUser: ptr.To[int64](1000),
 				},
 			},
 		},
@@ -904,12 +904,12 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: utilptr.String("foo"),
+							Name: ptr.To("foo"),
 							Path: "bundle.pem",
 						},
 					},
 				},
-				DefaultMode: utilptr.Int32(0644),
+				DefaultMode: ptr.To[int32](0644),
 			},
 			bundles: []runtime.Object{
 				&certificatesv1beta1.ClusterTrustBundle{
@@ -934,7 +934,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							SignerName: utilptr.String("foo.example/bar"), // Note: fake client doesn't understand selection by signer name.
+							SignerName: ptr.To("foo.example/bar"), // Note: fake client doesn't understand selection by signer name.
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"key": "non-value", // Note: fake client doesn't actually act on label selectors.
@@ -944,7 +944,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 						},
 					},
 				},
-				DefaultMode: utilptr.Int32(0644),
+				DefaultMode: ptr.To[int32](0644),
 			},
 			bundles: []runtime.Object{
 				&certificatesv1beta1.ClusterTrustBundle{
@@ -973,12 +973,12 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				Sources: []v1.VolumeProjection{
 					{
 						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
-							Name: utilptr.String("foo"),
+							Name: ptr.To("foo"),
 							Path: "bundle.pem",
 						},
 					},
 				},
-				DefaultMode: utilptr.Int32(0600),
+				DefaultMode: ptr.To[int32](0600),
 			},
 			bundles: []runtime.Object{
 				&certificatesv1beta1.ClusterTrustBundle{
@@ -994,6 +994,109 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				"bundle.pem": {
 					Data: []byte(goodCert1),
 					Mode: 0600,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					UID:       types.UID("test_pod_uid"),
+				},
+				Spec: v1.PodSpec{ServiceAccountName: "foo"},
+			}
+
+			client := fake.NewSimpleClientset(tc.bundles...)
+
+			tempDir, host := newTestHost(t, client)
+			defer os.RemoveAll(tempDir)
+
+			var myVolumeMounter = projectedVolumeMounter{
+				projectedVolume: &projectedVolume{
+					sources: tc.source.Sources,
+					podUID:  pod.UID,
+					plugin: &projectedPlugin{
+						host:   host,
+						kvHost: host.(volume.KubeletVolumeHost),
+					},
+				},
+				source: tc.source,
+				pod:    pod,
+			}
+
+			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
+			if err != nil {
+				t.Fatalf("Unexpected failure making payload: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantPayload, gotPayload); diff != "" {
+				t.Fatalf("Bad payload; diff (-want +got)\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestCollectDataWithPodCertificate(t *testing.T) {
+	testCases := []struct {
+		name string
+
+		source  v1.ProjectedVolumeSource
+		bundles []runtime.Object
+
+		fsUser  *int64
+		fsGroup *int64
+
+		wantPayload map[string]util.FileProjection
+		wantErr     error
+	}{
+		{
+			name: "credential bundle",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data: []byte("key\ncert\n"), // fake kubelet volume host is hardcoded to return this string.
+					Mode: 0644,
+				},
+			},
+		},
+		{
+			name: "key and cert bundle",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"key.pem": {
+					Data: []byte("key\n"), // fake kubelet volume host is hardcoded to return this string.
+					Mode: 0644,
+				},
+				"certificates.pem": {
+					Data: []byte("cert\n"), // fake kubelet volume host is hardcoded to return this string.
+					Mode: 0644,
 				},
 			},
 		},
@@ -1400,7 +1503,7 @@ func makeVolumeSpec(volumeName, name string, defaultMode int32) *v1.Volume {
 	return &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
-			Projected: makeProjection(name, utilptr.Int32Ptr(defaultMode), "secret"),
+			Projected: makeProjection(name, ptr.To[int32](defaultMode), "secret"),
 		},
 	}
 }

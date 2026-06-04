@@ -8,7 +8,7 @@
       "name": "deviceclasses",
       "namespaced": false,
       "singularName": "deviceclass",
-      "storageVersionHash": "OgEE055Fbnc=",
+      "storageVersionHash": "Yk2PTc1Ybxk=",
       "verbs": [
         "create",
         "delete",
@@ -21,11 +21,39 @@
       ]
     },
     {
+      "kind": "DeviceTaintRule",
+      "name": "devicetaintrules",
+      "namespaced": false,
+      "singularName": "devicetaintrule",
+      "storageVersionHash": "DJ3UJ0fj8MI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "DeviceTaintRule",
+      "name": "devicetaintrules/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
       "kind": "ResourceClaim",
       "name": "resourceclaims",
       "namespaced": true,
       "singularName": "resourceclaim",
-      "storageVersionHash": "RnQSwRxMnsw=",
+      "storageVersionHash": "wgAZaHcZxUg=",
       "verbs": [
         "create",
         "delete",
@@ -53,7 +81,7 @@
       "name": "resourceclaimtemplates",
       "namespaced": true,
       "singularName": "resourceclaimtemplate",
-      "storageVersionHash": "F6aZtQPvFlU=",
+      "storageVersionHash": "TuzjC49aUfM=",
       "verbs": [
         "create",
         "delete",
@@ -70,7 +98,7 @@
       "name": "resourceslices",
       "namespaced": false,
       "singularName": "resourceslice",
-      "storageVersionHash": "7r9IQQZblMY=",
+      "storageVersionHash": "KsC072WgaEY=",
       "verbs": [
         "create",
         "delete",

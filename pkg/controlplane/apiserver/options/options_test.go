@@ -47,7 +47,7 @@ import (
 	"k8s.io/component-base/metrics"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	netutils "k8s.io/utils/net"
 )
 
@@ -123,6 +123,10 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd3",
 		"--lease-reuse-duration-seconds=100",
 		"--emulated-version=test=1.31",
+		"--min-compatibility-version=test=1.29",
+		"--coordinated-leadership-lease-duration=10s",
+		"--coordinated-leadership-renew-deadline=5s",
+		"--coordinated-leadership-retry-period=1s",
 	}
 	fs.Parse(args)
 	utilruntime.Must(componentGlobalsRegistry.Set())
@@ -178,7 +182,6 @@ func TestAddFlags(t *testing.T) {
 			DeleteCollectionWorkers: 1,
 			EnableGarbageCollection: true,
 			EnableWatchCache:        true,
-			DefaultWatchCacheSize:   100,
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindAddress: netutils.ParseIPSloppy("192.168.10.20"),
@@ -297,6 +300,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{"kube-system", "kube-public", "default"},
+		CoordinatedLeadershipLeaseDuration:  10 * time.Second,
+		CoordinatedLeadershipRenewDeadline:  5 * time.Second,
+		CoordinatedLeadershipRetryPeriod:    1 * time.Second,
 	}
 
 	expected.Authentication.OIDC.UsernameClaim = "sub"
@@ -315,6 +321,9 @@ func TestAddFlags(t *testing.T) {
 	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
 	if testEffectiveVersion.EmulationVersion().String() != "1.31" {
 		t.Errorf("Got emulation version %s, wanted %s", testEffectiveVersion.EmulationVersion().String(), "1.31")
+	}
+	if testEffectiveVersion.MinCompatibilityVersion().String() != "1.29" {
+		t.Errorf("Got min compatibility version %s, wanted %s", testEffectiveVersion.MinCompatibilityVersion().String(), "1.29")
 	}
 }
 
@@ -485,7 +494,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			if tc.externalSigner {
 				// create and start mock signer.
 				socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
-				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+				mockSigner := v1testing.NewMockSigner(t, socketPath)
 				defer mockSigner.CleanUp()
 
 				mockSigner.MaxTokenExpirationSeconds = tc.externalMaxExpirationSec

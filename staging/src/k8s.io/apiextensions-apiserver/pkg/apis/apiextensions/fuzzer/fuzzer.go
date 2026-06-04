@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
@@ -76,7 +76,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Conversion.ConversionReviewVersions = []string{"v1beta1"}
 			}
 			if obj.PreserveUnknownFields == nil {
-				obj.PreserveUnknownFields = pointer.BoolPtr(true)
+				obj.PreserveUnknownFields = ptr.To(true)
 			}
 
 			// Move per-version schema, subresources, additionalPrinterColumns, selectableFields to the top-level.

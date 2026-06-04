@@ -19,42 +19,22 @@ package validate
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // Immutable verifies that the specified value has not changed in the course of
-// an update operation.  It does nothing if the old value is not provided. If
-// the caller needs to compare types that are not trivially comparable, they
-// should use ImmutableNonComparable instead.
-func Immutable[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+// an update operation. It does nothing if the old value is not provided.
+//
+// This function unconditionally returns a validation error as it
+// relies on the default ratcheting mechanism to only be called when a
+// change to the field has already been detected.  This avoids a redundant
+// equivalence check across ratcheting and this function.
+func Immutable[T any](_ context.Context, op operation.Operation, fldPath *field.Path, _, _ T) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
-	if value == nil && oldValue == nil {
-		return nil
+	return field.ErrorList{
+		field.Invalid(fldPath, nil, "field is immutable").WithOrigin("immutable"),
 	}
-	if value == nil || oldValue == nil || *value != *oldValue {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field is immutable"),
-		}
-	}
-	return nil
-}
-
-// ImmutableNonComparable verifies that the specified value has not changed in
-// the course of an update operation.  It does nothing if the old value is not
-// provided. Unlike Immutable, this function can be used with types that are
-// not directly comparable, at the cost of performance.
-func ImmutableNonComparable[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue T) field.ErrorList {
-	if op.Type != operation.Update {
-		return nil
-	}
-	if !equality.Semantic.DeepEqual(value, oldValue) {
-		return field.ErrorList{
-			field.Forbidden(fldPath, "field is immutable"),
-		}
-	}
-	return nil
 }

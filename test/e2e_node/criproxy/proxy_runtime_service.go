@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"google.golang.org/grpc"
@@ -64,6 +65,15 @@ const (
 	ListPodSandboxMetrics     = "ListPodSandboxMetrics"
 	RuntimeConfig             = "RuntimeConfig"
 	UpdatePodSandboxResources = "UpdatePodSandboxResources"
+	// Streaming APIs
+	StreamPodSandboxes      = "StreamPodSandboxes"
+	StreamContainers        = "StreamContainers"
+	StreamContainerStats    = "StreamContainerStats"
+	StreamPodSandboxStats   = "StreamPodSandboxStats"
+	StreamPodSandboxMetrics = "StreamPodSandboxMetrics"
+	// Per-send injection points for streaming APIs, called before each stream.Send().
+	StreamPodSandboxesSend = "StreamPodSandboxesSend"
+	StreamContainersSend   = "StreamContainersSend"
 )
 
 // AddInjector inject the error or delay to the next call to the RuntimeService.
@@ -91,6 +101,8 @@ type RemoteRuntime struct {
 	injectors      []func(string) error
 	runtimeService internalapi.RuntimeService
 	imageService   internalapi.ImageManagerService
+	runtimeapi.UnsafeImageServiceServer
+	runtimeapi.UnsafeRuntimeServiceServer
 }
 
 // NewRemoteRuntimeProxy creates a new RemoteRuntime.
@@ -474,20 +486,28 @@ func (p *RemoteRuntime) GetContainerEvents(req *runtimeapi.GetEventsRequest, ces
 		return err
 	}
 
+	ctx, cancel := context.WithCancel(ces.Context())
+	defer cancel()
+
 	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity := 1000
 	containerEventsResponseCh := make(chan *runtimeapi.ContainerEventResponse, plegChannelCapacity)
-	defer close(containerEventsResponseCh)
-
-	if err := p.runtimeService.GetContainerEvents(context.Background(), containerEventsResponseCh, nil); err != nil {
-		return err
-	}
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(containerEventsResponseCh)
+		errCh <- p.runtimeService.GetContainerEvents(ctx, containerEventsResponseCh, nil)
+	}()
 
 	for event := range containerEventsResponseCh {
 		if err := ces.Send(event); err != nil {
+			cancel()
 			return status.Errorf(codes.Unknown, "Failed to send event: %v", err)
 		}
+	}
+
+	if err := <-errCh; err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+		return err
 	}
 
 	return nil
@@ -530,4 +550,100 @@ func (p *RemoteRuntime) RuntimeConfig(ctx context.Context, req *runtimeapi.Runti
 		return nil, err
 	}
 	return resp, nil
+}
+
+// StreamPodSandboxes returns a stream of PodSandboxes.
+func (p *RemoteRuntime) StreamPodSandboxes(req *runtimeapi.StreamPodSandboxesRequest, stream runtimeapi.RuntimeService_StreamPodSandboxesServer) error {
+	if err := p.runInjectors(StreamPodSandboxes); err != nil {
+		return err
+	}
+
+	items, err := p.runtimeService.ListPodSandbox(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if err := p.runInjectors(StreamPodSandboxesSend); err != nil {
+			return err
+		}
+		if err := stream.Send(&runtimeapi.StreamPodSandboxesResponse{PodSandboxes: []*runtimeapi.PodSandbox{item}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StreamContainers returns a stream of containers.
+func (p *RemoteRuntime) StreamContainers(req *runtimeapi.StreamContainersRequest, stream runtimeapi.RuntimeService_StreamContainersServer) error {
+	if err := p.runInjectors(StreamContainers); err != nil {
+		return err
+	}
+
+	items, err := p.runtimeService.ListContainers(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if err := p.runInjectors(StreamContainersSend); err != nil {
+			return err
+		}
+		if err := stream.Send(&runtimeapi.StreamContainersResponse{Containers: []*runtimeapi.Container{item}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StreamContainerStats returns a stream of container stats.
+func (p *RemoteRuntime) StreamContainerStats(req *runtimeapi.StreamContainerStatsRequest, stream runtimeapi.RuntimeService_StreamContainerStatsServer) error {
+	if err := p.runInjectors(StreamContainerStats); err != nil {
+		return err
+	}
+
+	stats, err := p.runtimeService.ListContainerStats(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	for _, stat := range stats {
+		if err := stream.Send(&runtimeapi.StreamContainerStatsResponse{ContainerStats: []*runtimeapi.ContainerStats{stat}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StreamPodSandboxStats returns a stream of pod sandbox stats.
+func (p *RemoteRuntime) StreamPodSandboxStats(req *runtimeapi.StreamPodSandboxStatsRequest, stream runtimeapi.RuntimeService_StreamPodSandboxStatsServer) error {
+	if err := p.runInjectors(StreamPodSandboxStats); err != nil {
+		return err
+	}
+
+	stats, err := p.runtimeService.ListPodSandboxStats(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	for _, stat := range stats {
+		if err := stream.Send(&runtimeapi.StreamPodSandboxStatsResponse{PodSandboxStats: []*runtimeapi.PodSandboxStats{stat}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+func (p *RemoteRuntime) StreamPodSandboxMetrics(req *runtimeapi.StreamPodSandboxMetricsRequest, stream runtimeapi.RuntimeService_StreamPodSandboxMetricsServer) error {
+	if err := p.runInjectors(StreamPodSandboxMetrics); err != nil {
+		return err
+	}
+
+	podMetrics, err := p.runtimeService.ListPodSandboxMetrics(stream.Context())
+	if err != nil {
+		return err
+	}
+	for _, metric := range podMetrics {
+		if err := stream.Send(&runtimeapi.StreamPodSandboxMetricsResponse{PodSandboxMetrics: []*runtimeapi.PodSandboxMetrics{metric}}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

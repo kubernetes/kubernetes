@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -42,22 +41,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	klogtesting "k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
-	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
@@ -144,7 +139,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		},
 	}
 	p.setInitialized(true)
-	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
 	return p
 }
 
@@ -5644,6 +5639,21 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		t.Errorf("numComments (%d) != 0 after partial resync when numEndpoints (%d) > threshold (%d)", numComments, expectedEndpoints+3, largeClusterEndpointsThreshold)
 	}
 
+	// Even if FullSyncPeriod has elapsed, large-cluster mode should keep this as
+	// a partial resync when there are no explicit changes requiring a full sync.
+	if !fp.largeClusterMode {
+		t.Fatalf("expected to be in large cluster mode")
+	}
+	expectedLastFullSync := time.Now().Add(-proxyutil.FullSyncPeriod).Add(-time.Second)
+	fp.lastFullSync = expectedLastFullSync
+	err := fp.syncProxyRules()
+	if err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+	if !fp.lastFullSync.Equal(expectedLastFullSync) {
+		t.Fatalf("expected periodic sync in large cluster mode to skip full sync: lastFullSync changed from %v to %v", expectedLastFullSync, fp.lastFullSync)
+	}
+
 	// Now force a full resync and confirm that it rewrites the older services with
 	// no comments as well.
 	fp.forceSyncProxyRules()
@@ -6527,62 +6537,32 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 	testCases := []struct {
-		name          string
-		ipModeEnabled bool
-		svcIP         string
-		svcLBIP       string
-		ipMode        *v1.LoadBalancerIPMode
-		expectedRule  bool
+		name         string
+		svcIP        string
+		svcLBIP      string
+		ipMode       *v1.LoadBalancerIPMode
+		expectedRule bool
 	}{
-		/* LoadBalancerIPMode disabled */
 		{
-			name:          "LoadBalancerIPMode disabled, ipMode Proxy",
-			ipModeEnabled: false,
-			svcIP:         "10.20.30.41",
-			svcLBIP:       "1.2.3.4",
-			ipMode:        ptr.To(v1.LoadBalancerIPModeProxy),
-			expectedRule:  true,
+			name:         "ipMode Proxy",
+			svcIP:        "10.20.30.41",
+			svcLBIP:      "1.2.3.4",
+			ipMode:       ptr.To(v1.LoadBalancerIPModeProxy),
+			expectedRule: false,
 		},
 		{
-			name:          "LoadBalancerIPMode disabled, ipMode VIP",
-			ipModeEnabled: false,
-			svcIP:         "10.20.30.42",
-			svcLBIP:       "1.2.3.5",
-			ipMode:        ptr.To(v1.LoadBalancerIPModeVIP),
-			expectedRule:  true,
+			name:         "ipMode VIP",
+			svcIP:        "10.20.30.42",
+			svcLBIP:      "1.2.3.5",
+			ipMode:       ptr.To(v1.LoadBalancerIPModeVIP),
+			expectedRule: true,
 		},
 		{
-			name:          "LoadBalancerIPMode disabled, ipMode nil",
-			ipModeEnabled: false,
-			svcIP:         "10.20.30.43",
-			svcLBIP:       "1.2.3.6",
-			ipMode:        nil,
-			expectedRule:  true,
-		},
-		/* LoadBalancerIPMode enabled */
-		{
-			name:          "LoadBalancerIPMode enabled, ipMode Proxy",
-			ipModeEnabled: true,
-			svcIP:         "10.20.30.41",
-			svcLBIP:       "1.2.3.4",
-			ipMode:        ptr.To(v1.LoadBalancerIPModeProxy),
-			expectedRule:  false,
-		},
-		{
-			name:          "LoadBalancerIPMode enabled, ipMode VIP",
-			ipModeEnabled: true,
-			svcIP:         "10.20.30.42",
-			svcLBIP:       "1.2.3.5",
-			ipMode:        ptr.To(v1.LoadBalancerIPModeVIP),
-			expectedRule:  true,
-		},
-		{
-			name:          "LoadBalancerIPMode enabled, ipMode nil",
-			ipModeEnabled: true,
-			svcIP:         "10.20.30.43",
-			svcLBIP:       "1.2.3.6",
-			ipMode:        nil,
-			expectedRule:  true,
+			name:         "ipMode nil",
+			svcIP:        "10.20.30.43",
+			svcLBIP:      "1.2.3.6",
+			ipMode:       nil,
+			expectedRule: true,
 		},
 	}
 
@@ -6596,10 +6576,6 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if !testCase.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
 			makeServiceMap(fp,

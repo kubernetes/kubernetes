@@ -15,10 +15,10 @@ import (
 )
 
 type MatchXMLMatcher struct {
-	XMLToMatch interface{}
+	XMLToMatch any
 }
 
-func (matcher *MatchXMLMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *MatchXMLMatcher) Match(actual any) (success bool, err error) {
 	actualString, expectedString, err := matcher.formattedPrint(actual)
 	if err != nil {
 		return false, err
@@ -37,17 +37,17 @@ func (matcher *MatchXMLMatcher) Match(actual interface{}) (success bool, err err
 	return reflect.DeepEqual(aval, eval), nil
 }
 
-func (matcher *MatchXMLMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *MatchXMLMatcher) FailureMessage(actual any) (message string) {
 	actualString, expectedString, _ := matcher.formattedPrint(actual)
 	return fmt.Sprintf("Expected\n%s\nto match XML of\n%s", actualString, expectedString)
 }
 
-func (matcher *MatchXMLMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *MatchXMLMatcher) NegatedFailureMessage(actual any) (message string) {
 	actualString, expectedString, _ := matcher.formattedPrint(actual)
 	return fmt.Sprintf("Expected\n%s\nnot to match XML of\n%s", actualString, expectedString)
 }
 
-func (matcher *MatchXMLMatcher) formattedPrint(actual interface{}) (actualString, expectedString string, err error) {
+func (matcher *MatchXMLMatcher) formattedPrint(actual any) (actualString, expectedString string, err error) {
 	var ok bool
 	actualString, ok = toString(actual)
 	if !ok {

@@ -27,13 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	"github.com/spf13/pflag"
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
@@ -138,6 +138,9 @@ func validateAndApply(c *LoggingConfiguration, options *LoggingOptions, featureG
 // can be passed when the struct is not embedded in some larger struct.
 func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
+	if c.FlushFrequency.Duration.Duration <= 0 {
+		errs = append(errs, field.Invalid(fldPath.Child("flushFrequency"), c.FlushFrequency, "Must be greater than zero"))
+	}
 	if c.Format != DefaultLogFormat {
 		// WordSepNormalizeFunc is just a guess. Commands should use it,
 		// but we cannot know for sure.
@@ -240,7 +243,7 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 		case ReapplyHandlingError:
 			return errors.New("logging configuration was already applied earlier, changing it is not allowed")
 		case ReapplyHandlingIgnoreUnchanged:
-			if diff := cmp.Diff(oldP, p); diff != "" {
+			if diff := diff.Diff(oldP, p); diff != "" {
 				return fmt.Errorf("the logging configuration should not be changed after setting it once (- old setting, + new setting):\n%s", diff)
 			}
 			return nil

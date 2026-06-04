@@ -64,7 +64,7 @@ func Convert_v1beta1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSO
 		}
 		*out = i
 	} else {
-		out = nil
+		*out = nil
 	}
 	return nil
 }

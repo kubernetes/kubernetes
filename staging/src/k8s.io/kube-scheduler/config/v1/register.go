@@ -45,6 +45,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodTopologySpreadArgs{},
 		&VolumeBindingArgs{},
 		&NodeAffinityArgs{},
+		&DynamicResourcesArgs{},
 	)
 	return nil
 }

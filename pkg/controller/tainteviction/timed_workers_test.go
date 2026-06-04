@@ -116,7 +116,7 @@ func TestCancel(t *testing.T) {
 	}
 }
 
-func TestCancelAndReadd(t *testing.T) {
+func TestCancelAndRead(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	testVal := int32(0)
 	wg := sync.WaitGroup{}

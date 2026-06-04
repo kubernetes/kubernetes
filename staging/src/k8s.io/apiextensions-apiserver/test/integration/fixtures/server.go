@@ -24,7 +24,6 @@ import (
 	"github.com/google/uuid"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -90,7 +89,7 @@ users:
 		"--kubeconfig", fakeKubeConfig.Name(),
 		// disable admission and filters that require talking to kube-apiserver
 		"--enable-priority-and-fairness=false",
-		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ValidatingAdmissionPolicy"},
+		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ValidatingAdmissionPolicy,MutatingAdmissionPolicy"},
 		flags...,
 	), nil)
 	if err != nil {
@@ -172,10 +171,7 @@ func StartDefaultServerWithClientsAndEtcd(t servertesting.Logger, extraFlags ...
 	etcdConfig := clientv3.Config{
 		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
 		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
+		TLS:         tlsConfig,
 	}
 	etcdclient, err := clientv3.New(etcdConfig)
 	if err != nil {

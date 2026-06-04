@@ -10,8 +10,8 @@ Transfer-Encoding: chunked
 e9
 {"type":"ADDED","object":{"kind":"ServiceAccount","apiVersion":"v1","metadata":{"name":"foobar","namespace":"default","uid":"a1453396-7a5c-405a-93f9-ff44af8e7689","resourceVersion":"217","creationTimestamp":"2024-09-18T14:06:40Z"}}}
 
-ba
-{"type":"BOOKMARK","object":{"kind":"ServiceAccount","apiVersion":"v1","metadata":{"resourceVersion":"964","creationTimestamp":null,"annotations":{"k8s.io/initial-events-end":"true"}}}}
+a1
+{"type":"BOOKMARK","object":{"kind":"ServiceAccount","apiVersion":"v1","metadata":{"resourceVersion":"964","annotations":{"k8s.io/initial-events-end":"true"}}}}
 
 0
 

@@ -19,9 +19,10 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/grpc"
+
 	"go.etcd.io/etcd/api/v3/authpb"
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-	"google.golang.org/grpc"
 )
 
 type (
@@ -48,9 +49,9 @@ type (
 )
 
 const (
-	PermRead      = authpb.READ
-	PermWrite     = authpb.WRITE
-	PermReadWrite = authpb.READWRITE
+	PermRead      = authpb.Permission_READ
+	PermWrite     = authpb.Permission_WRITE
+	PermReadWrite = authpb.Permission_READWRITE
 )
 
 type UserAddOptions authpb.UserAddOptions

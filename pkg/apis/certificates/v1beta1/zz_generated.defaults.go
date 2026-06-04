@@ -36,6 +36,12 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.CertificateSigningRequestList{}, func(obj interface{}) {
 		SetObjectDefaults_CertificateSigningRequestList(obj.(*certificatesv1beta1.CertificateSigningRequestList))
 	})
+	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.PodCertificateRequest{}, func(obj interface{}) {
+		SetObjectDefaults_PodCertificateRequest(obj.(*certificatesv1beta1.PodCertificateRequest))
+	})
+	scheme.AddTypeDefaultingFunc(&certificatesv1beta1.PodCertificateRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_PodCertificateRequestList(obj.(*certificatesv1beta1.PodCertificateRequestList))
+	})
 	return nil
 }
 
@@ -51,5 +57,19 @@ func SetObjectDefaults_CertificateSigningRequestList(in *certificatesv1beta1.Cer
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CertificateSigningRequest(a)
+	}
+}
+
+func SetObjectDefaults_PodCertificateRequest(in *certificatesv1beta1.PodCertificateRequest) {
+	if in.Spec.MaxExpirationSeconds == nil {
+		var ptrVar1 int32 = 86400
+		in.Spec.MaxExpirationSeconds = &ptrVar1
+	}
+}
+
+func SetObjectDefaults_PodCertificateRequestList(in *certificatesv1beta1.PodCertificateRequestList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_PodCertificateRequest(a)
 	}
 }

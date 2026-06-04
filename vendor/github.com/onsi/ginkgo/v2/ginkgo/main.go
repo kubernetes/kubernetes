@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
 	"github.com/onsi/ginkgo/v2/ginkgo/build"
 	"github.com/onsi/ginkgo/v2/ginkgo/command"
 	"github.com/onsi/ginkgo/v2/ginkgo/generators"
@@ -42,6 +41,7 @@ func main() {
 			{Name: "nodot", Deprecation: types.Deprecations.Nodot()},
 		},
 	}
+	program.Commands = append(program.Commands, program.BuildCompletionCommand())
 
 	program.RunAndExit(os.Args)
 }

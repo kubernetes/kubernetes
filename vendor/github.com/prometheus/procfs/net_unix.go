@@ -1,4 +1,4 @@
-// Copyright 2018 The Prometheus Authors
+// Copyright The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -121,12 +121,12 @@ func parseNetUNIX(r io.Reader) (*NetUNIX, error) {
 	return &nu, nil
 }
 
-func (u *NetUNIX) parseLine(line string, hasInode bool, min int) (*NetUNIXLine, error) {
+func (u *NetUNIX) parseLine(line string, hasInode bool, minFields int) (*NetUNIXLine, error) {
 	fields := strings.Fields(line)
 
 	l := len(fields)
-	if l < min {
-		return nil, fmt.Errorf("%w: expected at least %d fields but got %d", ErrFileParse, min, l)
+	if l < minFields {
+		return nil, fmt.Errorf("%w: expected at least %d fields but got %d", ErrFileParse, minFields, l)
 	}
 
 	// Field offsets are as follows:
@@ -172,7 +172,7 @@ func (u *NetUNIX) parseLine(line string, hasInode bool, min int) (*NetUNIXLine, 
 	}
 
 	// Path field is optional.
-	if l > min {
+	if l > minFields {
 		// Path occurs at either index 6 or 7 depending on whether inode is
 		// already present.
 		pathIdx := 7

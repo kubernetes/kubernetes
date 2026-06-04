@@ -28,8 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 const (
@@ -68,7 +66,7 @@ type compiler struct {
 // NewDefaultCompiler returns a new Compiler following the default compatibility version.
 // Note: the compiler construction depends on feature gates and the compatibility version to be initialized.
 func NewDefaultCompiler() Compiler {
-	return NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	return NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
 }
 
 // NewCompiler returns a new Compiler.
@@ -229,10 +227,8 @@ func buildResourceAttributesType(field func(name string, declType *apiservercel.
 		field("subresource", apiservercel.StringType, false),
 		field("name", apiservercel.StringType, false),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		resourceAttributesFields = append(resourceAttributesFields, field("fieldSelector", buildFieldSelectorType(field, fields), false))
-		resourceAttributesFields = append(resourceAttributesFields, field("labelSelector", buildLabelSelectorType(field, fields), false))
-	}
+	resourceAttributesFields = append(resourceAttributesFields, field("fieldSelector", buildFieldSelectorType(field, fields), false))
+	resourceAttributesFields = append(resourceAttributesFields, field("labelSelector", buildLabelSelectorType(field, fields), false))
 	return apiservercel.NewObjectType("kubernetes.ResourceAttributes", fields(resourceAttributesFields...))
 }
 

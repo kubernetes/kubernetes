@@ -41,13 +41,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
-	"k8s.io/apiserver/pkg/features"
 	authzmetrics "k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -124,7 +121,6 @@ authorizers:
 func TestMultiWebhookAuthzConfig(t *testing.T) {
 	authzmetrics.ResetMetricsForTest()
 	defer authzmetrics.ResetMetricsForTest()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, true)
 
 	dir := t.TempDir()
 
@@ -739,8 +735,8 @@ authorizers:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if initialMetrics.reloadSuccess == nil {
-		t.Fatal("expected success timestamp, got none")
+	if initialMetrics.reloadSuccess != nil {
+		t.Fatal("expected no success timestamp, got one")
 	}
 	if initialMetrics.reloadFailure != nil {
 		t.Fatal("expected no failure timestamp, got one")
@@ -758,18 +754,12 @@ authorizers:
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reload1Metrics.reloadSuccess == nil {
-			t.Fatal("expected success timestamp, got none")
-		}
-		if !reload1Metrics.reloadSuccess.Equal(*initialMetrics.reloadSuccess) {
-			t.Fatalf("success timestamp changed from initial success %s to %s unexpectedly", initialMetrics.reloadSuccess.String(), reload1Metrics.reloadSuccess.String())
+		if reload1Metrics.reloadSuccess != nil {
+			t.Fatal("expected no success timestamp, got one")
 		}
 		if reload1Metrics.reloadFailure == nil {
 			t.Log("expected failure timestamp, got nil, retrying")
 			return false, nil
-		}
-		if !reload1Metrics.reloadFailure.After(*reload1Metrics.reloadSuccess) {
-			t.Fatalf("expected failure timestamp to be more recent than success timestamp, got %s <= %s", reload1Metrics.reloadFailure.String(), reload1Metrics.reloadSuccess.String())
 		}
 		return true, nil
 	})
@@ -833,14 +823,18 @@ authorizers:
 			t.Fatalf("failure timestamp changed from reload1Metrics.reloadFailure %s to %s unexpectedly", reload1Metrics.reloadFailure.String(), reload2Metrics.reloadFailure.String())
 		}
 		if reload2Metrics.reloadSuccess == nil {
-			t.Fatal("expected success timestamp, got none")
-		}
-		if reload2Metrics.reloadSuccess.Equal(*initialMetrics.reloadSuccess) {
-			t.Log("success timestamp hasn't updated from initial success, retrying")
+			t.Log("expected success timestamp, got nil, retrying")
 			return false, nil
 		}
 		if !reload2Metrics.reloadSuccess.After(*reload2Metrics.reloadFailure) {
 			t.Fatalf("expected success timestamp to be more recent than failure, got %s <= %s", reload2Metrics.reloadSuccess.String(), reload2Metrics.reloadFailure.String())
+		}
+		if len(reload2Metrics.configHash) == 0 {
+			t.Fatal("expected config hash, got none")
+		}
+		if reload2Metrics.configHash == initialMetrics.configHash {
+			t.Logf("config hash %s is the same as initial %s, retrying", reload2Metrics.configHash, initialMetrics.configHash)
+			return false, nil
 		}
 		return true, nil
 	})
@@ -887,6 +881,12 @@ authorizers:
 		if !reload3Metrics.reloadSuccess.Equal(*reload2Metrics.reloadSuccess) {
 			t.Fatalf("success timestamp changed from %s to %s unexpectedly", reload2Metrics.reloadSuccess.String(), reload3Metrics.reloadSuccess.String())
 		}
+		if len(reload3Metrics.configHash) == 0 {
+			t.Fatal("expected config hash, got none")
+		}
+		if reload3Metrics.configHash != reload2Metrics.configHash {
+			t.Fatalf("expected config hash to be the same as reload2Metrics %s, got %s", reload2Metrics.configHash, reload3Metrics.configHash)
+		}
 		if reload3Metrics.reloadFailure == nil {
 			t.Log("expected failure timestamp, got nil, retrying")
 			return false, nil
@@ -929,6 +929,7 @@ authorizers:
 type metrics struct {
 	reloadSuccess *time.Time
 	reloadFailure *time.Time
+	configHash    string
 	decisions     map[authorizerKey]map[string]int
 	exclusions    int
 	evalErrors    int
@@ -949,12 +950,14 @@ var webhookMatchConditionEvalErrorMetric = regexp.MustCompile(`apiserver_authori
 var whTotalMetric = regexp.MustCompile(`apiserver_authorization_webhook_evaluations_total{name="(.*?)",result="(.*?)"} (\d+)`)
 var webhookDurationMetric = regexp.MustCompile(`apiserver_authorization_webhook_duration_seconds_count{name="(.*?)",result="(.*?)"} (\d+)`)
 var webhookFailOpenMetric = regexp.MustCompile(`apiserver_authorization_webhook_evaluations_fail_open_total{name="(.*?)",result="(.*?)"} (\d+)`)
+var configInfoMetric = regexp.MustCompile(`apiserver_authorization_config_controller_last_config_info\{apiserver_id_hash="sha256:[^"]*",hash="([^"]*)"\} (\d+)`)
 
 func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	data, err := client.RESTClient().Get().AbsPath("/metrics").DoRaw(context.TODO())
 
 	//  apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:4b86cfa719a83dd63a4dc6a9831edb2b59240d0f59cf215b2d51aacb3f5c395e",status="success"} 1.7002567356895502e+09
 	//  apiserver_authorization_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:4b86cfa719a83dd63a4dc6a9831edb2b59240d0f59cf215b2d51aacb3f5c395e",status="failure"} 1.7002567356895502e+09
+	//  apiserver_authorization_config_controller_automatic_reload_last_config_info{apiserver_id_hash="sha256:4b86cfa719a83dd63a4dc6a9831edb2b59240d0f59cf215b2d51aacb3f5c395e",hash="sha256:f309dd9c31fe24b3e594d2f9420419c48dfe954523245d5f35dc37739970d881"} 1
 	//  apiserver_authorization_decisions_total{decision="allowed",name="allow.example.com",type="Webhook"} 2
 	//  apiserver_authorization_decisions_total{decision="allowed",name="allowreloaded.example.com",type="Webhook"} 1
 	//  apiserver_authorization_decisions_total{decision="denied",name="deny.example.com",type="Webhook"} 1
@@ -1055,6 +1058,12 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 				m.reloadFailure = &tm
 				t.Log("failure", m.reloadFailure.String())
 			}
+		}
+		if matches := configInfoMetric.FindStringSubmatch(line); matches != nil {
+			t.Logf("line: %s\n", line)
+			t.Log(matches)
+			m.configHash = matches[1]
+			t.Logf("config hash: %s", m.configHash)
 		}
 	}
 	return &m, nil

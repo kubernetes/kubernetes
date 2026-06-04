@@ -27,7 +27,7 @@ import (
 // ClusterTestTypeApplyConfiguration represents a declarative configuration of the ClusterTestType type for use
 // with apply.
 type ClusterTestTypeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                               *ClusterTestTypeStatusApplyConfiguration `json:"status,omitempty"`
 }
@@ -41,6 +41,8 @@ func ClusterTestType(name string) *ClusterTestTypeApplyConfiguration {
 	b.WithAPIVersion("example.crd.code-generator.k8s.io/v1")
 	return b
 }
+
+func (b ClusterTestTypeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -208,8 +210,24 @@ func (b *ClusterTestTypeApplyConfiguration) WithStatus(value *ClusterTestTypeSta
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ClusterTestTypeApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ClusterTestTypeApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ClusterTestTypeApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ClusterTestTypeApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

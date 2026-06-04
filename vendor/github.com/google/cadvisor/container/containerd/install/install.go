@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // The install package registers containerd.NewPlugin() as the "containerd" container provider when imported
 package install
 

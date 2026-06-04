@@ -83,11 +83,12 @@ const (
 	// strategy, new Pods will be created from the specification version indicated
 	// by the StatefulSet's updateRevision.
 	RollingUpdateStatefulSetStrategyType StatefulSetUpdateStrategyType = "RollingUpdate"
-	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
-	// tracking and ordered rolling restarts are disabled. Pods are recreated
-	// from the StatefulSetSpec when they are manually deleted. When a scale
-	// operation is performed with this strategy,specification version indicated
-	// by the StatefulSet's currentRevision.
+	// OnDeleteStatefulSetStrategyType disables ordered rolling restarts. Version
+	// tracking is done on a best-effort basis - the controller will try to
+	// eventually converge StatefulSet's currentRevision with updateRevision.
+	// Pods are recreated from the StatefulSetSpec when they are manually deleted.
+	// When a scale operation is performed with this strategy, new Pods will be
+	// created from the specification version indicated by the StatefulSet's updateRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
 )
 
@@ -101,10 +102,12 @@ type RollingUpdateStatefulSetStrategy struct {
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding up. This can not be 0.
-	// Defaults to 1. This field is alpha-level and is only honored by servers that enable the
-	// MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+	// Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
 	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
 	// will be counted towards MaxUnavailable.
+	// This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.
+	//
+	// +featureGate=MaxUnavailableStatefulSet
 	// +optional
 	MaxUnavailable *intstr.IntOrString
 }
@@ -229,9 +232,12 @@ type StatefulSetSpec struct {
 	// +optional
 	MinReadySeconds int32
 
-	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
-	// the StatefulSet VolumeClaimTemplates. This requires the
-	// StatefulSetAutoDeletePVC feature gate to be enabled, which is beta and default on from 1.27.
+	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+	// volume claims created from volumeClaimTemplates. By default, all persistent
+	// volume claims are created as needed and retained until manually deleted. This
+	// policy allows the lifecycle to be altered, for example by deleting persistent
+	// volume claims when their stateful set is deleted, or when their pod is scaled
+	// down.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
 
@@ -533,7 +539,7 @@ type DeploymentStatus struct {
 	// Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
 	// .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
 	//
-	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
 	// +optional
 	TerminatingReplicas *int32
 
@@ -892,7 +898,7 @@ type ReplicaSetStatus struct {
 	// The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp
 	// and have not yet reached the Failed or Succeeded .status.phase.
 	//
-	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
 	// +optional
 	TerminatingReplicas *int32
 

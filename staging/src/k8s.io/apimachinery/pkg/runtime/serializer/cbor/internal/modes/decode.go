@@ -44,7 +44,10 @@ var simpleValues *cbor.SimpleValueRegistry = func() *cbor.SimpleValueRegistry {
 	return simpleValues
 }()
 
-var Decode cbor.DecMode = func() cbor.DecMode {
+// decode is the basis for the Decode mode, with no JSONUnmarshalerTranscoder
+// configured. TranscodeToJSON uses this directly rather than Decode to avoid an initialization
+// cycle between the two. Everything else should use one of the exported DecModes.
+var decode cbor.DecMode = func() cbor.DecMode {
 	decode, err := cbor.DecOptions{
 		// Maps with duplicate keys are well-formed but invalid according to the CBOR spec
 		// and never acceptable. Unlike the JSON serializer, inputs containing duplicate map
@@ -55,12 +58,18 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// with or without tagging. If a tag number is present, it must be valid.
 		TimeTag: cbor.DecTagOptional,
 
-		// Observed depth up to 16 in fuzzed batch/v1 CronJobList. JSON implementation limit
-		// is 10000.
-		MaxNestedLevels: 64,
+		// MaxNestedLevels is set to the same value used in the JSON implementation.
+		MaxNestedLevels: 10000,
 
-		MaxArrayElements: 1024,
-		MaxMapPairs:      1024,
+		// MaxArrayElements is set to the maximum allowed by the cbor library. We rely on
+		// the library initial wellformedness scan and on the api max request limit to
+		// prevent preallocating very large slices during decoding.
+		MaxArrayElements: 2147483647,
+
+		// MaxMapPairs specifies the maximum number of key-value pairs allowed in a map.
+		// We selected this value as it is large enough so that in practice the API server
+		// decoder will always hit the request body limit before the limit here is reached.
+		MaxMapPairs: 2097152,
 
 		// Indefinite-length sequences aren't produced by this serializer, but other
 		// implementations can.
@@ -139,11 +148,28 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// Disable default recognition of types implementing encoding.BinaryUnmarshaler,
 		// which is not recognized for JSON decoding.
 		BinaryUnmarshaler: cbor.BinaryUnmarshalerNone,
+
+		// Marshal types that implement encoding.TextMarshaler by calling their MarshalText
+		// method and encoding the result to a CBOR text string.
+		TextUnmarshaler: cbor.TextUnmarshalerTextString,
 	}.DecMode()
 	if err != nil {
 		panic(err)
 	}
 	return decode
+}()
+
+var Decode cbor.DecMode = func() cbor.DecMode {
+	opts := decode.DecOptions()
+	// When decoding into a value of a type that implements json.Unmarshaler (and does not
+	// implement cbor.Unmarshaler), transcode the input to JSON and pass it to the value's
+	// UnmarshalJSON method.
+	opts.JSONUnmarshalerTranscoder = TranscodeFunc(TranscodeToJSON)
+	dm, err := opts.DecMode()
+	if err != nil {
+		panic(err)
+	}
+	return dm
 }()
 
 // DecodeLax is derived from Decode, but does not complain about unknown fields in the input.

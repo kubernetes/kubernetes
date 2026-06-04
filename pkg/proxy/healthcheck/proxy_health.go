@@ -70,34 +70,37 @@ type ProxyHealthServer struct {
 	httpFactory httpServerFactory
 	clock       clock.Clock
 
+	nodeManager nodeManager
+
 	addr          string
 	healthTimeout time.Duration
 
 	lock                   sync.RWMutex
 	lastUpdatedMap         map[v1.IPFamily]time.Time
 	oldestPendingQueuedMap map[v1.IPFamily]time.Time
-	nodeEligible           bool
+}
+
+// interface to break an import chain between pkg/proxy and pkg/proxy/healthcheck
+type nodeManager interface {
+	Node() *v1.Node
 }
 
 // NewProxyHealthServer returns a proxy health http server.
-func NewProxyHealthServer(addr string, healthTimeout time.Duration) *ProxyHealthServer {
-	return newProxyHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout)
+func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager nodeManager) *ProxyHealthServer {
+	return newProxyHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout, nodeManager)
 }
 
-func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration) *ProxyHealthServer {
+func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager nodeManager) *ProxyHealthServer {
 	return &ProxyHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
 		addr:          addr,
 		healthTimeout: healthTimeout,
+		nodeManager:   nodeManager,
 
 		lastUpdatedMap:         make(map[v1.IPFamily]time.Time),
 		oldestPendingQueuedMap: make(map[v1.IPFamily]time.Time),
-		// The node is eligible (and thus the proxy healthy) while it's starting up
-		// and until we've processed the first node event that indicates the
-		// contrary.
-		nodeEligible: true,
 	}
 }
 
@@ -172,30 +175,25 @@ func (hs *ProxyHealthServer) Health() ProxyHealth {
 	return health
 }
 
-// SyncNode syncs the node and determines if it is eligible or not. Eligible is
-// defined as being: not tainted by ToBeDeletedTaint and not deleted.
-func (hs *ProxyHealthServer) SyncNode(node *v1.Node) {
+// NodeEligible returns if node is eligible or not. Eligible is defined
+// as being: not tainted by ToBeDeletedTaint and not deleted.
+func (hs *ProxyHealthServer) NodeEligible() bool {
 	hs.lock.Lock()
 	defer hs.lock.Unlock()
 
+	node := hs.nodeManager.Node()
+	if node == nil {
+		return false
+	}
 	if !node.DeletionTimestamp.IsZero() {
-		hs.nodeEligible = false
-		return
+		return false
 	}
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == ToBeDeletedTaint {
-			hs.nodeEligible = false
-			return
+			return false
 		}
 	}
-	hs.nodeEligible = true
-}
-
-// NodeEligible returns nodeEligible field of ProxyHealthServer.
-func (hs *ProxyHealthServer) NodeEligible() bool {
-	hs.lock.RLock()
-	defer hs.lock.RUnlock()
-	return hs.nodeEligible
+	return true
 }
 
 // Run starts the healthz HTTP server and blocks until it exits.
@@ -205,7 +203,8 @@ func (hs *ProxyHealthServer) Run(ctx context.Context) error {
 	serveMux.Handle("/livez", livezHandler{hs: hs})
 	server := hs.httpFactory.New(serveMux)
 
-	listener, err := hs.listener.Listen(ctx, hs.addr)
+	// using MultiListen to support both IPv4 and IPv6 addresses.
+	listener, err := hs.listener.Listen(ctx, "tcp", hs.addr)
 	if err != nil {
 		return fmt.Errorf("failed to start proxy healthz on %s: %w", hs.addr, err)
 	}

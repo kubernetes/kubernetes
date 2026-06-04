@@ -59,6 +59,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if err := localFeatureGate.SetFromMap(kc.FeatureGates); err != nil {
 		return err
 	}
+	if errs := localFeatureGate.Validate(); len(errs) > 0 {
+		allErrors = append(allErrors, errs...)
+	}
 
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))
@@ -92,6 +95,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
+	}
+	if kc.ImageMinimumGCAge.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMinimumGCAge %v must not be negative", kc.ImageMinimumGCAge.Duration))
 	}
 	if kc.ImageMaximumGCAge.Duration < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must not be negative", kc.ImageMaximumGCAge.Duration))
@@ -334,12 +340,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
-	if localFeatureGate.Enabled(features.KubeletTracing) {
-		if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
-			allErrors = append(allErrors, errs.ToAggregate().Errors()...)
-		}
-	} else if kc.Tracing != nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled."))
+	if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
+		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
 	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {
@@ -349,12 +351,23 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
 	}
 
+	if !localFeatureGate.Enabled(features.MemoryQoS) &&
+		kc.MemoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryReservationPolicy %q requires MemoryQoS feature gate to be enabled",
+			kc.MemoryReservationPolicy))
+	}
+	switch kc.MemoryReservationPolicy {
+	case kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
+	}
+
 	if kc.ContainerRuntimeEndpoint == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: the containerRuntimeEndpoint was not specified or empty"))
 	}
 
 	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery"))
 	}
 	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
 		allErrors = append(allErrors,

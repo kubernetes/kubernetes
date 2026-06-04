@@ -36,6 +36,9 @@ type SchemaOrBool struct {
 }
 
 func (sb *SchemaOrBool) Schema() common.Schema {
+	if sb.SchemaOrBool.Schema == nil {
+		return nil
+	}
 	return &Schema{Schema: sb.SchemaOrBool.Schema}
 }
 
@@ -153,7 +156,6 @@ func (s *Schema) Nullable() bool {
 func (s *Schema) AllOf() []common.Schema {
 	var res []common.Schema
 	for _, nestedSchema := range s.Schema.AllOf {
-		nestedSchema := nestedSchema
 		res = append(res, &Schema{&nestedSchema})
 	}
 	return res
@@ -162,7 +164,6 @@ func (s *Schema) AllOf() []common.Schema {
 func (s *Schema) AnyOf() []common.Schema {
 	var res []common.Schema
 	for _, nestedSchema := range s.Schema.AnyOf {
-		nestedSchema := nestedSchema
 		res = append(res, &Schema{&nestedSchema})
 	}
 	return res
@@ -171,7 +172,6 @@ func (s *Schema) AnyOf() []common.Schema {
 func (s *Schema) OneOf() []common.Schema {
 	var res []common.Schema
 	for _, nestedSchema := range s.Schema.OneOf {
-		nestedSchema := nestedSchema
 		res = append(res, &Schema{&nestedSchema})
 	}
 	return res

@@ -17,8 +17,13 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -36,7 +41,7 @@ var _ Scope = &containerScope{}
 func NewContainerScope(policy Policy) Scope {
 	return &containerScope{
 		scope{
-			name:             containerTopologyScope,
+			name:             ContainerTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
 			podMap:           containermap.NewContainerMap(),
@@ -44,19 +49,24 @@ func NewContainerScope(policy Policy) Scope {
 	}
 }
 
-func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
+	logger := klog.FromContext(ctx)
+
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		bestHint, admit := s.calculateAffinity(pod, &container)
-		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
+		bestHint, admit := s.calculateAffinity(logger, pod, &container)
+		logger.Info("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 
 		if !admit {
 			if IsAlignmentGuaranteed(s.policy) {
 				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 			}
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+				return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission with a container-level topology manager"))
+			}
 			return admission.GetPodAdmitResult(&TopologyAffinityError{})
 		}
-		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
 		err := s.allocateAlignedResources(pod, &container)
@@ -66,28 +76,28 @@ func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		}
 
 		if IsAlignmentGuaranteed(s.policy) {
-			klog.V(4).InfoS("Resource alignment at container scope guaranteed", "pod", klog.KObj(pod))
+			logger.V(4).Info("Resource alignment at container scope guaranteed", "pod", klog.KObj(pod))
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 		}
 	}
 	return admission.GetPodAdmitResult(nil)
 }
 
-func (s *containerScope) accumulateProvidersHints(pod *v1.Pod, container *v1.Container) []map[string][]TopologyHint {
+func (s *containerScope) accumulateProvidersHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) []map[string][]TopologyHint {
 	var providersHints []map[string][]TopologyHint
 
 	for _, provider := range s.hintProviders {
 		// Get the TopologyHints for a Container from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 		providersHints = append(providersHints, hints)
-		klog.InfoS("TopologyHints", "hints", hints, "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.Info("TopologyHints", "hints", hints, "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	return providersHints
 }
 
-func (s *containerScope) calculateAffinity(pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
-	providersHints := s.accumulateProvidersHints(pod, container)
-	bestHint, admit := s.policy.Merge(providersHints)
-	klog.InfoS("ContainerTopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
+func (s *containerScope) calculateAffinity(logger klog.Logger, pod *v1.Pod, container *v1.Container) (TopologyHint, bool) {
+	providersHints := s.accumulateProvidersHints(logger, pod, container)
+	bestHint, admit := s.policy.Merge(logger, providersHints)
+	logger.Info("ContainerTopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 	return bestHint, admit
 }

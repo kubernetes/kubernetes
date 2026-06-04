@@ -1,4 +1,12 @@
 aliases:
+  sig-api-machinery-approvers:
+    - deads2k
+    - jpbetz
+    - sttts
+  sig-api-machinery-reviewers:
+    - deads2k
+    - jpbetz
+    - sttts
   # Note: sig-architecture-approvers has approval on root files (including go.mod/go.sum) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
   # People with approve rights via this alias should defer dependency update PRs to dep-approvers.
   sig-architecture-approvers:
@@ -150,6 +158,7 @@ aliases:
     - mauriciopoppe
     - msau42
     - saikat-royc
+    - sunnylovestiramisu
     - xing-yang
   # emeritus:
   # - chrishenzie
@@ -158,25 +167,31 @@ aliases:
   # - rootfs
   # - verult
   sig-scheduling-maintainers:
-    - alculquicondor
     - ahg-g
+    - ania-borowiec
+    - dom4ha
     - Huang-Wei
     - kerthcet
     - macsko
     - sanposhiho
   # emeritus:
+  # - alculquicondor
   # - damemi
   # - bsalamat
   # - k82cn
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
+    - ania-borowiec
     - AxeZhan
     - damemi
     - denkensk
     - dom4ha
     - macsko
+    - mm4tt
     - sanposhiho
+    - tosi3k
+    - utam0k
     - kerthcet
   # emeritus:
   # - adtac
@@ -213,10 +228,13 @@ aliases:
     - seans3
     - soltysh
   sig-testing-reviewers:
+    - aojea
     - bentheelder
     - cblecker
-    - spiffxp
     - dims
+    - pohly
+  # emeritus:
+  # - spiffxp
   sig-node-approvers:
     - Random-Liu
     - dchen1107
@@ -244,6 +262,7 @@ aliases:
     - dims
     - endocrimes
     - feiskyer
+    - HirazawaUi
     - mtaufen
     - sjenning
     - wzshiming
@@ -264,29 +283,28 @@ aliases:
     - kannon92
     - ffromani
     - tallclair
+    - natasha41575
+    - ndixita
+    - harche
   sig-network-approvers:
-    - andrewsykim
     - aojea
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
+  # emeritus:
+  # - andrewsykim
+  # - caseydavenport
+  # - dcbw
+  # - freehan
+  # - khenidak
+  # - mrhohn
   sig-network-reviewers:
-    - andrewsykim
+    - adrianmoisey
     - aojea
     - aroradaman
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
     - tnqn
@@ -309,33 +327,40 @@ aliases:
   # - tnozicka
 
   sig-autoscaling-maintainers:
-    - gjtempleton
-    - MaciekPytel
+    - adrianmoisey
+    - jackfrancis
+    - omerap12
+    - towca
+  # emeritus
+  # - maciekpytel
+  # - mwielgus
+  # - raywainman
+  # - gjtempleton
   sig-instrumentation-approvers:
-    - logicalhan
     - dashpole
     - RainbowMango
     - serathius
     - dgrisonnet
     - rexagod
     - richabanker
+    - pohly
+  # sig-instrumentation-emeritus
+  # - brancz
+  # - DirectXMan12
+  # - ehashman
+  # - logicalhan
   sig-instrumentation-reviewers:
     - dashpole
     - s-urbaniak
     - coffeepac
-    - logicalhan
     - RainbowMango
     - serathius
     - dgrisonnet
     - pohly
     - mengjiao-liu
+    - nmn3m
     - rexagod
     - richabanker
-  # sig-instrumentation-emeritus
-  # - brancz
-  # - DirectXMan12
-  # - ehashman
-
   api-approvers:
     - deads2k
     - msau42
@@ -375,8 +400,7 @@ aliases:
     - smarterclayton
     - thockin
   sig-network-api-reviewers:
-    - andrewsykim
-    - caseydavenport
+    - aojea
     - danwinship
     - thockin
   sig-scheduling-api-approvers:
@@ -444,6 +468,7 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - elmiko
     - cheftako
+    - joelspeed
     - dims
   # sig-cluster-lifecycle-api-reviewers:
   #   -
@@ -455,12 +480,24 @@ aliases:
     - palnabarun
     - kaslin
     - MadhavJivrajani
+    - mfahlandt
     - Priyankasaggu11929
+  # See https://github.com/kubernetes/org/blob/main/OWNERS_ALIASES
+  # for the authoritative list of SIG Docs leads, or look for
+  # https://github.com/kubernetes/website/blob/main/OWNERS_ALIASES
+  # for the list that this was derived from. SIG Docs' leads can
+  # confirm modifications here.
   sig-docs-approvers:
-    - jimangel
-    - kbhawkey
-    - onlydole
-    - sftim
+    - dipesh-rawat
+    - divya-mohan0209
+    - katcosgrove
+    - lmktfy
+    - natalisucks
+    - nate-double-u
+    - reylejano
+    - salaxander
+    - SayakMukhopadhyay
+    - tengqm
   sig-node-api-reviewers:
     - dchen1107
     - derekwaynecarr
@@ -469,17 +506,22 @@ aliases:
   sig-scalability-approvers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
-  sig-scheduling-api-reviewers:
-    - alculquicondor
+  # sig-scheduling-api-reviewers:
+  # emeritus:
+  # - alculquicondor
   sig-storage-api-reviewers:
     - deads2k
     - saad-ali
@@ -501,12 +543,18 @@ aliases:
     - soltysh
     - liggitt
   dep-reviewers:
-    - logicalhan
+    - BenTheElder
+    - cblecker
+    - dims
+    - thockin
+    - sttts
+    - soltysh
+    - liggitt
   feature-approvers:
-    - andrewsykim # Cloud Provider
-    - ahg-g # Scheduling
+    - adrianmoisey # Autoscaling
     - ardaguclu # CLI
     - aojea # Network, Testing
+    - cheftako # Cloud Provider
     - danwinship # Network
     - dashpole # Instrumentation
     - dchen1107 # Node
@@ -514,38 +562,47 @@ aliases:
     - derekwaynecarr # Node
     - dgrisonnet # Instrumentation
     - dims # Architecture
+    - dom4ha # Scheduling
     - eddiezane # CLI
+    - elmiko # Cloud Provider
     - enj # Auth
-    - gjtempleton # Autoscaling
+    - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
+    - joelspeed # Cloud Provider
     - jpbetz # API Machinery
     - jsafrane # Storage
     - jsturtevant # Windows
     - justinsb # Cluster Lifecycle
     - kow3ns # Apps
     - liggitt # Auth
-    - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
-    - maciekpytel # Autoscaling
+    - macsko # Scheduling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
+    - omerap12 # Autoscaling
+    - pohly # Instrumentation
     - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage
+    - sanposhiho # Scheduling
     - sergeykanzhelev # Node
     - shaneutt # Network
     - soltysh # Apps, CLI
     - sttts # API Machinery
     - tallclair # Auth
     - thockin # Network
+    - towca # Autoscaling
     - xing-yang # Storage
     - wojtek-t # Scalability
+  # feature-approvers-emeritus:
+  # - logicalhan # Instrumentation
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
     - smarterclayton
     - johnbelamaric
-    - spiffxp
     - dims
+  # emeritus:
+  # - spiffpx

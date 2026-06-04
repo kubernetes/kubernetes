@@ -18,7 +18,12 @@ package parallelize
 
 import (
 	"fmt"
+	"sync"
 	"testing"
+
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 func TestChunkSize(t *testing.T) {
@@ -50,5 +55,38 @@ func TestChunkSize(t *testing.T) {
 				t.Errorf("Expected: %d, got: %d", test.wantOutput, chunkSizeFor(test.input, DefaultParallelism))
 			}
 		})
+	}
+}
+
+func TestGoroutinesMetric(t *testing.T) {
+	metrics.Register()
+	metrics.Goroutines.Reset()
+
+	const (
+		operation = "test-operation"
+		pieces    = 32
+	)
+
+	var (
+		mu        sync.Mutex
+		peakValue float64
+	)
+
+	_, ctx := ktesting.NewTestContext(t)
+	p := NewParallelizer(DefaultParallelism)
+	p.Until(ctx, pieces, func(_ int) {
+		val, err := testutil.GetGaugeMetricValue(metrics.Goroutines.WithLabelValues(operation))
+		if err != nil {
+			t.Fatalf("failed to read goroutines metric inside Until: %v", err)
+		}
+		mu.Lock()
+		if val > peakValue {
+			peakValue = val
+		}
+		mu.Unlock()
+	}, operation)
+
+	if peakValue <= 0 {
+		t.Errorf("expected goroutines metric to be >0 during Until, peak was %v", peakValue)
 	}
 }

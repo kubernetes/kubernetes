@@ -394,7 +394,6 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 }
 
 func TestAdoption(t *testing.T) {
-	boolPtr := func(b bool) *bool { return &b }
 	testCases := []struct {
 		name                    string
 		existingOwnerReferences func(rs *apps.ReplicaSet) []metav1.OwnerReference
@@ -406,7 +405,7 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"}}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}}
 			},
 		},
 		{
@@ -415,29 +414,29 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}}
 			},
 		},
 		{
 			"pod refers rs as a controller",
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)}}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)}}
 			},
 		},
 		{
 			"pod refers other rs as the controller, refers the rs as an owner",
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)},
+					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)},
 					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"},
 				}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)},
+					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)},
 					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"},
 				}
 			},
@@ -730,7 +729,7 @@ func TestOverlappingRSs(t *testing.T) {
 	defer stopControllers()
 
 	// Create 2 RSs with identical selectors
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		// One RS has 1 replica, and another has 2 replicas
 		rs := newRS(fmt.Sprintf("rs-%d", i+1), ns.Name, i+1)
 		rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -745,7 +744,7 @@ func TestOverlappingRSs(t *testing.T) {
 	}
 
 	// Expect both RSs have .status.replicas = .spec.replicas
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		newRS, err := c.AppsV1().ReplicaSets(ns.Name).Get(tCtx, fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rs rs-%d: %v", i+1, err)
@@ -946,7 +945,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	rs := newRS("rs", ns.Name, 2)
 	// Create 3 pods, RS should adopt only 2 of them
 	podList := []*v1.Pod{}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		pod := newMatchingPod(fmt.Sprintf("pod-%d", i+1), ns.Name)
 		pod.Labels = labelMap()
 		podList = append(podList, pod)

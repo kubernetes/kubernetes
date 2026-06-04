@@ -19,14 +19,13 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 

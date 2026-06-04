@@ -99,7 +99,7 @@ type Metrics struct {
 	// and will not equal InodesUsed + InodesFree as the fs is shared.
 	Inodes *resource.Quantity
 
-	// InodesFree represent the inodes available for the volume.  For Volumes that share
+	// InodesFree represents the inodes available for the volume. For Volumes that share
 	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
 	// on the underlying storage, and is shared with host processes and other volumes
 	InodesFree *resource.Quantity
@@ -134,6 +134,26 @@ type MounterArgs struct {
 	DesiredSize         *resource.Quantity
 	SELinuxLabel        string
 	Recorder            record.EventRecorder
+
+	// Optional interface that will be used to change the ownership of the volume, if specified.
+	// mainly used by unit tests
+	VolumeOwnershipApplicator VolumeOwnershipChanger
+	ReconstructedVolume       bool
+
+	// IsRemount is true when SetUp is being invoked on a volume that the
+	// reconciler considers already mounted to the pod, e.g. a periodic
+	// republish triggered by CSIDriver.spec.requiresRepublish=true. Volume
+	// plugins should use this to avoid destroying state (e.g. mount
+	// directories, volume metadata files) that the pod is currently
+	// observing through an existing bind mount, since teardown on a
+	// failed remount cannot be repaired by a subsequent successful
+	// remount and would leave the pod with stale contents.
+	IsRemount bool
+}
+
+type VolumeOwnershipChanger interface {
+	AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger
+	ChangePermissions() error
 }
 
 type VolumeOwnership struct {

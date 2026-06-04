@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	openapi_v3 "github.com/google/gnostic-models/openapiv3"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Temporary parse implementation to be used until gnostic->kube-openapi conversion

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -236,7 +237,7 @@ func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetr
 	controllerManagerMetrics.ControllerStarted("service")
 	defer controllerManagerMetrics.ControllerStopped("service")
 
-	if !cache.WaitForNamedCacheSync("service", ctx.Done(), c.serviceListerSynced, c.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceListerSynced, c.nodeListerSynced) {
 		return
 	}
 
@@ -1011,7 +1012,14 @@ var (
 
 // We consider the node for load balancing only when the node is not labelled for exclusion.
 func nodeIncludedPredicate(node *v1.Node) bool {
-	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
+	v, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
+	if hasExcludeBalancerLabel {
+		v, err := strconv.ParseBool(v)
+		if err != nil {
+			return false
+		}
+		return !v
+	}
 	return !hasExcludeBalancerLabel
 }
 

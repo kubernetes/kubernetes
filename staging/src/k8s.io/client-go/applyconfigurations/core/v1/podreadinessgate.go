@@ -24,7 +24,10 @@ import (
 
 // PodReadinessGateApplyConfiguration represents a declarative configuration of the PodReadinessGate type for use
 // with apply.
+//
+// PodReadinessGate contains the reference to a pod condition
 type PodReadinessGateApplyConfiguration struct {
+	// ConditionType refers to a condition in the pod's condition list with matching type.
 	ConditionType *corev1.PodConditionType `json:"conditionType,omitempty"`
 }
 

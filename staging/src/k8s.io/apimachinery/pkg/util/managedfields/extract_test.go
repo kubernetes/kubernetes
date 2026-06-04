@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -144,7 +144,7 @@ func applyFieldsEntry(fieldManager string, fieldsJSON string, subresource string
 		Operation:   metav1.ManagedFieldsOperationApply,
 		APIVersion:  "v1",
 		FieldsType:  "FieldsV1",
-		FieldsV1:    &metav1.FieldsV1{Raw: []byte(fieldsJSON)},
+		FieldsV1:    metav1.NewFieldsV1(fieldsJSON),
 		Subresource: subresource,
 	}
 }

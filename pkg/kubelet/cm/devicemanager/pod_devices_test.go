@@ -27,6 +27,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetContainerDevices(t *testing.T) {
@@ -66,35 +67,35 @@ func TestResourceDeviceInstanceFilter(t *testing.T) {
 	var resp ResourceDeviceInstances
 	devs := ResourceDeviceInstances{
 		"foo": DeviceInstances{
-			"dev-foo1": pluginapi.Device{
+			"dev-foo1": &pluginapi.Device{
 				ID: "foo1",
 			},
-			"dev-foo2": pluginapi.Device{
+			"dev-foo2": &pluginapi.Device{
 				ID: "foo2",
 			},
-			"dev-foo3": pluginapi.Device{
+			"dev-foo3": &pluginapi.Device{
 				ID: "foo3",
 			},
 		},
 		"bar": DeviceInstances{
-			"dev-bar1": pluginapi.Device{
+			"dev-bar1": &pluginapi.Device{
 				ID: "bar1",
 			},
-			"dev-bar2": pluginapi.Device{
+			"dev-bar2": &pluginapi.Device{
 				ID: "bar2",
 			},
-			"dev-bar3": pluginapi.Device{
+			"dev-bar3": &pluginapi.Device{
 				ID: "bar3",
 			},
 		},
 		"baz": DeviceInstances{
-			"dev-baz1": pluginapi.Device{
+			"dev-baz1": &pluginapi.Device{
 				ID: "baz1",
 			},
-			"dev-baz2": pluginapi.Device{
+			"dev-baz2": &pluginapi.Device{
 				ID: "baz2",
 			},
-			"dev-baz3": pluginapi.Device{
+			"dev-baz3": &pluginapi.Device{
 				ID: "baz3",
 			},
 		},
@@ -157,6 +158,7 @@ func expectResourceDeviceInstances(t *testing.T, resp ResourceDeviceInstances, e
 }
 
 func TestDeviceRunContainerOptions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	const (
 		podUID        = "pod"
 		containerName = "container"
@@ -239,7 +241,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 					response,
 				)
 			}
-			opts := podDevices.deviceRunContainerOptions(podUID, containerName)
+			opts := podDevices.deviceRunContainerOptions(logger, podUID, containerName)
 
 			// The exact ordering of the options depends on the order of the resources in the map.
 			// We therefore use `ElementsMatch` instead of `Equal` on the member slices.

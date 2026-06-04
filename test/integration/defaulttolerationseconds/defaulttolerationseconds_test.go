@@ -21,6 +21,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
@@ -30,10 +32,14 @@ import (
 
 func TestAdmission(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	handler, err := newHandlerForTest()
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
 	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(cfg *controlplane.Config) {
 			cfg.ControlPlane.Generic.EnableProfiling = true
-			cfg.ControlPlane.Generic.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+			cfg.ControlPlane.Generic.AdmissionControl = handler
 		},
 	})
 	defer tearDownFn()
@@ -99,4 +105,12 @@ func TestAdmission(t *testing.T) {
 	if found != 2 {
 		t.Fatalf("unexpected tolerations: %v\n", updatedPod.Spec.Tolerations)
 	}
+}
+
+// newHandlerForTest returns a handler configured for testing.
+func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
+	handler := defaulttolerationseconds.NewDefaultTolerationSeconds()
+	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil, nil)
+	pluginInitializer.Initialize(handler)
+	return handler, admission.ValidateInitialization(handler)
 }

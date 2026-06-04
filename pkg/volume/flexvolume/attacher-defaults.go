@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -67,7 +68,7 @@ func (a *attacherDefaults) MountDevice(spec *volume.Spec, devicePath string, dev
 		options = append(options, "rw")
 	}
 
-	diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: a.plugin.host.GetExec(a.plugin.GetPluginName())}
+	diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: exec.New()}
 
 	return diskMounter.FormatAndMount(devicePath, deviceMountPath, volSourceFSType, options)
 }

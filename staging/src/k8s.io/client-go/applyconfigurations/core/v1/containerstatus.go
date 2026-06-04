@@ -24,22 +24,70 @@ import (
 
 // ContainerStatusApplyConfiguration represents a declarative configuration of the ContainerStatus type for use
 // with apply.
+//
+// ContainerStatus contains details for the current status of this container.
 type ContainerStatusApplyConfiguration struct {
-	Name                     *string                                 `json:"name,omitempty"`
-	State                    *ContainerStateApplyConfiguration       `json:"state,omitempty"`
-	LastTerminationState     *ContainerStateApplyConfiguration       `json:"lastState,omitempty"`
-	Ready                    *bool                                   `json:"ready,omitempty"`
-	RestartCount             *int32                                  `json:"restartCount,omitempty"`
-	Image                    *string                                 `json:"image,omitempty"`
-	ImageID                  *string                                 `json:"imageID,omitempty"`
-	ContainerID              *string                                 `json:"containerID,omitempty"`
-	Started                  *bool                                   `json:"started,omitempty"`
-	AllocatedResources       *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
-	Resources                *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	VolumeMounts             []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
-	User                     *ContainerUserApplyConfiguration        `json:"user,omitempty"`
-	AllocatedResourcesStatus []ResourceStatusApplyConfiguration      `json:"allocatedResourcesStatus,omitempty"`
-	StopSignal               *corev1.Signal                          `json:"stopSignal,omitempty"`
+	// Name is a DNS_LABEL representing the unique name of the container.
+	// Each container in a pod must have a unique name across all container types.
+	// Cannot be updated.
+	Name *string `json:"name,omitempty"`
+	// State holds details about the container's current condition.
+	State *ContainerStateApplyConfiguration `json:"state,omitempty"`
+	// LastTerminationState holds the last termination state of the container to
+	// help debug container crashes and restarts. This field is not
+	// populated if the container is still running and RestartCount is 0.
+	LastTerminationState *ContainerStateApplyConfiguration `json:"lastState,omitempty"`
+	// Ready specifies whether the container is currently passing its readiness check.
+	// The value will change as readiness probes keep executing. If no readiness
+	// probes are specified, this field defaults to true once the container is
+	// fully started (see Started field).
+	//
+	// The value is typically used to determine whether a container is ready to
+	// accept traffic.
+	Ready *bool `json:"ready,omitempty"`
+	// RestartCount holds the number of times the container has been restarted.
+	// Kubelet makes an effort to always increment the value, but there
+	// are cases when the state may be lost due to node restarts and then the value
+	// may be reset to 0. The value is never negative.
+	RestartCount *int32 `json:"restartCount,omitempty"`
+	// Image is the name of container image that the container is running.
+	// The container image may not match the image used in the PodSpec,
+	// as it may have been resolved by the runtime.
+	// More info: https://kubernetes.io/docs/concepts/containers/images.
+	Image *string `json:"image,omitempty"`
+	// ImageID is the image ID of the container's image. The image ID may not
+	// match the image ID of the image used in the PodSpec, as it may have been
+	// resolved by the runtime.
+	ImageID *string `json:"imageID,omitempty"`
+	// ContainerID is the ID of the container in the format '<type>://<container_id>'.
+	// Where type is a container runtime identifier, returned from Version call of CRI API
+	// (for example "containerd").
+	ContainerID *string `json:"containerID,omitempty"`
+	// Started indicates whether the container has finished its postStart lifecycle hook
+	// and passed its startup probe.
+	// Initialized as false, becomes true after startupProbe is considered
+	// successful. Resets to false when the container is restarted, or if kubelet
+	// loses state temporarily. In both cases, startup probes will run again.
+	// Is always true when no startupProbe is defined and container is running and
+	// has passed the postStart lifecycle hook. The null value must be treated the
+	// same as false.
+	Started *bool `json:"started,omitempty"`
+	// AllocatedResources represents the compute resources allocated for this container by the
+	// node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
+	// and after successfully admitting desired pod resize.
+	AllocatedResources *corev1.ResourceList `json:"allocatedResources,omitempty"`
+	// Resources represents the compute resource requests and limits that have been successfully
+	// enacted on the running container after it has been started or has been successfully resized.
+	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	// Status of volume mounts.
+	VolumeMounts []VolumeMountStatusApplyConfiguration `json:"volumeMounts,omitempty"`
+	// User represents user identity information initially attached to the first process of the container
+	User *ContainerUserApplyConfiguration `json:"user,omitempty"`
+	// AllocatedResourcesStatus represents the status of various resources
+	// allocated for this Pod.
+	AllocatedResourcesStatus []ResourceStatusApplyConfiguration `json:"allocatedResourcesStatus,omitempty"`
+	// StopSignal reports the effective stop signal for this container
+	StopSignal *corev1.Signal `json:"stopSignal,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs a declarative configuration of the ContainerStatus type for use with

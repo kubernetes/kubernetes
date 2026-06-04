@@ -19,12 +19,11 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewUploadCertsPhase returns the uploadCerts phase

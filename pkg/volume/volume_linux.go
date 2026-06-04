@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -51,7 +50,7 @@ var (
 )
 
 // NewVolumeOwnership returns an interface that can be used to recursively change volume permissions and ownership
-func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) *VolumeOwnership {
+func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) VolumeOwnershipChanger {
 	vo := &VolumeOwnership{
 		mounter:             mounter,
 		dir:                 dir,
@@ -63,7 +62,7 @@ func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 	return vo
 }
 
-func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) *VolumeOwnership {
+func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger {
 	vo.pod = pod
 	vo.recorder = recorder
 	return vo
@@ -252,7 +251,7 @@ func readDirNames(dirname string) ([]string, error) {
 // walkDeep can be used to traverse directories and has two minor differences
 // from filepath.Walk:
 //   - List of files/dirs is not sorted for performance reasons
-//   - callback walkFunc is invoked on root directory after visiting children dirs and files
+//   - callback walkFunc is invoked on root directory after visiting child dirs and files
 func walkDeep(root string, walkFunc filepath.WalkFunc) error {
 	info, err := os.Lstat(root)
 	if err != nil {

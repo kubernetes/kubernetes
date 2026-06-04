@@ -30,6 +30,9 @@ type MeterProvider interface {
 	//
 	// If the name is empty, then an implementation defined default name will
 	// be used instead.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Meter(name string, opts ...MeterOption) Meter
 }
 
@@ -51,6 +54,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Int64Counter(name string, options ...Int64CounterOption) (Int64Counter, error)
 
 	// Int64UpDownCounter returns a new Int64UpDownCounter instrument
@@ -61,6 +67,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Int64UpDownCounter(name string, options ...Int64UpDownCounterOption) (Int64UpDownCounter, error)
 
 	// Int64Histogram returns a new Int64Histogram instrument identified by
@@ -71,6 +80,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Int64Histogram(name string, options ...Int64HistogramOption) (Int64Histogram, error)
 
 	// Int64Gauge returns a new Int64Gauge instrument identified by name and
@@ -80,6 +92,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Int64Gauge(name string, options ...Int64GaugeOption) (Int64Gauge, error)
 
 	// Int64ObservableCounter returns a new Int64ObservableCounter identified
@@ -95,6 +110,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Int64ObservableCounter(name string, options ...Int64ObservableCounterOption) (Int64ObservableCounter, error)
 
 	// Int64ObservableUpDownCounter returns a new Int64ObservableUpDownCounter
@@ -110,7 +128,13 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
-	Int64ObservableUpDownCounter(name string, options ...Int64ObservableUpDownCounterOption) (Int64ObservableUpDownCounter, error)
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
+	Int64ObservableUpDownCounter(
+		name string,
+		options ...Int64ObservableUpDownCounterOption,
+	) (Int64ObservableUpDownCounter, error)
 
 	// Int64ObservableGauge returns a new Int64ObservableGauge instrument
 	// identified by name and configured with options. The instrument is used
@@ -125,6 +149,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Int64ObservableGauge(name string, options ...Int64ObservableGaugeOption) (Int64ObservableGauge, error)
 
 	// Float64Counter returns a new Float64Counter instrument identified by
@@ -145,6 +172,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Float64UpDownCounter(name string, options ...Float64UpDownCounterOption) (Float64UpDownCounter, error)
 
 	// Float64Histogram returns a new Float64Histogram instrument identified by
@@ -155,6 +185,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Float64Histogram(name string, options ...Float64HistogramOption) (Float64Histogram, error)
 
 	// Float64Gauge returns a new Float64Gauge instrument identified by name and
@@ -164,6 +197,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Float64Gauge(name string, options ...Float64GaugeOption) (Float64Gauge, error)
 
 	// Float64ObservableCounter returns a new Float64ObservableCounter
@@ -179,6 +215,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Float64ObservableCounter(name string, options ...Float64ObservableCounterOption) (Float64ObservableCounter, error)
 
 	// Float64ObservableUpDownCounter returns a new
@@ -194,7 +233,13 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
-	Float64ObservableUpDownCounter(name string, options ...Float64ObservableUpDownCounterOption) (Float64ObservableUpDownCounter, error)
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
+	Float64ObservableUpDownCounter(
+		name string,
+		options ...Float64ObservableUpDownCounterOption,
+	) (Float64ObservableUpDownCounter, error)
 
 	// Float64ObservableGauge returns a new Float64ObservableGauge instrument
 	// identified by name and configured with options. The instrument is used
@@ -209,6 +254,9 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Float64ObservableGauge(name string, options ...Float64ObservableGaugeOption) (Float64ObservableGauge, error)
 
 	// RegisterCallback registers f to be called during the collection of a
@@ -222,6 +270,9 @@ type Meter interface {
 	//
 	// If no instruments are passed, f should not be registered nor called
 	// during collection.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	//
 	// The function f needs to be concurrent safe.
 	RegisterCallback(f Callback, instruments ...Observable) (Registration, error)
@@ -238,7 +289,11 @@ type Meter interface {
 // Callbacks. Meaning, it should not report measurements for an instrument with
 // the same attributes as another Callback will report.
 //
-// The function needs to be concurrent safe.
+// The function needs to be reentrant and concurrent safe.
+//
+// Note that Go's mutexes are not reentrant, and locking a mutex takes
+// an indefinite amount of time. It is therefore advised to avoid
+// using mutexes inside callbacks.
 type Callback func(context.Context, Observer) error
 
 // Observer records measurements for multiple instruments in a Callback.
@@ -253,9 +308,15 @@ type Observer interface {
 	embedded.Observer
 
 	// ObserveFloat64 records the float64 value for obsrv.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	ObserveFloat64(obsrv Float64Observable, value float64, opts ...ObserveOption)
 
 	// ObserveInt64 records the int64 value for obsrv.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	ObserveInt64(obsrv Int64Observable, value int64, opts ...ObserveOption)
 }
 
@@ -273,6 +334,7 @@ type Registration interface {
 
 	// Unregister removes the callback registration from a Meter.
 	//
-	// This method needs to be idempotent and concurrent safe.
+	// Implementations of this method need to be idempotent and safe for a user
+	//  to call concurrently.
 	Unregister() error
 }

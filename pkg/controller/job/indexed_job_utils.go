@@ -27,10 +27,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -43,7 +41,7 @@ func isIndexedJob(job *batch.Job) bool {
 }
 
 func hasBackoffLimitPerIndex(job *batch.Job) bool {
-	return feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) && job.Spec.BackoffLimitPerIndex != nil
+	return job.Spec.BackoffLimitPerIndex != nil
 }
 
 type interval struct {
@@ -467,12 +465,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 			return
 		}
 	}
-	var fieldPath string
-	if feature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-		fieldPath = fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
-	} else {
-		fieldPath = fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation)
-	}
+	fieldPath := fmt.Sprintf("metadata.labels['%s']", batch.JobCompletionIndexAnnotation)
 	container.Env = append(container.Env, v1.EnvVar{
 		Name: completionIndexEnvName,
 		ValueFrom: &v1.EnvVarSource{

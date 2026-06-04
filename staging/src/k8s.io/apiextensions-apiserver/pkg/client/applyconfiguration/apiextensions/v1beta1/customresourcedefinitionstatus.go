@@ -20,10 +20,23 @@ package v1beta1
 
 // CustomResourceDefinitionStatusApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionStatus type for use
 // with apply.
+//
+// CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
 type CustomResourceDefinitionStatusApplyConfiguration struct {
-	Conditions     []CustomResourceDefinitionConditionApplyConfiguration `json:"conditions,omitempty"`
-	AcceptedNames  *CustomResourceDefinitionNamesApplyConfiguration      `json:"acceptedNames,omitempty"`
-	StoredVersions []string                                              `json:"storedVersions,omitempty"`
+	// conditions indicate state for particular aspects of a CustomResourceDefinition
+	Conditions []CustomResourceDefinitionConditionApplyConfiguration `json:"conditions,omitempty"`
+	// acceptedNames are the names that are actually being used to serve discovery.
+	// They may be different than the names in spec.
+	AcceptedNames *CustomResourceDefinitionNamesApplyConfiguration `json:"acceptedNames,omitempty"`
+	// storedVersions lists all versions of CustomResources that were ever persisted. Tracking these
+	// versions allows a migration path for stored versions in etcd. The field is mutable
+	// so a migration controller can finish a migration to another version (ensuring
+	// no old objects are left in storage), and then remove the rest of the
+	// versions from this list.
+	// Versions may not be removed from `spec.versions` while they exist in this list.
+	StoredVersions []string `json:"storedVersions,omitempty"`
+	// The generation observed by the CRD controller.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
 // CustomResourceDefinitionStatusApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionStatus type for use with
@@ -60,5 +73,13 @@ func (b *CustomResourceDefinitionStatusApplyConfiguration) WithStoredVersions(va
 	for i := range values {
 		b.StoredVersions = append(b.StoredVersions, values[i])
 	}
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *CustomResourceDefinitionStatusApplyConfiguration) WithObservedGeneration(value int64) *CustomResourceDefinitionStatusApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }

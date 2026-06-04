@@ -20,11 +20,19 @@ package v1
 
 // VsphereVirtualDiskVolumeSourceApplyConfiguration represents a declarative configuration of the VsphereVirtualDiskVolumeSource type for use
 // with apply.
+//
+// Represents a vSphere volume resource.
 type VsphereVirtualDiskVolumeSourceApplyConfiguration struct {
-	VolumePath        *string `json:"volumePath,omitempty"`
-	FSType            *string `json:"fsType,omitempty"`
+	// volumePath is the path that identifies vSphere volume vmdk
+	VolumePath *string `json:"volumePath,omitempty"`
+	// fsType is filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType *string `json:"fsType,omitempty"`
+	// storagePolicyName is the storage Policy Based Management (SPBM) profile name.
 	StoragePolicyName *string `json:"storagePolicyName,omitempty"`
-	StoragePolicyID   *string `json:"storagePolicyID,omitempty"`
+	// storagePolicyID is the storage Policy Based Management (SPBM) profile ID associated with the StoragePolicyName.
+	StoragePolicyID *string `json:"storagePolicyID,omitempty"`
 }
 
 // VsphereVirtualDiskVolumeSourceApplyConfiguration constructs a declarative configuration of the VsphereVirtualDiskVolumeSource type for use with

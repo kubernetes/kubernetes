@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -73,7 +73,7 @@ func (c *updateAny) collectsMetrics() bool {
 	return false
 }
 
-func (c updateAny) patchParams(w *workload) (realOp, error) {
+func (c updateAny) patchParams(w *Workload) (realOp, error) {
 	if c.CountParam != "" {
 		count, err := w.Params.get(c.CountParam[1:])
 		if err != nil {
@@ -102,7 +102,7 @@ func (c *updateAny) run(tCtx ktesting.TContext) {
 		for index := 0; index < count; index++ {
 			err := c.update(tCtx, map[string]any{"Index": index, "Count": count})
 			if err != nil {
-				tCtx.Fatalf("Failed to update object: %w", err)
+				tCtx.Fatalf("Failed to update object: %v", err)
 			}
 		}
 		return
@@ -115,7 +115,7 @@ func (c *updateAny) run(tCtx ktesting.TContext) {
 		case <-ticker.C:
 			err := c.update(tCtx, map[string]any{"Index": index, "Count": count})
 			if err != nil {
-				tCtx.Fatalf("Failed to update object: %w", err)
+				tCtx.Fatalf("Failed to update object: %v", err)
 			}
 		case <-tCtx.Done():
 			return

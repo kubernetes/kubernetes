@@ -8,6 +8,9 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"go.etcd.io/bbolt/errors"
+	"go.etcd.io/bbolt/internal/common"
 )
 
 // fdatasync flushes written data to a file descriptor.
@@ -42,7 +45,7 @@ func flock(db *DB, exclusive bool, timeout time.Duration) error {
 
 		// If we timed oumercit then return an error.
 		if timeout != 0 && time.Since(t) > timeout-flockRetryTimeout {
-			return ErrTimeout
+			return errors.ErrTimeout
 		}
 
 		// Wait for a bit and try again.
@@ -70,7 +73,7 @@ func mmap(db *DB, sz int) error {
 			return fmt.Errorf("truncate: %s", err)
 		}
 		sizehi = uint32(sz >> 32)
-		sizelo = uint32(sz) & 0xffffffff
+		sizelo = uint32(sz)
 	}
 
 	// Open a file mapping handle.
@@ -93,7 +96,7 @@ func mmap(db *DB, sz int) error {
 	}
 
 	// Convert to a byte array.
-	db.data = ((*[maxMapSize]byte)(unsafe.Pointer(addr)))
+	db.data = (*[common.MaxMapSize]byte)(unsafe.Pointer(addr))
 	db.datasz = sz
 
 	return nil

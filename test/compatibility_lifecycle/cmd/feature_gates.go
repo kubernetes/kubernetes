@@ -30,18 +30,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 
+	yaml "go.yaml.in/yaml/v2"
 	"k8s.io/apimachinery/pkg/util/version"
 	baseversion "k8s.io/component-base/version"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 var (
 	alphabeticalOrder        bool
 	k8RootPath               string
 	versionedFeatureListFile = "test/compatibility_lifecycle/reference/versioned_feature_list.yaml"
-	// thresholdVersion is the version after which we require emulation support for feature removal
-	// 1.31 is when we introduced emulation version support
-	thresholdVersion = version.MajorMinor(1, 31)
 )
 
 const (
@@ -60,7 +57,10 @@ type featureSpec struct {
 }
 
 type featureInfo struct {
-	Name           string        `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name"`
+	// FullName is the full name of the feature, including the package name,
+	// used for ensuring that features are grouped by their package prefix first,
+	// and then sorted alphabetically within that group.
 	FullName       string        `yaml:"-" json:"-"`
 	VersionedSpecs []featureSpec `yaml:"versionedSpecs" json:"versionedSpecs"`
 }
@@ -158,7 +158,7 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion 
 		return err
 	}
 
-	if err := verifyFeatureRemoval(featureList, baseFeatureList, currentVersion, thresholdVersion); err != nil {
+	if err := verifyFeatureRemoval(featureList, baseFeatureList, currentVersion); err != nil {
 		return err
 	}
 
@@ -208,13 +208,10 @@ func dedupeFeatureList(featureList []featureInfo) ([]featureInfo, error) {
 // Returns error if:
 //   - Beta features are removed (not allowed)
 //   - GA/Deprecated features are removed without being locked to default
-//   - GA/Deprecated features locked after v1.31 are removed before 3 minor versions
-//     have passed (required for emulation support)
+//   - GA/Deprecated features are removed before 3 minor versions have passed
+//     since locking (required for emulation support)
 func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureInfo,
-	currentVersion *version.Version, thresholdVersion *version.Version) error {
-	if thresholdVersion == nil {
-		thresholdVersion = version.MajorMinor(0, 0)
-	}
+	currentVersion *version.Version) error {
 	baseFeatures := make(map[string]featureInfo)
 	for _, f := range baseFeatureList {
 		baseFeatures[f.Name] = f
@@ -250,17 +247,11 @@ func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureIn
 			if err != nil {
 				return fmt.Errorf("invalid version \"%s\" for feature %s: %w", lastSpec.Version, name, err)
 			}
-			// we do not require the 3 version retention for features locked before the thresholdVersion.
-			// TODO: remove after 1.34
-			if !specVer.GreaterThan(thresholdVersion) {
-				continue
-			}
 			minRemovalVer := specVer.AddMinor(3)
 			if currentVersion.LessThan(minRemovalVer) {
 				return fmt.Errorf("feature %s cannot be removed until version %s (required for emulation support)",
 					name, minRemovalVer)
 			}
-
 		}
 	}
 	return nil
@@ -435,9 +426,20 @@ func isFeatureSpecType(v ast.Expr, aliasMap map[string]string) bool {
 }
 
 func parseFeatureInfo(variables map[string]ast.Expr, kv *ast.KeyValueExpr) (featureInfo, error) {
+	name := identifierName(kv.Key, true)
+	fullName := identifierName(kv.Key, false)
+
+	if id, ok := kv.Key.(*ast.Ident); ok {
+		if varVal, ok := variables[id.Name]; ok {
+			if strVal, err := basicStringLiteral(varVal); err == nil {
+				name = strVal
+			}
+		}
+	}
+
 	info := featureInfo{
-		Name:           identifierName(kv.Key, true),
-		FullName:       identifierName(kv.Key, false),
+		Name:           name,
+		FullName:       fullName,
 		VersionedSpecs: []featureSpec{},
 	}
 	specExps := []ast.Expr{}

@@ -33,7 +33,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 )
@@ -42,21 +41,20 @@ import (
 type Manager interface {
 	lifecycle.PodAdmitHandler
 
-	Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
-	Start() error
+	Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+	Start(ctx context.Context) error
 	ShutdownStatus() error
 }
 
 // Config represents Manager configuration
 type Config struct {
 	Logger                           klog.Logger
-	ProbeManager                     prober.Manager
 	VolumeManager                    volumemanager.VolumeManager
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc
 	KillPodFunc                      eviction.KillPodFunc
-	SyncNodeStatusFunc               func()
+	SyncNodeStatusFunc               func(context.Context)
 	ShutdownGracePeriodRequested     time.Duration
 	ShutdownGracePeriodCriticalPods  time.Duration
 	ShutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
@@ -68,12 +66,12 @@ type Config struct {
 type managerStub struct{}
 
 // Admit returns a fake Pod admission which always returns true
-func (managerStub) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (managerStub) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 // Start is a no-op always returning nil for non linux platforms.
-func (managerStub) Start() error {
+func (managerStub) Start(context.Context) error {
 	return nil
 }
 
@@ -128,9 +126,15 @@ func newPodManager(conf *Config) *podManager {
 }
 
 // killPods terminates pods by priority.
-func (m *podManager) killPods(activePods []*v1.Pod) error {
+func (m *podManager) killPods(ctx context.Context, activePods []*v1.Pod) error {
 	groups := groupByPriority(m.shutdownGracePeriodByPodPriority, activePods)
 	for _, group := range groups {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		// If there are no pods in a particular range,
 		// then do not wait for pods in that priority range.
 		if len(group.Pods) == 0 {
@@ -161,7 +165,7 @@ func (m *podManager) killPods(activePods []*v1.Pod) error {
 					status.Reason = nodeShutdownReason
 					podutil.UpdatePodCondition(status, &v1.PodCondition{
 						Type:               v1.DisruptionTarget,
-						ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(status, pod.Generation, v1.DisruptionTarget),
+						ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget),
 						Status:             v1.ConditionTrue,
 						Reason:             v1.PodReasonTerminationByKubelet,
 						Message:            nodeShutdownMessage,
@@ -178,9 +182,9 @@ func (m *podManager) killPods(activePods []*v1.Pod) error {
 		// to terminate before proceeding to the next group.
 		var groupTerminationWaitDuration = time.Duration(group.ShutdownGracePeriodSeconds) * time.Second
 		var (
-			doneCh         = make(chan struct{})
-			timer          = m.clock.NewTimer(groupTerminationWaitDuration)
-			ctx, ctxCancel = context.WithTimeout(context.Background(), groupTerminationWaitDuration)
+			doneCh              = make(chan struct{})
+			timer               = m.clock.NewTimer(groupTerminationWaitDuration)
+			groupCtx, ctxCancel = context.WithTimeout(ctx, groupTerminationWaitDuration)
 		)
 		go func() {
 			defer close(doneCh)
@@ -190,7 +194,9 @@ func (m *podManager) killPods(activePods []*v1.Pod) error {
 			// let's wait until all the volumes are unmounted from all the pods before
 			// continuing to the next group. This is done so that the CSI Driver (assuming
 			// that it's part of the highest group) has a chance to perform unmounts.
-			if err := m.volumeManager.WaitForAllPodsUnmount(ctx, group.Pods); err != nil {
+			// The wait is derived from the kubelet context so it can stop early if the
+			// parent kubelet context is cancelled while shutdown processing is in progress.
+			if err := m.volumeManager.WaitForAllPodsUnmount(groupCtx, group.Pods); err != nil {
 				var podIdentifiers []string
 				for _, pod := range group.Pods {
 					podIdentifiers = append(podIdentifiers, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))

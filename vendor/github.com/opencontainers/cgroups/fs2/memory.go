@@ -18,17 +18,14 @@ import (
 // cgroupv2 files with .min, .max, .low, or .high suffix.
 // The value of -1 is converted to "max" for cgroupv1 compatibility
 // (which used to write -1 to remove the limit).
-func numToStr(value int64) (ret string) {
-	switch {
-	case value == 0:
-		ret = ""
-	case value == -1:
-		ret = "max"
-	default:
-		ret = strconv.FormatInt(value, 10)
+func numToStr(value int64) string {
+	switch value {
+	case 0:
+		return ""
+	case -1:
+		return "max"
 	}
-
-	return ret
+	return strconv.FormatInt(value, 10)
 }
 
 func isMemorySet(r *cgroups.Resources) bool {
@@ -57,7 +54,7 @@ func setMemory(dirPath string, r *cgroups.Resources) error {
 	if swapStr != "" {
 		if err := cgroups.WriteFile(dirPath, "memory.swap.max", swapStr); err != nil {
 			// If swap is not enabled, silently ignore setting to max or disabling it.
-			if !(errors.Is(err, os.ErrNotExist) && (swapStr == "max" || swapStr == "0")) {
+			if !(errors.Is(err, os.ErrNotExist) && (swapStr == "max" || swapStr == "0")) { //nolint:staticcheck // Ignore "QF1001: could apply De Morgan's law".
 				return err
 			}
 		}

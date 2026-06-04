@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"regexp"
 	"time"
@@ -152,13 +153,19 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod) {
 	pod = podClient.Create(ctx, pod)
 
-	ginkgo.By("Watching for error events or started pod")
-	ev, err := podClient.WaitForErrorEventOrSuccessWithTimeout(ctx, pod, framework.PodStartTimeout*6)
+	ginkgo.By("Waiting for pod to start or complete")
+	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "started or completed", framework.PodStartTimeout*6, func(p *v1.Pod) (bool, error) {
+		switch p.Status.Phase {
+		case v1.PodRunning, v1.PodSucceeded, v1.PodFailed:
+			return true, nil
+		default:
+			return false, nil
+		}
+	})
 	framework.ExpectNoError(err)
-	gomega.Expect(ev).To(gomega.BeNil())
 
 	ginkgo.By("Waiting for pod completion")
-	err = e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+	err = e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout*6)
 	framework.ExpectNoError(err)
 	pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -183,13 +190,50 @@ func testNvidiaCLIPod() *v1.Pod {
 						"bash",
 						"-c",
 						`
-nvidia-smi
-apt-get update -y && \
-	DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated cuda-demo-suite-12-5
-/usr/local/cuda/extras/demo_suite/deviceQuery
-/usr/local/cuda/extras/demo_suite/vectorAdd
-/usr/local/cuda/extras/demo_suite/bandwidthTest --device=all --csv
-/usr/local/cuda/extras/demo_suite/busGrind -a
+set -euo pipefail
+
+nvidia_smi_ready=false
+for i in $(seq 1 12); do
+	nvidia_smi_output="$(nvidia-smi 2>&1 || true)"
+	echo "${nvidia_smi_output}"
+	if [[ "${nvidia_smi_output}" == *"NVIDIA-SMI"* ]]; then
+		nvidia_smi_ready=true
+		break
+	fi
+	echo "nvidia-smi did not become ready yet (attempt ${i}/12), retrying in 10s"
+	sleep 10
+done
+if [[ "${nvidia_smi_ready}" != "true" ]]; then
+	echo "nvidia-smi never became ready"
+	exit 1
+fi
+
+apt-get update -y -o Acquire::Retries=5
+if [ "$(uname -m)" = "x86_64" ]; then
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated -o Acquire::Retries=5 cuda-demo-suite-12-5
+	/usr/local/cuda/extras/demo_suite/deviceQuery
+	/usr/local/cuda/extras/demo_suite/vectorAdd
+	/usr/local/cuda/extras/demo_suite/bandwidthTest --device=all --csv
+	/usr/local/cuda/extras/demo_suite/busGrind -a
+else
+	# NVIDIA does not publish cuda-demo-suite-* for sbsa/arm64. Build the
+	# equivalents from the public NVIDIA/cuda-samples repo instead. busGrind
+	# is bundled only in cuda-demo-suite (not in cuda-samples), so it is
+	# skipped on non-x86_64.
+	#
+	# cuda-samples is pinned to v12.5 to match the CUDA 12.5 toolkit in the
+	# nvidia/cuda:12.5.0-devel-ubuntu22.04 base image above and the
+	# cuda-demo-suite-12-5 apt package used on the x86_64 branch; NVIDIA
+	# tags cuda-samples 1:1 with a toolkit version (v12.5 -> CUDA 12.5,
+	# v13.x -> CUDA 13.x), and v13+ also switched the build system from
+	# make to CMake, so bumping requires updating the base image, apt
+	# package, git tag, and build commands together.
+	DEBIAN_FRONTEND=noninteractive apt-get install -y -o Acquire::Retries=5 git
+	git clone --depth 1 --branch v12.5 https://github.com/NVIDIA/cuda-samples.git /tmp/cuda-samples
+	(cd /tmp/cuda-samples/Samples/1_Utilities/deviceQuery  && make && ./deviceQuery)
+	(cd /tmp/cuda-samples/Samples/0_Introduction/vectorAdd && make && ./vectorAdd)
+	(cd /tmp/cuda-samples/Samples/1_Utilities/bandwidthTest && make && ./bandwidthTest)
+fi
 `,
 					},
 					Resources: v1.ResourceRequirements{
@@ -292,25 +336,40 @@ func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework
 	}
 }
 
-func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet clientset.Interface) bool {
+func isControlPlaneNode(node v1.Node) bool {
+	_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
+	if isControlPlane {
+		framework.Logf("Node: %q is a control-plane node (label)", node.Name)
+		return true
+	}
+
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == "node-role.kubernetes.io/control-plane" {
+			framework.Logf("Node: %q is a control-plane node (taint)", node.Name)
+			return true
+		}
+	}
+	framework.Logf("Node: %q is NOT a control-plane node", node.Name)
+	return false
+}
+
+func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet clientset.Interface) error {
 	framework.Logf("Getting list of Nodes from API server")
 	nodeList, err := clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err, "getting node list")
+	if err != nil {
+		return fmt.Errorf("unexpected error getting node list: %w", err)
+	}
 	for _, node := range nodeList.Items {
-		if node.Spec.Unschedulable {
-			continue
-		}
-		if _, ok := node.Labels[framework.ControlPlaneLabel]; ok {
+		if node.Spec.Unschedulable || isControlPlaneNode(node) {
 			continue
 		}
 		framework.Logf("gpuResourceName %s", e2egpu.NVIDIAGPUResourceName)
 		if val, ok := node.Status.Capacity[e2egpu.NVIDIAGPUResourceName]; !ok || val.Value() == 0 {
-			framework.Logf("Nvidia GPUs not available on Node: %q", node.Name)
-			return false
+			return fmt.Errorf("nvidia GPUs not available on Node: %q", node.Name)
 		}
 	}
 	framework.Logf("Nvidia GPUs exist on all schedulable nodes")
-	return true
+	return nil
 }
 
 func logOSImages(ctx context.Context, f *framework.Framework) {
@@ -386,9 +445,9 @@ func waitForGPUs(ctx context.Context, f *framework.Framework, namespace, name st
 
 	// Wait for Nvidia GPUs to be available on nodes
 	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
 		return areGPUsAvailableOnAllSchedulableNodes(ctx, f.ClientSet)
-	}, driverInstallTimeout, time.Second).Should(gomega.BeTrueBecause("expected GPU resources to be available within the timout"))
+	}, driverInstallTimeout, time.Second).Should(gomega.Succeed())
 }
 
 // StartJob starts a simple CUDA job that requests gpu and the specified number of completions

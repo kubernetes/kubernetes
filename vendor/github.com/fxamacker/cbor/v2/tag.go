@@ -1,3 +1,6 @@
+// Copyright (c) Faye Amacker. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 package cbor
 
 import (
@@ -7,23 +10,50 @@ import (
 	"sync"
 )
 
-// Tag represents CBOR tag data, including tag number and unmarshaled tag content. Marshaling and
-// unmarshaling of tag content is subject to any encode and decode options that would apply to
-// enclosed data item if it were to appear outside of a tag.
+// Tag represents a tagged data item (CBOR major type 6), comprising a tag number and the unmarshaled tag content.
+// NOTE: The same encoding and decoding options that apply to untagged CBOR data items also applies to tag content
+// during encoding and decoding.
 type Tag struct {
 	Number  uint64
-	Content interface{}
+	Content any
 }
 
-// RawTag represents CBOR tag data, including tag number and raw tag content.
-// RawTag implements Unmarshaler and Marshaler interfaces.
+// RawTag represents a tagged data item (CBOR major type 6), comprising a tag number and the raw tag content.
+// The raw tag content (enclosed data item) is a CBOR-encoded data item.
+// RawTag can be used to delay decoding a CBOR data item or precompute encoding a CBOR data item.
 type RawTag struct {
 	Number  uint64
 	Content RawMessage
 }
 
-// UnmarshalCBOR sets *t with tag number and raw tag content copied from data.
+// UnmarshalCBOR sets *t with the tag number and the raw tag content copied from data.
+//
+// Deprecated: No longer used by this codec; kept for compatibility
+// with user apps that directly call this function.
 func (t *RawTag) UnmarshalCBOR(data []byte) error {
+	if t == nil {
+		return errors.New("cbor.RawTag: UnmarshalCBOR on nil pointer")
+	}
+
+	d := decoder{data: data, dm: defaultDecMode}
+
+	// Check if data is a well-formed CBOR data item.
+	// RawTag.UnmarshalCBOR() is exported, so
+	// the codec needs to support same behavior for:
+	// - Unmarshal(data, *RawTag)
+	// - RawTag.UnmarshalCBOR(data)
+	err := d.wellformed(false, false)
+	if err != nil {
+		return err
+	}
+
+	return t.unmarshalCBOR(data)
+}
+
+// unmarshalCBOR sets *t with the tag number and the raw tag content copied from data.
+// This function assumes data is well-formed, and does not perform bounds checking.
+// This function is called by Unmarshal().
+func (t *RawTag) unmarshalCBOR(data []byte) error {
 	if t == nil {
 		return errors.New("cbor.RawTag: UnmarshalCBOR on nil pointer")
 	}
@@ -193,7 +223,7 @@ func (t *syncTagSet) Add(opts TagOptions, contentType reflect.Type, num uint64, 
 	if contentType == nil {
 		return errors.New("cbor: cannot add nil content type to TagSet")
 	}
-	for contentType.Kind() == reflect.Ptr {
+	for contentType.Kind() == reflect.Pointer {
 		contentType = contentType.Elem()
 	}
 	tag, err := newTagItem(opts, contentType, num, nestedNum...)
@@ -216,7 +246,7 @@ func (t *syncTagSet) Add(opts TagOptions, contentType reflect.Type, num uint64, 
 
 // Remove removes given tag content type from TagSet.
 func (t *syncTagSet) Remove(contentType reflect.Type) {
-	for contentType.Kind() == reflect.Ptr {
+	for contentType.Kind() == reflect.Pointer {
 		contentType = contentType.Elem()
 	}
 	t.Lock()

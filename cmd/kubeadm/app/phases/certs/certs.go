@@ -24,14 +24,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -69,7 +68,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	fmt.Printf("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
-	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.EncryptionAlgorithmType())
+	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.EncryptionAlgorithm)
 }
 
 // CreateServiceAccountKeyAndPublicKeyFiles creates new public/private key files for signing service account users.

@@ -55,7 +55,8 @@ type Op struct {
 	// fragmentation should be disabled by default
 	// if true, split watch events when total exceeds
 	// "--max-request-bytes" flag value + 512-byte
-	fragment bool
+	fragment           bool
+	watchBufLogEnabled bool
 
 	// for put
 	ignoreValue bool
@@ -106,6 +107,9 @@ func (op Op) RangeBytes() []byte { return op.end }
 // Rev returns the requested revision, if any.
 func (op Op) Rev() int64 { return op.rev }
 
+// Limit returns limit of the result, if any.
+func (op Op) Limit() int64 { return op.limit }
+
 // IsPut returns true iff the operation is a Put.
 func (op Op) IsPut() bool { return op.t == tPut }
 
@@ -123,6 +127,31 @@ func (op Op) IsKeysOnly() bool { return op.keysOnly }
 
 // IsCountOnly returns whether countOnly is set.
 func (op Op) IsCountOnly() bool { return op.countOnly }
+
+// IsSortSet returns true if WithSort is set.
+func (op Op) IsSortSet() bool { return op.sort != nil }
+
+func (op Op) IsOptsWithFromKey() bool { return op.isOptsWithFromKey }
+
+func (op Op) IsOptsWithPrefix() bool { return op.isOptsWithPrefix }
+
+// IsPrevKV returns whether WithPrevKV() is set.
+func (op Op) IsPrevKV() bool { return op.prevKV }
+
+// IsFragment returns whether WithFragment() is set.
+func (op Op) IsFragment() bool { return op.fragment }
+
+// IsProgressNotify returns whether WithProgressNotify() is set.
+func (op Op) IsProgressNotify() bool { return op.progressNotify }
+
+// IsCreatedNotify returns whether WithCreatedNotify() is set.
+func (op Op) IsCreatedNotify() bool { return op.createdNotify }
+
+// IsFilterPut returns whether WithFilterPut() is set.
+func (op Op) IsFilterPut() bool { return op.filterPut }
+
+// IsFilterDelete returns whether WithFilterDelete() is set.
+func (op Op) IsFilterDelete() bool { return op.filterDelete }
 
 // MinModRev returns the operation's minimum modify revision.
 func (op Op) MinModRev() int64 { return op.minModRev }
@@ -180,7 +209,8 @@ func (op Op) toTxnRequest() *pb.TxnRequest {
 	}
 	cmps := make([]*pb.Compare, len(op.cmps))
 	for i := range op.cmps {
-		cmps[i] = (*pb.Compare)(&op.cmps[i])
+		cmp := op.cmps[i].Clone()
+		cmps[i] = cmp.GetCompare()
 	}
 	return &pb.TxnRequest{Compare: cmps, Success: thenOps, Failure: elseOps}
 }
@@ -298,10 +328,14 @@ func OpPut(key, val string, opts ...OpOption) Op {
 
 // OpTxn returns "txn" operation based on given transaction conditions.
 func OpTxn(cmps []Cmp, thenOps []Op, elseOps []Op) Op {
-	return Op{t: tTxn, cmps: cmps, thenOps: thenOps, elseOps: elseOps}
+	clonedCmps := make([]Cmp, len(cmps))
+	for i := range cmps {
+		clonedCmps[i] = cmps[i].Clone()
+	}
+	return Op{t: tTxn, cmps: clonedCmps, thenOps: thenOps, elseOps: elseOps}
 }
 
-func opWatch(key string, opts ...OpOption) Op {
+func OpWatch(key string, opts ...OpOption) Op {
 	ret := Op{t: tRange, key: []byte(key)}
 	ret.applyOpts(opts)
 	switch {
@@ -418,9 +452,15 @@ func WithFromKey() OpOption {
 	}
 }
 
-// WithSerializable makes 'Get' request serializable. By default,
-// it's linearizable. Serializable requests are better for lower latency
-// requirement.
+// WithSerializable makes `Get` and `MemberList` requests serializable.
+// By default, they are linearizable. Serializable requests are better
+// for lower latency requirement, but users should be aware that they
+// could get stale data with serializable requests.
+//
+// In some situations users may want to use serializable requests. For
+// example, when adding a new member to a one-node cluster, it's reasonable
+// and safe to use serializable request before the new added member gets
+// started.
 func WithSerializable() OpOption {
 	return func(op *Op) { op.serializable = true }
 }
@@ -516,6 +556,11 @@ func WithFragment() OpOption {
 	return func(op *Op) { op.fragment = true }
 }
 
+// WithWatchBufLog enables watch response buffer logging.
+func WithWatchBufLog() OpOption {
+	return func(op *Op) { op.watchBufLogEnabled = true }
+}
+
 // WithIgnoreValue updates the key using its current value.
 // This option can not be combined with non-empty values.
 // Returns an error if the key does not exist.
@@ -580,4 +625,20 @@ func IsOptsWithFromKey(opts []OpOption) bool {
 	}
 
 	return ret.isOptsWithFromKey
+}
+
+func (op Op) IsSortOptionValid() bool {
+	if op.sort != nil {
+		sortOrder := int32(op.sort.Order)
+		sortTarget := int32(op.sort.Target)
+
+		if _, ok := pb.RangeRequest_SortOrder_name[sortOrder]; !ok {
+			return false
+		}
+
+		if _, ok := pb.RangeRequest_SortTarget_name[sortTarget]; !ok {
+			return false
+		}
+	}
+	return true
 }

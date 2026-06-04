@@ -24,16 +24,10 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// DeviceClasses returns a DeviceClassInformer.
-	DeviceClasses() DeviceClassInformer
 	// DeviceTaintRules returns a DeviceTaintRuleInformer.
 	DeviceTaintRules() DeviceTaintRuleInformer
-	// ResourceClaims returns a ResourceClaimInformer.
-	ResourceClaims() ResourceClaimInformer
-	// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
-	ResourceClaimTemplates() ResourceClaimTemplateInformer
-	// ResourceSlices returns a ResourceSliceInformer.
-	ResourceSlices() ResourceSliceInformer
+	// ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
+	ResourcePoolStatusRequests() ResourcePoolStatusRequestInformer
 }
 
 type version struct {
@@ -47,27 +41,12 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// DeviceClasses returns a DeviceClassInformer.
-func (v *version) DeviceClasses() DeviceClassInformer {
-	return &deviceClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
 // DeviceTaintRules returns a DeviceTaintRuleInformer.
 func (v *version) DeviceTaintRules() DeviceTaintRuleInformer {
 	return &deviceTaintRuleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ResourceClaims returns a ResourceClaimInformer.
-func (v *version) ResourceClaims() ResourceClaimInformer {
-	return &resourceClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
-func (v *version) ResourceClaimTemplates() ResourceClaimTemplateInformer {
-	return &resourceClaimTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ResourceSlices returns a ResourceSliceInformer.
-func (v *version) ResourceSlices() ResourceSliceInformer {
-	return &resourceSliceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
+func (v *version) ResourcePoolStatusRequests() ResourcePoolStatusRequestInformer {
+	return &resourcePoolStatusRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

@@ -24,6 +24,7 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
@@ -37,8 +38,8 @@ func TestWorkEstimator(t *testing.T) {
 		name                      string
 		requestURI                string
 		requestInfo               *apirequest.RequestInfo
-		counts                    map[string]int64
-		countErr                  error
+		stats                     storage.Stats
+		statsErr                  error
 		watchCount                int
 		maxSeats                  uint64
 		initialSeatsExpected      uint64
@@ -46,14 +47,14 @@ func TestWorkEstimator(t *testing.T) {
 		additionalLatencyExpected time.Duration
 	}{
 		{
-			name:                 "request has no RequestInfo",
+			name:                 "request has no RequestInfo, expect maxSeats",
 			requestURI:           "http://server/apis/",
 			requestInfo:          nil,
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			maxSeats:             100,
+			initialSeatsExpected: 100,
 		},
 		{
-			name:       "request verb is not list",
+			name:       "request verb is not list, expect minSeats",
 			requestURI: "http://server/apis/",
 			requestInfo: &apirequest.RequestInfo{
 				Verb: "get",
@@ -62,237 +63,430 @@ func TestWorkEstimator(t *testing.T) {
 			initialSeatsExpected: 1,
 		},
 		{
-			name:       "request verb is list, conversion to ListOptions returns error",
+			name:       "request verb is list, conversion to ListOptions returns error, expect maxSeats",
 			requestURI: "http://server/apis/foo.bar/v1/events?limit=invalid",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 100,
 		},
 		{
-			name:       "request verb is list, has limit and resource version is 1",
+			name:       "request verb is list, resource version 1, limit 399, expect read 4MB read from etcd",
 			requestURI: "http://server/apis/foo.bar/v1/events?limit=399&resourceVersion=1",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 8,
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
 		},
 		{
-			name:       "request verb is list, limit not set",
+			name:       "request verb is list, resource version 1, expect seats capped by cache",
 			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 10,
+		},
+		{
+			name:       "request verb is list, resource version 1, expect read 7MB read from cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
 			},
-			maxSeats:             10,
+			stats:                storage.Stats{ObjectCount: 69, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
 			initialSeatsExpected: 7,
 		},
 		{
-			name:       "request verb is list, resource version not set",
+			name:       "request verb is list, limit 399, expect 4MB read from etcd",
 			requestURI: "http://server/apis/foo.bar/v1/events?limit=399",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 8,
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
 		},
 		{
-			name:       "request verb is list, no query parameters, count known",
+			name:       "request verb is list, expect read 4MB from etcd",
 			requestURI: "http://server/apis/foo.bar/v1/events",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 399,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 8,
+			stats:                storage.Stats{ObjectCount: 399, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
 		},
 		{
-			name:       "request verb is list, no query parameters, count not known",
+			name:       "request verb is list, count not known, expect minSeats",
 			requestURI: "http://server/apis/foo.bar/v1/events",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             ObjectCountNotFoundErr,
-			maxSeats:             10,
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
 			initialSeatsExpected: 1,
 		},
 		{
-			name:       "request verb is list, continuation is set",
+			name:       "request verb is list, continuation is set, limit 399, expect read 4MB from etcd",
 			requestURI: "http://server/apis/foo.bar/v1/events?continue=token&limit=399",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 8,
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
 		},
 		{
-			name:       "request verb is list, resource version is zero",
+			name:       "request verb is list, resource version is zero, limit 299, expect seats capped by cache",
 			requestURI: "http://server/apis/foo.bar/v1/events?limit=299&resourceVersion=0",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 399,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 4,
+			stats:                storage.Stats{ObjectCount: 399, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 10,
 		},
 		{
-			name:       "request verb is list, resource version is zero, no limit",
+			name:       "request verb is list, resource version is zero, limit 10, expect read 400KB from cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=20&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 399, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 2,
+		},
+		{
+			name:       "request verb is list, resource version is zero, expect seats capped by cache",
 			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 10,
+		},
+		{
+			name:       "request verb is list, resource version is zero, expect read 8MB from cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
 			},
+			stats:                storage.Stats{ObjectCount: 79, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
 			initialSeatsExpected: 8,
 		},
 		{
-			name:       "request verb is list, resource version match is Exact",
+			name:       "request verb is list, resource version 1, match is Exact, expect read 4MB from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1&resourceVersionMatch=Exact&limit=399",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
+		},
+		{
+			name:       "request verb is list, resource version 1, match is NotOlderThan, expect seats capped by cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1&resourceVersionMatch=NotOlderThan",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 10,
+		},
+		{
+			name:       "request verb is list, resource version 1, match is NotOlderThan, expect read 8 MB from cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1&resourceVersionMatch=NotOlderThan",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 79, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
+		},
+		{
+			name:       "request verb is list, resource version 1, match is Exact, expect seats capped by max",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1&resourceVersionMatch=Exact",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 5000, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             20,
+			initialSeatsExpected: 20,
+		},
+		{
+			name:       "request verb is list, bad match, expect read 2MB from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersionMatch=foo",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 200, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 20,
+		},
+		{
+			name:       "request verb is list, bad match, limit 399, expect read 4MB from etcd",
 			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo&resourceVersionMatch=Exact&limit=399",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 8,
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
 		},
 		{
-			name:       "request verb is list, resource version match is NotOlderThan, limit not specified",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo&resourceVersionMatch=NotOlderThan",
+			name:       "request verb is list, resource version 1, match exact, expect seats capped by max seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1&resourceVersionMatch=Exact",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 8,
+			stats:                storage.Stats{ObjectCount: 5000, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             20,
+			initialSeatsExpected: 20,
 		},
 		{
-			name:       "request verb is list, maximum is capped",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo",
+			name:       "request verb is list, resource version 0, count is not found, expect min seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 1999,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 10,
-		},
-		{
-			name:       "request verb is list, maximum is capped, lower max seats",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "list",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 1999,
-			},
-			maxSeats:             5,
-			initialSeatsExpected: 5,
-		},
-		{
-			name:       "request verb is list, list from cache, count not known",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0&limit=799",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "list",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			countErr:             ObjectCountNotFoundErr,
-			maxSeats:             10,
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
 			initialSeatsExpected: 1,
 		},
 		{
-			name:       "request verb is list, object count is stale",
-			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
+			name:       "request verb is list, object count is stale, expect max seats",
+			requestURI: "http://server/apis/foo.bar/v1/events",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			countErr:             ObjectCountStaleErr,
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			stats:                storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 1},
+			statsErr:             ObjectCountStaleErr,
+			maxSeats:             100,
+			initialSeatsExpected: 100,
 		},
 		{
-			name:       "request verb is list, object count is not found",
-			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
+			name:       "request verb is list, no object size, expect seats capped by cache",
+			requestURI: "http://server/apis/foo.bar/v1/events",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             ObjectCountNotFoundErr,
-			maxSeats:             10,
+			stats:                storage.Stats{ObjectCount: 1},
+			maxSeats:             100,
+			initialSeatsExpected: 15,
+		},
+		{
+			name:       "request verb is list, object count is not found, expect min seats",
+			requestURI: "http://server/apis/foo.bar/v1/events",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
 			initialSeatsExpected: 1,
 		},
 		{
-			name:       "request verb is list, count getter throws unknown error",
+			name:       "request verb is list, count getter throws unknown error, expect max seats",
+			requestURI: "http://server/apis/foo.bar/v1/events",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             errors.New("unknown error"),
+			maxSeats:             100,
+			initialSeatsExpected: 100,
+		},
+		{
+			name:       "request verb is list, resource version 0, count not known, limit 1, expect min seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0&limit=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
+			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is list, object count is stale, limit 1, expect read max object size from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 10_000},
+			statsErr:             ObjectCountStaleErr,
+			maxSeats:             100,
+			initialSeatsExpected: 15,
+		},
+		{
+			name:       "request verb is list, no object size, limit 1, expect read max object size from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events&limit=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 1},
+			maxSeats:             100,
+			initialSeatsExpected: 15,
+		},
+		{
+			name:       "request verb is list, object count is not found, limit 1, expect min seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
+			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is list, count getter throws unknown error, limit 1, expect read max object size from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             errors.New("unknown error"),
+			maxSeats:             100,
+			initialSeatsExpected: 15,
+		},
+		{
+			name:       "request verb is list, resource version 0, count not known, limit 499, expect min seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0&limit=499",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
+			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is list, object count is stale, limit 499, expect max seats",
 			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             errors.New("unknown error"),
-			maxSeats:             10,
+			stats:                storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 1},
+			statsErr:             ObjectCountStaleErr,
+			maxSeats:             100,
+			initialSeatsExpected: 100,
+		},
+		{
+			name:       "request verb is list, no object size, limit 499, expect read max object size from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 1},
+			maxSeats:             100,
+			initialSeatsExpected: 15,
+		},
+		{
+			name:       "request verb is list, no object size, resource version 0, limit 499, expect capped by cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0&limit=499",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 1},
+			maxSeats:             100,
 			initialSeatsExpected: 10,
 		},
 		{
-			name:       "request verb is list, metadata.name specified",
+			name:       "request verb is list, object count is not found, limit 499, expect min seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             ObjectCountNotFoundErr,
+			maxSeats:             100,
+			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is list, count getter throws unknown error, limit 499, expect max seats",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			statsErr:             errors.New("unknown error"),
+			maxSeats:             100,
+			initialSeatsExpected: 100,
+		},
+		{
+			name:       "request verb is list, metadata.name specified, expect read 200KB from etcd",
 			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
@@ -300,14 +494,25 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 200_000},
+			maxSeats:             100,
+			initialSeatsExpected: 2,
 		},
 		{
-			name:       "request verb is list, metadata.name, resourceVersion and limit specified",
+			name:       "request verb is list, metadata.name specified, expect read 1.5MB from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_500_000},
+			maxSeats:             100,
+			initialSeatsExpected: 15,
+		},
+		{
+			name:       "request verb is list, metadata.name, resource version 0, limit 500, expect read 200KB from cache",
 			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest&limit=500&resourceVersion=0",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
@@ -315,49 +520,189 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			maxSeats:             10,
-			initialSeatsExpected: 1,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 200_000},
+			maxSeats:             100,
+			initialSeatsExpected: 2,
 		},
 		{
-			name:       "request verb is watch, sendInitialEvents is nil",
+			name:       "request verb is list, metadata.name, resource version 0, limit 500, expect seats capped by cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest&limit=500&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: maxObjectSize},
+			maxSeats:             100,
+			initialSeatsExpected: 10,
+		},
+		{
+			name:       "request verb is list, labelSelector, expect read 8MB from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?labelSelector=app%3Dtest",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 80,
+		},
+		{
+			name:       "request verb is list, labelSelector, limit 49, expect read 4MB from etcd by pagination",
+			requestURI: "http://server/apis/foo.bar/v1/events?labelSelector=app%3Dtest&limit=49",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 40,
+		},
+		{
+			name:       "request verb is list, labelSelector, limit 699, expect read 7MB from etcd",
+			requestURI: "http://server/apis/foo.bar/v1/events?labelSelector=app%3Dtest&limit=699",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 70,
+		},
+		{
+			name:       "request verb is list, labelSelector, resource version 0, expect seats capped cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0&labelSelector=app%3Dtest",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 10,
+		},
+		{
+			name:       "request verb is list, labelSelector, resource version 0, limit 299, expect read 300KB from cache",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0&labelSelector=app%3Dtest&limit=29",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 10_000},
+			maxSeats:             100,
+			initialSeatsExpected: 3,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is nil and RV unset (legacy watch with init events)",
 			requestURI: "http://server/apis/foo.bar/v1/events?watch=true",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "watch",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			initialSeatsExpected: minimumSeats,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
 		},
 		{
-			name:       "request verb is watch, sendInitialEvents is false",
+			name:       "request verb is watch, sendInitialEvents is nil and RV set to 0 (legacy watch with init events)",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is nil and RV set to non-zero (legacy watch without init events)",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&resourceVersion=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is false and RV unset (legacy watch with init events)",
 			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=false",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "watch",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			initialSeatsExpected: minimumSeats,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
 		},
 		{
-			name:       "request verb is watch, sendInitialEvents is true",
+			name:       "request verb is watch, sendInitialEvents is false and RV set to 0 (legacy watch with init events)",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=false&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is false and RV set to non-zero (legacy watch without init events))",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=false&resourceVersion=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is true and RV unset (streaming list with init events)",
 			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=true",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "watch",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is true and RV set to 0 (streaming list with init events)",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=true&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
 			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
+			initialSeatsExpected: 8,
+		},
+		{
+			name:       "request verb is watch, sendInitialEvents is true and RV set to non-zero (streaming list with init events)",
+			requestURI: "http://server/apis/foo.bar/v1/events?watch=true&sendInitialEvents=true&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "watch",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             100,
 			initialSeatsExpected: 8,
 		},
 		{
@@ -402,7 +747,7 @@ func TestWorkEstimator(t *testing.T) {
 			additionalLatencyExpected: 0,
 		},
 		{
-			name:       "request verb is create, watches registered, maximum is capped",
+			name:       "request verb is create, watches registered, capped by watch cache",
 			requestURI: "http://server/apis/foo.bar/v1/foos",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "create",
@@ -534,7 +879,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "serviceaccounts",
 			},
 			watchCount:                1000,
-			maxSeats:                  10,
+			maxSeats:                  20,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        10,
 			additionalLatencyExpected: 50 * time.Millisecond,
@@ -543,12 +888,8 @@ func TestWorkEstimator(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			counts := test.counts
-			if len(counts) == 0 {
-				counts = map[string]int64{}
-			}
-			countsFn := func(key string) (int64, error) {
-				return counts[key], test.countErr
+			statsFn := func(key string) (storage.Stats, error) {
+				return test.stats, test.statsErr
 			}
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount
@@ -557,7 +898,7 @@ func TestWorkEstimator(t *testing.T) {
 				return test.maxSeats
 			}
 
-			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg, maxSeatsFn)
+			estimator := NewWorkEstimator(statsFn, watchCountsFn, defaultCfg, maxSeatsFn)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {

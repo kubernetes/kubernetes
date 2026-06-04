@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/v4/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
 )
 
 // ToSchema converts openapi definitions into a schema suitable for structured
@@ -72,7 +72,7 @@ func (c *convert) makeRef(model proto.Schema, preserveUnknownFields bool) schema
 		mapRelationship, err := getMapElementRelationship(model.GetExtensions())
 
 		if err != nil {
-			c.reportError(err.Error())
+			c.reportError("%v", err)
 		}
 
 		// empty string means unset.
@@ -114,7 +114,7 @@ func (c *convert) VisitKind(k *proto.Kind) {
 
 	unions, err := makeUnions(k.GetExtensions())
 	if err != nil {
-		c.reportError(err.Error())
+		c.reportError("%v", err)
 		return
 	}
 	// TODO: We should check that the fields and discriminator
@@ -129,14 +129,14 @@ func (c *convert) VisitKind(k *proto.Kind) {
 
 	a.Map.ElementRelationship, err = getMapElementRelationship(k.GetExtensions())
 	if err != nil {
-		c.reportError(err.Error())
+		c.reportError("%v", err)
 	}
 }
 
 func (c *convert) VisitArray(a *proto.Array) {
 	relationship, mapKeys, err := getListElementRelationship(a.GetExtensions())
 	if err != nil {
-		c.reportError(err.Error())
+		c.reportError("%v", err)
 	}
 
 	atom := c.top()
@@ -150,7 +150,7 @@ func (c *convert) VisitArray(a *proto.Array) {
 func (c *convert) VisitMap(m *proto.Map) {
 	relationship, err := getMapElementRelationship(m.GetExtensions())
 	if err != nil {
-		c.reportError(err.Error())
+		c.reportError("%v", err)
 	}
 
 	a := c.top()

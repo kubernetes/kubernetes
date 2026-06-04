@@ -17,8 +17,10 @@ package snap
 import (
 	"io"
 
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/pkg/v3/ioutil"
-	"go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 // Message is a struct that contains a raft Message and a ReadCloser. The type
@@ -30,17 +32,17 @@ import (
 //
 // User of Message should close the Message after sending it.
 type Message struct {
-	raftpb.Message
+	*raftpb.Message
 	ReadCloser io.ReadCloser
 	TotalSize  int64
 	closeC     chan bool
 }
 
-func NewMessage(rs raftpb.Message, rc io.ReadCloser, rcSize int64) *Message {
+func NewMessage(rs *raftpb.Message, rc io.ReadCloser, rcSize int64) *Message {
 	return &Message{
 		Message:    rs,
 		ReadCloser: ioutil.NewExactReadCloser(rc, rcSize),
-		TotalSize:  int64(rs.Size()) + rcSize,
+		TotalSize:  int64(proto.Size(rs)) + rcSize,
 		closeC:     make(chan bool, 1),
 	}
 }
@@ -48,11 +50,11 @@ func NewMessage(rs raftpb.Message, rc io.ReadCloser, rcSize int64) *Message {
 // CloseNotify returns a channel that receives a single value
 // when the message sent is finished. true indicates the sent
 // is successful.
-func (m Message) CloseNotify() <-chan bool {
+func (m *Message) CloseNotify() <-chan bool {
 	return m.closeC
 }
 
-func (m Message) CloseWithError(err error) {
+func (m *Message) CloseWithError(err error) {
 	if cerr := m.ReadCloser.Close(); cerr != nil {
 		err = cerr
 	}

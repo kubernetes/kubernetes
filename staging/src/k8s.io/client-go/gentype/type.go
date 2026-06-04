@@ -23,13 +23,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/apply"
-	"k8s.io/client-go/util/consistencydetector"
-	"k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
 )
 
 // objectWithMeta matches objects implementing both runtime.Object and metav1.Object.
@@ -172,24 +169,6 @@ func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOpti
 
 // List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := l.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for "+l.client.resource, l.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for %s ended with an error, falling back to the standard LIST semantics, err = %v", l.client.resource, err)
-	}
-	result, err := l.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for "+l.client.resource, l.list, opts, result)
-	}
-	return result, err
-}
-
-func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L, error) {
 	list := l.newList()
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
@@ -204,24 +183,6 @@ func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L
 		Do(ctx).
 		Into(list)
 	return list, err
-}
-
-// watchList establishes a watch stream with the server and returns the list of resources.
-func (l *alsoLister[T, L]) watchList(ctx context.Context, opts metav1.ListOptions) (result L, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = l.newList()
-	err = l.client.client.Get().
-		UseProtobufAsDefaultIfPreferred(l.client.prefersProtobuf).
-		NamespaceIfScoped(l.client.namespace, l.client.namespace != "").
-		Resource(l.client.resource).
-		VersionedParams(&opts, l.client.parameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
 }
 
 // Watch returns a watch.Interface that watches the requested resources.
@@ -357,7 +318,7 @@ func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyO
 	return result, err
 }
 
-// Apply takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
+// ApplyStatus takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
 func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
 	if obj == *new(C) {
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")

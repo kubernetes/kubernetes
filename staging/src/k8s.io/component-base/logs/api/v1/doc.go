@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:openapi-model-package=io.k8s.component-base.logs.api.v1
 
 // Package v1 contains the configuration API for logging.
 //

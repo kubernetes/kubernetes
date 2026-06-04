@@ -20,12 +20,26 @@ package v1
 
 // FCVolumeSourceApplyConfiguration represents a declarative configuration of the FCVolumeSource type for use
 // with apply.
+//
+// Represents a Fibre Channel volume.
+// Fibre Channel volumes can only be mounted as read/write once.
+// Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSourceApplyConfiguration struct {
+	// targetWWNs is Optional: FC target worldwide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs,omitempty"`
-	Lun        *int32   `json:"lun,omitempty"`
-	FSType     *string  `json:"fsType,omitempty"`
-	ReadOnly   *bool    `json:"readOnly,omitempty"`
-	WWIDs      []string `json:"wwids,omitempty"`
+	// lun is Optional: FC target lun number
+	Lun *int32 `json:"lun,omitempty"`
+	// fsType is the filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType *string `json:"fsType,omitempty"`
+	// readOnly is Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly *bool `json:"readOnly,omitempty"`
+	// wwids Optional: FC volume world wide identifiers (wwids)
+	// Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
+	WWIDs []string `json:"wwids,omitempty"`
 }
 
 // FCVolumeSourceApplyConfiguration constructs a declarative configuration of the FCVolumeSource type for use with

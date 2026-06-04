@@ -23,9 +23,11 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -36,9 +38,11 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -59,15 +63,15 @@ import (
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
-	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/klog/v2"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
+	conversionv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics/resources"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -160,6 +164,9 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	}
 	// add feature enablement metrics
 	fg.(featuregate.MutableFeatureGate).AddMetrics()
+	// add component version metrics
+	opts.ComponentGlobalsRegistry.AddMetrics()
+
 	return Run(ctx, cc, sched)
 }
 
@@ -172,11 +179,17 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
+	externalConfig := &configv1.KubeSchedulerConfiguration{}
+	if err := conversionv1.Convert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(&cc.ComponentConfig, externalConfig, nil); err != nil {
+		return fmt.Errorf("unable to convert configz: %w", err)
+	}
+	externalConfig.SetGroupVersionKind(configv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration"))
+
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err != nil {
-		return fmt.Errorf("unable to register configz: %s", err)
-	} else {
-		cz.Set(cc.ComponentConfig)
+		return fmt.Errorf("unable to register configz: %w", err)
+	} else if err := cz.Set(externalConfig); err != nil {
+		return fmt.Errorf("unable to set configz: %w", err)
 	}
 
 	// Start events processing pipeline.
@@ -242,12 +255,23 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Start up the server for endpoints.
+	gracefulShutdownSecureServer := func() {}
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newEndpointsHandler(&cc.ComponentConfig, cc.InformerFactory, isLeader, checks, readyzChecks, cc.Flagz), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := cc.SecureServing.Serve(handler, 0, ctx.Done()); err != nil {
+		internalStopCh := make(chan struct{})
+		shutdownTimeout := 5 * time.Second
+		stoppedCh, listenerStoppedCh, err := cc.SecureServing.Serve(handler, shutdownTimeout, internalStopCh)
+		if err != nil {
 			// fail early for secure handlers, removing the old error loop from above
+			close(internalStopCh)
 			return fmt.Errorf("failed to start secure server: %v", err)
+		}
+		gracefulShutdownSecureServer = func() {
+			close(internalStopCh)
+			<-listenerStoppedCh
+			logger.Info("[graceful-termination] secure server has stopped listening")
+			<-stoppedCh
+			logger.Info("[graceful-termination] secure server is exiting")
 		}
 	}
 
@@ -293,6 +317,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				sched.Run(ctx)
 			},
 			OnStoppedLeading: func() {
+				gracefulShutdownSecureServer()
 				select {
 				case <-ctx.Done():
 					// We were asked to terminate. Exit 0.
@@ -318,11 +343,12 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	// Leader election is disabled, so runCommand inline until done.
 	close(waitingForLeader)
 	sched.Run(ctx)
+	gracefulShutdownSecureServer()
 	return fmt.Errorf("finished without leader elect")
 }
 
 // buildHandlerChain wraps the given handler with the standard filters.
-func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
+func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.UnconditionalAuthorizer) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
 	failedHandler := genericapifilters.Unauthorized(scheme.Codecs)
 
@@ -375,14 +401,14 @@ func newEndpointsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(pathRecorderMux, kubeScheduler, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		statusz.Install(pathRecorderMux, kubeScheduler, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(pathRecorderMux.ListedPaths())))
 	}
 
 	return pathRecorderMux
 }
 
 func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
-	return func(name string) events.EventRecorder {
+	return func(name string) events.EventRecorderLogger {
 		return cc.EventBroadcaster.NewRecorder(name)
 	}
 }

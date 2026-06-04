@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -31,6 +29,7 @@ import (
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewAddonPhase returns a new addon phase.
@@ -119,7 +118,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 func runKubeProxyAddon(c workflow.RunData) error {
 	const skipMessagePrefix = "[upgrade/addon] Skipping the addon/kube-proxy phase."
 
-	cfg, client, _, out, dryRun, isControlPlaneNode, err := getInitData(c)
+	cfg, client, patchesDir, out, dryRun, isControlPlaneNode, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -142,7 +141,7 @@ func runKubeProxyAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	if err := proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, dryRun); err != nil {
+	if err := proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, patchesDir, out, dryRun); err != nil {
 		return err
 	}
 
@@ -155,7 +154,7 @@ func getAddonPhaseFlags(name string) []string {
 		options.KubeconfigPath,
 		options.DryRun,
 	}
-	if name == "all" || name == "coredns" {
+	if name == "all" || name == "coredns" || name == "kube-proxy" {
 		flags = append(flags,
 			options.Patches,
 		)

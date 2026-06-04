@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
@@ -40,15 +41,17 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -95,7 +98,7 @@ func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1.Lease
 			Namespace: v1.NamespaceNodeLease,
 		},
 		Spec: coordv1.LeaseSpec{
-			HolderIdentity: pointer.String(nodeName),
+			HolderIdentity: ptr.To(nodeName),
 			RenewTime:      &renewTime,
 		},
 	}
@@ -1283,6 +1286,9 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 	nodeCreationTime := metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeControllerLeaseCircuitBreaker, true)
+
 	testcases := []struct {
 		description             string
 		fakeNodeHandler         *testutil.FakeNodeHandler
@@ -1290,6 +1296,8 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 		timeToPass              time.Duration
 		newNodeStatus           v1.NodeStatus
 		newLease                *coordv1.Lease
+		apiServerLease          *coordv1.Lease
+		newAPIServerLease       *coordv1.Lease
 		expectedRequestCount    int
 		expectedNodes           []*v1.Node
 		expectedPodStatusUpdate bool
@@ -1767,6 +1775,180 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 			},
 			expectedPodStatusUpdate: true,
 		},
+		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// Node lease is expired in cache, but fresh in API server.
+		// Expect no action from node controller (within monitor grace period) because of double check.
+		{
+			description: "Node created long time ago, with status updated by kubelet exceeds grace period. Node lease is expired in cache, but fresh in API server.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:      createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			timeToPass: time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			newLease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time))
+				l.ResourceVersion = "50"
+				return l
+			}(),
+			apiServerLease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time))
+				l.ResourceVersion = "50"
+				return l
+			}(),
+			newAPIServerLease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time.Add(time.Hour)))
+				l.ResourceVersion = "100"
+				return l
+			}(),
+			expectedRequestCount: 2, // List nodes + List nodes + GET lease (GET not counted)
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: fakeNow,
+							},
+						},
+						Capacity: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node lease expired in cache but fresh in API server. EnsureReady should skip on second run.
+		{
+			description: "Node lease expired in cache but fresh in API server. EnsureReady should skip on second run.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time.Add(-60*time.Second)))
+				l.ResourceVersion = "50"
+				return l
+			}(),
+			timeToPass: 1 * time.Second,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			newLease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time.Add(-60*time.Second)))
+				l.ResourceVersion = "50"
+				return l
+			}(),
+			apiServerLease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time))
+				l.ResourceVersion = "100"
+				return l
+			}(),
+			newAPIServerLease: func() *coordv1.Lease {
+				l := createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time))
+				l.ResourceVersion = "100"
+				return l
+			}(),
+			expectedRequestCount: 2, // List nodes + List nodes (GET lease not counted)
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: fakeNow,
+							},
+						},
+						Capacity: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: false,
+		},
 	}
 
 	for _, item := range testcases {
@@ -1792,6 +1974,12 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 			if err := nodeController.syncLeaseStore(item.lease); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			if item.apiServerLease != nil {
+				_, err := item.fakeNodeHandler.CoordinationV1().Leases(v1.NamespaceNodeLease).Create(tCtx, item.apiServerLease, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unexpected error creating lease in fake client: %v", err)
+				}
+			}
 			if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1803,6 +1991,12 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 				}
 				if err := nodeController.syncLeaseStore(item.newLease); err != nil {
 					t.Fatalf("unexpected error: %v", err)
+				}
+				if item.newAPIServerLease != nil {
+					_, err := item.fakeNodeHandler.CoordinationV1().Leases(v1.NamespaceNodeLease).Update(tCtx, item.newAPIServerLease, metav1.UpdateOptions{})
+					if err != nil {
+						t.Fatalf("unexpected error updating lease in fake client: %v", err)
+					}
 				}
 				if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -2520,6 +2714,191 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	// We should not see any taint on the node(especially the Not-Ready taint with NoExecute effect).
 	if taintutils.TaintExists(node3.Spec.Taints, NotReadyTaintTemplate) || len(node3.Spec.Taints) > 0 {
 		t.Errorf("Found taint %v in %v, which should not be present", NotReadyTaintTemplate, node3.Spec.Taints)
+	}
+}
+
+// TestApplyNoExecuteTaintsToUnreachableNode ensures a NoExecute taint is applied to node that hasn't posted the
+// node status for a period greater than nodeMonitorGracePeriod.
+func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
+	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows.")
+	}
+	time1 := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
+	// time2 is set to NodeMonitorGracePeriod plus 1 second after time1.
+	time2 := metav1.Time{Time: time1.Add(testNodeMonitorGracePeriod + time.Second)}
+
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			// Unreachable Taint with effect 'NoExecute' should be applied to this node after 2015-01-01 12:00:40.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  time1,
+							LastTransitionTime: time1,
+						},
+					},
+				},
+			},
+			// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+			// we need second healthy node in tests.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node1",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  time1,
+							LastTransitionTime: time1,
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+	_, ctx := ktesting.NewTestContext(t)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		ctx,
+		fakeNodeHandler,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+	)
+	// No taint should be added when the NodeReady conditions were not set longer ago than NodeMonitorGracePeriod.
+	nodeController.now = func() metav1.Time { return time1 }
+	nodeController.recorder = testutil.NewFakeRecorder()
+	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.doNoExecuteTaintingPass(ctx)
+	node0, err := fakeNodeHandler.Get(ctx, "node0", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node0...")
+		return
+	}
+	if len(node0.Spec.Taints) > 0 {
+		t.Errorf("Got unexpected taints %v", node0.Spec.Taints)
+	}
+	node1, err := fakeNodeHandler.Get(ctx, "node1", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node1...")
+		return
+	}
+	if len(node1.Spec.Taints) > 0 {
+		t.Errorf("Got unexpected taints %v", node1.Spec.Taints)
+	}
+
+	// Advance the clock to time2 to expire the previous NodeReady condition.
+	nodeController.now = func() metav1.Time { return time2 }
+	// Only node1 sends a new heartbeat at time2.
+	node1.Status = v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:               v1.NodeReady,
+				Status:             v1.ConditionTrue,
+				LastHeartbeatTime:  time2,
+				LastTransitionTime: time1,
+			},
+		},
+	}
+	_, err = fakeNodeHandler.UpdateStatus(ctx, node1, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	// Unreachable taint should be added to node0 and not node1 because the former's NodeReadyCondition was set longer ago than NodeMonitorGracePeriod.
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.doNoExecuteTaintingPass(ctx)
+
+	node0, err = fakeNodeHandler.Get(ctx, "node0", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node0...")
+		return
+	}
+	if !taintutils.TaintExists(node0.Spec.Taints, UnreachableTaintTemplate) {
+		t.Errorf("Can't find taint %v in %v", UnreachableTaintTemplate, node0.Spec.Taints)
+	}
+	node1, err = fakeNodeHandler.Get(ctx, "node1", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node1...")
+		return
+	}
+	if len(node1.Spec.Taints) > 0 {
+		t.Errorf("Got unexpected taints %v", node1.Spec.Taints)
+	}
+
+	// Unreachable taint should be deleted from node0 after it sends a new heartbeat.
+	node0.Status = v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:               v1.NodeReady,
+				Status:             v1.ConditionTrue,
+				LastHeartbeatTime:  time2,
+				LastTransitionTime: time2,
+			},
+		},
+	}
+	_, err = fakeNodeHandler.UpdateStatus(ctx, node0, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.doNoExecuteTaintingPass(ctx)
+
+	node0, err = fakeNodeHandler.Get(ctx, "node0", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node0...")
+		return
+	}
+	// We should not see any taint on the node.
+	if len(node0.Spec.Taints) > 0 {
+		t.Errorf("Got unexpected taints %v", node0.Spec.Taints)
 	}
 }
 

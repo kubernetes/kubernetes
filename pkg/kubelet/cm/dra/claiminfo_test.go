@@ -25,11 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // ClaimInfo test cases
@@ -43,6 +45,7 @@ const (
 	cdiID         = "test-driver/test=cdi-test-device" // CDI device ID
 	poolName      = "test-pool"
 	requestName   = "test-request"
+	requestName2  = "test-request-2"
 	claimName     = "test-claim"
 	claimUID      = types.UID(claimName + "-uid")
 	podUID        = "test-pod-uid"
@@ -90,8 +93,10 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 					Devices: resourceapi.DeviceClaim{
 						Requests: []resourceapi.DeviceRequest{
 							{
-								Name:            requestName,
-								DeviceClassName: className,
+								Name: requestName,
+								Exactly: &resourceapi.ExactDeviceRequest{
+									DeviceClassName: className,
+								},
 							},
 						},
 					},
@@ -494,10 +499,11 @@ func TestClaimInfoCacheWithLock(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
-			err = cache.withLock(test.funcGen(cache))
+			err = cache.withLock(tCtx.Logger(), test.funcGen(cache))
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -569,8 +575,11 @@ func TestClaimInfoCacheWithRLock(t *testing.T) {
 
 func TestClaimInfoCacheAdd(t *testing.T) {
 	for _, test := range []struct {
-		description string
-		claimInfo   *ClaimInfo
+		description      string
+		initialClaimInfo []*ClaimInfo
+		claimInfo        *ClaimInfo
+		expectMetrics    string
+		expectLog        string
 	}{
 		{
 			description: "claimInfo successfully added",
@@ -580,14 +589,94 @@ func TestClaimInfoCacheAdd(t *testing.T) {
 					Namespace: namespace,
 				},
 			},
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
+# TYPE dra_resource_claims_in_use gauge
+dra_resource_claims_in_use{driver_name="<any>"} 0
+`,
+		},
+		{
+			description: "prepared claimInfo",
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimName: claimName,
+					Namespace: namespace,
+					DriverState: map[string]state.DriverState{
+						"test-driver":       {},
+						"other-test-driver": {},
+					},
+				},
+				prepared: true,
+			},
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
+# TYPE dra_resource_claims_in_use gauge
+dra_resource_claims_in_use{driver_name="<any>"} 1
+dra_resource_claims_in_use{driver_name="other-test-driver"} 1
+dra_resource_claims_in_use{driver_name="test-driver"} 1
+`,
+			expectLog: `INFO dra-claiminfo: ResourceClaim usage changed claimsInUse=<
+	<any>: 1 (+1)
+	other-test-driver: 1 (+1)
+	test-driver: 1 (+1)
+ >
+`,
+		},
+		{
+			description: "add more prepared claimInfo",
+			initialClaimInfo: []*ClaimInfo{{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimName: claimName + "-old",
+					Namespace: namespace,
+					DriverState: map[string]state.DriverState{
+						"test-driver": {},
+					},
+				},
+				prepared: true,
+			}},
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimName: claimName,
+					Namespace: namespace,
+					DriverState: map[string]state.DriverState{
+						"test-driver":       {},
+						"other-test-driver": {},
+					},
+				},
+				prepared: true,
+			},
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
+# TYPE dra_resource_claims_in_use gauge
+dra_resource_claims_in_use{driver_name="<any>"} 2
+dra_resource_claims_in_use{driver_name="other-test-driver"} 1
+dra_resource_claims_in_use{driver_name="test-driver"} 2
+`,
+			expectLog: `INFO dra-claiminfo: ResourceClaim usage changed claimsInUse=<
+	<any>: 2 (+1)
+	other-test-driver: 1 (+1)
+	test-driver: 2 (+1)
+ >
+`,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			logger := klogtesting.NewLogger(t, klogtesting.NewConfig(
+				klogtesting.BufferLogs(true),
+				klogtesting.Verbosity(5),
+			))
 			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
+			for _, claimInfo := range test.initialClaimInfo {
+				cache.add(claimInfo)
+			}
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
-			cache.add(test.claimInfo)
+			_ = cache.withLock(logger, func() error {
+				cache.add(test.claimInfo)
+				return nil
+			})
 			assert.True(t, cache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace))
+			testClaimsInUseMetric(tCtx, cache, test.expectMetrics)
+			logOutput := logger.GetSink().(ktesting.Underlier).GetBuffer()
+			assert.Equal(t, test.expectLog, logOutput.String())
 		})
 	}
 }
@@ -682,28 +771,72 @@ func TestClaimInfoCacheDelete(t *testing.T) {
 	for _, test := range []struct {
 		description    string
 		claimInfoCache *claimInfoCache
+		expectMetrics  string
+		expectLog      string
 	}{
 		{
 			description: "item in cache",
 			claimInfoCache: &claimInfoCache{
 				claimInfo: map[string]*ClaimInfo{
-					claimName + namespace: {
+					namespace + "/" + claimName: {
 						ClaimInfoState: state.ClaimInfoState{
 							ClaimName: claimName,
 							Namespace: namespace,
+							DriverState: map[string]state.DriverState{
+								"test-driver": {},
+							},
 						},
+						prepared: true,
+					},
+					namespace + "/" + claimName + "-old": {
+						ClaimInfoState: state.ClaimInfoState{
+							ClaimName: claimName,
+							Namespace: namespace,
+							DriverState: map[string]state.DriverState{
+								"test-driver":       {},
+								"other-test-driver": {},
+							},
+						},
+						prepared: true,
 					},
 				},
 			},
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
+# TYPE dra_resource_claims_in_use gauge
+dra_resource_claims_in_use{driver_name="<any>"} 1
+dra_resource_claims_in_use{driver_name="test-driver"} 1
+dra_resource_claims_in_use{driver_name="other-test-driver"} 1
+`,
+			expectLog: `INFO dra-claiminfo: ResourceClaim usage changed claimsInUse=<
+	<any>: 1 (-1)
+	other-test-driver: 1 (+0)
+	test-driver: 1 (-1)
+ >
+`,
 		},
 		{
 			description:    "item not in cache",
 			claimInfoCache: &claimInfoCache{},
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
+# TYPE dra_resource_claims_in_use gauge
+dra_resource_claims_in_use{driver_name="<any>"} 0
+`,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			test.claimInfoCache.delete(claimName, namespace)
+			tCtx := ktesting.Init(t)
+			logger := klogtesting.NewLogger(t, klogtesting.NewConfig(
+				klogtesting.BufferLogs(true),
+				klogtesting.Verbosity(5),
+			))
+			_ = test.claimInfoCache.withLock(logger, func() error {
+				test.claimInfoCache.delete(claimName, namespace)
+				return nil
+			})
 			assert.False(t, test.claimInfoCache.contains(claimName, namespace))
+			testClaimsInUseMetric(tCtx, test.claimInfoCache, test.expectMetrics)
+			logOutput := logger.GetSink().(klogtesting.Underlier).GetBuffer()
+			assert.Equal(t, test.expectLog, logOutput.String())
 		})
 	}
 }
@@ -718,7 +851,7 @@ func TestClaimInfoCacheHasPodReference(t *testing.T) {
 			description: "uid is referenced",
 			claimInfoCache: &claimInfoCache{
 				claimInfo: map[string]*ClaimInfo{
-					claimName + namespace: {
+					namespace + "/" + claimName: {
 						ClaimInfoState: state.ClaimInfoState{
 							ClaimName: claimName,
 							Namespace: namespace,

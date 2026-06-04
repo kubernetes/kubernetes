@@ -48,9 +48,11 @@ message ControllerRevision {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // data is the serialized representation of the state.
+  // +required
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // revision indicates the revision of the state represented by Data.
+  // +optional
   optional int64 revision = 3;
 }
 
@@ -67,13 +69,14 @@ message ControllerRevisionList {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 message Deployment {
   // Standard object metadata.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
-  // +optional
+  // +required
   optional DeploymentSpec spec = 2;
 
   // Most recently observed status of the Deployment.
@@ -84,21 +87,27 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +optional
   optional string status = 2;
 
   // The last time this condition was updated.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // Last time the condition transitioned from one status to another.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
   // The reason for the condition's last transition.
+  // +optional
   optional string reason = 4;
 
   // A human readable message indicating details about the transition.
+  // +optional
   optional string message = 5;
 }
 
@@ -116,6 +125,7 @@ message DeploymentList {
 // DeploymentRollback stores the information required to rollback a deployment.
 message DeploymentRollback {
   // Required: This must match the Name of a deployment.
+  // +required
   optional string name = 1;
 
   // The annotations to be updated to a deployment
@@ -123,6 +133,7 @@ message DeploymentRollback {
   map<string, string> updatedAnnotations = 2;
 
   // The config of this deployment rollback.
+  // +optional
   optional RollbackConfig rollbackTo = 3;
 }
 
@@ -140,6 +151,7 @@ message DeploymentSpec {
 
   // Template describes the pods that will be created.
   // The only allowed template.spec.restartPolicy value is "Always".
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
@@ -208,7 +220,7 @@ message DeploymentStatus {
   // Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
   // .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
   //
-  // This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+  // This is a beta field and requires enabling DeploymentReplicaSetTerminatingReplicas feature (enabled by default).
   // +optional
   optional int32 terminatingReplicas = 9;
 
@@ -284,15 +296,18 @@ message RollingUpdateStatefulSetStrategy {
   // for updates. During a rolling update, all pods from ordinal Replicas-1 to
   // Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
   // This is helpful in being able to do a canary based deployment. The default value is 0.
+  // +optional
   optional int32 partition = 1;
 
   // maxUnavailable is the maximum number of pods that can be unavailable during the update.
   // Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
   // Absolute number is calculated from percentage by rounding up. This can not be 0.
-  // Defaults to 1. This field is alpha-level and is only honored by servers that enable the
-  // MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+  // Defaults to 1. This field is beta-level and is enabled by default. The field applies to all pods in the range 0 to
   // Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
   // will be counted towards MaxUnavailable.
+  // This setting might not be effective for the OrderedReady podManagementPolicy. That policy ensures pods are created and become ready one at a time.
+  //
+  // +featureGate=MaxUnavailableStatefulSet
   // +optional
   optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 2;
 }
@@ -316,12 +331,16 @@ message Scale {
 message ScaleSpec {
   // replicas is the number of observed instances of the scaled object.
   // +optional
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +default=0
+  // +k8s:alpha(since: "1.36")=+k8s:minimum=0
   optional int32 replicas = 1;
 }
 
 // ScaleStatus represents the current status of a scale subresource.
 message ScaleStatus {
   // replias is the actual number of observed instances of the scaled object.
+  // +optional
   optional int32 replicas = 1;
 
   // selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -347,12 +366,13 @@ message ScaleStatus {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/status"
 message StatefulSet {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired identities of pods in this set.
-  // +optional
+  // +required
   optional StatefulSetSpec spec = 2;
 
   // Status is the current status of Pods in this StatefulSet. This data
@@ -364,9 +384,11 @@ message StatefulSet {
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
   // Type of statefulset condition.
+  // +optional
   optional string type = 1;
 
   // Status of the condition, one of True, False, Unknown.
+  // +optional
   optional string status = 2;
 
   // Last time the condition transitioned from one status to another.
@@ -412,6 +434,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // VolumeClaimTemplates when the StatefulSet is deleted. The default policy
   // of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
   // `Delete` policy causes those PVCs to be deleted.
+  // +optional
   optional string whenDeleted = 1;
 
   // whenScaled specifies what happens to PVCs created from StatefulSet
@@ -419,6 +442,7 @@ message StatefulSetPersistentVolumeClaimRetentionPolicy {
   // policy of `Retain` causes PVCs to not be affected by a scaledown. The
   // `Delete` policy causes the associated PVCs for any excess pods above
   // the replica count to be deleted.
+  // +optional
   optional string whenScaled = 2;
 }
 
@@ -444,6 +468,7 @@ message StatefulSetSpec {
   // of the StatefulSet. Each pod will be named with the format
   // <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
   // "web" with index number "3" would be named "web-3".
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // volumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -479,12 +504,14 @@ message StatefulSetSpec {
   // updateStrategy indicates the StatefulSetUpdateStrategy that will be
   // employed to update Pods in the StatefulSet when a revision is made to
   // Template.
+  // +optional
   optional StatefulSetUpdateStrategy updateStrategy = 7;
 
   // revisionHistoryLimit is the maximum number of revisions that will
   // be maintained in the StatefulSet's revision history. The revision history
   // consists of all revisions not represented by a currently applied
   // StatefulSetSpec version. The default value is 10.
+  // +optional
   optional int32 revisionHistoryLimit = 8;
 
   // minReadySeconds is the minimum number of seconds for which a newly created pod should be ready
@@ -493,8 +520,12 @@ message StatefulSetSpec {
   // +optional
   optional int32 minReadySeconds = 9;
 
-  // PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
-  // the StatefulSet VolumeClaimTemplates.
+  // persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+  // volume claims created from volumeClaimTemplates. By default, all persistent
+  // volume claims are created as needed and retained until manually deleted. This
+  // policy allows the lifecycle to be altered, for example by deleting persistent
+  // volume claims when their stateful set is deleted, or when their pod is scaled
+  // down.
   // +optional
   optional StatefulSetPersistentVolumeClaimRetentionPolicy persistentVolumeClaimRetentionPolicy = 10;
 
@@ -558,9 +589,11 @@ message StatefulSetStatus {
 // necessary to perform the update for the indicated strategy.
 message StatefulSetUpdateStrategy {
   // Type indicates the type of the StatefulSetUpdateStrategy.
+  // +optional
   optional string type = 1;
 
   // RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+  // +optional
   optional RollingUpdateStatefulSetStrategy rollingUpdate = 2;
 }
 

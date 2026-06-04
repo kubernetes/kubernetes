@@ -20,8 +20,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
@@ -32,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
@@ -136,7 +135,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 	}
 
 	if len(resetBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, errors.Errorf("no %s found in the supplied config", constants.ResetConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.ResetConfiguration{}

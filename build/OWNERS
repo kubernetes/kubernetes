@@ -14,7 +14,6 @@ reviewers:
   - palnabarun # Release Manager
   - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
   - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-  - spiffxp
   - thockin
   - Verolop # Release Manager
   - xmudrii # Release Manager
@@ -25,10 +24,10 @@ approvers:
   - justaugustus
   - liggitt
   - mikedanese
-  - spiffxp
   - thockin
 emeritus_approvers:
   - fejta
   - jbeda
+  - spiffxp
   - zmerlynn
   - lavalamp

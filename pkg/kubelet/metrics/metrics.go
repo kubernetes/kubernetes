@@ -51,6 +51,7 @@ const (
 	PLEGDiscardEventsKey               = "pleg_discard_events"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
+	PLEGPodRelistDurationKey           = "pleg_pod_relist_duration_seconds"
 	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
 	EventedPLEGConnKey                 = "evented_pleg_connection_success_count"
 	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
@@ -74,6 +75,7 @@ const (
 	RestartedPodTotalKey               = "restarted_pods_total"
 	ImagePullDurationKey               = "image_pull_duration_seconds"
 	CgroupVersionKey                   = "cgroup_version"
+	CRILosingSupportKey                = "cri_losing_support"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -99,14 +101,36 @@ const (
 	StartedPodsTotalKey             = "started_pods_total"
 	StartedPodsErrorsTotalKey       = "started_pods_errors_total"
 	StartedContainersTotalKey       = "started_containers_total"
+	TerminatedContainersTotalKey    = "terminated_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
 
 	// Metrics to track HostProcess container usage by this kubelet
 	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
 	StartedHostProcessContainersErrorsTotalKey = "started_host_process_containers_errors_total"
 
+	// Metrics to track UserNamespaced (hostUsers = false) pods.
+	StartedUserNamespacedPodsTotalKey       = "started_user_namespaced_pods_total"
+	StartedUserNamespacedPodsErrorsTotalKey = "started_user_namespaced_pods_errors_total"
+
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
+
+	// Metrics to track resource managers allocation
+	ResourceManagerAllocationTotalKey = "resource_manager_allocations_total"
+
+	ResourceManagerAllocationErrorsTotalKey = "resource_manager_allocation_errors_total"
+
+	ResourceManagerContainerAssignmentsKey = "resource_manager_container_assignments"
+
+	ResourceManagerPod  = "pod"
+	ResourceManagerNode = "node"
+
+	ResourceManagerCPU    = "cpu"
+	ResourceManagerMemory = "memory"
+
+	ResourceManagerExclusiveNode = "node_exclusive"
+	ResourceManagerSharedPod     = "pod_shared"
+	ResourceManagerExclusivePod  = "pod_exclusive"
 
 	// Metrics to track the CPU manager behavior
 	CPUManagerPinningRequestsTotalKey         = "cpu_manager_pinning_requests_total"
@@ -131,7 +155,7 @@ const (
 	// Metric for tracking garbage collected images
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
 
-	// Metric for tracking aligment of compute resources
+	// Metric for tracking alignment of compute resources
 	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_count"
 	ContainerAlignedComputeResourcesFailureNameKey   = "container_aligned_compute_resources_failure_count"
 	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
@@ -140,6 +164,10 @@ const (
 	// Metric keys for DRA operations
 	DRAOperationsDurationKey     = "operations_duration_seconds"
 	DRAGRPCOperationsDurationKey = "grpc_operations_duration_seconds"
+
+	// Metric keys for MemoryQoS
+	MemoryQoSNodeMemoryMinBytesKey = "memory_qos_node_memory_min_bytes"
+	MemoryQoSNodeMemoryLowBytesKey = "memory_qos_node_memory_low_bytes"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -160,6 +188,23 @@ const (
 	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
 	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
 	ImageVolumeMountedErrorsTotalKey  = "image_volume_mounted_errors_total"
+
+	// Special label for [DRAResourceClaimsInUseDesc] which counts ResourceClaims regardless of the driver.
+	DRAResourceClaimsInUseAnyDriver = "<any>"
+
+	// Metric keys for in-place pod resize operations.
+	ContainerRequestedResizesKey     = "container_requested_resizes_total"
+	PodResizeDurationMillisecondsKey = "pod_resize_duration_milliseconds"
+	PodPendingResizesKey             = "pod_pending_resizes"
+	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
+	PodInProgressResizesKey          = "pod_in_progress_resizes"
+	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+
+	// Metric key for podcertificate states.
+	PodCertificateStatesKey = "podcertificate_states"
+
+	// Metric key for podsapi
+	PodWatchEventsDroppedKey = "pod_watch_events_dropped_total"
 )
 
 type imageSizeBucket struct {
@@ -191,10 +236,13 @@ var (
 	// The buckets max value 40 is based on the 45sec max gRPC timeout value defined
 	// for the DRA gRPC calls in the pkg/kubelet/cm/dra/plugin/registration.go
 	DRADurationBuckets = metrics.ExponentialBucketsRange(.1, 40, 15)
+
+	// podResizeDurationBuckets is the bucket boundaries for pod_resize_duration_milliseconds metrics.
+	podResizeDurationBuckets = []float64{10, 50, 100, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000, 120000, 300000, 600000}
 )
 
 var (
-	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
+	// NodeName is a Gauge that tracks the node's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -361,6 +409,17 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PLEGLastSeenKey,
 			Help:           "Timestamp in seconds when PLEG was last seen active.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// PLEGPodRelistDuration is a Histogram that tracks the duration (in seconds) it takes for relisting a single pod in the Kubelet's
+	// Pod Lifecycle Event Generator (PLEG).
+	PLEGPodRelistDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PLEGPodRelistDurationKey,
+			Help:           "Duration in seconds for relisting a single pod in PLEG.",
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -707,6 +766,16 @@ var (
 		},
 		[]string{"container_type"},
 	)
+	// TerminatedContainersTotal is a counter that tracks the number of container terminations
+	TerminatedContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TerminatedContainersTotalKey,
+			Help:           "Cumulative number of container terminations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "exit_code", "reason"},
+	)
 	// StartedContainersTotal is a counter that tracks the number of errors creating containers
 	StartedContainersErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -736,6 +805,24 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
+	)
+	// StartedUserNamespacedPodsTotal is a counter that tracks the number of user namespaced pods that are attempted to be created.
+	StartedUserNamespacedPodsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedUserNamespacedPodsTotalKey,
+			Help:           "Cumulative number of pods with user namespaces started. This metric will only be collected on Linux.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// StartedUserNamespacedPodsErrorsTotal is a counter that tracks the number of errors creating user namespaced pods
+	StartedUserNamespacedPodsErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedUserNamespacedPodsErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting pods with user namespaces. This metric will only be collected on Linux.",
+			StabilityLevel: metrics.ALPHA,
+		},
 	)
 	// ManagedEphemeralContainers is a gauge that indicates how many ephemeral containers are managed by this kubelet.
 	ManagedEphemeralContainers = metrics.NewGauge(
@@ -867,6 +954,26 @@ var (
 		},
 	)
 
+	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
+	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryQoSNodeMemoryMinBytesKey,
+			Help:           "Total cgroup v2 memory.min in bytes for Guaranteed pods. This memory is hard-reserved and never reclaimed by the kernel.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// MemoryQoSNodeMemoryLowBytes tracks total cgroup v2 memory.low (soft protection) for Burstable pods.
+	MemoryQoSNodeMemoryLowBytes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryQoSNodeMemoryLowBytesKey,
+			Help:           "Total cgroup v2 memory.low in bytes for Burstable pods. This memory is soft-reserved and may be reclaimed under extreme pressure.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// TopologyManagerAdmissionRequestsTotal tracks the number of times the pod spec will cause the topology manager to admit a pod
 	TopologyManagerAdmissionRequestsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -887,7 +994,7 @@ var (
 		},
 	)
 
-	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
+	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in milliseconds) to serve a pod admission request.
 	TopologyManagerAdmissionDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -907,7 +1014,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// OrphanPodCleanedVolumes is number of times that removeOrphanedPodVolumeDirs failed.
+	// OrphanPodCleanedVolumesErrors is the number of times that removeOrphanedPodVolumeDirs failed.
 	OrphanPodCleanedVolumesErrors = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1004,6 +1111,16 @@ var (
 		},
 	)
 
+	CRILosingSupport = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CRILosingSupportKey,
+			Help:           "the Kubernetes version that the currently running CRI implementation will lose support on if not upgraded.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"version"},
+	)
+
 	// DRAOperationsDuration tracks the duration of the DRA PrepareResources and UnprepareResources requests.
 	DRAOperationsDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -1028,6 +1145,15 @@ var (
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 
+	DRAResourceClaimsInUseDesc = metrics.NewDesc(
+		metrics.BuildFQName("", DRASubsystem, "resource_claims_in_use"),
+		"The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.",
+		[]string{"driver_name"},
+		nil,
+		metrics.ALPHA,
+		"",
+	)
+
 	// AdmissionRejectionsTotal tracks the number of failed admission times, currently, just record it for pod additions
 	AdmissionRejectionsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1039,13 +1165,13 @@ var (
 		[]string{"reason"},
 	)
 
-	// ImageVolumeRequestedTotal trakcs the number of requested image volumes.
+	// ImageVolumeRequestedTotal tracks the number of requested image volumes.
 	ImageVolumeRequestedTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageVolumeRequestedTotalKey,
 			Help:           "Number of requested image volumes.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -1055,7 +1181,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageVolumeMountedSucceedTotalKey,
 			Help:           "Number of successful image volume mounts.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 	)
 
@@ -1065,6 +1191,115 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           ImageVolumeMountedErrorsTotalKey,
 			Help:           "Number of failed image volume mounts.",
+			StabilityLevel: metrics.BETA,
+		},
+	)
+
+	// ContainerRequestedResizes tracks the cumulative number of requested resizes at the container level.
+	ContainerRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ContainerRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource", "requirement", "operation"},
+	)
+
+	// PodResizeDurationMilliseconds tracks the duration (in milliseconds) it takes to resize a pod.
+	PodResizeDurationMilliseconds = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResizeDurationMillisecondsKey,
+			Help:           "Duration in milliseconds to actuate a pod resize",
+			Buckets:        podResizeDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"success"},
+	)
+
+	// PodPendingResizes tracks the number of pending resizes for pods.
+	PodPendingResizes = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodPendingResizesKey,
+			Help:           "Number of pending resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
+
+	// PodInfeasibleResizes tracks the number of infeasible resizes for pods.
+	PodInfeasibleResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodInfeasibleResizesKey,
+			Help:           "Number of infeasible resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason_detail"},
+	)
+
+	// PodInProgressResizes tracks the number of in-progress resizes for pods.
+	PodInProgressResizes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodInProgressResizesKey,
+			Help:           "Number of in-progress resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// PodDeferredAcceptedResizes tracks the cumulative number of deferred accepted resizes for pods.
+	PodDeferredAcceptedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodDeferredAcceptedResizesKey,
+			Help:           "Cumulative number of resizes that were accepted after being deferred.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"retry_trigger"},
+	)
+
+	// ResourceManagerAllocationsTotal counts the total number of exclusive resource
+	// allocations performed by a manager. The `source` label distinguishes between
+	// allocations drawn from the node-level pool versus a pre-allocated pod-level pool.
+	ResourceManagerAllocationsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: ResourceManagerAllocationTotalKey,
+			Help: "Number of exclusive resource allocations performed by a resource manager.",
+		},
+		[]string{"resource_name", "source"},
+	)
+
+	// ResourceManagerAllocationErrorsTotal counts errors encountered during exclusive
+	// resource allocation, distinguished by the intended allocation source.
+	ResourceManagerAllocationErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: ResourceManagerAllocationErrorsTotalKey,
+			Help: "Number of errors encountered during exclusive resource allocation.",
+		},
+		[]string{"resource_name", "source"},
+	)
+
+	// ResourceManagerContainerAssignments counts the total number of containers with
+	// a specific type of resource assignment. This provides visibility into how many
+	// containers were allocated with exclusive resources (from the node or pod pool)
+	// versus the pod-level shared pool.
+	ResourceManagerContainerAssignments = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: ResourceManagerContainerAssignmentsKey,
+			Help: "Number of containers with a specific type of resource assignment.",
+		},
+		[]string{"resource_name", "assignment_type"},
+	)
+
+	// PodWatchEventsDroppedTotal tracks the number of dropped pod watch events.
+	PodWatchEventsDroppedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWatchEventsDroppedKey,
+			Help:           "Cumulative number of pod watch events dropped.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -1073,7 +1308,7 @@ var (
 var registerMetrics sync.Once
 
 // Register registers all metrics.
-func Register(collectors ...metrics.StableCollector) {
+func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(FirstNetworkPodStartSLIDuration)
@@ -1097,6 +1332,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PLEGDiscardEvents)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
+		legacyregistry.MustRegister(PLEGPodRelistDuration)
 		legacyregistry.MustRegister(EventedPLEGConnErr)
 		legacyregistry.MustRegister(EventedPLEGConn)
 		legacyregistry.MustRegister(EventedPLEGConnLatency)
@@ -1122,13 +1358,16 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
-			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
-			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
+		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+			legacyregistry.MustRegister(StartedUserNamespacedPodsTotal)
+			legacyregistry.MustRegister(StartedUserNamespacedPodsErrorsTotal)
 		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
@@ -1143,15 +1382,15 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+			legacyregistry.MustRegister(MemoryQoSNodeMemoryMinBytes)
+			legacyregistry.MustRegister(MemoryQoSNodeMemoryLowBytes)
+		}
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
-
-		for _, collector := range collectors {
-			legacyregistry.CustomMustRegister(collector)
-		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
@@ -1164,8 +1403,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CgroupVersion)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			legacyregistry.MustRegister(DRAOperationsDuration)
-			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
+			legacyregistry.MustRegister(
+				DRAOperationsDuration,
+				DRAGRPCOperationsDuration,
+			)
 		}
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
@@ -1175,7 +1416,28 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			legacyregistry.MustRegister(ContainerRequestedResizes)
+			legacyregistry.MustRegister(PodResizeDurationMilliseconds)
+			legacyregistry.MustRegister(PodPendingResizes)
+			legacyregistry.MustRegister(PodInfeasibleResizes)
+			legacyregistry.MustRegister(PodInProgressResizes)
+			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+			legacyregistry.MustRegister(ResourceManagerAllocationsTotal)
+			legacyregistry.MustRegister(ResourceManagerAllocationErrorsTotal)
+			legacyregistry.MustRegister(ResourceManagerContainerAssignments)
+		}
+
+		legacyregistry.MustRegister(PodWatchEventsDroppedTotal)
 	})
+}
+
+func RegisterCollectors(collectors ...metrics.StableCollector) {
+	legacyregistry.CustomMustRegister(collectors...)
 }
 
 // GetGather returns the gatherer. It used by test case outside current package.

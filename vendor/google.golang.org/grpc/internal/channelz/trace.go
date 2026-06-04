@@ -194,7 +194,7 @@ func (r RefChannelType) String() string {
 // If channelz is not turned ON, this will simply log the event descriptions.
 func AddTraceEvent(l grpclog.DepthLoggerV2, e Entity, depth int, desc *TraceEvent) {
 	// Log only the trace description associated with the bottom most entity.
-	d := fmt.Sprintf("[%s]%s", e, desc.Desc)
+	d := fmt.Sprintf("[%s] %s", e, desc.Desc)
 	switch desc.Severity {
 	case CtUnknown, CtInfo:
 		l.InfoDepth(depth+1, d)

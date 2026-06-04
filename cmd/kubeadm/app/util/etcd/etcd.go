@@ -23,25 +23,26 @@ import (
 	"net"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const etcdTimeout = 2 * time.Second
@@ -71,7 +72,7 @@ type etcdClient interface {
 	Endpoints() []string
 
 	// MemberList lists the current cluster membership.
-	MemberList(ctx context.Context) (*clientv3.MemberListResponse, error)
+	MemberList(ctx context.Context, opts ...clientv3.OpOption) (*clientv3.MemberListResponse, error)
 
 	// MemberAdd adds a new member into the cluster.
 	MemberAdd(ctx context.Context, peerAddrs []string) (*clientv3.MemberAddResponse, error)
@@ -101,6 +102,13 @@ type Client struct {
 	listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
 }
 
+type etcdMemberStatus struct {
+	ep     string
+	status *clientv3.StatusResponse
+	// err is any error encountered while communicating with the etcd server.
+	err error
+}
+
 // New creates a new EtcdCluster client
 func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	client := Client{Endpoints: endpoints}
@@ -123,10 +131,7 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 		return clientv3.New(clientv3.Config{
 			Endpoints:   endpoints,
 			DialTimeout: etcdTimeout,
-			DialOptions: []grpc.DialOption{
-				grpc.WithBlock(), // block until the underlying connection is up
-			},
-			TLS: tlsConfig,
+			TLS:         tlsConfig,
 		})
 	}
 
@@ -284,31 +289,42 @@ type Member struct {
 	PeerURL string
 }
 
+func (c *Client) listMembersOnce() (*clientv3.MemberListResponse, error) {
+	cli, err := c.newEtcdClient(c.Endpoints)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cli.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+	resp, err := cli.MemberList(ctx)
+	cancel()
+	if err == nil {
+		return resp, nil
+	}
+	klog.V(5).Infof("Failed to get etcd member list: %v", err)
+	return nil, err
+}
+
 func (c *Client) listMembers(timeout time.Duration) (*clientv3.MemberListResponse, error) {
 	// Gets the member list
-	var lastError error
-	var resp *clientv3.MemberListResponse
+	var (
+		err       error
+		lastError error
+		resp      *clientv3.MemberListResponse
+	)
+
 	if timeout == 0 {
 		timeout = kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration
 	}
-	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, timeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, timeout,
 		true, func(_ context.Context) (bool, error) {
-			cli, err := c.newEtcdClient(c.Endpoints)
+			resp, err = c.listMembersOnce()
 			if err != nil {
 				lastError = err
-				return false, nil
+				return false, err
 			}
-			defer func() { _ = cli.Close() }()
-
-			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-			resp, err = cli.MemberList(ctx)
-			cancel()
-			if err == nil {
-				return true, nil
-			}
-			klog.V(5).Infof("Failed to get etcd member list: %v", err)
-			lastError = err
-			return false, nil
+			return true, nil
 		})
 	if err != nil {
 		return nil, lastError
@@ -388,7 +404,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 				respMembers = resp.Members
 				return true, nil
 			}
-			if errors.Is(rpctypes.ErrMemberNotFound, err) {
+			if errors.Is(err, rpctypes.ErrMemberNotFound) {
 				klog.V(5).Infof("Member was already removed, because member %s was not found", strconv.FormatUint(id, 16))
 				listResp, err = cli.MemberList(ctx)
 				if err == nil {
@@ -522,44 +538,89 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		ret = append(ret, Member{Name: memberName, PeerURL: m.PeerURLs[0]})
 	}
 
-	// Add the new member client address to the list of endpoints
-	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
+	if !isLearner {
+		// Add the new member client address to the list of endpoints
+		c.addEndpoint(GetClientURLByIP(parsedPeerAddrs.Hostname()))
+	}
 
 	return ret, nil
 }
 
-// isLearner returns true if the given member ID is a learner.
-func (c *Client) isLearner(memberID uint64) (bool, error) {
-	resp, err := c.listMembersFunc(0)
+// getMemberStatus returns the status of the given member ID.
+// It returns whether the member is a learner and whether it is started.
+func (c *Client) getMemberStatus(memberID uint64) (isLearner bool, started bool, err error) {
+	resp, err := c.listMembersOnce()
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
+	var m *etcdserverpb.Member
 	for _, member := range resp.Members {
-		if member.ID == memberID && member.IsLearner {
-			return true, nil
+		if member.ID == memberID {
+			m = member
+			break
 		}
 	}
-	return false, nil
+	if m == nil {
+		return false, false, fmt.Errorf("member %s not found", strconv.FormatUint(memberID, 16))
+	}
+
+	started = true
+	// There is no field for "started".
+	// If the member is not started, the Name and ClientURLs fields are set to their respective zero values.
+	if len(m.Name) == 0 {
+		started = false
+	}
+
+	return m.IsLearner, started, nil
 }
 
 // MemberPromote promotes a member as a voting member. If the given member ID is already a voting member this method
-// will return early and do nothing.
+// will return early and do nothing. It waits for the member to be started before attempting to promote.
 func (c *Client) MemberPromote(learnerID uint64) error {
-	isLearner, err := c.isLearner(learnerID)
+	var (
+		lastError     error
+		isLearner     bool
+		isStarted     bool
+		learnerIDUint = strconv.FormatUint(learnerID, 16)
+	)
+
+	klog.V(1).Infof("[etcd] Waiting for a learner to start: %s", learnerIDUint)
+
+	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			var err error
+			isLearner, isStarted, err = c.getMemberStatus(learnerID)
+			if err != nil {
+				lastError = errors.WithMessagef(err, "failed to get member %s status", learnerIDUint)
+				return false, nil
+			}
+			if !isLearner {
+				klog.V(1).Infof("[etcd] Member %s was already promoted.", learnerIDUint)
+				return true, nil
+			}
+			if !isStarted {
+				klog.V(1).Infof("[etcd] Member %s is not started yet. Waiting for it to be started.", learnerIDUint)
+				lastError = errors.Errorf("the etcd member %s is not started", learnerIDUint)
+				return false, nil
+			}
+			return true, nil
+		})
 	if err != nil {
-		return err
+		return lastError
 	}
+
 	if !isLearner {
-		klog.V(1).Infof("[etcd] Member %s already promoted.", strconv.FormatUint(learnerID, 16))
 		return nil
 	}
 
-	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %s", strconv.FormatUint(learnerID, 16))
+	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %s", learnerIDUint)
+
 	cli, err := c.newEtcdClient(c.Endpoints)
 	if err != nil {
 		return err
 	}
+
 	defer func() { _ = cli.Close() }()
 
 	// TODO: warning logs from etcd client should be removed.
@@ -568,38 +629,69 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 	// 2. context deadline exceeded
 	// 3. peer URLs already exists
 	// Once the client provides a way to check if the etcd learner is ready to promote, the retry logic can be revisited.
-	var (
-		lastError error
-	)
+	var promoteResp *clientv3.MemberPromoteResponse
 	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
-
-			_, err = cli.MemberPromote(ctx, learnerID)
+			promoteResp, err = cli.MemberPromote(ctx, learnerID)
 			if err == nil {
-				klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %s", strconv.FormatUint(learnerID, 16))
+				klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %s", learnerIDUint)
 				return true, nil
 			}
-			klog.V(5).Infof("[etcd] Promoting the learner %s failed: %v", strconv.FormatUint(learnerID, 16), err)
+			klog.V(5).Infof("[etcd] Promoting the learner %s failed: %v", learnerIDUint, err)
 			lastError = err
 			return false, nil
 		})
 	if err != nil {
 		return lastError
 	}
+
+	for _, m := range promoteResp.Members {
+		if m.ID == learnerID {
+			parsedPeerAddrs, err := url.Parse(m.PeerURLs[0])
+			if err != nil {
+				return errors.Wrapf(err, "error parsing peer address %s", m.PeerURLs[0])
+			}
+			c.addEndpoint(GetClientURLByIP(parsedPeerAddrs.Hostname()))
+			break
+		}
+	}
+
 	return nil
+}
+
+func (c *Client) addEndpoint(ep string) {
+	if slices.Contains(c.Endpoints, ep) {
+		return
+	}
+	c.Endpoints = append(c.Endpoints, ep)
 }
 
 // CheckClusterHealth returns nil for status Up or error for status Down
 func (c *Client) CheckClusterHealth() error {
-	_, err := c.getClusterStatus()
+	_, ok, err := c.getClusterStatus()
+	if err != nil {
+		klog.V(1).Infof("[etcd] cluster has quorum: %t; some members are not healthy: %v\n", ok, err)
+	}
+	if ok {
+		return nil
+	}
 	return err
 }
 
-// getClusterStatus returns nil for status Up (along with endpoint status response map) or error for status Down
-func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error) {
-	clusterStatus := make(map[string]*clientv3.StatusResponse)
+// getClusterStatus checks the health of the cluster members and returns
+// their individual status map, whether cluster quorum is satisfied, and any
+// aggregated member errors.
+//
+// The boolean result is true when a majority of members are healthy
+// (healthyCount > totalCount/2).
+//
+// A member is considered unhealthy if its status request failed or if the
+// reported status contains health errors.
+func (c *Client) getClusterStatus() (map[string]*etcdMemberStatus, bool, error) {
+	// Step 1: get the cluster status first
+	clusterStatus := make(map[string]*etcdMemberStatus)
 	for _, ep := range c.Endpoints {
 		// Gets the member status
 		var lastError error
@@ -608,6 +700,7 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 			true, func(_ context.Context) (bool, error) {
 				cli, err := c.newEtcdClient(c.Endpoints)
 				if err != nil {
+					klog.V(5).Infof("Failed to create etcd client with %v: %v", c.Endpoints, err)
 					lastError = err
 					return false, nil
 				}
@@ -624,33 +717,47 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 				return false, nil
 			})
 		if err != nil {
-			return nil, lastError
+			clusterStatus[ep] = &etcdMemberStatus{ep: ep, err: lastError}
+		} else {
+			clusterStatus[ep] = &etcdMemberStatus{ep: ep, status: resp}
 		}
-
-		clusterStatus[ep] = resp
 	}
-	return clusterStatus, nil
+
+	// Step 2: evaluate the cluster status
+	totalCount, healthyCount := len(clusterStatus), 0
+	var memberErrs []error
+
+	for ep, epStatus := range clusterStatus {
+		if epStatus.err != nil {
+			memberErrs = append(memberErrs, errors.Wrapf(epStatus.err, "the status of member %s is not available", ep))
+			continue
+		}
+		if len(epStatus.status.Errors) > 0 {
+			memberErrs = append(memberErrs, errors.Errorf("member %s is not healthy: %s", ep, strings.Join(epStatus.status.Errors, ",")))
+			continue
+		}
+		healthyCount++
+	}
+
+	err := utilerrors.NewAggregate(memberErrs)
+	return clusterStatus, healthyCount > totalCount/2, err
 }
 
-// WaitForClusterAvailable returns true if all endpoints in the cluster are available after retry attempts, an error is returned otherwise
+// WaitForClusterAvailable returns true if the etcd cluster is healthy after retry attempts, otherwise returns an error.
 func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
-	for i := 0; i < retries; i++ {
+	for i := range retries {
 		if i > 0 {
 			klog.V(1).Infof("[etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)
 		}
 		klog.V(2).Infof("[etcd] attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
-		_, err := c.getClusterStatus()
+		_, ok, err := c.getClusterStatus()
 		if err != nil {
-			switch err {
-			case context.DeadlineExceeded:
-				klog.V(1).Infof("[etcd] Attempt timed out")
-			default:
-				klog.V(1).Infof("[etcd] Attempt failed with error: %v\n", err)
-			}
-			continue
+			klog.V(1).Infof("[etcd] cluster has quorum: %t; some members are not healthy: %v\n", ok, err)
 		}
-		return true, nil
+		if ok {
+			return true, nil
+		}
 	}
 	return false, errors.New("timeout waiting for etcd cluster to be available")
 }

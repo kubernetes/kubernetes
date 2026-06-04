@@ -24,14 +24,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
-
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -88,7 +87,7 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.Cert
 	}
 
 	// Use the encryption algorithm from ClusterConfiguration.
-	k.config.EncryptionAlgorithm = ic.ClusterConfiguration.EncryptionAlgorithmType()
+	k.config.EncryptionAlgorithm = ic.ClusterConfiguration.EncryptionAlgorithm
 	return &k.config, nil
 }
 
@@ -318,9 +317,8 @@ func KubeadmCertKubeletClient() *KubeadmCert {
 		CAName:   "ca",
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
-				CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-				Organization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				CommonName: kubeadmconstants.APIServerKubeletClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},
 	}

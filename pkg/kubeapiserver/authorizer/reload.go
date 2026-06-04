@@ -36,16 +36,19 @@ import (
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
+	"k8s.io/apiserver/pkg/util/filesystem"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
+
+var _ = authorizer.Authorizer(&reloadableAuthorizerResolver{})
+var _ = authorizer.RuleResolver(&reloadableAuthorizerResolver{})
 
 type reloadableAuthorizerResolver struct {
 	// initialConfig holds the ReloadFile used to initiate background reloading,
@@ -77,6 +80,16 @@ type authorizerResolver struct {
 
 func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return r.current.Load().authorizer.Authorize(ctx, a)
+}
+
+// ConditionsAwareAuthorize delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return r.current.Load().authorizer.ConditionsAwareAuthorize(ctx, a)
+}
+
+// EvaluateConditions delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return r.current.Load().authorizer.EvaluateConditions(ctx, decision, data)
 }
 
 func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -141,10 +154,18 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			default:
 				return nil, nil, fmt.Errorf("unknown failurePolicy %q", configuredAuthorizer.Webhook.FailurePolicy)
 			}
+
+			authorizedTTL, unauthorizedTTL := configuredAuthorizer.Webhook.AuthorizedTTL.Duration, configuredAuthorizer.Webhook.UnauthorizedTTL.Duration
+			if !configuredAuthorizer.Webhook.CacheAuthorizedRequests {
+				authorizedTTL = 0
+			}
+			if !configuredAuthorizer.Webhook.CacheUnauthorizedRequests {
+				unauthorizedTTL = 0
+			}
 			webhookAuthorizer, err := webhook.New(clientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
-				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
-				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
+				authorizedTTL,
+				unauthorizedTTL,
 				*r.initialConfig.WebhookRetryBackoff,
 				decisionOnError,
 				configuredAuthorizer.Webhook.MatchConditions,
@@ -184,7 +205,7 @@ type kubeapiserverWebhookMetrics struct {
 // Blocks until ctx is complete.
 func (r *reloadableAuthorizerResolver) runReload(ctx context.Context) {
 	metrics.RegisterMetrics()
-	metrics.RecordAuthorizationConfigAutomaticReloadSuccess(r.apiServerID)
+	metrics.RecordAuthorizationConfigLastConfigInfo(r.apiServerID, string(r.lastReadData))
 
 	filesystem.WatchUntil(
 		ctx,
@@ -242,5 +263,5 @@ func (r *reloadableAuthorizerResolver) checkFile(ctx context.Context) {
 		ruleResolver: ruleResolver,
 	})
 	klog.InfoS("reloaded authz config")
-	metrics.RecordAuthorizationConfigAutomaticReloadSuccess(r.apiServerID)
+	metrics.RecordAuthorizationConfigAutomaticReloadSuccess(r.apiServerID, string(data))
 }

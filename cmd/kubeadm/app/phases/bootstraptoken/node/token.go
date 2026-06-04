@@ -19,8 +19,6 @@ package node
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,6 +28,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // CreateNewTokens tries to create a token and fails if one with the same ID already exists

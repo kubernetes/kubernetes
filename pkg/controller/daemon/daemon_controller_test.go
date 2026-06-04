@@ -2376,7 +2376,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
 			node.Spec.Unschedulable = c.nodeUnschedulable
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			manager, _, _, err := newTestController(ctx)
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -2387,7 +2387,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				manager.podStore.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
-			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)
+			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(logger, node, c.ds)
 
 			if shouldRun != c.shouldRun {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)
@@ -2410,6 +2410,9 @@ func TestUpdateNode(t *testing.T) {
 		expectedEventsFunc func(strategyType apps.DaemonSetUpdateStrategyType) int
 		shouldEnqueue      bool
 		expectedCreates    func() int
+		// Indicates whether a DaemonSet pod was already present on the node before the node transitioned to Ready and schedulable state.
+		// (In other words, was the DaemonSet pod scheduled before the node lost its readiness / was tainted?)
+		preExistingPod bool
 	}{
 		{
 			test:    "Nothing changed, should not enqueue",
@@ -2422,6 +2425,7 @@ func TestUpdateNode(t *testing.T) {
 			}(),
 			shouldEnqueue:   false,
 			expectedCreates: func() int { return 0 },
+			preExistingPod:  false,
 		},
 		{
 			test:    "Node labels changed",
@@ -2434,6 +2438,7 @@ func TestUpdateNode(t *testing.T) {
 			}(),
 			shouldEnqueue:   true,
 			expectedCreates: func() int { return 0 },
+			preExistingPod:  false,
 		},
 		{
 			test: "Node taints changed",
@@ -2446,6 +2451,7 @@ func TestUpdateNode(t *testing.T) {
 			ds:              newDaemonSet("ds"),
 			shouldEnqueue:   true,
 			expectedCreates: func() int { return 0 },
+			preExistingPod:  false,
 		},
 		{
 			test:    "Node Allocatable changed",
@@ -2475,6 +2481,21 @@ func TestUpdateNode(t *testing.T) {
 			expectedCreates: func() int {
 				return 1
 			},
+			preExistingPod: false,
+		},
+		{
+			test:    "Pod transitions from misscheduled to scheduled due to node label change",
+			oldNode: newNode("node1", nil),
+			newNode: newNode("node1", simpleNodeLabel),
+			ds: func() *apps.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
+				ds.Status.NumberMisscheduled = 1
+				return ds
+			}(),
+			shouldEnqueue:   true,
+			expectedCreates: func() int { return 0 },
+			preExistingPod:  true,
 		},
 	}
 	for _, c := range cases {
@@ -2510,6 +2531,10 @@ func TestUpdateNode(t *testing.T) {
 				expectedCreates = c.expectedCreates()
 			}
 			expectSyncDaemonSets(t, manager, c.ds, podControl, expectedCreates, 0, expectedEvents)
+
+			if c.preExistingPod {
+				addPods(manager.podStore, c.oldNode.Name, simpleDaemonSetLabel, c.ds, 1)
+			}
 
 			manager.enqueueDaemonSet = func(ds *apps.DaemonSet) {
 				if ds.Name == "ds" {
@@ -3596,7 +3621,7 @@ func TestStoreDaemonSetStatus(t *testing.T) {
 				}
 				return true, ds, nil
 			})
-			if err := storeDaemonSetStatus(context.TODO(), fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
+			if _, err := storeDaemonSetStatus(context.TODO(), fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); !errors.Is(err, tt.expectedError) {
 				t.Errorf("storeDaemonSetStatus() got %v, expected %v", err, tt.expectedError)
 			}
 			if getCalled != tt.expectedGetCalled {

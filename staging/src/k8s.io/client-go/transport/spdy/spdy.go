@@ -23,8 +23,10 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	httpstreamspdy "k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+	streamhttp "k8s.io/streaming/pkg/httpstream"
 )
 
 // Upgrader validates a response from the server after a SPDY upgrade.
@@ -43,7 +45,7 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, er
 	if config.Proxy != nil {
 		proxy = config.Proxy
 	}
-	upgradeRoundTripper, err := spdy.NewRoundTripperWithConfig(spdy.RoundTripperConfig{
+	upgradeRoundTripper, err := httpstreamspdy.NewRoundTripperWithConfig(httpstreamspdy.RoundTripperConfig{
 		TLS:              tlsConfig,
 		Proxier:          proxy,
 		PingPeriod:       time.Second * 5,
@@ -79,6 +81,18 @@ func NewDialer(upgrader Upgrader, client *http.Client, method string, url *url.U
 	}
 }
 
+// NewDialerForStreaming creates a SPDY dialer for in-tree callers that use
+// k8s.io/streaming/pkg/httpstream types.
+func NewDialerForStreaming(upgrader Upgrader, client *http.Client, method string, url *url.URL) streamhttp.Dialer {
+	return &streamingDialerAdapter{delegate: NewDialer(upgrader, client, method, url)}
+}
+
+// NewUpgraderForStreaming adapts a streaming upgrader for callers that need
+// the compatibility Upgrader interface.
+func NewUpgraderForStreaming(upgrader streamhttp.UpgradeRoundTripper) Upgrader {
+	return &compatUpgraderAdapter{delegate: upgrader}
+}
+
 func (d *dialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	req, err := http.NewRequest(d.method, d.url.String(), nil)
 	if err != nil {
@@ -104,4 +118,200 @@ func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, protoc
 		return nil, "", err
 	}
 	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
+}
+
+// NegotiateStreaming is for in-tree callers that still operate on
+// k8s.io/streaming/pkg/httpstream types.
+func NegotiateStreaming(upgrader Upgrader, client *http.Client, req *http.Request, protocols ...string) (streamhttp.Connection, string, error) {
+	conn, protocol, err := Negotiate(upgrader, client, req, protocols...)
+	if err != nil {
+		return nil, "", err
+	}
+	return wrapStreamingConnection(conn), protocol, nil
+}
+
+type streamingDialerAdapter struct {
+	delegate httpstream.Dialer
+}
+
+func (d *streamingDialerAdapter) Dial(protocols ...string) (streamhttp.Connection, string, error) {
+	conn, protocol, err := d.delegate.Dial(protocols...)
+	if err != nil {
+		return nil, "", err
+	}
+	return wrapStreamingConnection(conn), protocol, nil
+}
+
+type compatUpgraderAdapter struct {
+	delegate streamhttp.UpgradeRoundTripper
+}
+
+func (u *compatUpgraderAdapter) NewConnection(resp *http.Response) (httpstream.Connection, error) {
+	conn, err := u.delegate.NewConnection(resp)
+	if err != nil {
+		return nil, err
+	}
+	return wrapCompatConnection(conn), nil
+}
+
+type streamingStreamAdapter struct {
+	delegate httpstream.Stream
+}
+
+func (s *streamingStreamAdapter) Read(p []byte) (int, error) {
+	return s.delegate.Read(p)
+}
+
+func (s *streamingStreamAdapter) Write(p []byte) (int, error) {
+	return s.delegate.Write(p)
+}
+
+func (s *streamingStreamAdapter) Close() error {
+	return s.delegate.Close()
+}
+
+func (s *streamingStreamAdapter) Reset() error {
+	return s.delegate.Reset()
+}
+
+func (s *streamingStreamAdapter) Headers() http.Header {
+	return s.delegate.Headers()
+}
+
+func (s *streamingStreamAdapter) Identifier() uint32 {
+	return s.delegate.Identifier()
+}
+
+type streamingConnectionAdapter struct {
+	delegate httpstream.Connection
+}
+
+func (c *streamingConnectionAdapter) CreateStream(headers http.Header) (streamhttp.Stream, error) {
+	stream, err := c.delegate.CreateStream(headers)
+	if err != nil {
+		return nil, err
+	}
+	return &streamingStreamAdapter{delegate: stream}, nil
+}
+
+func (c *streamingConnectionAdapter) Close() error {
+	return c.delegate.Close()
+}
+
+func (c *streamingConnectionAdapter) CloseChan() <-chan bool {
+	return c.delegate.CloseChan()
+}
+
+func (c *streamingConnectionAdapter) SetIdleTimeout(timeout time.Duration) {
+	c.delegate.SetIdleTimeout(timeout)
+}
+
+func (c *streamingConnectionAdapter) RemoveStreams(streams ...streamhttp.Stream) {
+	compatStreams := make([]httpstream.Stream, 0, len(streams))
+	for _, stream := range streams {
+		if stream == nil {
+			continue
+		}
+		if s, ok := stream.(*streamingStreamAdapter); ok {
+			compatStreams = append(compatStreams, s.delegate)
+			continue
+		}
+		if s, ok := stream.(httpstream.Stream); ok {
+			compatStreams = append(compatStreams, s)
+			continue
+		}
+		klog.V(5).Infof("dropping unadaptable streaming stream %T in RemoveStreams", stream)
+	}
+	c.delegate.RemoveStreams(compatStreams...)
+}
+
+func wrapStreamingConnection(conn httpstream.Connection) streamhttp.Connection {
+	if conn == nil {
+		return nil
+	}
+	if wrapped, ok := conn.(*compatConnectionAdapter); ok {
+		return wrapped.delegate
+	}
+	return &streamingConnectionAdapter{delegate: conn}
+}
+
+type compatStreamAdapter struct {
+	delegate streamhttp.Stream
+}
+
+func (s *compatStreamAdapter) Read(p []byte) (int, error) {
+	return s.delegate.Read(p)
+}
+
+func (s *compatStreamAdapter) Write(p []byte) (int, error) {
+	return s.delegate.Write(p)
+}
+
+func (s *compatStreamAdapter) Close() error {
+	return s.delegate.Close()
+}
+
+func (s *compatStreamAdapter) Reset() error {
+	return s.delegate.Reset()
+}
+
+func (s *compatStreamAdapter) Headers() http.Header {
+	return s.delegate.Headers()
+}
+
+func (s *compatStreamAdapter) Identifier() uint32 {
+	return s.delegate.Identifier()
+}
+
+type compatConnectionAdapter struct {
+	delegate streamhttp.Connection
+}
+
+func (c *compatConnectionAdapter) CreateStream(headers http.Header) (httpstream.Stream, error) {
+	stream, err := c.delegate.CreateStream(headers)
+	if err != nil {
+		return nil, err
+	}
+	return &compatStreamAdapter{delegate: stream}, nil
+}
+
+func (c *compatConnectionAdapter) Close() error {
+	return c.delegate.Close()
+}
+
+func (c *compatConnectionAdapter) CloseChan() <-chan bool {
+	return c.delegate.CloseChan()
+}
+
+func (c *compatConnectionAdapter) SetIdleTimeout(timeout time.Duration) {
+	c.delegate.SetIdleTimeout(timeout)
+}
+
+func (c *compatConnectionAdapter) RemoveStreams(streams ...httpstream.Stream) {
+	streamingStreams := make([]streamhttp.Stream, 0, len(streams))
+	for _, stream := range streams {
+		if stream == nil {
+			continue
+		}
+		if s, ok := stream.(*compatStreamAdapter); ok {
+			streamingStreams = append(streamingStreams, s.delegate)
+			continue
+		}
+		if s, ok := stream.(streamhttp.Stream); ok {
+			streamingStreams = append(streamingStreams, s)
+			continue
+		}
+		klog.V(5).Infof("dropping unadaptable compat stream %T in RemoveStreams", stream)
+	}
+	c.delegate.RemoveStreams(streamingStreams...)
+}
+
+func wrapCompatConnection(conn streamhttp.Connection) httpstream.Connection {
+	if conn == nil {
+		return nil
+	}
+	if wrapped, ok := conn.(*streamingConnectionAdapter); ok {
+		return wrapped.delegate
+	}
+	return &compatConnectionAdapter{delegate: conn}
 }

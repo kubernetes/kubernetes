@@ -125,7 +125,11 @@ func IncreaseLevel(lvl zapcore.LevelEnabler) Option {
 	return optionFunc(func(log *Logger) {
 		core, err := zapcore.NewIncreaseLevelCore(log.core, lvl)
 		if err != nil {
-			fmt.Fprintf(log.errorOutput, "failed to IncreaseLevel: %v\n", err)
+			_, _ = fmt.Fprintf(
+				log.errorOutput,
+				"failed to IncreaseLevel: %v\n",
+				err,
+			)
 		} else {
 			log.core = core
 		}

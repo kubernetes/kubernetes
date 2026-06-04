@@ -21,10 +21,10 @@ import (
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (

@@ -22,6 +22,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -30,15 +31,19 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+const (
+	warningServiceAccountTokenInSecretsRecommended = "spec.serviceAccountTokenInSecrets is unset; if supported by this CSI driver, set to true to prevent possible logging of tokens in volume attributes"
+)
+
 // csiDriverStrategy implements behavior for CSIDriver objects
 type csiDriverStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // CSIDriver objects via the REST API.
-var Strategy = csiDriverStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = csiDriverStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (csiDriverStrategy) NamespaceScoped() bool {
 	return false
@@ -53,6 +58,12 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) {
+		csiDriver.Spec.ServiceAccountTokenInSecrets = nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		csiDriver.Spec.PreventPodSchedulingIfMissing = nil
+	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -63,14 +74,24 @@ func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (csiDriverStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	csiDriver := obj.(*storage.CSIDriver)
+	var warnings []string
+
+	// Warn if tokenRequests is configured but serviceAccountTokenInSecrets is not enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) &&
+		len(csiDriver.Spec.TokenRequests) > 0 &&
+		csiDriver.Spec.ServiceAccountTokenInSecrets == nil {
+		warnings = append(warnings, warningServiceAccountTokenInSecretsRecommended)
+	}
+
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
 func (csiDriverStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiDriverStrategy) AllowCreateOnUpdate() bool {
+func (csiDriverStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -86,9 +107,19 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newCSIDriver.Spec.SELinuxMount = nil
 	}
 
+	if oldCSIDriver.Spec.ServiceAccountTokenInSecrets == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) {
+		newCSIDriver.Spec.ServiceAccountTokenInSecrets = nil
+	}
+
 	if oldCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		newCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds = nil
+	}
+
+	if oldCSIDriver.Spec.PreventPodSchedulingIfMissing == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		newCSIDriver.Spec.PreventPodSchedulingIfMissing = nil
 	}
 
 	// Any changes to the spec increment the generation number.
@@ -105,9 +136,22 @@ func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 
 // WarningsOnUpdate returns warnings for the given update.
 func (csiDriverStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newCSIDriver := obj.(*storage.CSIDriver)
+	oldCSIDriver := old.(*storage.CSIDriver)
+
+	var warnings []string
+
+	// Warn if tokenRequests is being changed and serviceAccountTokenInSecrets is not enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) &&
+		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) &&
+		len(newCSIDriver.Spec.TokenRequests) > 0 &&
+		newCSIDriver.Spec.ServiceAccountTokenInSecrets == nil {
+		warnings = append(warnings, warningServiceAccountTokenInSecretsRecommended)
+	}
+
+	return warnings
 }
 
-func (csiDriverStrategy) AllowUnconditionalUpdate() bool {
+func (csiDriverStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

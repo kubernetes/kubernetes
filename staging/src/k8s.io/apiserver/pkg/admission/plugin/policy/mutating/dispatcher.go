@@ -20,8 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,13 +36,14 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
+	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/mutating/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	webhookgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
+func NewDispatcher(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
 	res := &dispatcher{
 		matcher:              m,
 		authz:                a,
@@ -58,7 +60,7 @@ func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeC
 
 type dispatcher struct {
 	matcher              *matching.Matcher
-	authz                authorizer.Authorizer
+	authz                authorizer.UnconditionalAuthorizer
 	typeConverterManager patch.TypeConverterManager
 	generic.Dispatcher[PolicyHook]
 }
@@ -120,8 +122,12 @@ func (d *dispatcher) dispatchInvocations(
 	// if it is cluster scoped, namespaceName will be empty
 	// Otherwise, get the Namespace resource.
 	if namespaceName != "" {
-		namespace, err = d.matcher.GetNamespace(namespaceName)
+		namespace, err = d.matcher.GetNamespace(ctx, namespaceName)
 		if err != nil {
+			var statusError *k8serrors.StatusError
+			if errors.As(err, &statusError) {
+				return nil, statusError
+			}
 			return nil, k8serrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespaceName)
 		}
 	}
@@ -131,8 +137,8 @@ func (d *dispatcher) dispatchInvocations(
 	// Should loop through invocations, handling possible error and invoking
 	// evaluator to apply patch, also should handle re-invocations
 	for _, invocation := range invocations {
-		if invocation.Evaluator.CompositionEnv != nil {
-			ctx = invocation.Evaluator.CompositionEnv.CreateContext(ctx)
+		if invocation.Evaluator.CompositedCompiler != nil {
+			ctx = invocation.Evaluator.CompositedCompiler.CreateContext(ctx)
 		}
 		if len(invocation.Evaluator.Mutators) != len(invocation.Policy.Spec.Mutations) {
 			// This would be a bug. The compiler should always return exactly as
@@ -171,19 +177,23 @@ func (d *dispatcher) dispatchInvocations(
 			continue
 		}
 
-		objectBeforeMutations := versionedAttr.VersionedObject
+		objectBeforeMutations := versionedAttr.VersionedObject.Object()
 		// Mutations for a single invocation of a MutatingAdmissionPolicy are evaluated
 		// in order.
 		for mutationIndex := range invocation.Policy.Spec.Mutations {
 			lastVersionedAttr = versionedAttr
-			if versionedAttr.VersionedObject == nil { // Do not call patchers if there is no object to patch.
+			if versionedAttr.VersionedObject.Object() == nil { // Do not call patchers if there is no object to patch.
 				continue
 			}
 
 			patcher := invocation.Evaluator.Mutators[mutationIndex]
 			optionalVariables := cel.OptionalVariableBindings{VersionedParams: invocation.Param, Authorizer: authz}
+			startTime := time.Now()
 			err = d.dispatchOne(ctx, patcher, o, versionedAttr, namespace, invocation.Resource, optionalVariables)
+			elapsed := time.Since(startTime)
+
 			if err != nil {
+				celmetrics.Metrics.ObserveRejection(ctx, elapsed, invocation.Policy.Name, invocation.Binding.Name, ErrorType(err))
 				var statusError *k8serrors.StatusError
 				if errors.As(err, &statusError) {
 					return nil, statusError
@@ -191,22 +201,24 @@ func (d *dispatcher) dispatchInvocations(
 
 				addConfigError(err, invocation, metav1.StatusReasonInvalid)
 				continue
+			} else {
+				celmetrics.Metrics.ObserveAdmission(ctx, elapsed, invocation.Policy.Name, invocation.Binding.Name, celmetrics.MutationNoError)
 			}
 		}
-		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject) {
+		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject.Object()) {
 			// The mutation has changed the object. Prepare to reinvoke all previous mutations that are eligible for re-invocation.
 			policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
 		}
-		if invocation.Policy.Spec.ReinvocationPolicy == v1alpha1.IfNeededReinvocationPolicy {
+		if invocation.Policy.Spec.ReinvocationPolicy == admissionregistrationv1.IfNeededReinvocationPolicy {
 			policyReinvokeCtx.AddReinvocablePolicyToPreviouslyInvoked(invocationKey)
 		}
 	}
 
-	if lastVersionedAttr != nil && lastVersionedAttr.VersionedObject != nil && lastVersionedAttr.Dirty {
+	if lastVersionedAttr != nil && lastVersionedAttr.VersionedObject.Object() != nil && lastVersionedAttr.Dirty {
 		policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 		reinvokeCtx.SetShouldReinvoke()
-		if err := o.GetObjectConvertor().Convert(lastVersionedAttr.VersionedObject, lastVersionedAttr.Attributes.GetObject(), nil); err != nil {
+		if err := o.GetObjectConvertor().Convert(lastVersionedAttr.VersionedObject.Object(), lastVersionedAttr.Attributes.GetObject(), nil); err != nil {
 			return nil, k8serrors.NewInternalError(fmt.Errorf("failed to convert object: %w", err))
 		}
 	}
@@ -249,7 +261,7 @@ func (d *dispatcher) dispatchOne(
 		return err
 	}
 
-	switch versionedAttributes.VersionedObject.(type) {
+	switch versionedAttributes.VersionedObject.Object().(type) {
 	case *unstructured.Unstructured:
 		// No conversion needed before defaulting for the patch object if the admitted object is unstructured.
 	default:
@@ -260,9 +272,7 @@ func (d *dispatcher) dispatchOne(
 		}
 	}
 	o.GetObjectDefaulter().Default(newVersionedObject)
-
-	versionedAttributes.Dirty = true
-	versionedAttributes.VersionedObject = newVersionedObject
+	versionedAttributes.UpdateObject(newVersionedObject)
 	return nil
 }
 

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -33,18 +34,18 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // persistentvolumeStrategy implements behavior for PersistentVolume objects
 type persistentvolumeStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating PersistentVolume
 // objects via the REST API.
-var Strategy = persistentvolumeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = persistentvolumeStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (persistentvolumeStrategy) NamespaceScoped() bool {
 	return false
@@ -89,7 +90,7 @@ func (persistentvolumeStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 func (persistentvolumeStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
+func (persistentvolumeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -115,7 +116,7 @@ func (persistentvolumeStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 	return pvutil.GetWarningsForPersistentVolume(obj.(*api.PersistentVolume))
 }
 
-func (persistentvolumeStrategy) AllowUnconditionalUpdate() bool {
+func (persistentvolumeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

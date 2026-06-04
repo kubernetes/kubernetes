@@ -25,13 +25,21 @@ import (
 
 // StorageVersionConditionApplyConfiguration represents a declarative configuration of the StorageVersionCondition type for use
 // with apply.
+//
+// Describes the state of the storageVersion at a certain point.
 type StorageVersionConditionApplyConfiguration struct {
-	Type               *apiserverinternalv1alpha1.StorageVersionConditionType `json:"type,omitempty"`
-	Status             *apiserverinternalv1alpha1.ConditionStatus             `json:"status,omitempty"`
-	ObservedGeneration *int64                                                 `json:"observedGeneration,omitempty"`
-	LastTransitionTime *v1.Time                                               `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                                `json:"reason,omitempty"`
-	Message            *string                                                `json:"message,omitempty"`
+	// type of the condition.
+	Type *apiserverinternalv1alpha1.StorageVersionConditionType `json:"type,omitempty"`
+	// status of the condition, one of True, False, Unknown.
+	Status *apiserverinternalv1alpha1.ConditionStatus `json:"status,omitempty"`
+	// observedGeneration represents the .metadata.generation that the condition was set based upon, if field is set.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
+	LastTransitionTime *v1.Time `json:"lastTransitionTime,omitempty"`
+	// reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human readable string indicating details about the transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // StorageVersionConditionApplyConfiguration constructs a declarative configuration of the StorageVersionCondition type for use with

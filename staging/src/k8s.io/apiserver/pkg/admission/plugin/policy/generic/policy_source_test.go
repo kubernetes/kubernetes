@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,12 +43,13 @@ func (fd *fakeDispatcher) Start(context.Context) error {
 	return nil
 }
 
-func makeTestDispatcher(authorizer.Authorizer, *matching.Matcher, kubernetes.Interface) generic.Dispatcher[generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]] {
+func makeTestDispatcher(authorizer.UnconditionalAuthorizer, *matching.Matcher, kubernetes.Interface) generic.Dispatcher[generic.PolicyHook[*FakePolicy, *FakeBinding, generic.Evaluator]] {
 	return &fakeDispatcher{}
 }
 
 func TestPolicySourceHasSyncedEmpty(t *testing.T) {
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -81,6 +82,7 @@ func TestPolicySourceHasSyncedInitialList(t *testing.T) {
 	}
 
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },
@@ -150,6 +152,7 @@ func TestPolicySourceBindsToPolicies(t *testing.T) {
 	}
 
 	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
 		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
 		func(fb *FakeBinding) generic.BindingAccessor { return fb },
 		func(fp *FakePolicy) generic.Evaluator { return nil },

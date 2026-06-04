@@ -26,12 +26,26 @@ import (
 
 // HorizontalPodAutoscalerConditionApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerCondition type for use
 // with apply.
+//
+// HorizontalPodAutoscalerCondition describes the state of
+// a HorizontalPodAutoscaler at a certain point.
 type HorizontalPodAutoscalerConditionApplyConfiguration struct {
-	Type               *autoscalingv2.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus                                 `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                                        `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                             `json:"reason,omitempty"`
-	Message            *string                                             `json:"message,omitempty"`
+	// type describes the current condition
+	Type *autoscalingv2.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
+	// status is the status of the condition (True, False, Unknown)
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// lastTransitionTime is the last time the condition transitioned from
+	// one status to another
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is the reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human-readable explanation containing details about
+	// the transition
+	Message *string `json:"message,omitempty"`
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
+	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+	// with respect to the current state of the instance.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
 // HorizontalPodAutoscalerConditionApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerCondition type for use with
@@ -77,5 +91,13 @@ func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithReason(value st
 // If called multiple times, the Message field is set to the value of the last call.
 func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithMessage(value string) *HorizontalPodAutoscalerConditionApplyConfiguration {
 	b.Message = &value
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithObservedGeneration(value int64) *HorizontalPodAutoscalerConditionApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }

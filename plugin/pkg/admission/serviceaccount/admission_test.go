@@ -35,7 +35,7 @@ import (
 	v1defaults "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestIgnoresNonCreate(t *testing.T) {
@@ -200,7 +200,7 @@ func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.
 					{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []api.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
 					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
 				},
-				DefaultMode: utilpointer.Int32(0644),
+				DefaultMode: ptr.To[int32](0644),
 			},
 		},
 	}}

@@ -67,8 +67,13 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 	if !ok {
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected TypeMeta field to have TypeMeta type")
 	}
-	if listType.Field(0).Tag.Get("json") != ",inline" {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be ",inline"`)
+	if !listType.Field(0).Anonymous {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be embedded`)
+	}
+	if jsonTag, jsonTagExists := listType.Field(0).Tag.Lookup("json"); !jsonTagExists {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag`)
+	} else if jsonTag != "" && jsonTag != ",inline" {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be "" or ",inline"`)
 	}
 	// ListMeta
 	listMeta, ok := listValue.Field(1).Interface().(metav1.ListMeta)

@@ -472,7 +472,7 @@ func unwrap(desc description, msg proto.Message) (any, bool, error) {
 		}
 		return v.GetValue(), true, nil
 	}
-	return msg, false, nil
+	return unwrapDynamic(desc, msg.ProtoReflect())
 }
 
 // unwrapDynamic unwraps a reflected protobuf Message value.

@@ -19,7 +19,7 @@ package test
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 /*
@@ -37,20 +37,20 @@ containerFields: []string{
 func init() {
 
 	fixtureData_1_0 := fixtureGenerator{
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// set at pod level
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
+					p.Spec.SecurityContext.RunAsNonRoot = ptr.To(true)
 					p.Spec.Containers[0].SecurityContext.RunAsNonRoot = nil
 					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = nil
 				}),
 				// set on all containers
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.RunAsNonRoot = nil
-					p.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
-					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.RunAsNonRoot = ptr.To(true)
+					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = ptr.To(true)
 				}),
 			}
 		},
@@ -64,10 +64,10 @@ func init() {
 					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = nil
 				}),
 				// explicit false on pod
-				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(false) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.RunAsNonRoot = ptr.To(false) }),
 				// explicit false on containers
-				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(false) }),
-				tweak(p, func(p *corev1.Pod) { p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(false) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.RunAsNonRoot = ptr.To(false) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = ptr.To(false) }),
 			}
 		},
 	}

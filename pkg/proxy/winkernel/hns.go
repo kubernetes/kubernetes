@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -32,7 +31,10 @@ import (
 
 type HostNetworkService interface {
 	getNetworkByName(name string) (*hnsNetworkInfo, error)
-	getAllEndpointsByNetwork(networkName string) (map[string]*endpointInfo, error)
+	// Returns a map of endpoints keyed by both endpoint ID and IP address for all endpoints on the specified network, and a map of remote endpoints with duplicate IPs to be deleted.
+	getAllEndpointsByNetwork(networkName string) (map[string]*endpointInfo, map[string]bool, error)
+	// deleteAllRemoteEndpointsWithDupIP deletes all remote endpoints with duplicate IPs that were found in getAllEndpointsByNetwork. This is needed to clean up stale remote endpoints that can be left behind due to a Windows bug.
+	deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP map[string]bool)
 	getEndpointByID(id string) (*endpointInfo, error)
 	getEndpointByIpAddress(ip string, networkName string) (*endpointInfo, error)
 	getEndpointByName(id string) (*endpointInfo, error)
@@ -115,17 +117,20 @@ func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
-func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointInfo), error) {
+func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointInfo), map[string]bool, error) {
 	hcnnetwork, err := hns.hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
-		return nil, err
+		return nil, nil, err
 	}
 	endpoints, err := hns.hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list endpoints: %w", err)
+		return nil, nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
+
 	endpointInfos := make(map[string]*(endpointInfo))
+	remoteEPsWithDupIP := make(map[string]bool)
+
 	for _, ep := range endpoints {
 
 		if len(ep.IpConfigurations) == 0 {
@@ -133,44 +138,65 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 			continue
 		}
 
-		// Add to map with key endpoint ID or IP address
-		// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
-		// TODO: Store by IP only and remove any lookups by endpoint ID.
-		endpointInfos[ep.Id] = &endpointInfo{
-			ip:         ep.IpConfigurations[0].IpAddress,
-			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
-			macAddress: ep.MacAddress,
-			hnsID:      ep.Id,
-			hns:        hns,
-			// only ready and not terminating endpoints were added to HNS
-			ready:       true,
-			serving:     true,
-			terminating: false,
-		}
-		endpointInfos[ep.IpConfigurations[0].IpAddress] = endpointInfos[ep.Id]
+		for index, ipConfig := range ep.IpConfigurations {
 
-		if len(ep.IpConfigurations) == 1 {
-			continue
-		}
+			if index > 1 {
+				// Expecting only ipv4 and ipv6 ipaddresses
+				// This is highly unlikely to happen, but if it does, we should log a warning
+				// and break out of the loop
+				klog.Warning("Endpoint ipconfiguration holds more than 2 IP addresses.", "hnsID", ep.Id, "IP", ipConfig.IpAddress, "ipConfigCount", len(ep.IpConfigurations))
+				break
+			}
 
-		// If ipFamilyPolicy is RequireDualStack or PreferDualStack, then there will be 2 IPS (iPV4 and IPV6)
-		// in the endpoint list
-		endpointDualstack := &endpointInfo{
-			ip:         ep.IpConfigurations[1].IpAddress,
-			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
-			macAddress: ep.MacAddress,
-			hnsID:      ep.Id,
-			hns:        hns,
-			// only ready and not terminating endpoints were added to HNS
-			ready:       true,
-			serving:     true,
-			terminating: false,
+			curEpIsLocal := uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0
+
+			if existingEp, ok := endpointInfos[ipConfig.IpAddress]; ok {
+				if curEpIsLocal && !existingEp.isLocal {
+					// Local found, stale remote in map → delete remote from HNS, overwrite
+					remoteEPsWithDupIP[existingEp.hnsID] = true
+					delete(endpointInfos, existingEp.hnsID)
+					delete(endpointInfos, existingEp.ip)
+					// fall through to add local
+				} else if !curEpIsLocal && existingEp.isLocal {
+					// Local already in map, remote arriving → delete remote from HNS, skip
+					remoteEPsWithDupIP[ep.Id] = true
+					continue
+				} else {
+					continue // same type, keep existing
+				}
+			}
+
+			// Add to map with key endpoint ID or IP address
+			// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 and 2022 that can cause two endpoints (local and remote) to be created with the same IP address.
+			// TODO: Store by IP only and remove any lookups by endpoint ID.
+			epInfo := &endpointInfo{
+				ip:         ipConfig.IpAddress,
+				isLocal:    curEpIsLocal,
+				macAddress: ep.MacAddress,
+				hnsID:      ep.Id,
+				hns:        hns,
+				// only ready and not terminating endpoints were added to HNS
+				ready:       true,
+				serving:     true,
+				terminating: false,
+			}
+			endpointInfos[ep.Id] = epInfo
+			endpointInfos[ipConfig.IpAddress] = epInfo
 		}
-		endpointInfos[ep.IpConfigurations[1].IpAddress] = endpointDualstack
 	}
 	klog.V(3).InfoS("Queried endpoints from network", "network", networkName, "count", len(endpointInfos))
 	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
-	return endpointInfos, nil
+	return endpointInfos, remoteEPsWithDupIP, nil
+}
+
+func (hns hns) deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP map[string]bool) {
+	for hnsID := range remoteEPsWithDupIP {
+		klog.V(3).InfoS("Deleting stale remote endpoint with duplicate IP", "hnsID", hnsID)
+		err := hns.deleteEndpoint(hnsID)
+		if err != nil {
+			klog.ErrorS(err, "Failed to delete stale remote endpoint with duplicate IP", "hnsID", hnsID)
+		}
+	}
 }
 
 func (hns hns) getEndpointByID(id string) (*endpointInfo, error) {
@@ -199,7 +225,7 @@ func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpointI
 	}
 	for _, endpoint := range endpoints {
 		equal := false
-		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
+		if len(endpoint.IpConfigurations) > 0 {
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
 
 			if !equal && len(endpoint.IpConfigurations) > 1 {
@@ -273,11 +299,13 @@ func (hns hns) createEndpoint(ep *endpointInfo, networkName string) (*endpointIn
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("Created remote endpoint resource", "hnsID", createdEndpoint.Id)
 	} else {
 		createdEndpoint, err = hns.hcn.CreateEndpoint(hnsNetwork, hnsEndpoint)
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("Created local endpoint resource", "hnsID", createdEndpoint.Id)
 	}
 	return &endpointInfo{
 		ip:              createdEndpoint.IpConfigurations[0].IpAddress,
@@ -301,17 +329,14 @@ func (hns hns) deleteEndpoint(hnsID string) error {
 }
 
 // findLoadBalancerID will construct a id from the provided loadbalancer fields
-func findLoadBalancerID(endpoints []endpointInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+func findLoadBalancerID(endpoints []endpointInfo, vip string, protocol, internalPort, externalPort uint16, isIpv6 bool) (loadBalancerIdentifier, error) {
 	// Compute hash from backends (endpoint IDs)
 	hash, err := hashEndpoints(endpoints)
 	if err != nil {
 		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
 		return loadBalancerIdentifier{}, err
 	}
-	if len(vip) > 0 {
-		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
-	}
-	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash, isIPv6: isIpv6}, nil
 }
 
 func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
@@ -322,6 +347,7 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	}
 	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 	for _, lb := range lbs {
+		isIPv6 := (lb.Flags & LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
 		portMap := lb.PortMappings[0]
 		// Compute hash from backends (endpoint IDs)
 		hash, err := hashEndpoints(lb.HostComputeEndpoints)
@@ -331,9 +357,9 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 		}
 		if len(lb.FrontendVIPs) == 0 {
 			// Leave VIP uninitialized
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash, isIPv6: isIPv6}
 		} else {
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash, isIPv6: isIPv6}
 		}
 		loadBalancers[id] = &loadBalancerInfo{
 			hnsID: lb.Id,
@@ -346,17 +372,22 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	var id loadBalancerIdentifier
 	vips := []string{}
-	// Compute hash from backends (endpoint IDs)
-	hash, err := hashEndpoints(endpoints)
-	if err != nil {
-		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
-		return nil, err
+	id, lbIdErr := findLoadBalancerID(
+		endpoints,
+		vip,
+		protocol,
+		internalPort,
+		externalPort,
+		flags.isIPv6,
+	)
+
+	if lbIdErr != nil {
+		klog.V(2).ErrorS(lbIdErr, "Error hashing endpoints", "endpoints", endpoints)
+		return nil, lbIdErr
 	}
+
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
 		vips = append(vips, vip)
-	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {
@@ -454,10 +485,10 @@ func (hns hns) updateLoadBalancer(hnsID string,
 		return nil, err
 	}
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash, isIPv6: flags.isIPv6}
 		vips = append(vips, vip)
 	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash, isIPv6: flags.isIPv6}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {
@@ -524,8 +555,13 @@ func (hns hns) deleteLoadBalancer(hnsID string) error {
 		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
 		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
-		return hns.hcn.DeleteLoadBalancer(lb)
+		err = hns.hcn.DeleteLoadBalancer(lb)
 	}
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error deleting Hns loadbalancer policy resource again.", "hnsID", hnsID)
+		return err
+	}
+	klog.V(3).InfoS("Deleted Hns loadbalancer policy resource", "hnsID", hnsID)
 	return err
 }
 

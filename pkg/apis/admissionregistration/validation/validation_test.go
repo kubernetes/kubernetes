@@ -29,8 +29,6 @@ import (
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/utils/ptr"
 )
@@ -107,7 +105,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			AdmissionReviewVersions: []string{"invalidVersion"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalidVersion"}`,
+		expectedError: `Invalid value: ["invalidVersion"]`,
 	}, {
 		name: "should fail on duplicate AdmissionReviewVersion",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -313,7 +311,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			}},
 		},
 		}, true),
-		expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `webhooks[0].rules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -892,7 +890,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -908,7 +906,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			SideEffects:  &unknownSideEffect,
 		},
 		}, false),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "Webhooks must have unique names when old config has unique names",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -1084,7 +1082,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			AdmissionReviewVersions: []string{"invalidVersion"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalidVersion"}`,
+		expectedError: `Invalid value: ["invalidVersion"]`,
 	}, {
 		name: "should fail on duplicate AdmissionReviewVersion",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1290,7 +1288,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			}},
 		},
 		}, true),
-		expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `webhooks[0].rules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1885,7 +1883,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1901,7 +1899,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			SideEffects:  &unknownSideEffect,
 		},
 		}, false),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "Webhooks can have duplicate names when old config has duplicate names",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -2592,7 +2590,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "invalid expression",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
@@ -2904,7 +2902,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.variables[0].name: Invalid value: "4ever": name is not a valid CEL identifier`,
+		expectedError: `spec.variables[0].name: Invalid value: "4ever": must be a valid CEL identifier`,
 	}, {
 		name: "variable composition cannot compile",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
@@ -3409,9 +3407,8 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 		},
 		// TODO: CustomAuditAnnotations: string valueExpression with {oldObject} is allowed
 	}
-	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost)
+	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	extended, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MustParseGeneric("1.999"),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -3419,19 +3416,11 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strictCost {
-		originalCompiler := getStrictStatelessCELCompiler()
-		lazyStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
-		defer func() {
-			lazyStrictStatelessCELCompiler = originalCompiler
-		}()
-	} else {
-		originalCompiler := getNonStrictStatelessCELCompiler()
-		lazyNonStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
-		defer func() {
-			lazyNonStrictStatelessCELCompiler = originalCompiler
-		}()
-	}
+	originalCompiler := getStrictStatelessCELCompiler()
+	lazyStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
+	defer func() {
+		lazyStrictStatelessCELCompiler = originalCompiler
+	}()
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -3900,7 +3889,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "validationActions must be unique",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -5055,7 +5044,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "patchType required",
 		config: &admissionregistration.MutatingAdmissionPolicy{
@@ -5946,7 +5935,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "paramRef selector must not be set when name is set",
 		config: &admissionregistration.MutatingAdmissionPolicyBinding{

@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,12 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -49,33 +52,36 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var (
 			targetIP, targetURL, targetNode string
-
-			httpPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 8080,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 9090,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsArgs = []string{
-				"netexec",
-				"--http-port", "9090",
-				"--udp-port", "9091",
-				"--tls-cert-file", "/localhost.crt",
-				"--tls-private-key-file", "/localhost.key",
-			}
 		)
 
+		// We test the probes by creating an HTTP server and looking at its logs
+		// to verify that it got hit with the expected probes. This is tricky
+		// though: when testing PostStart, the HTTP server can't be the container
+		// we're starting, because PostStart may run before the container starts.
+		// We can solve that by using a sidecar container, but that doesn't work
+		// for PreStop, because we can't reliably ensure that the sidecar stays
+		// around long enough after we Delete the pod for us to have a chance to
+		// read the logs.
+		//
+		// To make both cases work, we run a separate pod to do the logging, and
+		// then use a sidecar container in the test pod that can receive probes at
+		// the test pod's IP and handle them by making a request to the logging
+		// pod.
+		//
+		// (The Exec case is much simpler, since we can just have it curl the
+		// logging pod directly.)
 		podHandleHookRequest := e2epod.NewAgnhostPodFromContainers(
 			"", "pod-handle-http-request", nil,
-			e2epod.NewAgnhostContainer("container-handle-http-request", nil, httpPorts, "netexec"),
-			e2epod.NewAgnhostContainer("container-handle-https-request", nil, httpsPorts, httpsArgs...),
+			e2epod.NewAgnhostContainer("container-handle-http-request", nil, nil, "netexec"),
 		)
+		// netexecConnect takes a target and a request, and returns a netexec
+		// command that will connect to `target` and request `req`.
+		netexecConnect := func(target, req string) string {
+			return fmt.Sprintf("/dial?host=%s&port=8080&request=%s",
+				target,
+				url.QueryEscape(strings.TrimLeft(req, "/")),
+			)
+		}
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -95,22 +101,47 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			}
 		})
 		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
+			testContainer := podWithHook.Spec.Containers[0]
+			scheme := v1.URISchemeHTTP
+			if testContainer.Lifecycle.PostStart != nil && testContainer.Lifecycle.PostStart.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PostStart.HTTPGet.Scheme
+			} else if testContainer.Lifecycle.PreStop != nil && testContainer.Lifecycle.PreStop.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PreStop.HTTPGet.Scheme
+			}
+
+			ginkgo.By("add a sidecar to the test pod")
+			sidecarArgs := []string{
+				"netexec",
+				"--udp-port", "-1",
+			}
+			if scheme == v1.URISchemeHTTPS {
+				sidecarArgs = append(sidecarArgs,
+					"--tls-cert-file", "/localhost.crt",
+					"--tls-private-key-file", "/localhost.key",
+				)
+			}
+			sidecarContainer := e2epod.NewAgnhostContainer("container-redirect", nil, nil, sidecarArgs...)
+			sidecarContainer.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+			sidecarContainer.StartupProbe = &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: scheme,
+						Path:   "/echo?msg=startup",
+						Port:   intstr.FromInt32(8080),
+					},
+				},
+			}
+			podWithHook.Spec.InitContainers = append(
+				[]v1.Container{sidecarContainer},
+				podWithHook.Spec.InitContainers...,
+			)
+
 			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(ctx, podWithHook)
-			const (
-				defaultHandler = iota
-				httpsHandler
-			)
-			handlerContainer := defaultHandler
 			if podWithHook.Spec.Containers[0].Lifecycle.PostStart != nil {
 				ginkgo.By("check poststart hook")
-				if podWithHook.Spec.Containers[0].Lifecycle.PostStart.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=poststart`)
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
@@ -118,13 +149,8 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
-				if podWithHook.Spec.Containers[0].Lifecycle.PreStop.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=prestop`)
 				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
@@ -171,8 +197,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=poststart",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=poststart"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -189,14 +214,13 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, poststart https hook
 			Description: When a post-start handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod on the same node with a container lifecycle specifying a post-start that invokes the server pod to validate that the post-start is executed.
 		*/
-		f.It("should execute poststart https hook properly [MinimumKubeletVersion:1.23]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should execute poststart https hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=poststart"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -216,8 +240,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=prestop",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=prestop"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -234,14 +257,13 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop https hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'HttpGet' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve https requests, create a second pod on the same node with a container lifecycle specifying a pre-stop that invokes the server pod to validate that the pre-stop is executed.
 		*/
-		f.It("should execute prestop https hook properly [MinimumKubeletVersion:1.23]", f.WithNodeConformance(), func(ctx context.Context) {
+		f.It("should execute prestop https hook properly", f.WithNodeConformance(), func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=prestop"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -255,7 +277,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -267,33 +289,19 @@ var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifec
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var (
 			targetIP, targetURL, targetNode string
-
-			httpPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 8080,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsPorts = []v1.ContainerPort{
-				{
-					ContainerPort: 9090,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}
-			httpsArgs = []string{
-				"netexec",
-				"--http-port", "9090",
-				"--udp-port", "9091",
-				"--tls-cert-file", "/localhost.crt",
-				"--tls-private-key-file", "/localhost.key",
-			}
 		)
 
+		// See description above in the "Container Lifecycle Hook" tests
 		podHandleHookRequest := e2epod.NewAgnhostPodFromContainers(
 			"", "pod-handle-http-request", nil,
-			e2epod.NewAgnhostContainer("container-handle-http-request", nil, httpPorts, "netexec"),
-			e2epod.NewAgnhostContainer("container-handle-https-request", nil, httpsPorts, httpsArgs...),
+			e2epod.NewAgnhostContainer("container-handle-http-request", nil, nil, "netexec"),
 		)
+		netexecConnect := func(target, req string) string {
+			return fmt.Sprintf("/dial?host=%s&port=8080&request=%s",
+				target,
+				url.QueryEscape(strings.TrimLeft(req, "/")),
+			)
+		}
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
@@ -313,36 +321,56 @@ var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifec
 			}
 		})
 		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
+			testContainer := podWithHook.Spec.InitContainers[0]
+			scheme := v1.URISchemeHTTP
+			if testContainer.Lifecycle.PostStart != nil && testContainer.Lifecycle.PostStart.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PostStart.HTTPGet.Scheme
+			} else if testContainer.Lifecycle.PreStop != nil && testContainer.Lifecycle.PreStop.HTTPGet != nil {
+				scheme = testContainer.Lifecycle.PreStop.HTTPGet.Scheme
+			}
+
+			ginkgo.By("add a sidecar to the test pod")
+			sidecarArgs := []string{
+				"netexec",
+				"--udp-port", "-1",
+			}
+			if scheme == v1.URISchemeHTTPS {
+				sidecarArgs = append(sidecarArgs,
+					"--tls-cert-file", "/localhost.crt",
+					"--tls-private-key-file", "/localhost.key",
+				)
+			}
+			sidecarContainer := e2epod.NewAgnhostContainer("container-redirect", nil, nil, sidecarArgs...)
+			sidecarContainer.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+			sidecarContainer.StartupProbe = &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: scheme,
+						Path:   "/echo?msg=startup",
+						Port:   intstr.FromInt32(8080),
+					},
+				},
+			}
+			podWithHook.Spec.InitContainers = append(
+				[]v1.Container{sidecarContainer},
+				podWithHook.Spec.InitContainers...,
+			)
+
 			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(ctx, podWithHook)
-			const (
-				defaultHandler = iota
-				httpsHandler
-			)
-			handlerContainer := defaultHandler
-			if podWithHook.Spec.InitContainers[0].Lifecycle.PostStart != nil {
+			if testContainer.Lifecycle.PostStart != nil {
 				ginkgo.By("check poststart hook")
-				if podWithHook.Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=poststart`)
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 			ginkgo.By("delete the pod with lifecycle hook")
 			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
-			if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop != nil {
+			if testContainer.Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
-				if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet != nil {
-					if v1.URISchemeHTTPS == podWithHook.Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme {
-						handlerContainer = httpsHandler
-					}
-				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=prestop`)
 				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
@@ -404,8 +432,7 @@ var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifec
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=poststart",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=poststart"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -427,14 +454,13 @@ var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifec
 			container lifecycle specifying a post-start that invokes the server pod
 			to validate that the post-start is executed.
 		*/
-		ginkgo.It("should execute poststart https hook properly [MinimumKubeletVersion:1.23]", func(ctx context.Context) {
+		ginkgo.It("should execute poststart https hook properly", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=poststart"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -459,8 +485,7 @@ var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifec
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/echo?msg=prestop",
-						Host: targetIP,
+						Path: netexecConnect(targetIP, "/echo?msg=prestop"),
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -482,14 +507,13 @@ var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifec
 			container lifecycle specifying a pre-stop that invokes the server pod to
 			validate that the pre-stop is executed.
 		*/
-		ginkgo.It("should execute prestop https hook properly [MinimumKubeletVersion:1.23]", func(ctx context.Context) {
+		ginkgo.It("should execute prestop https hook properly", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
-						Port:   intstr.FromInt32(9090),
+						Path:   netexecConnect(targetIP, "/echo?msg=prestop"),
+						Port:   intstr.FromInt32(8080),
 					},
 				},
 			}
@@ -551,7 +575,7 @@ func validDuration(duration time.Duration, low, high int64) bool {
 	return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
 }
 
-var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
+var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -560,77 +584,155 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			podClient = e2epod.NewPodClient(f)
 		})
+
+		var finalizer = "test/finalizer"
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop sleep hook
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod will be created to verify if its termination time aligns with the sleep time specified when it is terminated.
+		*/
 		ginkgo.It("valid prestop hook using sleep action", func(ctx context.Context) {
+			const sleepSeconds = 50
+			const gracePeriod = 100
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 5},
+					Sleep: &v1.SleepAction{Seconds: sleepSeconds},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
+			name := "pod-with-prestop-sleep-hook"
+			podWithHook := getPodWithHook(name, imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Finalizers = append(podWithHook.Finalizers, finalizer)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](gracePeriod)
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
-			podClient.CreateSync(ctx, podWithHook)
+			p := podClient.CreateSync(ctx, podWithHook)
+			defer podClient.RemoveFinalizer(ctx, name, finalizer)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			cost := time.Since(start)
-			// cost should be
-			// longer than 5 seconds (pod should sleep for 5 seconds)
-			// shorter than gracePeriodSeconds (default 30 seconds here)
-			if !validDuration(cost, 5, 30) {
-				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
+			_ = podClient.Delete(ctx, podWithHook.Name, metav1.DeleteOptions{})
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// deletionTimestamp equals to delete_time + tgps
+			// TODO: reduce sleep_seconds and tgps after issues.k8s.io/132205 is solved
+			// we get deletionTimestamp before container become terminated here because of issues.k8s.io/132205
+			deletionTS := p.DeletionTimestamp.Time
+			if err := e2epod.WaitForContainerTerminated(ctx, f.ClientSet, p.Namespace, p.Name, name, sleepSeconds*2*time.Second); err != nil {
+				framework.Failf("failed waiting for container terminated")
+			}
+
+			p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// finishAt equals to delete_time + sleep_duration
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+
+			// sleep_duration = (delete_time + sleep_duration) - (delete_time + tgps) + tgps
+			sleepDuration := finishAt.Sub(deletionTS) + time.Second*gracePeriod
+
+			// sleep_duration should be
+			// longer than 50 seconds (pod should sleep for 50 seconds)
+			// shorter than gracePeriodSeconds (100 seconds here)
+			if !validDuration(sleepDuration, sleepSeconds, gracePeriod) {
+				framework.Failf("unexpected delay duration before killing the pod, finishAt = %v, deletionAt= %v", finishAt, deletionTS)
 			}
 		})
 
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop sleep hook with low gracePeriodSeconds
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod will be created, and its `gracePeriodSeconds` will be modified to a value less than the sleep time before termination. The termination time will then be checked to ensure it aligns with the `gracePeriodSeconds` value.
+		*/
 		ginkgo.It("reduce GracePeriodSeconds during runtime", func(ctx context.Context) {
+			const sleepSeconds = 50
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 15},
+					Sleep: &v1.SleepAction{Seconds: sleepSeconds},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
+			name := "pod-with-prestop-sleep-hook"
+			podWithHook := getPodWithHook(name, imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Finalizers = append(podWithHook.Finalizers, finalizer)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
-			podClient.CreateSync(ctx, podWithHook)
+			p := podClient.CreateSync(ctx, podWithHook)
+			defer podClient.RemoveFinalizer(ctx, name, finalizer)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), f.Timeouts.PodDelete)
-			cost := time.Since(start)
-			// cost should be
-			// longer than 2 seconds (we change gracePeriodSeconds to 2 seconds here, and it's less than sleep action)
+
+			const gracePeriod = 30
+			_ = podClient.Delete(ctx, podWithHook.Name, *metav1.NewDeleteOptions(gracePeriod))
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// deletionTimestamp equals to delete_time + tgps
+			// TODO: reduce sleep_seconds and tgps after issues.k8s.io/132205 is solved
+			// we get deletionTimestamp before container become terminated here because of issues.k8s.io/132205
+			deletionTS := p.DeletionTimestamp.Time
+			if err := e2epod.WaitForContainerTerminated(ctx, f.ClientSet, p.Namespace, p.Name, name, sleepSeconds*2*time.Second); err != nil {
+				framework.Failf("failed waiting for container terminated")
+			}
+			p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			// finishAt equals to delete_time + sleep_duration
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+
+			// sleep_duration = (delete_time + sleep_duration) - (delete_time + tgps) + tgps
+			sleepDuration := finishAt.Sub(deletionTS) + time.Second*gracePeriod
+			// sleep_duration should be
+			// longer than 30 seconds (we change gracePeriodSeconds to 30 seconds here, and it's less than sleep action)
 			// shorter than sleep action (to make sure it doesn't take effect)
-			if !validDuration(cost, 2, 15) {
-				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
+			if !validDuration(sleepDuration, gracePeriod, sleepSeconds) {
+				framework.Failf("unexpected delay duration before killing the pod, finishAt = %v, deletionAt= %v", finishAt, deletionTS)
 			}
 		})
 
+		/*
+			Release : v1.34
+			Testname: Pod Lifecycle, prestop sleep hook with erroneous startup command
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod with an erroneous startup command will be created, and upon termination, it will be checked whether it ignored the sleep time.
+		*/
 		ginkgo.It("ignore terminated container", func(ctx context.Context) {
+			const sleepSeconds = 10
+			const gracePeriod = 30
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 20},
+					Sleep: &v1.SleepAction{Seconds: sleepSeconds},
 				},
 			}
 			name := "pod-with-prestop-sleep-hook"
 			podWithHook := getPodWithHook(name, imageutils.GetE2EImage(imageutils.BusyBox), lifecycle)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](gracePeriod)
 			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh"}
-			podWithHook.Spec.Containers[0].Args = []string{"-c", "exit 0"}
+			// If we exit the container as soon as it's created,
+			// finishAt - startedAt can be negative due to some internal race
+			// so we need to keep it running for a while
+			podWithHook.Spec.Containers[0].Args = []string{"-c", "sleep 3"}
 			podWithHook.Spec.RestartPolicy = v1.RestartPolicyNever
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
 			p := podClient.Create(ctx, podWithHook)
-			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, 3*time.Minute))
-			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			cost := time.Since(start)
+			defer podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, gracePeriod*time.Second))
+
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+			startedAt := p.Status.ContainerStatuses[0].State.Terminated.StartedAt
+			cost := finishAt.Sub(startedAt.Time)
 			// cost should be
 			// shorter than sleep action (container is terminated and sleep action should be ignored)
-			if !validDuration(cost, 0, 15) {
+			if !validDuration(cost, 0, sleepSeconds) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
-
 	})
 })
 
-var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
+var _ = SIGDescribe("Lifecycle sleep action zero value", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -663,7 +765,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
 	})
 })
 
-var _ = SIGDescribe(feature.ContainerStopSignals, func() {
+var _ = SIGDescribe(feature.ContainerStopSignals, framework.WithFeatureGate(features.ContainerStopSignals), func() {
 	f := framework.NewDefaultFramework("container-stop-signals")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient

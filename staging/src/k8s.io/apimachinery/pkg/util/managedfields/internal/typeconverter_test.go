@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	smdschema "sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

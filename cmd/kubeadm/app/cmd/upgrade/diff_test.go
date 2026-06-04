@@ -22,12 +22,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -45,7 +44,7 @@ func createTestRunDiffFile(contents []byte) (string, error) {
 	return file.Name(), nil
 }
 
-func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	return &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			KubernetesVersion: "v1.0.1",

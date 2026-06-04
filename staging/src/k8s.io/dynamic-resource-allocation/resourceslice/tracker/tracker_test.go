@@ -19,17 +19,18 @@ package tracker
 import (
 	stdcmp "cmp"
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -54,1429 +55,663 @@ type handlerEvent struct {
 	newObj *resourceapi.ResourceSlice
 }
 
-type inputEventGenerator struct {
-	addResourceSlice      func(slice *resourceapi.ResourceSlice)
-	deleteResourceSlice   func(name string)
-	addDeviceTaintRule    func(taintRule *resourcealphaapi.DeviceTaintRule)
-	deleteDeviceTaintRule func(name string)
-	addDeviceClass        func(class *resourceapi.DeviceClass)
-	deleteDeviceClass     func(name string)
+func add[T any](obj *T) [2]*T {
+	return [2]*T{nil, obj}
 }
 
-func inputEventGeneratorForTest(ctx context.Context, t *testing.T, tracker *Tracker) inputEventGenerator {
-	return inputEventGenerator{
-		addResourceSlice: func(slice *resourceapi.ResourceSlice) {
-			oldObj, exists, err := tracker.resourceSlices.GetIndexer().Get(slice)
-			require.NoError(t, err)
-			err = tracker.resourceSlices.GetIndexer().Add(slice)
-			require.NoError(t, err)
-			if !exists {
-				tracker.resourceSliceAdd(ctx)(slice)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, slice) {
-				tracker.resourceSliceUpdate(ctx)(oldObj, slice)
-			}
-		},
-		deleteResourceSlice: func(name string) {
-			oldObj, exists, err := tracker.resourceSlices.GetIndexer().GetByKey(name)
-			require.NoError(t, err)
-			require.True(t, exists, "deleting resource slice that was never created")
-			err = tracker.resourceSlices.GetIndexer().Delete(oldObj)
-			require.NoError(t, err)
-			tracker.resourceSliceDelete(ctx)(oldObj)
-		},
-		addDeviceTaintRule: func(taintRule *resourcealphaapi.DeviceTaintRule) {
-			oldObj, exists, err := tracker.deviceTaints.GetIndexer().Get(taintRule)
-			require.NoError(t, err)
-			err = tracker.deviceTaints.GetIndexer().Add(taintRule)
-			require.NoError(t, err)
-			if !exists {
-				tracker.deviceTaintAdd(ctx)(taintRule)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, taintRule) {
-				tracker.deviceTaintUpdate(ctx)(oldObj, taintRule)
-			}
-		},
-		deleteDeviceTaintRule: func(name string) {
-			oldObj, exists, err := tracker.deviceTaints.GetIndexer().GetByKey(name)
-			require.NoError(t, err)
-			require.True(t, exists, "deleting DeviceTaintRule that was never created")
-			err = tracker.deviceTaints.GetIndexer().Delete(oldObj)
-			require.NoError(t, err)
-			tracker.deviceTaintDelete(ctx)(oldObj)
-		},
-		addDeviceClass: func(class *resourceapi.DeviceClass) {
-			oldObj, exists, err := tracker.deviceClasses.GetIndexer().Get(class)
-			require.NoError(t, err)
-			err = tracker.deviceClasses.GetIndexer().Add(class)
-			require.NoError(t, err)
-			if !exists {
-				tracker.deviceClassAdd(ctx)(class)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, class) {
-				tracker.deviceClassUpdate(ctx)(oldObj, class)
-			}
-		},
-		deleteDeviceClass: func(name string) {
-			oldObj, exists, err := tracker.deviceClasses.GetIndexer().GetByKey(name)
-			require.NoError(t, err)
-			require.True(t, exists, "deleting device class that was never created")
-			err = tracker.deviceClasses.GetIndexer().Delete(oldObj)
-			require.NoError(t, err)
-			tracker.deviceClassDelete(ctx)(oldObj)
-		},
+func remove[T any](obj *T) [2]*T {
+	return [2]*T{obj, nil}
+}
+
+func update[T any](oldObj, newObj *T) [2]*T {
+	return [2]*T{oldObj, newObj}
+}
+
+func runInputEvents(tCtx *testContext, events []any, permutation []int) {
+	for _, i := range permutation {
+		event, name := lookupEvent(events, i)
+		stepCtx := tCtx.withLoggerName(fmt.Sprintf("event #%s", name))
+		applyEventPair(stepCtx, event)
 	}
 }
 
-func TestListPatchedResourceSlices(t *testing.T) {
-	now, _ := time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+// lookupEvent is the opposite of flatten: it takes an index
+// after flattening and maps it back to the event in the original
+// event hierarchy. To do so, it descends into the second level where necessary.
+func lookupEvent(events []any, index int) (any, string) {
+	numEvents := 0
+	for i := range events {
+		if e, ok := events[i].([]any); ok {
+			for j := range e {
+				if numEvents == index {
+					return e[j], fmt.Sprintf("%d/%d", i, j)
+				}
+				numEvents++
+			}
+		} else {
+			if numEvents == index {
+				return events[i], fmt.Sprintf("%d", i)
+			}
+			numEvents++
+		}
+	}
+	panic(fmt.Sprintf("invalid event index #%d", index))
+}
 
-	tests := map[string]struct {
-		deviceTaintsDisabled  bool
-		inputEvents           func(event inputEventGenerator)
+func applyEventPair(tCtx *testContext, event any) {
+	switch pair := event.(type) {
+	case [2]*resourceapi.ResourceSlice:
+		store := tCtx.resourceSlices.GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			err := store.Update(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.resourceSliceUpdate(tCtx.Context)(pair[0], pair[1])
+		case pair[0] != nil:
+			err := store.Delete(pair[0])
+			require.NoError(tCtx, err)
+			tCtx.resourceSliceDelete(tCtx.Context)(pair[0])
+		default:
+			err := store.Add(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.resourceSliceAdd(tCtx.Context)(pair[1])
+		}
+	case [2]*resourcealphaapi.DeviceTaintRule:
+		store := tCtx.deviceTaints.GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			err := store.Update(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.deviceTaintUpdate(tCtx.Context)(pair[0], pair[1])
+		case pair[0] != nil:
+			err := store.Delete(pair[0])
+			require.NoError(tCtx, err)
+			tCtx.deviceTaintDelete(tCtx.Context)(pair[0])
+		default:
+			err := store.Add(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.deviceTaintAdd(tCtx.Context)(pair[1])
+		}
+	case [2]*resourceapi.DeviceClass:
+		store := tCtx.deviceClasses.GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			err := store.Update(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.deviceClassUpdate(tCtx.Context)(pair[0], pair[1])
+		case pair[0] != nil:
+			err := store.Delete(pair[0])
+			require.NoError(tCtx, err)
+			tCtx.deviceClassDelete(tCtx.Context)(pair[0])
+		default:
+			err := store.Add(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.deviceClassAdd(tCtx.Context)(pair[1])
+		}
+	}
+}
+
+type testContext struct {
+	*testing.T
+	context.Context
+	*Tracker
+	*fake.Clientset
+}
+
+func (t *testContext) withLoggerName(name string) *testContext {
+	logger := klog.FromContext(t.Context)
+	logger = klog.LoggerWithName(logger, name)
+	t = &testContext{
+		T:         t.T,
+		Context:   klog.NewContext(t.Context, logger),
+		Tracker:   t.Tracker,
+		Clientset: t.Clientset,
+	}
+	return t
+}
+
+var (
+	now, _      = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+	driver1     = "driver1.example.com"
+	driver2     = "driver2.example.com"
+	pool1       = "pool-1"
+	pool2       = "pool-2"
+	device0Name = "device-0"
+	device1Name = "device-1"
+	device2Name = "device-2"
+
+	deviceClass1 = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{Name: "device-class-1"},
+		Spec: resourceapi.DeviceClassSpec{
+			Selectors: []resourceapi.DeviceSelector{
+				{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: `device.driver == "` + driver1 + `"`,
+					},
+				},
+			},
+		},
+	}
+
+	sliceWithDevices = func(slice *resourceapi.ResourceSlice, devices []resourceapi.Device) *resourceapi.ResourceSlice {
+		slice = slice.DeepCopy()
+		slice.Spec.Devices = devices
+		return slice
+	}
+	slice1NoDevices = &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "s1",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: driver1,
+			Pool: resourceapi.ResourcePool{
+				Name: pool1,
+			},
+		},
+	}
+	slice2NoDevices = &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "s2",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: driver2,
+			Pool: resourceapi.ResourcePool{
+				Name: pool2,
+			},
+		},
+	}
+	unchangedSlice = &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}}
+
+	deviceWithName = func(device resourceapi.Device, name string) resourceapi.Device {
+		device.Name = name
+		return device
+	}
+	deviceWithTaints = func(device resourceapi.Device, taints []resourceapi.DeviceTaint) resourceapi.Device {
+		device.Taints = taints
+		return device
+	}
+	emptyDevice = resourceapi.Device{}
+	device0     = deviceWithName(emptyDevice, device0Name)
+	device1     = deviceWithName(emptyDevice, device1Name)
+	device2     = deviceWithName(emptyDevice, device2Name)
+
+	deviceTaint1 = resourceapi.DeviceTaint{
+		Key:       "example.com/taint",
+		Value:     "tainted",
+		Effect:    resourceapi.DeviceTaintEffectNoExecute,
+		TimeAdded: &metav1.Time{Time: now},
+	}
+	deviceTaint2 = resourceapi.DeviceTaint{
+		Key:       "example.com/taint2",
+		Value:     "tainted2",
+		Effect:    resourceapi.DeviceTaintEffectNoExecute,
+		TimeAdded: &metav1.Time{Time: now},
+	}
+	deviceTaints   = []resourceapi.DeviceTaint{deviceTaint1}
+	device1Tainted = deviceWithTaints(device1, deviceTaints)
+	device2Tainted = deviceWithTaints(device2, deviceTaints)
+	devices        = []resourceapi.Device{device1}
+	threeDevices   = []resourceapi.Device{
+		device0,
+		device1,
+		device2,
+	}
+	threeDevicesOneTainted = []resourceapi.Device{
+		device0,
+		device1Tainted,
+		device2,
+	}
+	devices2        = []resourceapi.Device{device2}
+	taintedDevices  = []resourceapi.Device{device1Tainted}
+	taintedDevices2 = []resourceapi.Device{device2Tainted}
+
+	existingDeviceTaints   = []resourceapi.DeviceTaint{deviceTaint2}
+	existingDevice1Tainted = deviceWithTaints(device1, existingDeviceTaints)
+	existingTaintedDevices = []resourceapi.Device{existingDevice1Tainted}
+	mergedDeviceTaints     = []resourceapi.DeviceTaint{deviceTaint2, deviceTaint1}
+	mergedDevice1Tainted   = deviceWithTaints(device1, mergedDeviceTaints)
+	mergedTaintedDevices   = []resourceapi.Device{mergedDevice1Tainted}
+
+	slice1               = sliceWithDevices(slice1NoDevices, devices)
+	slice1Tainted        = sliceWithDevices(slice1, taintedDevices)
+	slice1AlreadyTainted = sliceWithDevices(slice1, existingTaintedDevices)
+	slice1MergedTaints   = sliceWithDevices(slice1, mergedTaintedDevices)
+	slice2               = sliceWithDevices(slice2NoDevices, devices2)
+	slice2Tainted        = sliceWithDevices(slice2, taintedDevices2)
+
+	alphaDeviceTaint = func(taint resourceapi.DeviceTaint) resourcealphaapi.DeviceTaint {
+		return resourcealphaapi.DeviceTaint{
+			Key:       taint.Key,
+			Value:     taint.Value,
+			Effect:    resourcealphaapi.DeviceTaintEffect(taint.Effect),
+			TimeAdded: taint.TimeAdded,
+		}
+	}
+	taintAllDevicesRule = &resourcealphaapi.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "rule",
+		},
+		Spec: resourcealphaapi.DeviceTaintRuleSpec{
+			Taint: alphaDeviceTaint(deviceTaint1),
+		},
+	}
+	taintPoolDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, pool string) *resourcealphaapi.DeviceTaintRule {
+		rule = rule.DeepCopy()
+		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
+			Pool: &pool,
+		}
+		return rule
+	}
+	taintDriverDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, driver string) *resourcealphaapi.DeviceTaintRule {
+		rule = rule.DeepCopy()
+		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
+			Driver: &driver,
+		}
+		return rule
+	}
+	taintNamedDevicesRule = func(rule *resourcealphaapi.DeviceTaintRule, name string) *resourcealphaapi.DeviceTaintRule {
+		rule = rule.DeepCopy()
+		rule.Spec.DeviceSelector = &resourcealphaapi.DeviceTaintSelector{
+			Device: &name,
+		}
+		return rule
+	}
+	taintPool1DevicesRule   = taintPoolDevicesRule(taintAllDevicesRule, pool1)
+	taintPool2DevicesRule   = taintPoolDevicesRule(taintAllDevicesRule, pool2)
+	taintDriver1DevicesRule = taintDriverDevicesRule(taintAllDevicesRule, driver1)
+	taintDevice1Rule        = taintNamedDevicesRule(taintAllDevicesRule, device1Name)
+)
+
+func TestListPatchedResourceSlices(t *testing.T) {
+	type test struct {
+		// events contains pairs of old and new objects which will
+		// be passed to event handler methods.
+		// Objects can be slices, device taint rules, and device
+		// classes.
+		// [add], [remove], and [update] can be used to produce
+		// such pairs.
+		//
+		// Alternatively, it can also contain a list of such pairs.
+		// Those will be applied in the order in which they appear
+		// in each event entry, but not necessarily in consecutive
+		// order. Other events may be placed in between as long as
+		// the order in those nested lists is preserved.
+		events                []any
 		expectedPatchedSlices []*resourceapi.ResourceSlice
-		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
+		// The exact events that are emitted for a sequence of events is
+		// highly dependent on the order in which those events are received.
+		// We punt on determining a set of validation criteria for every
+		// possible sequence and only check them against the first
+		// permutation: the order in which the events are defined.
+		expectedHandlerEvents []handlerEvent
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
-	}{
+	}
+	tests := map[string]test{
 		"add-slices-no-patches": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s1"}})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s2"}})
+			events: []any{
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{ObjectMeta: metav1.ObjectMeta{Name: "s1"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
+				slice1,
+				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "s1", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "s2", events[1].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"update-slices-no-patches": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "s1",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						// no devices
-						Devices: nil,
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "s2",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						// no devices
-						Devices: nil,
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}})
-
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "s1",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						// devices!
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "s2",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						// devices!
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}})
+			events: []any{
+				[]any{
+					add(slice1NoDevices),
+					update(slice1NoDevices, slice1),
+				},
+				[]any{
+					add(slice2NoDevices),
+					update(slice2NoDevices, slice2),
+				},
+				add(unchangedSlice),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "s1",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "s2",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{Basic: &resourceapi.BasicDevice{}},
-						},
-					},
-				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}},
+				slice1,
+				slice2,
+				unchangedSlice,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 5) {
-					return
-				}
-				// The first events are adds.
-				assert.Equal(t, handlerEventUpdate, events[3].event)
-				assert.Equal(t, "s1", events[3].newObj.Name)
-				assert.Equal(t, "s1", events[3].oldObj.Name)
-				assert.Nil(t, events[3].oldObj.Spec.Devices)
-				assert.NotNil(t, events[3].newObj.Spec.Devices)
-				assert.Equal(t, handlerEventUpdate, events[4].event)
-				assert.Equal(t, "s2", events[4].newObj.Name)
-				assert.Equal(t, "s2", events[4].oldObj.Name)
-				assert.Nil(t, events[4].oldObj.Spec.Devices)
-				assert.NotNil(t, events[4].newObj.Spec.Devices)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1NoDevices},
+				{event: handlerEventUpdate, oldObj: slice1NoDevices, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2NoDevices},
+				{event: handlerEventUpdate, oldObj: slice2NoDevices, newObj: slice2},
+				{event: handlerEventAdd, newObj: unchangedSlice},
 			},
 		},
 		"delete-slices": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s1"}})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "s2"}})
-				event.addResourceSlice(&resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "keep-me"}})
-				event.deleteResourceSlice("s1")
-				event.deleteResourceSlice("s2")
+			events: []any{
+				[]any{add(slice1), remove(slice1)},
+				[]any{add(slice2), remove(slice2)},
+				add(unchangedSlice),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{ObjectMeta: metav1.ObjectMeta{Name: "keep-me"}},
+				unchangedSlice,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 5) {
-					return
-				}
-				// The first events are adds.
-				assert.Equal(t, handlerEventDelete, events[3].event)
-				assert.Equal(t, "s1", events[3].oldObj.Name)
-				assert.Equal(t, handlerEventDelete, events[4].event)
-				assert.Equal(t, "s2", events[4].oldObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventDelete, oldObj: slice1},
+				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventDelete, oldObj: slice2},
+				{event: handlerEventAdd, newObj: unchangedSlice},
 			},
 		},
 		"patch-all-slices": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "all-slices",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: nil,
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
+			events: []any{
+				add(slice1),
+				add(taintAllDevicesRule),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
+				slice1Tainted,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-				assert.Equal(t, handlerEventUpdate, events[1].event)
-				assert.Equal(t, "slice", events[1].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Tainted},
 			},
 		},
 		"update-patch": {
-			inputEvents: func(event inputEventGenerator) {
-				taintRule := &resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "taintRule",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Pool: ptr.To("pool-1"),
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				}
-				event.addDeviceTaintRule(taintRule.DeepCopy())
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice-1",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-1",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice-2",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-2",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				taintRule.Spec.DeviceSelector.Pool = ptr.To("pool-2")
-				event.addDeviceTaintRule(taintRule)
+			events: []any{
+				[]any{
+					add(taintPool1DevicesRule),
+					update(taintPool1DevicesRule, taintPool2DevicesRule),
+				},
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice-1",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-1",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice-2",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool-2",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
+				slice1,
+				slice2Tainted,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 4) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice-1", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "slice-2", events[1].newObj.Name)
-
-				assert.Equal(t, handlerEventUpdate, events[2].event)
-				assert.Equal(t, handlerEventUpdate, events[3].event)
-				assert.ElementsMatch(t, []string{"slice-1", "slice-2"}, []string{events[2].newObj.Name, events[3].newObj.Name})
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2Tainted},
 			},
 		},
 		"merge-taints": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "merge",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: nil,
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:    "example.com/taint2",
-										Value:  "tainted2",
-										Effect: resourceapi.DeviceTaintEffectNoSchedule,
-									}},
-								},
-							},
-						},
-					},
-				})
+			events: []any{
+				add(taintAllDevicesRule),
+				add(slice1AlreadyTainted),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{
-										{
-											Key:    "example.com/taint2",
-											Value:  "tainted2",
-											Effect: resourceapi.DeviceTaintEffectNoSchedule,
-										},
-										{
-											Key:       "example.com/taint",
-											Value:     "tainted",
-											Effect:    resourceapi.DeviceTaintEffectNoExecute,
-											TimeAdded: &metav1.Time{Time: now},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
+				slice1MergedTaints,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 1) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1MergedTaints},
 			},
 		},
 		"add-taint-for-driver": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "driver",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Driver: ptr.To("test.example.com"),
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
+			events: []any{
+				add(taintDriver1DevicesRule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
+				slice1Tainted,
+				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "wrong-driver", events[1].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"add-taint-for-pool": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pool",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Pool: ptr.To("pool"),
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-pool",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "other",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
+			events: []any{
+				add(taintPool1DevicesRule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-pool",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "other",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
+				slice1Tainted,
+				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "wrong-pool", events[1].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"add-taint-for-device": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "device",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Device: ptr.To("device"),
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Name:  "device",
-								Basic: &resourceapi.BasicDevice{},
-							},
-							{
-								Name:  "wrong-device",
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
+			events: []any{
+				add(taintDevice1Rule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Name: "device",
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-							{
-								Name:  "wrong-device",
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
+				slice1Tainted,
+				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 1) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-			},
-		},
-		"add-attribute-for-selector": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "selector",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Selectors: []resourcealphaapi.DeviceSelector{
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `device.driver == "test.example.com"`,
-									},
-								},
-							},
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
-			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "wrong-driver", events[1].newObj.Name)
-			},
-		},
-		"selector-does-not-match": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "selector",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Selectors: []resourcealphaapi.DeviceSelector{
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `true`,
-									},
-								},
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `false`,
-									},
-								},
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `true`,
-									},
-								},
-							},
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
-			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 1) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-			},
-		},
-		"runtime-CEL-errors-skip-devices": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "selector",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Selectors: []resourcealphaapi.DeviceSelector{
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `device.attributes["test.example.com"].deviceAttr`,
-									},
-								},
-							},
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				})
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectEvents: func(t *assert.CollectT, events *v1.EventList) {
-				if !assert.Len(t, events.Items, 1) {
-					return
-				}
-				assert.Equal(t, "selector", events.Items[0].InvolvedObject.Name)
-				assert.Equal(t, "CELRuntimeError", events.Items[0].Reason)
-			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 1) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-			},
-		},
-		"invalid-CEL-expression-throws-error": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "selector",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Selectors: []resourcealphaapi.DeviceSelector{
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `invalid`,
-									},
-								},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
-			expectUnhandledErrors: func(t *testing.T, errs []error) {
-				if !assert.Len(t, errs, 1) {
-					return
-				}
-				assert.ErrorContains(t, errs[0], "CEL compile error")
-			},
-		},
-		"add-taint-for-device-class": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceClass(&resourceapi.DeviceClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "class.example.com",
-					},
-					Spec: resourceapi.DeviceClassSpec{
-						Selectors: []resourceapi.DeviceSelector{
-							{
-								CEL: &resourceapi.CELDeviceSelector{
-									Expression: `device.driver == "test.example.com"`,
-								},
-							},
-						},
-					},
-				})
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "device-class",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							DeviceClassName: ptr.To("class.example.com"),
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
-			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "wrong-driver", events[1].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"filter-all-criteria": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceClass(&resourceapi.DeviceClass{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "class.example.com",
-					},
-					Spec: resourceapi.DeviceClassSpec{
-						Selectors: []resourceapi.DeviceSelector{
-							{
-								CEL: &resourceapi.CELDeviceSelector{
-									Expression: `device.driver == "test.example.com"`,
-								},
-							},
-						},
-					},
-				})
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "all-criteria",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							DeviceClassName: ptr.To("class.example.com"),
-							Driver:          ptr.To("test.example.com"),
-							Pool:            ptr.To("pool"),
-							Device:          ptr.To("device"),
-							Selectors: []resourcealphaapi.DeviceSelector{
-								{
-									CEL: &resourcealphaapi.CELDeviceSelector{
-										Expression: `true`,
-									},
-								},
-							},
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Name:  "device",
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
-				event.addResourceSlice(&resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				})
+			events: []any{
+				add(deviceClass1),
+				add(
+					taintDriverDevicesRule(
+						taintPoolDevicesRule(
+							taintNamedDevicesRule(
+								taintAllDevicesRule,
+								device1Name,
+							),
+							pool1,
+						),
+						driver1,
+					),
+				),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "test.example.com",
-						Pool: resourceapi.ResourcePool{
-							Name: "pool",
-						},
-						Devices: []resourceapi.Device{
-							{
-								Name: "device",
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "wrong-driver",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: "wrong.example.com",
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
+				slice1Tainted,
+				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 2) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "slice", events[0].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[1].event)
-				assert.Equal(t, "wrong-driver", events[1].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"update-patched-slice": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(&resourcealphaapi.DeviceTaintRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "all-slices",
-					},
-					Spec: resourcealphaapi.DeviceTaintRuleSpec{
-						DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
-							Device: ptr.To("device-1"),
-						},
-						Taint: resourcealphaapi.DeviceTaint{
-							Key:       "example.com/taint",
-							Value:     "tainted",
-							Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
-							TimeAdded: &metav1.Time{Time: now},
-						},
-					},
-				})
-				oneDevice := []resourceapi.Device{
-					{Name: "device-1", Basic: &resourceapi.BasicDevice{}},
-				}
-				threeDevices := []resourceapi.Device{
-					{Name: "device-0", Basic: &resourceapi.BasicDevice{}},
-					{Name: "device-1", Basic: &resourceapi.BasicDevice{}},
-					{Name: "device-2", Basic: &resourceapi.BasicDevice{}},
-				}
-				devicesAdded := &resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "devices-added",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: oneDevice,
-					},
-				}
-				devicesRemoved := &resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "devices-removed",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: threeDevices,
-					},
-				}
-				event.addResourceSlice(devicesAdded.DeepCopy())
-				devicesAdded.Spec.Devices = threeDevices
-				event.addResourceSlice(devicesAdded)
-				event.addResourceSlice(devicesRemoved.DeepCopy())
-				devicesRemoved.Spec.Devices = oneDevice
-				event.addResourceSlice(devicesRemoved)
+			events: []any{
+				add(taintDevice1Rule),
+				[]any{
+					add(slice1),
+					update(slice1, sliceWithDevices(slice1, threeDevices)),
+				},
+				[]any{
+					add(sliceWithDevices(slice2, threeDevices)),
+					update(sliceWithDevices(slice2, threeDevices), sliceWithDevices(slice2, devices)),
+				},
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "devices-added",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{Name: "device-0", Basic: &resourceapi.BasicDevice{}},
-							{
-								Name: "device-1",
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-							{Name: "device-2", Basic: &resourceapi.BasicDevice{}},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "devices-removed",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{
-								Name: "device-1",
-								Basic: &resourceapi.BasicDevice{
-									Taints: []resourceapi.DeviceTaint{{
-										Key:       "example.com/taint",
-										Value:     "tainted",
-										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &metav1.Time{Time: now},
-									}},
-								},
-							},
-						},
-					},
-				},
+				sliceWithDevices(slice1, threeDevicesOneTainted),
+				sliceWithDevices(slice2, taintedDevices),
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				if !assert.Len(t, events, 4) {
-					return
-				}
-				assert.Equal(t, handlerEventAdd, events[0].event)
-				assert.Equal(t, "devices-added", events[0].newObj.Name)
-				assert.Equal(t, handlerEventUpdate, events[1].event)
-				assert.Equal(t, "devices-added", events[1].newObj.Name)
-				assert.Equal(t, handlerEventAdd, events[2].event)
-				assert.Equal(t, "devices-removed", events[2].newObj.Name)
-				assert.Equal(t, handlerEventUpdate, events[3].event)
-				assert.Equal(t, "devices-removed", events[3].newObj.Name)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventUpdate, oldObj: slice1Tainted, newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
+				{event: handlerEventAdd, newObj: sliceWithDevices(slice2, threeDevicesOneTainted)},
+				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice2, threeDevicesOneTainted), newObj: sliceWithDevices(slice2, taintedDevices)},
 			},
 		},
 	}
 
-	for name, test := range tests {
+	setup := func(t *testing.T) *testContext {
+		_, ctx := ktesting.NewTestContext(t)
+
+		kubeClient := fake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+
+		opts := Options{
+			EnableDeviceTaintRules: true,
+			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
+			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
+			KubeClient:             kubeClient,
+		}
+		tracker, err := newTracker(ctx, opts)
+		require.NoError(t, err)
+
+		return &testContext{
+			T:         t,
+			Context:   ctx,
+			Tracker:   tracker,
+			Clientset: kubeClient,
+		}
+	}
+
+	testHandlers := func(tCtx *testContext, test test, permutation []int) {
+		isPermutated := false
+		for i, j := range permutation {
+			if i != j {
+				isPermutated = true
+				break
+			}
+		}
+
+		var handlerEvents []handlerEvent
+		handler := cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
+			},
+			DeleteFunc: func(obj interface{}) {
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
+			},
+		}
+		_, _ = tCtx.AddEventHandler(handler)
+
+		var unhandledErrors []error
+		tCtx.handleError = func(_ context.Context, err error, _ string, _ ...any) {
+			unhandledErrors = append(unhandledErrors, err)
+		}
+
+		runInputEvents(tCtx, test.events, permutation)
+
+		if !isPermutated {
+			assert.Equal(tCtx, test.expectedHandlerEvents, handlerEvents)
+		}
+
+		expectUnhandledErrors := test.expectUnhandledErrors
+		if expectUnhandledErrors == nil {
+			expectUnhandledErrors = func(t *testing.T, errs []error) {
+				assert.Empty(t, errs)
+			}
+		}
+		expectUnhandledErrors(tCtx.T, unhandledErrors)
+
+		// Check ResourceSlices
+		patchedResourceSlices, err := tCtx.ListPatchedResourceSlices()
+		require.NoError(tCtx, err, "list patched resource slices")
+		sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
+			return stdcmp.Compare(s1.Name, s2.Name)
+		}
+		slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
+		slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
+		assert.Equal(tCtx, test.expectedPatchedSlices, patchedResourceSlices)
+		expectEvents := test.expectEvents
+		if expectEvents == nil {
+			expectEvents = func(t *assert.CollectT, events *v1.EventList) {
+				assert.Empty(t, events.Items)
+			}
+		}
+		// Events are generated asynchronously. While shutting down the event recorder will flush all
+		// pending events, it is not possible to determine when exactly that flush is complete.
+		assert.EventuallyWithT(
+			tCtx,
+			func(t *assert.CollectT) {
+				events, err := tCtx.CoreV1().Events("").List(tCtx.Context, metav1.ListOptions{})
+				require.NoError(t, err, "list events")
+				expectEvents(t, events)
+			},
+			1*time.Second,
+			10*time.Millisecond,
+			"did not observe expected events",
+		)
+	}
+
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			// flatten does one level of flattening of events, counting all events.
+			// It also returns a slice of pairs of indices representing ranges which were
+			// flattened (= came from the second level) and which therefore must
+			// remain in that order.
+			flatten := func(events []any) (int, [][2]int) {
+				numEvents := 0
+				var ranges [][2]int
+				for _, e := range events {
+					switch e := e.(type) {
+					case []any:
+						ranges = append(ranges, [2]int{numEvents, numEvents + len(e)})
+						numEvents += len(e)
+					default:
+						numEvents++
+					}
+				}
+				return numEvents, ranges
+			}
+			numEvents, constraints := flatten(tc.events)
 
-			kubeClient := fake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
-
-			var handlerEvents []handlerEvent
-			handler := cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
-				},
-				UpdateFunc: func(oldObj, newObj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
-				},
-				DeleteFunc: func(obj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
-				},
+			if len(tc.events) <= 1 {
+				// No permutations possible.
+				var permutation []int
+				for i := 0; i < numEvents; i++ {
+					permutation = append(permutation, i)
+				}
+				tContext := setup(t)
+				testHandlers(tContext, tc, permutation)
+				return
 			}
 
-			opts := Options{
-				EnableDeviceTaints: !test.deviceTaintsDisabled,
-				SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
-				TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-				ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
-				KubeClient:         kubeClient,
-			}
-			tracker, err := newTracker(ctx, opts)
-			require.NoError(t, err)
-			var unhandledErrors []error
-			tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
-				unhandledErrors = append(unhandledErrors, err)
-			}
-			_, _ = tracker.AddEventHandler(handler)
+			permutation := make([]int, numEvents)
+			var permutate func(depth int)
+			permutate = func(depth int) {
+				if depth >= numEvents {
+					// Define a sub-test which runs the current permutation of events.
+					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
+					t.Run(name, func(t *testing.T) {
+						tContext := setup(t)
+						// No need to clone the slice, we don't run in parallel.
+						testHandlers(tContext, tc, permutation)
+					})
+					return
+				}
+			nexti:
+				for i := range numEvents {
+					if slices.Contains(permutation[0:depth], i) {
+						// Already taken.
+						continue
+					}
+					for _, constraint := range constraints {
+						if i < constraint[0] || i > constraint[1] {
+							continue
+						}
+						for j := i + 1; j < constraint[1]; j++ {
+							if slices.Contains(permutation[0:depth], j) {
+								// Invalid permutation, would change order
+								// of sub-events.
+								continue nexti
+							}
+						}
+					}
 
-			if test.inputEvents != nil {
-				test.inputEvents(inputEventGeneratorForTest(ctx, t, tracker))
-			}
-
-			expectHandlerEvents := test.expectHandlerEvents
-			if expectHandlerEvents == nil {
-				expectHandlerEvents = func(t *testing.T, events []handlerEvent) {
-					assert.Empty(t, events)
+					// Pick it for the current position in permutation,
+					// continue with next position.
+					permutation[depth] = i
+					permutate(depth + 1)
 				}
 			}
-			expectHandlerEvents(t, handlerEvents)
-
-			expectUnhandledErrors := test.expectUnhandledErrors
-			if expectUnhandledErrors == nil {
-				expectUnhandledErrors = func(t *testing.T, errs []error) {
-					assert.Empty(t, errs)
-				}
-			}
-			expectUnhandledErrors(t, unhandledErrors)
-
-			// Check ResourceSlices
-			patchedResourceSlices, err := tracker.ListPatchedResourceSlices()
-			require.NoError(t, err, "list patched resource slices")
-			sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
-				return stdcmp.Compare(s1.Name, s2.Name)
-			}
-			slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
-			slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
-			assert.Equal(t, test.expectedPatchedSlices, patchedResourceSlices)
-			expectEvents := test.expectEvents
-			if expectEvents == nil {
-				expectEvents = func(t *assert.CollectT, events *v1.EventList) {
-					assert.Empty(t, events.Items)
-				}
-			}
-			// Events are generated asynchronously. While shutting down the event recorder will flush all
-			// pending events, it is not possible to determine when exactly that flush is complete.
-			assert.EventuallyWithT(
-				t,
-				func(t *assert.CollectT) {
-					events, err := kubeClient.CoreV1().Events("").List(ctx, metav1.ListOptions{})
-					require.NoError(t, err, "list events")
-					expectEvents(t, events)
-				},
-				1*time.Second,
-				10*time.Millisecond,
-				"did not observe expected events",
-			)
+			permutate(0)
 		})
 	}
 }
@@ -1497,7 +732,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{}, 64),
 						},
 					}
 				}
@@ -1516,7 +751,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -1551,7 +786,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -1595,8 +830,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 								devices := make([]resourceapi.Device, nDevices)
 								for j := range devices {
 									devices[j] = resourceapi.Device{
-										Name:  "device-" + strconv.Itoa(j),
-										Basic: &resourceapi.BasicDevice{},
+										Name: "device-" + strconv.Itoa(j),
 									}
 								}
 								return devices
@@ -1643,7 +877,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							},
 							Devices: func() []resourceapi.Device {
 								nDevices := 64
-								devices := slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, nDevices)
+								devices := slices.Repeat([]resourceapi.Device{{}}, nDevices)
 								devices[nDevices/2].Name = "patchme"
 								return devices
 							}(),
@@ -1687,7 +921,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Pool: resourceapi.ResourcePool{
 								Name: "pool-" + strconv.Itoa(i),
 							},
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -1725,11 +959,11 @@ func BenchmarkEventHandlers(b *testing.B) {
 		kubeClient := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 		opts := Options{
-			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
-			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-			ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
-			KubeClient:         kubeClient,
+			EnableDeviceTaintRules: true,
+			SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			TaintInformer:          informerFactory.Resource().V1beta2().DeviceTaintRules(),
+			ClassInformer:          informerFactory.Resource().V1().DeviceClasses(),
+			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
 		require.NoError(b, err)

@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
+	"k8s.io/code-generator/pkg/apidefinitions"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -98,7 +100,11 @@ func extractRemovedTag(t *types.Type) (*tagValue, int, int, error) {
 func extractReplacementTag(t *types.Type) (group, version, kind string, hasReplacement bool, err error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
 
-	tagVals := gengo.ExtractCommentTags("+", comments)[replacementTagName]
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{replacementTagName}, comments)
+	if err != nil {
+		return "", "", "", false, fmt.Errorf("failed to parse comments: %w", err)
+	}
+	tagVals := tags[replacementTagName]
 	if len(tagVals) == 0 {
 		// No match for the tag.
 		return "", "", "", false, nil
@@ -132,21 +138,24 @@ func extractReplacementTag(t *types.Type) (group, version, kind string, hasRepla
 }
 
 func extractTag(tagName string, comments []string) *tagValue {
-	tagVals := gengo.ExtractCommentTags("+", comments)[tagName]
-	if tagVals == nil {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+	}
+	if tags[tagName] == nil {
 		// No match for the tag.
 		return nil
 	}
 	// If there are multiple values, abort.
-	if len(tagVals) > 1 {
-		klog.Fatalf("Found %d %s tags: %q", len(tagVals), tagName, tagVals)
+	if len(tags[tagName]) > 1 {
+		klog.Fatalf("Found %d %s tags: %q", len(tags[tagName]), tagName, tags[tagName])
 	}
 
 	// If we got here we are returning something.
 	tag := &tagValue{}
 
 	// Get the primary value.
-	parts := strings.Split(tagVals[0], ",")
+	parts := strings.Split(tags[tagName][0], ",")
 	if len(parts) >= 1 {
 		tag.value = parts[0]
 	}
@@ -184,64 +193,44 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	targets := []generator.Target{}
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
+	targetList := []generator.Target{}
 
 	for _, i := range context.Inputs {
-		klog.V(5).Infof("Considering pkg %q", i)
-
+		klog.V(5).Infof("considering pkg %q", i)
 		pkg := context.Universe[i]
 
-		ptag := extractTag(tagEnabledName, pkg.Comments)
-		pkgNeedsGeneration := false
-		if ptag != nil {
-			pkgNeedsGeneration, err = strconv.ParseBool(ptag.value)
-			if err != nil {
-				klog.Fatalf("Package %v: unsupported %s value: %q :%v", i, tagEnabledName, ptag.value, err)
-			}
+		info, err := apidefinitions.Identify(pkg, apidefinitions.PrereleaseLifecycle, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
 		}
-		if !pkgNeedsGeneration {
-			klog.V(5).Infof("  skipping package")
+		if !info.ShouldGenerate() {
+			klog.V(5).Infof("  not enabled")
 			continue
 		}
-		klog.V(3).Infof("Generating package %q", pkg.Path)
+		klog.V(3).Infof("generating package %q", pkg.Path)
 
-		// If the pkg-scoped tag says to generate, we can skip scanning types.
-		if !pkgNeedsGeneration {
-			// If the pkg-scoped tag did not exist, scan all types for one that
-			// explicitly wants generation.
-			for _, t := range pkg.Types {
-				klog.V(5).Infof("  considering type %q", t.Name.String())
-				ttag := extractEnabledTypeTag(t)
-				if ttag != nil && ttag.value == "true" {
-					klog.V(5).Infof("    tag=true")
-					if !isAPIType(t) {
-						klog.Fatalf("Type %v requests prerelease generation but is not an API type", t)
+		targetList = append(targetList,
+			&generator.SimpleTarget{
+				PkgName:       strings.Split(path.Base(pkg.Path), ".")[0],
+				PkgPath:       pkg.Path,
+				PkgDir:        pkg.Dir, // output pkg is the same as the input
+				HeaderComment: boilerplate,
+				FilterFunc: func(c *generator.Context, t *types.Type) bool {
+					return t.Name.Package == pkg.Path
+				},
+				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
+					return []generator.Generator{
+						NewPrereleaseLifecycleGen(args.OutputFile, pkg.Path),
 					}
-					pkgNeedsGeneration = true
-					break
-				}
-			}
-		}
-
-		if pkgNeedsGeneration {
-			targets = append(targets,
-				&generator.SimpleTarget{
-					PkgName:       strings.Split(path.Base(pkg.Path), ".")[0],
-					PkgPath:       pkg.Path,
-					PkgDir:        pkg.Dir, // output pkg is the same as the input
-					HeaderComment: boilerplate,
-					FilterFunc: func(c *generator.Context, t *types.Type) bool {
-						return t.Name.Package == pkg.Path
-					},
-					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
-						return []generator.Generator{
-							NewPrereleaseLifecycleGen(args.OutputFile, pkg.Path),
-						}
-					},
-				})
-		}
+				},
+			})
 	}
-	return targets
+	return targetList
 }
 
 // genDeepCopy produces a file with autogenerated deep-copy functions.

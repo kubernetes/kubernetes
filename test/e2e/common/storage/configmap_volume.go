@@ -59,7 +59,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
 	})
 
-	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -75,7 +75,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
 	})
 
-	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
@@ -110,7 +110,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		doConfigMapE2EWithMappings(ctx, f, true, 0, nil)
 	})
 
-	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", func(ctx context.Context) {
+	f.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		doConfigMapE2EWithMappings(ctx, f, true, 1001, nil)
@@ -554,7 +554,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	// The pod is in pending during volume creation until the configMap objects are available
 	// or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timeout exception unless it is marked optional.
 	// Slow (~5 mins)
-	f.It("Should fail non-optional pod creation due to configMap object does not exist", f.WithSlow(), func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to configMap object does not exist", f.WithSlow(), f.WithNodeConformance(), func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
 		pod := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
 		getPod := e2epod.Get(f.ClientSet, pod)
@@ -564,7 +564,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	// ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
 	// the volume setup will error unless it is marked optional, during the pod creation.
 	// Slow (~5 mins)
-	f.It("Should fail non-optional pod creation due to the key in the configMap object does not exist", f.WithSlow(), func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to the key in the configMap object does not exist", f.WithSlow(), f.WithNodeConformance(), func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
 		pod := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
 		getPod := e2epod.Get(f.ClientSet, pod)

@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -20,9 +19,11 @@ limitations under the License.
 package preflight
 
 import (
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
+
 	utilsexec "k8s.io/utils/exec"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // Check validates if a user has elevated (administrator) privileges.

@@ -38,10 +38,10 @@
 package identifiers
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/containerd/errdefs"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -64,15 +64,15 @@ var (
 // In general identifiers that pass this validation should be safe for use as filesystem path components.
 func Validate(s string) error {
 	if len(s) == 0 {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier must not be empty")
+		return fmt.Errorf("identifier must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 
 	if len(s) > maxLength {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q greater than maximum length (%d characters)", s, maxLength)
+		return fmt.Errorf("identifier %q greater than maximum length (%d characters): %w", s, maxLength, errdefs.ErrInvalidArgument)
 	}
 
 	if !identifierRe.MatchString(s) {
-		return errors.Wrapf(errdefs.ErrInvalidArgument, "identifier %q must match %v", s, identifierRe)
+		return fmt.Errorf("identifier %q must match %v: %w", s, identifierRe, errdefs.ErrInvalidArgument)
 	}
 	return nil
 }

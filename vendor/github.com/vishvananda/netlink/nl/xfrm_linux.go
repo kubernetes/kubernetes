@@ -78,10 +78,14 @@ const (
 	XFRMA_PROTO          /* __u8 */
 	XFRMA_ADDRESS_FILTER /* struct xfrm_address_filter */
 	XFRMA_PAD
-	XFRMA_OFFLOAD_DEV   /* struct xfrm_state_offload */
-	XFRMA_SET_MARK      /* __u32 */
-	XFRMA_SET_MARK_MASK /* __u32 */
-	XFRMA_IF_ID         /* __u32 */
+	XFRMA_OFFLOAD_DEV            /* struct xfrm_state_offload */
+	XFRMA_SET_MARK               /* __u32 */
+	XFRMA_SET_MARK_MASK          /* __u32 */
+	XFRMA_IF_ID                  /* __u32 */
+	XFRMA_MTIMER_THRESH          /* __u32 in seconds for input SA */
+	XFRMA_SA_DIR                 /* __u8 */
+	XFRMA_NAT_KEEPALIVE_INTERVAL /* __u32 in seconds for NAT keepalive */
+	XFRMA_SA_PCPU                /* __u32 */
 
 	XFRMA_MAX = iota - 1
 )

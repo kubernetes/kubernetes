@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,61 @@ func init() {
 	}
 }
 
+// ConstructionNodeReport captures information about a Ginkgo spec.
+type ConstructionNodeReport struct {
+	// ContainerHierarchyTexts is a slice containing the text strings of
+	// all Describe/Context/When containers in this spec's hierarchy.
+	ContainerHierarchyTexts []string
+
+	// ContainerHierarchyLocations is a slice containing the CodeLocations of
+	// all Describe/Context/When containers in this spec's hierarchy.
+	ContainerHierarchyLocations []CodeLocation
+
+	// ContainerHierarchyLabels is a slice containing the labels of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchyLabels [][]string
+
+	// ContainerHierarchySemVerConstraints is a slice containing the semVerConstraints of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchySemVerConstraints [][]string
+
+	// ContainerHierarchyComponentSemVerConstraints is a slice containing the component-specific semVerConstraints of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchyComponentSemVerConstraints []map[string][]string
+
+	// IsSerial captures whether the any container has the Serial decorator
+	IsSerial bool
+
+	// IsInOrderedContainer captures whether any container is an Ordered container
+	IsInOrderedContainer bool
+}
+
+// FullText returns a concatenation of all the report.ContainerHierarchyTexts and report.LeafNodeText
+func (report ConstructionNodeReport) FullText() string {
+	texts := []string{}
+	texts = append(texts, report.ContainerHierarchyTexts...)
+	texts = slices.DeleteFunc(texts, func(t string) bool {
+		return t == ""
+	})
+	return strings.Join(texts, " ")
+}
+
+// Labels returns a deduped set of all the spec's Labels.
+func (report ConstructionNodeReport) Labels() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, labels := range report.ContainerHierarchyLabels {
+		for _, label := range labels {
+			if !seen[label] {
+				seen[label] = true
+				out = append(out, label)
+			}
+		}
+	}
+
+	return out
+}
+
 // Report captures information about a Ginkgo test run
 type Report struct {
 	//SuitePath captures the absolute path to the test suite
@@ -29,6 +85,12 @@ type Report struct {
 
 	//SuiteLabels captures any labels attached to the suite by the DSL's RunSpecs() function
 	SuiteLabels []string
+
+	//SuiteSemVerConstraints captures any semVerConstraints attached to the suite by the DSL's RunSpecs() function
+	SuiteSemVerConstraints []string
+
+	//SuiteComponentSemVerConstraints captures any component-specific semVerConstraints attached to the suite by the DSL's RunSpecs() function
+	SuiteComponentSemVerConstraints map[string][]string
 
 	//SuiteSucceeded captures the success or failure status of the test run
 	//If true, the test run is considered successful.
@@ -129,13 +191,26 @@ type SpecReport struct {
 	// all Describe/Context/When containers in this spec's hierarchy
 	ContainerHierarchyLabels [][]string
 
-	// LeafNodeType, LeadNodeLocation, LeafNodeLabels and LeafNodeText capture the NodeType, CodeLocation, and text
+	// ContainerHierarchySemVerConstraints is a slice containing the semVerConstraints of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchySemVerConstraints [][]string
+
+	// ContainerHierarchyComponentSemVerConstraints is a slice containing the component-specific semVerConstraints of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchyComponentSemVerConstraints []map[string][]string
+
+	// LeafNodeType, LeafNodeLocation, LeafNodeLabels, LeafNodeSemVerConstraints and LeafNodeText capture the NodeType, CodeLocation, and text
 	// of the Ginkgo node being tested (typically an NodeTypeIt node, though this can also be
 	// one of the NodeTypesForSuiteLevelNodes node types)
-	LeafNodeType     NodeType
-	LeafNodeLocation CodeLocation
-	LeafNodeLabels   []string
-	LeafNodeText     string
+	LeafNodeType                       NodeType
+	LeafNodeLocation                   CodeLocation
+	LeafNodeLabels                     []string
+	LeafNodeSemVerConstraints          []string
+	LeafNodeComponentSemVerConstraints map[string][]string
+	LeafNodeText                       string
+
+	// Captures the Spec Priority
+	SpecPriority int
 
 	// State captures whether the spec has passed, failed, etc.
 	State SpecState
@@ -198,48 +273,54 @@ type SpecReport struct {
 func (report SpecReport) MarshalJSON() ([]byte, error) {
 	//All this to avoid emitting an empty Failure struct in the JSON
 	out := struct {
-		ContainerHierarchyTexts     []string
-		ContainerHierarchyLocations []CodeLocation
-		ContainerHierarchyLabels    [][]string
-		LeafNodeType                NodeType
-		LeafNodeLocation            CodeLocation
-		LeafNodeLabels              []string
-		LeafNodeText                string
-		State                       SpecState
-		StartTime                   time.Time
-		EndTime                     time.Time
-		RunTime                     time.Duration
-		ParallelProcess             int
-		Failure                     *Failure `json:",omitempty"`
-		NumAttempts                 int
-		MaxFlakeAttempts            int
-		MaxMustPassRepeatedly       int
-		CapturedGinkgoWriterOutput  string              `json:",omitempty"`
-		CapturedStdOutErr           string              `json:",omitempty"`
-		ReportEntries               ReportEntries       `json:",omitempty"`
-		ProgressReports             []ProgressReport    `json:",omitempty"`
-		AdditionalFailures          []AdditionalFailure `json:",omitempty"`
-		SpecEvents                  SpecEvents          `json:",omitempty"`
+		ContainerHierarchyTexts                      []string
+		ContainerHierarchyLocations                  []CodeLocation
+		ContainerHierarchyLabels                     [][]string
+		ContainerHierarchySemVerConstraints          [][]string
+		ContainerHierarchyComponentSemVerConstraints []map[string][]string
+		LeafNodeType                                 NodeType
+		LeafNodeLocation                             CodeLocation
+		LeafNodeLabels                               []string
+		LeafNodeSemVerConstraints                    []string
+		LeafNodeText                                 string
+		State                                        SpecState
+		StartTime                                    time.Time
+		EndTime                                      time.Time
+		RunTime                                      time.Duration
+		ParallelProcess                              int
+		Failure                                      *Failure `json:",omitempty"`
+		NumAttempts                                  int
+		MaxFlakeAttempts                             int
+		MaxMustPassRepeatedly                        int
+		CapturedGinkgoWriterOutput                   string              `json:",omitempty"`
+		CapturedStdOutErr                            string              `json:",omitempty"`
+		ReportEntries                                ReportEntries       `json:",omitempty"`
+		ProgressReports                              []ProgressReport    `json:",omitempty"`
+		AdditionalFailures                           []AdditionalFailure `json:",omitempty"`
+		SpecEvents                                   SpecEvents          `json:",omitempty"`
 	}{
-		ContainerHierarchyTexts:     report.ContainerHierarchyTexts,
-		ContainerHierarchyLocations: report.ContainerHierarchyLocations,
-		ContainerHierarchyLabels:    report.ContainerHierarchyLabels,
-		LeafNodeType:                report.LeafNodeType,
-		LeafNodeLocation:            report.LeafNodeLocation,
-		LeafNodeLabels:              report.LeafNodeLabels,
-		LeafNodeText:                report.LeafNodeText,
-		State:                       report.State,
-		StartTime:                   report.StartTime,
-		EndTime:                     report.EndTime,
-		RunTime:                     report.RunTime,
-		ParallelProcess:             report.ParallelProcess,
-		Failure:                     nil,
-		ReportEntries:               nil,
-		NumAttempts:                 report.NumAttempts,
-		MaxFlakeAttempts:            report.MaxFlakeAttempts,
-		MaxMustPassRepeatedly:       report.MaxMustPassRepeatedly,
-		CapturedGinkgoWriterOutput:  report.CapturedGinkgoWriterOutput,
-		CapturedStdOutErr:           report.CapturedStdOutErr,
+		ContainerHierarchyTexts:                      report.ContainerHierarchyTexts,
+		ContainerHierarchyLocations:                  report.ContainerHierarchyLocations,
+		ContainerHierarchyLabels:                     report.ContainerHierarchyLabels,
+		ContainerHierarchySemVerConstraints:          report.ContainerHierarchySemVerConstraints,
+		ContainerHierarchyComponentSemVerConstraints: report.ContainerHierarchyComponentSemVerConstraints,
+		LeafNodeType:                                 report.LeafNodeType,
+		LeafNodeLocation:                             report.LeafNodeLocation,
+		LeafNodeLabels:                               report.LeafNodeLabels,
+		LeafNodeSemVerConstraints:                    report.LeafNodeSemVerConstraints,
+		LeafNodeText:                                 report.LeafNodeText,
+		State:                                        report.State,
+		StartTime:                                    report.StartTime,
+		EndTime:                                      report.EndTime,
+		RunTime:                                      report.RunTime,
+		ParallelProcess:                              report.ParallelProcess,
+		Failure:                                      nil,
+		ReportEntries:                                nil,
+		NumAttempts:                                  report.NumAttempts,
+		MaxFlakeAttempts:                             report.MaxFlakeAttempts,
+		MaxMustPassRepeatedly:                        report.MaxMustPassRepeatedly,
+		CapturedGinkgoWriterOutput:                   report.CapturedGinkgoWriterOutput,
+		CapturedStdOutErr:                            report.CapturedStdOutErr,
 	}
 
 	if !report.Failure.IsZero() {
@@ -287,6 +368,9 @@ func (report SpecReport) FullText() string {
 	if report.LeafNodeText != "" {
 		texts = append(texts, report.LeafNodeText)
 	}
+	texts = slices.DeleteFunc(texts, func(t string) bool {
+		return t == ""
+	})
 	return strings.Join(texts, " ")
 }
 
@@ -312,6 +396,56 @@ func (report SpecReport) Labels() []string {
 	return out
 }
 
+// SemVerConstraints returns a deduped set of all the spec's SemVerConstraints.
+func (report SpecReport) SemVerConstraints() []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, semVerConstraints := range report.ContainerHierarchySemVerConstraints {
+		for _, semVerConstraint := range semVerConstraints {
+			if !seen[semVerConstraint] {
+				seen[semVerConstraint] = true
+				out = append(out, semVerConstraint)
+			}
+		}
+	}
+	for _, semVerConstraint := range report.LeafNodeSemVerConstraints {
+		if !seen[semVerConstraint] {
+			seen[semVerConstraint] = true
+			out = append(out, semVerConstraint)
+		}
+	}
+
+	return out
+}
+
+// ComponentSemVerConstraints returns a deduped map of all the spec's component-specific SemVerConstraints.
+func (report SpecReport) ComponentSemVerConstraints() map[string][]string {
+	out := map[string][]string{}
+	seen := map[string]bool{}
+	for _, compSemVerConstraints := range report.ContainerHierarchyComponentSemVerConstraints {
+		for component := range compSemVerConstraints {
+			if !seen[component] {
+				seen[component] = true
+				out[component] = compSemVerConstraints[component]
+			} else {
+				out[component] = append(out[component], compSemVerConstraints[component]...)
+				out[component] = slices.Compact(out[component])
+			}
+		}
+	}
+	for component := range report.LeafNodeComponentSemVerConstraints {
+		if !seen[component] {
+			seen[component] = true
+			out[component] = report.LeafNodeComponentSemVerConstraints[component]
+		} else {
+			out[component] = append(out[component], report.LeafNodeComponentSemVerConstraints[component]...)
+			out[component] = slices.Compact(out[component])
+		}
+	}
+
+	return out
+}
+
 // MatchesLabelFilter returns true if the spec satisfies the passed in label filter query
 func (report SpecReport) MatchesLabelFilter(query string) (bool, error) {
 	filter, err := ParseLabelFilter(query)
@@ -319,6 +453,30 @@ func (report SpecReport) MatchesLabelFilter(query string) (bool, error) {
 		return false, err
 	}
 	return filter(report.Labels()), nil
+}
+
+// MatchesSemVerFilter returns true if the spec satisfies the passed in label filter query
+func (report SpecReport) MatchesSemVerFilter(version string) (bool, error) {
+	filter, err := ParseSemVerFilter(version)
+	if err != nil {
+		return false, err
+	}
+
+	semVerConstraints := report.SemVerConstraints()
+	if len(semVerConstraints) != 0 && filter("", report.SemVerConstraints()) == false {
+		return false, nil
+	}
+
+	componentSemVerConstraints := report.ComponentSemVerConstraints()
+	if len(componentSemVerConstraints) != 0 {
+		for component, constraints := range componentSemVerConstraints {
+			if filter(component, constraints) == false {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
 }
 
 // FileName() returns the name of the file containing the spec

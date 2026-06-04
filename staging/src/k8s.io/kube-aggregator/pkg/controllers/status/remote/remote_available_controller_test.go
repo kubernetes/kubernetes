@@ -18,6 +18,7 @@ package remote
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,10 +27,12 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/dump"
+	"k8s.io/apiserver/pkg/util/proxy"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	discoveryv1listers "k8s.io/client-go/listers/discovery/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -38,6 +41,7 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
+	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
@@ -46,31 +50,43 @@ const (
 	testServicePortName       = "testPort"
 )
 
-func newEndpoints(namespace, name string) *v1.Endpoints {
-	return &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
-	}
-}
-
-func newEndpointsWithAddress(namespace, name string, port int32, portName string) *v1.Endpoints {
-	return &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
-		Subsets: []v1.EndpointSubset{
-			{
-				Addresses: []v1.EndpointAddress{
-					{
-						IP: "val",
-					},
-				},
-				Ports: []v1.EndpointPort{
-					{
-						Name: portName,
-						Port: port,
-					},
-				},
+func newEndpointSlice(namespace, serviceName string) *discoveryv1.EndpointSlice {
+	return &discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      serviceName + "-xxx",
+			Labels: map[string]string{
+				discoveryv1.LabelServiceName: serviceName,
 			},
 		},
 	}
+}
+
+func newEndpointSliceWithAddress(namespace, serviceName string, port int32, portName string) *discoveryv1.EndpointSlice {
+	slice := newEndpointSlice(namespace, serviceName)
+	slice.Endpoints = []discoveryv1.Endpoint{{
+		Addresses: []string{"val"},
+	}}
+	slice.Ports = []discoveryv1.EndpointPort{{
+		Name: &portName,
+		Port: &port,
+	}}
+	return slice
+}
+
+func newUnreadyEndpointSliceWithAddress(namespace, serviceName string, port int32, portName string) *discoveryv1.EndpointSlice {
+	slice := newEndpointSlice(namespace, serviceName)
+	slice.Endpoints = []discoveryv1.Endpoint{{
+		Addresses: []string{"val"},
+		Conditions: discoveryv1.EndpointConditions{
+			Ready: ptr.To(false),
+		},
+	}}
+	slice.Ports = []discoveryv1.EndpointPort{{
+		Name: &portName,
+		Port: &port,
+	}}
+	return slice
 }
 
 func newService(namespace, name string, port int32, portName string) *v1.Service {
@@ -115,7 +131,12 @@ func setupAPIServices(t T, apiServices []runtime.Object) (*AvailableConditionCon
 	fakeClient := fake.NewSimpleClientset()
 	apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	endpointSliceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	endpointSliceGetter, err := proxy.NewEndpointSliceListerGetter(discoveryv1listers.NewEndpointSliceLister(endpointSliceIndexer))
+	if err != nil {
+		t.Fatalf("error creating endpointSliceGetter: %v", err)
+	}
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -129,11 +150,11 @@ func setupAPIServices(t T, apiServices []runtime.Object) (*AvailableConditionCon
 	}
 
 	c := AvailableConditionController{
-		apiServiceClient: fakeClient.ApiregistrationV1(),
-		apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
-		serviceLister:    v1listers.NewServiceLister(serviceIndexer),
-		endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
-		serviceResolver:  &fakeServiceResolver{url: testServer.URL},
+		apiServiceClient:    fakeClient.ApiregistrationV1(),
+		apiServiceLister:    listers.NewAPIServiceLister(apiServiceIndexer),
+		serviceLister:       v1listers.NewServiceLister(serviceIndexer),
+		endpointSliceGetter: endpointSliceGetter,
+		serviceResolver:     &fakeServiceResolver{url: testServer.URL},
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
@@ -153,12 +174,12 @@ func BenchmarkBuildCache(b *testing.B) {
 	apiServiceName := "remote.group"
 	// model 1 APIService pointing at a given service, and 30 pointing at local group/versions
 	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		apiServices = append(apiServices, newLocalAPIService(fmt.Sprintf("local.group%d", i)))
 	}
 	// model one service backing an API service, and 100 unrelated services
 	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		services = append(services, newService("foo", fmt.Sprintf("bar%d", i), testServicePort, testServicePortName))
 	}
 	c, _ := setupAPIServices(b, apiServices)
@@ -184,7 +205,6 @@ func TestBuildCache(t *testing.T) {
 		apiServiceName string
 		apiServices    []runtime.Object
 		services       []*v1.Service
-		endpoints      []*v1.Endpoints
 
 		expectedAvailability apiregistration.APIServiceCondition
 	}{
@@ -219,7 +239,7 @@ func TestSync(t *testing.T) {
 		apiServiceName  string
 		apiServices     []runtime.Object
 		services        []*v1.Service
-		endpoints       []*v1.Endpoints
+		endpointSlices  []*discoveryv1.EndpointSlice
 		backendStatus   int
 		backendLocation string
 
@@ -266,8 +286,8 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
-			endpoints:     []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
-			backendStatus: http.StatusOK,
+			endpointSlices: []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -285,7 +305,7 @@ func TestSync(t *testing.T) {
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "EndpointsNotFound",
-				Message: `cannot find endpoints for service/bar in "foo"`,
+				Message: `cannot find endpointslices for service/bar in "foo"`,
 			},
 		},
 		{
@@ -293,13 +313,13 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []runtime.Object{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:      []*v1.Endpoints{newEndpoints("foo", "bar")},
+			endpointSlices: []*discoveryv1.EndpointSlice{newEndpointSlice("foo", "bar")},
 			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "MissingEndpoints",
-				Message: `endpoints for service/bar in "foo" have no addresses with port name "testPort"`,
+				Message: `endpointslices for service/bar in "foo" have no addresses with port name "testPort"`,
 			},
 		},
 		{
@@ -307,13 +327,27 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []runtime.Object{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, "wrongName")},
+			endpointSlices: []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, "wrongName")},
 			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "MissingEndpoints",
-				Message: fmt.Sprintf(`endpoints for service/bar in "foo" have no addresses with port name "%s"`, testServicePortName),
+				Message: fmt.Sprintf(`endpointslices for service/bar in "foo" have no addresses with port name "%s"`, testServicePortName),
+			},
+		},
+		{
+			name:           "endpoints not ready",
+			apiServiceName: "remote.group",
+			apiServices:    []runtime.Object{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpointSlices: []*discoveryv1.EndpointSlice{newUnreadyEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "MissingEndpoints",
+				Message: fmt.Sprintf(`endpointslices for service/bar in "foo" have no addresses with port name "%s"`, testServicePortName),
 			},
 		},
 		{
@@ -321,7 +355,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []runtime.Object{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			endpointSlices: []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)},
 			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
@@ -335,7 +369,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []runtime.Object{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			endpointSlices: []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)},
 			backendStatus:  http.StatusForbidden,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
@@ -350,7 +384,7 @@ func TestSync(t *testing.T) {
 			apiServiceName:  "remote.group",
 			apiServices:     []runtime.Object{newRemoteAPIService("remote.group")},
 			services:        []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:       []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			endpointSlices:  []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)},
 			backendStatus:   http.StatusFound,
 			backendLocation: "/test",
 			expectedAvailability: apiregistration.APIServiceCondition{
@@ -366,7 +400,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []runtime.Object{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			endpointSlices: []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)},
 			backendStatus:  http.StatusNotModified,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
@@ -383,15 +417,20 @@ func TestSync(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(tc.apiServices...)
 			apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-			endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			endpointSliceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			for _, obj := range tc.apiServices {
-				apiServiceIndexer.Add(obj)
+				apiServiceIndexer.Add(obj) //nolint:errcheck
 			}
 			for _, obj := range tc.services {
-				serviceIndexer.Add(obj)
+				serviceIndexer.Add(obj) //nolint:errcheck
 			}
-			for _, obj := range tc.endpoints {
-				endpointsIndexer.Add(obj)
+			for _, obj := range tc.endpointSlices {
+				endpointSliceIndexer.Add(obj) //nolint:errcheck
+			}
+
+			endpointSliceGetter, err := proxy.NewEndpointSliceListerGetter(discoveryv1listers.NewEndpointSliceLister(endpointSliceIndexer))
+			if err != nil {
+				t.Fatalf("error creating endpointSliceGetter: %v", err)
 			}
 
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -406,12 +445,12 @@ func TestSync(t *testing.T) {
 				apiServiceClient:           fakeClient.ApiregistrationV1(),
 				apiServiceLister:           listers.NewAPIServiceLister(apiServiceIndexer),
 				serviceLister:              v1listers.NewServiceLister(serviceIndexer),
-				endpointsLister:            v1listers.NewEndpointsLister(endpointsIndexer),
+				endpointSliceGetter:        endpointSliceGetter,
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 				metrics:                    availabilitymetrics.New(),
 			}
-			err := c.sync(tc.apiServiceName)
+			err = c.sync(tc.apiServiceName)
 			if tc.expectedSyncError != "" {
 				if err == nil {
 					t.Fatalf("%v expected error with %q, got none", tc.name, tc.expectedSyncError)
@@ -498,4 +537,76 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 
 func emptyCert() []byte {
 	return []byte{}
+}
+
+func TestCloseIdleConnections(t *testing.T) {
+	apiServiceName := "remote.group"
+	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
+	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
+	endpointSlices := []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)}
+
+	fakeClient := fake.NewSimpleClientset(apiServices...)
+	apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	endpointSliceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for _, obj := range apiServices {
+		if err := apiServiceIndexer.Add(obj); err != nil {
+			t.Fatalf("failed to add APIService: %v", err)
+		}
+	}
+	for _, obj := range services {
+		if err := serviceIndexer.Add(obj); err != nil {
+			t.Fatalf("failed to add service: %v", err)
+		}
+	}
+	for _, obj := range endpointSlices {
+		if err := endpointSliceIndexer.Add(obj); err != nil {
+			t.Fatalf("failed to add endpointSlice: %v", err)
+		}
+	}
+
+	endpointSliceGetter, err := proxy.NewEndpointSliceListerGetter(discoveryv1listers.NewEndpointSliceLister(endpointSliceIndexer))
+	if err != nil {
+		t.Fatalf("error creating endpointSliceGetter: %v", err)
+	}
+
+	closed := make(chan struct{}, 1)
+	testServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	// We want to verify that the client closes the connection.
+	// httptest.Server doesn't expose ConnState, but the underlying http.Server does.
+	testServer.Config.ConnState = func(c net.Conn, state http.ConnState) {
+		if state == http.StateClosed {
+			select {
+			case closed <- struct{}{}:
+			default:
+			}
+		}
+	}
+	testServer.Start()
+	defer testServer.Close()
+
+	c := AvailableConditionController{
+		apiServiceClient:           fakeClient.ApiregistrationV1(),
+		apiServiceLister:           listers.NewAPIServiceLister(apiServiceIndexer),
+		serviceLister:              v1listers.NewServiceLister(serviceIndexer),
+		endpointSliceGetter:        endpointSliceGetter,
+		serviceResolver:            &fakeServiceResolver{url: testServer.URL},
+		proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
+		metrics:                    availabilitymetrics.New(),
+	}
+
+	// This should trigger the bad gateway response and (with the fix) close the connection.
+	err = c.sync(apiServiceName)
+	if err == nil {
+		t.Fatal("expected error from sync")
+	}
+
+	select {
+	case <-closed:
+		// success, connection was closed
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for connection to be closed")
+	}
 }

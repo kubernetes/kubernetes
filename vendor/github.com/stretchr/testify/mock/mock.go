@@ -208,9 +208,16 @@ func (c *Call) On(methodName string, arguments ...interface{}) *Call {
 	return c.Parent.On(methodName, arguments...)
 }
 
-// Unset removes a mock handler from being called.
+// Unset removes all mock handlers that satisfy the call instance arguments from being
+// called. Only supported on call instances with static input arguments.
 //
-//	test.On("func", mock.Anything).Unset()
+// For example, the only handler remaining after the following would be "MyMethod(2, 2)":
+//
+//	Mock.
+//	   On("MyMethod", 2, 2).Return(0).
+//	   On("MyMethod", 3, 3).Return(0).
+//	   On("MyMethod", Anything, Anything).Return(0)
+//	Mock.On("MyMethod", 3, 3).Unset()
 func (c *Call) Unset() *Call {
 	var unlockOnce sync.Once
 
@@ -331,7 +338,10 @@ func (m *Mock) TestData() objx.Map {
 	Setting expectations
 */
 
-// Test sets the test struct variable of the mock object
+// Test sets the [TestingT] on which errors will be reported, otherwise errors
+// will cause a panic.
+// Test should not be called on an object that is going to be used in a
+// goroutine other than the one running the test function.
 func (m *Mock) Test(t TestingT) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -494,7 +504,7 @@ func (m *Mock) MethodCalled(methodName string, arguments ...interface{}) Argumen
 		// expected call found, but it has already been called with repeatable times
 		if call != nil {
 			m.mutex.Unlock()
-			m.fail("\nassert: mock: The method has been called over %d times.\n\tEither do one more Mock.On(\"%s\").Return(...), or remove extra call.\n\tThis call was unexpected:\n\t\t%s\n\tat: %s", call.totalCalls, methodName, callString(methodName, arguments, true), assert.CallerInfo())
+			m.fail("\nassert: mock: The method has been called over %d times.\n\tEither do one more Mock.On(%#v).Return(...), or remove extra call.\n\tThis call was unexpected:\n\t\t%s\n\tat: %s", call.totalCalls, methodName, callString(methodName, arguments, true), assert.CallerInfo())
 		}
 		// we have to fail here - because we don't know what to do
 		// as the return arguments.  This is because:
@@ -514,7 +524,7 @@ func (m *Mock) MethodCalled(methodName string, arguments ...interface{}) Argumen
 				assert.CallerInfo(),
 			)
 		} else {
-			m.fail("\nassert: mock: I don't know what to return because the method call was unexpected.\n\tEither do Mock.On(\"%s\").Return(...) first, or remove the %s() call.\n\tThis method was unexpected:\n\t\t%s\n\tat: %s", methodName, methodName, callString(methodName, arguments, true), assert.CallerInfo())
+			m.fail("\nassert: mock: I don't know what to return because the method call was unexpected.\n\tEither do Mock.On(%#v).Return(...) first, or remove the %s() call.\n\tThis method was unexpected:\n\t\t%s\n\tat: %s", methodName, methodName, callString(methodName, arguments, true), assert.CallerInfo())
 		}
 	}
 
@@ -661,7 +671,7 @@ func (m *Mock) AssertNumberOfCalls(t TestingT, methodName string, expectedCalls 
 			actualCalls++
 		}
 	}
-	return assert.Equal(t, expectedCalls, actualCalls, fmt.Sprintf("Expected number of calls (%d) does not match the actual number of calls (%d).", expectedCalls, actualCalls))
+	return assert.Equal(t, expectedCalls, actualCalls, fmt.Sprintf("Expected number of calls (%d) of method %s does not match the actual number of calls (%d).", expectedCalls, methodName, actualCalls))
 }
 
 // AssertCalled asserts that the method was called.

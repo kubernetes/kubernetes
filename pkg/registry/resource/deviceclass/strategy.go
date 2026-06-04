@@ -22,19 +22,22 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // deviceClassStrategy implements behavior for DeviceClass objects
 type deviceClassStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
-var Strategy = deviceClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = deviceClassStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (deviceClassStrategy) NamespaceScoped() bool {
 	return false
@@ -58,7 +61,7 @@ func (deviceClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obj
 func (deviceClassStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (deviceClassStrategy) AllowCreateOnUpdate() bool {
+func (deviceClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -75,18 +78,42 @@ func (deviceClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 }
 
 func (deviceClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateDeviceClass(obj.(*resource.DeviceClass))
-	return append(errorList, validation.ValidateDeviceClassUpdate(obj.(*resource.DeviceClass), old.(*resource.DeviceClass))...)
+	newClass := obj.(*resource.DeviceClass)
+	oldClass := old.(*resource.DeviceClass)
+	return validation.ValidateDeviceClassUpdate(newClass, oldClass)
 }
 
 func (deviceClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
-func (deviceClassStrategy) AllowUnconditionalUpdate() bool {
+func (deviceClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClass, oldClass *resource.DeviceClass) {
+	dropDisabledDRAExtendedResourceFields(newClass, oldClass)
+}
+
+func dropDisabledDRAExtendedResourceFields(newClass, oldClass *resource.DeviceClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		return
+	}
+	if draExtendedResourceFeatureInUse(oldClass) {
+		return
+	}
+	newClass.Spec.ExtendedResourceName = nil
+}
+
+func draExtendedResourceFeatureInUse(class *resource.DeviceClass) bool {
+	if class == nil {
+		return false
+	}
+
+	if class.Spec.ExtendedResourceName != nil {
+		return true
+	}
+
+	return false
 }

@@ -92,11 +92,11 @@ func (HPAScalingPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_HPAScalingRules = map[string]string{
-	"":                           "HPAScalingRules configures the scaling behavior for one direction via scaling Policy Rules and a configurable metric tolerance.\n\nScaling Policy Rules are applied after calculating DesiredReplicas from metrics for the HPA. They can limit the scaling velocity by specifying scaling policies. They can prevent flapping by specifying the stabilization window, so that the number of replicas is not set instantly, instead, the safest value from the stabilization window is chosen.\n\nThe tolerance is applied to the metric values and prevents scaling too eagerly for small metric variations. (Note that setting a tolerance requires enabling the alpha HPAConfigurableTolerance feature gate.)",
+	"":                           "HPAScalingRules configures the scaling behavior for one direction via scaling Policy Rules and a configurable metric tolerance.\n\nScaling Policy Rules are applied after calculating DesiredReplicas from metrics for the HPA. They can limit the scaling velocity by specifying scaling policies. They can prevent flapping by specifying the stabilization window, so that the number of replicas is not set instantly, instead, the safest value from the stabilization window is chosen.\n\nThe tolerance is applied to the metric values and prevents scaling too eagerly for small metric variations. (Note that setting a tolerance requires the beta HPAConfigurableTolerance feature gate to be enabled.)",
 	"stabilizationWindowSeconds": "stabilizationWindowSeconds is the number of seconds for which past recommendations should be considered while scaling up or scaling down. StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour). If not set, use the default values: - For scale up: 0 (i.e. no stabilization is done). - For scale down: 300 (i.e. the stabilization window is 300 seconds long).",
 	"selectPolicy":               "selectPolicy is used to specify which policy should be used. If not set, the default value Max is used.",
 	"policies":                   "policies is a list of potential scaling polices which can be used during scaling. If not set, use the default values: - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window. - For scale down: allow all pods to be removed in a 15s window.",
-	"tolerance":                  "tolerance is the tolerance on the ratio between the current and desired metric value under which no updates are made to the desired number of replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not set, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi, and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be triggered when the actual consumption falls below 95Mi or exceeds 101Mi.\n\nThis is an alpha field and requires enabling the HPAConfigurableTolerance feature gate.",
+	"tolerance":                  "tolerance is the tolerance on the ratio between the current and desired metric value under which no updates are made to the desired number of replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not set, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi, and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be triggered when the actual consumption falls below 95Mi or exceeds 101Mi.\n\nThis is an beta field and requires the HPAConfigurableTolerance feature gate to be enabled.",
 }
 
 func (HPAScalingRules) SwaggerDoc() map[string]string {
@@ -131,6 +131,7 @@ var map_HorizontalPodAutoscalerCondition = map[string]string{
 	"lastTransitionTime": "lastTransitionTime is the last time the condition transitioned from one status to another",
 	"reason":             "reason is the reason for the condition's last transition.",
 	"message":            "message is a human-readable explanation containing details about the transition",
+	"observedGeneration": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
 }
 
 func (HorizontalPodAutoscalerCondition) SwaggerDoc() map[string]string {
@@ -204,7 +205,7 @@ var map_MetricStatus = map[string]string{
 	"object":            "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
 	"pods":              "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
 	"resource":          "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-	"containerResource": "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+	"containerResource": "containerResource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
 	"external":          "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
 }
 
@@ -228,7 +229,7 @@ var map_MetricValueStatus = map[string]string{
 	"":                   "MetricValueStatus holds the current value for a metric",
 	"value":              "value is the current value of the metric (as a quantity).",
 	"averageValue":       "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
-	"averageUtilization": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+	"averageUtilization": "averageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
 }
 
 func (MetricValueStatus) SwaggerDoc() map[string]string {
@@ -250,7 +251,7 @@ var map_ObjectMetricStatus = map[string]string{
 	"":                "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
 	"metric":          "metric identifies the target metric by name and selector",
 	"current":         "current contains the current value for the given metric",
-	"describedObject": "DescribedObject specifies the descriptions of a object,such as kind,name apiVersion",
+	"describedObject": "describedObject specifies the descriptions of a object,such as kind,name apiVersion",
 }
 
 func (ObjectMetricStatus) SwaggerDoc() map[string]string {

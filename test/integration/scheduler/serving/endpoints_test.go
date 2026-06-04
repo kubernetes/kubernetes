@@ -19,6 +19,7 @@ package serving
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,19 +29,27 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiserverfeat "k8s.io/apiserver/pkg/features"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	flagzv1beta1 "k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
+	flagztesting "k8s.io/apiserver/pkg/server/flagz/testing"
+	statuszv1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	statuszv1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
+	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestEndpointHandlers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
-
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver server: %v", err)
@@ -120,26 +129,6 @@ func TestEndpointHandlers(t *testing.T) {
 			useBrokenConfig:  true,
 			wantResponseCode: http.StatusInternalServerError,
 		},
-		{
-			name:             "/flagz",
-			path:             "/flagz",
-			requestHeader:    map[string]string{"Accept": "text/plain"},
-			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `^\n` +
-				`kube-scheduler flags\n` +
-				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.`,
-		},
-		{
-			name:             "/statusz",
-			path:             "/statusz",
-			requestHeader:    map[string]string{"Accept": "text/plain"},
-			wantResponseCode: http.StatusOK,
-			wantResponseBodyRegx: `^\n` +
-				`kube-scheduler statusz\n` +
-				`Warning: This endpoint is not meant to be machine parseable, ` +
-				`has no formatting compatibility guarantees and is for debugging purposes only.`,
-		},
 	}
 
 	for _, tt := range tests {
@@ -152,7 +141,7 @@ func TestEndpointHandlers(t *testing.T) {
 				configFile = brokenConfig.Name()
 			}
 			result, err := kubeschedulertesting.StartTestServer(
-				ctx,
+				t, ctx,
 				[]string{"--kubeconfig", configFile, "--leader-elect=false", "--authorization-always-allow-paths", tt.path})
 
 			if err != nil {
@@ -166,7 +155,7 @@ func TestEndpointHandlers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to get client from test server: %v", err)
 			}
-			req, err := http.NewRequest("GET", base+tt.path, nil)
+			req, err := http.NewRequest(http.MethodGet, base+tt.path, nil)
 			if err != nil {
 				t.Fatalf("failed to request: %v", err)
 			}
@@ -175,28 +164,444 @@ func TestEndpointHandlers(t *testing.T) {
 					req.Header.Set(k, v)
 				}
 			}
+
+			err = retry.OnError(
+				retry.DefaultBackoff,
+				func(err error) bool {
+					// the endpoint /readyz/sched-handler-sync needs some time to finish
+					// the initialization, so we need to retry
+					return !tt.useBrokenConfig &&
+						// The message differ depending on endpoint
+						(tt.path == "/readyz" && strings.Contains(err.Error(), "sched-handler-sync failed: reason withheld") ||
+							tt.path == "/readyz/sched-handler-sync" && strings.Contains(err.Error(), "handlers are not fully synchronized"))
+				},
+				func() error {
+					r, err := client.Do(req)
+					if err != nil {
+						return fmt.Errorf("failed to GET %s from component: %w", tt.path, err)
+					}
+
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						return fmt.Errorf("failed to read response body: %w", err)
+					}
+					if err = r.Body.Close(); err != nil {
+						return fmt.Errorf("failed to close response body: %w", err)
+					}
+					if got, expected := r.StatusCode, tt.wantResponseCode; got != expected {
+						return fmt.Errorf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
+					}
+					if tt.wantResponseBodyRegx != "" {
+						matched, err := regexp.MatchString(tt.wantResponseBodyRegx, string(body))
+						if err != nil {
+							return fmt.Errorf("failed to compile regex: %w", err)
+						}
+						if !matched {
+							return fmt.Errorf("response body does not match regex.\nExpected:\n%s\n\nGot:\n%s", tt.wantResponseBodyRegx, string(body))
+						}
+					}
+					return nil
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestSchedulerZPages(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ComponentStatusz:           true,
+		features.ComponentFlagz:             true,
+		apiserverfeat.CBORServingAndStorage: true,
+	})
+
+	server, configStr, _, err := startTestAPIServer(t)
+	if err != nil {
+		t.Fatalf("Failed to start kube-apiserver server: %v", err)
+	}
+	defer server.TearDownFn()
+
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatalf("Failed to create config file: %v", err)
+	}
+	defer func() {
+		_ = os.Remove(apiserverConfig.Name())
+	}()
+	if _, err = apiserverConfig.WriteString(configStr); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	result, err := kubeschedulertesting.StartTestServer(
+		t, ctx,
+		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authorization-always-allow-paths=/statusz,/flagz,/configz"},
+	)
+	if err != nil {
+		t.Fatalf("Failed to start kube-scheduler server: %v", err)
+	}
+	if result.TearDownFn != nil {
+		defer result.TearDownFn()
+	}
+
+	client, base, err := clientAndURLFromTestServer(result)
+	if err != nil {
+		t.Fatalf("Failed to get client from test server: %v", err)
+	}
+
+	statuszWantBodyStr := "kube-scheduler statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyStructuredAlpha := &statuszv1alpha1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
+	}
+	statuszWantBodyStructuredBeta := &statuszv1beta1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
+	}
+
+	flagzWantBodyStr := "kube-scheduler flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyStructuredAlpha := &flagzv1alpha1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+		Flags: map[string]string{
+			"leader-elect-resource-name": "kube-scheduler",
+		},
+	}
+	flagzWantBodyStructuredBeta := &flagzv1beta1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-scheduler",
+		},
+		Flags: map[string]string{
+			"leader-elect-resource-name": "kube-scheduler",
+		},
+	}
+
+	statuszTestCases := []struct {
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string
+		wantBodyStructured    interface{}
+		wantDeprecationHeader bool
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodyText: statuszWantBodyStr,
+		},
+		{
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyStructuredBeta,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodyText: statuszWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodyText: statuszWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodyText: statuszWantBodyStr,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyStructuredBeta,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyStructuredBeta,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1alpha1;as=Statusz,application/json;g=config.k8s.io;v=v1beta1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    statuszWantBodyStructuredAlpha,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1beta1;as=Statusz,application/json;g=config.k8s.io;v=v1alpha1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    statuszWantBodyStructuredBeta,
+			wantDeprecationHeader: false,
+		},
+	}
+
+	flagzTestCases := []struct {
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string
+		wantBodyStructured    interface{}
+		wantDeprecationHeader bool
+	}{
+		{
+			name:         "text plain response",
+			acceptHeader: "text/plain",
+			wantStatus:   http.StatusOK,
+			wantBodyText: flagzWantBodyStr,
+		},
+		{
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:         "no accept header (defaults to text)",
+			acceptHeader: "",
+			wantStatus:   http.StatusOK,
+			wantBodyText: flagzWantBodyStr,
+		},
+		{
+			name:         "invalid accept header",
+			acceptHeader: "application/xml",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json without params",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "application/json with missing as",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
+			wantStatus:   http.StatusNotAcceptable,
+		},
+		{
+			name:         "wildcard accept header",
+			acceptHeader: "*/*",
+			wantStatus:   http.StatusOK,
+			wantBodyText: flagzWantBodyStr,
+		},
+		{
+			name:         "bad json header fall back wildcard",
+			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
+			wantStatus:   http.StatusOK,
+			wantBodyText: flagzWantBodyStr,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz,application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    flagzWantBodyStructuredAlpha,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;v=v1beta1;g=config.k8s.io;as=Flagz,application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    flagzWantBodyStructuredBeta,
+			wantDeprecationHeader: false,
+		},
+	}
+
+	configzTestCases := []struct {
+		name         string
+		acceptHeader string
+		wantStatus   int
+	}{
+		{
+			name:         "application/json response",
+			acceptHeader: "application/json",
+			wantStatus:   http.StatusOK,
+		},
+	}
+
+	for _, tc := range statuszTestCases {
+		t.Run("statusz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+"/statusz", nil)
+			if err != nil {
+				t.Fatalf("failed to request: %v", err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
 			r, err := client.Do(req)
 			if err != nil {
-				t.Fatalf("failed to GET %s from component: %v", tt.path, err)
+				t.Fatalf("failed to GET /statusz: %v", err)
 			}
 
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				t.Fatalf("failed to read response body: %v", err)
 			}
+
 			if err = r.Body.Close(); err != nil {
 				t.Fatalf("failed to close response body: %v", err)
 			}
-			if got, expected := r.StatusCode, tt.wantResponseCode; got != expected {
-				t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
 			}
-			if tt.wantResponseBodyRegx != "" {
-				matched, err := regexp.MatchString(tt.wantResponseBodyRegx, string(body))
-				if err != nil {
-					t.Fatalf("failed to compile regex: %v", err)
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodyText != "" {
+					if !strings.Contains(string(body), tc.wantBodyText) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
+					}
 				}
-				if !matched {
-					t.Fatalf("response body does not match regex.\nExpected:\n%s\n\nGot:\n%s", tt.wantResponseBodyRegx, string(body))
+				if tc.wantBodyStructured != nil {
+					warnings := append([]string{}, r.Header.Values("Warning")...)
+					statusztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
+				}
+			}
+		})
+	}
+
+	for _, tc := range flagzTestCases {
+		t.Run("flagz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+"/flagz", nil)
+			if err != nil {
+				t.Fatalf("failed to request: %v", err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /flagz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				if tc.wantBodyText != "" {
+					if !strings.Contains(string(body), tc.wantBodyText) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
+					}
+				}
+				if tc.wantBodyStructured != nil {
+					warnings := append([]string{}, r.Header.Values("Warning")...)
+					flagztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
+				}
+			}
+		})
+	}
+
+	for _, tc := range configzTestCases {
+		t.Run("configz_"+tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, base+"/configz", nil)
+			if err != nil {
+				t.Fatalf("failed to request: %v", err)
+			}
+
+			req.Header.Set("Accept", tc.acceptHeader)
+			r, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("failed to GET /configz: %v", err)
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("failed to read response body: %v", err)
+			}
+
+			if err = r.Body.Close(); err != nil {
+				t.Fatalf("failed to close response body: %v", err)
+			}
+
+			if r.StatusCode != tc.wantStatus {
+				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				var configz map[string]unstructured.Unstructured
+				if err := json.Unmarshal(body, &configz); err != nil {
+					t.Fatalf("failed to unmarshal configz: %v", err)
+				}
+				cfg, ok := configz["componentconfig"]
+				if !ok {
+					t.Fatalf("configz missing 'componentconfig' key")
+				}
+				if cfg.GetAPIVersion() != "kubescheduler.config.k8s.io/v1" {
+					t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+				}
+				if cfg.GetKind() != "KubeSchedulerConfiguration" {
+					t.Errorf("unexpected Kind: %s", cfg.GetKind())
+				}
+
+				// confirm that they expose public config type
+				var schedulerConfig kubeschedulerconfigv1.KubeSchedulerConfiguration
+				err = json.Unmarshal(body, &struct {
+					ComponentConfig *kubeschedulerconfigv1.KubeSchedulerConfiguration `json:"componentconfig"`
+				}{ComponentConfig: &schedulerConfig})
+				if err != nil {
+					t.Errorf("failed to deserialize into public config type: %v", err)
 				}
 			}
 		})

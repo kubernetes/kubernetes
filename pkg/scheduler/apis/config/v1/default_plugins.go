@@ -58,23 +58,45 @@ func getDefaultPlugins() *v1.Plugins {
 }
 
 func applyFeatureGates(config *v1.Plugins) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.NodeDeclaredFeatures})
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		// This plugin should come before DefaultPreemption because if
-		// there is a problem with a Pod and PostFilter gets called to
-		// resolve the problem, it is better to first deallocate an
-		// idle ResourceClaim than it is to evict some Pod that might
-		// be doing useful work.
-		for i := range config.MultiPoint.Enabled {
-			if config.MultiPoint.Enabled[i].Name == names.DefaultPreemption {
-				extended := make([]v1.Plugin, 0, len(config.MultiPoint.Enabled)+1)
-				extended = append(extended, config.MultiPoint.Enabled[:i]...)
-				extended = append(extended, v1.Plugin{Name: names.DynamicResources})
-				extended = append(extended, config.MultiPoint.Enabled[i:]...)
-				config.MultiPoint.Enabled = extended
-				break
-			}
+		applyDynamicResources(config)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
+		applyGangScheduling(config)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		applyTopologyAwareWorkloadScheduling(config)
+	}
+}
+
+func applyDynamicResources(config *v1.Plugins) {
+	// This plugin should come before DefaultPreemption because if
+	// there is a problem with a Pod and PostFilter gets called to
+	// resolve the problem, it is better to first deallocate an
+	// idle ResourceClaim than it is to evict some Pod that might
+	// be doing useful work.
+	for i := range config.MultiPoint.Enabled {
+		if config.MultiPoint.Enabled[i].Name == names.DefaultPreemption {
+			extended := make([]v1.Plugin, 0, len(config.MultiPoint.Enabled)+1)
+			extended = append(extended, config.MultiPoint.Enabled[:i]...)
+			extended = append(extended, v1.Plugin{Name: names.DynamicResources, Weight: ptr.To[int32](2)})
+			extended = append(extended, config.MultiPoint.Enabled[i:]...)
+			config.MultiPoint.Enabled = extended
+			break
 		}
 	}
+}
+
+func applyGangScheduling(config *v1.Plugins) {
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.GangScheduling})
+}
+
+func applyTopologyAwareWorkloadScheduling(config *v1.Plugins) {
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)})
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
@@ -96,6 +118,8 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 	defaultPlugins.PreBind = mergePluginSet(logger, defaultPlugins.PreBind, customPlugins.PreBind)
 	defaultPlugins.Bind = mergePluginSet(logger, defaultPlugins.Bind, customPlugins.Bind)
 	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
+	defaultPlugins.PlacementGenerate = mergePluginSet(logger, defaultPlugins.PlacementGenerate, customPlugins.PlacementGenerate)
+	defaultPlugins.PlacementScore = mergePluginSet(logger, defaultPlugins.PlacementScore, customPlugins.PlacementScore)
 	return defaultPlugins
 }
 

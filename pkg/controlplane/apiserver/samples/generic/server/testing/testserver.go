@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/pflag"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/samples/generic/server"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -43,7 +43,6 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -268,10 +267,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	etcdConfig := clientv3.Config{
 		Endpoints:   storageConfig.Transport.ServerList,
 		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
+		TLS:         tlsConfig,
 	}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {

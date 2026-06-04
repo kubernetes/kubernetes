@@ -75,7 +75,7 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 	defer func() {
 		err := c.leaseInformer.Informer().RemoveEventHandler(c.leaseRegistration)
@@ -88,14 +88,14 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 		}
 	}()
 
-	if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), c.leaseRegistration.HasSynced, c.leaseCandidateRegistration.HasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.leaseRegistration.HasSynced, c.leaseCandidateRegistration.HasSynced) {
 		return
 	}
 
 	// This controller is leader elected and may start after informers have already started. List on startup.
 	lcs, err := c.leaseCandidateInformer.Lister().List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to list lease candidates")
 		return
 	}
 	for _, lc := range lcs {
@@ -103,7 +103,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	}
 
 	klog.Infof("Workers: %d", workers)
-	for i := 0; i < workers; i++ {
+	for range workers {
 		klog.Infof("Starting worker")
 		go wait.UntilWithContext(ctx, c.runElectionWorker, time.Second)
 	}
@@ -166,7 +166,9 @@ func (c *Controller) processNextElectionItem(ctx context.Context) bool {
 	}
 
 	intervalForRequeue, err := c.reconcileElectionStep(ctx, key)
-	utilruntime.HandleError(err)
+	if err != nil { // HandleErrorWithContext logs regardless of error value, filter out nil err.
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to reconcile election step", "key", key)
+	}
 	if intervalForRequeue != noRequeue {
 		defer c.queue.AddAfter(key, intervalForRequeue)
 	}

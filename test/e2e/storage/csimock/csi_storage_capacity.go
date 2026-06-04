@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -117,9 +118,15 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 					registerDriver: true,
 				}
 
+				var nodeAnnotationSet atomic.Bool
+				var nodeAnnotationReset atomic.Bool
+
 				if test.resourceExhausted {
 					params.hooks = createPreHook("CreateVolume", func(counter int64) error {
-						if counter%2 != 0 {
+						if test.topology && test.lateBinding && !nodeAnnotationReset.Load() {
+							return status.Error(codes.ResourceExhausted, "fake error")
+						}
+						if counter == 1 {
 							return status.Error(codes.ResourceExhausted, "fake error")
 						}
 						return nil
@@ -144,6 +151,43 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				pvcWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
 				framework.ExpectNoError(err, "create PVC watch")
 				defer pvcWatch.Stop()
+
+				var watchFailed atomic.Bool
+				watchDone := make(chan struct{})
+				go func() {
+					defer close(watchDone)
+					for {
+						select {
+						case event, ok := <-pvcWatch.ResultChan():
+							if !ok {
+								watchFailed.Store(true)
+								return
+							}
+
+							framework.Logf("PVC event %s: %#v", event.Type, event.Object)
+							switch event.Type {
+							case watch.Modified:
+								pvc, ok := event.Object.(*v1.PersistentVolumeClaim)
+								if !ok {
+									continue
+								}
+								_, set := pvc.Annotations["volume.kubernetes.io/selected-node"]
+								if set {
+									nodeAnnotationSet.Store(true)
+								} else if nodeAnnotationSet.Load() {
+									nodeAnnotationReset.Store(true)
+								}
+							case watch.Deleted:
+								return
+							case watch.Error:
+								watchFailed.Store(true)
+								return
+							}
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
 
 				sc, claim, pod := m.createPod(ctx, pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod")
@@ -207,41 +251,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				// additional evidence that rescheduling really happened. What we have observed
 				// above is how the PVC changed over time. Now we can analyze that.
 				ginkgo.By("Checking PVC events")
-				nodeAnnotationSet := false
-				nodeAnnotationReset := false
-				watchFailed := false
-			loop:
-				for {
-					select {
-					case event, ok := <-pvcWatch.ResultChan():
-						if !ok {
-							watchFailed = true
-							break loop
-						}
-
-						framework.Logf("PVC event %s: %#v", event.Type, event.Object)
-						switch event.Type {
-						case watch.Modified:
-							pvc, ok := event.Object.(*v1.PersistentVolumeClaim)
-							if !ok {
-								framework.Failf("PVC watch sent %#v instead of a PVC", event.Object)
-							}
-							_, set := pvc.Annotations["volume.kubernetes.io/selected-node"]
-							if set {
-								nodeAnnotationSet = true
-							} else if nodeAnnotationSet {
-								nodeAnnotationReset = true
-							}
-						case watch.Deleted:
-							break loop
-						case watch.Error:
-							watchFailed = true
-							break
-						}
-					case <-ctx.Done():
-						framework.Failf("Timeout while waiting to observe PVC list")
-					}
-				}
+				<-watchDone
 
 				// More tests when capacity is limited.
 				if test.resourceExhausted {
@@ -253,23 +263,23 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 					}
 
 					switch {
-					case watchFailed:
+					case watchFailed.Load():
 						// If the watch failed or stopped prematurely (which can happen at any time), then we cannot
 						// verify whether the annotation was set as expected. This is still considered a successful
 						// test.
 						framework.Logf("PVC watch delivered incomplete data, cannot check annotation")
 					case test.lateBinding:
-						gomega.Expect(nodeAnnotationSet).To(gomega.BeTrueBecause("selected-node should have been set"))
+						gomega.Expect(nodeAnnotationSet.Load()).To(gomega.BeTrueBecause("selected-node should have been set"))
 						// Whether it gets reset depends on whether we have topology enabled. Without
 						// it, rescheduling is unnecessary.
 						if test.topology {
-							gomega.Expect(nodeAnnotationReset).To(gomega.BeTrueBecause("selected-node should have been set"))
+							gomega.Expect(nodeAnnotationReset.Load()).To(gomega.BeTrueBecause("selected-node should have been set"))
 						} else {
-							gomega.Expect(nodeAnnotationReset).To(gomega.BeFalseBecause("selected-node should not have been reset"))
+							gomega.Expect(nodeAnnotationReset.Load()).To(gomega.BeFalseBecause("selected-node should not have been reset"))
 						}
 					default:
-						gomega.Expect(nodeAnnotationSet).To(gomega.BeFalseBecause("selected-node should not have been set"))
-						gomega.Expect(nodeAnnotationReset).To(gomega.BeFalseBecause("selected-node should not have been reset"))
+						gomega.Expect(nodeAnnotationSet.Load()).To(gomega.BeFalseBecause("selected-node should not have been set"))
+						gomega.Expect(nodeAnnotationReset.Load()).To(gomega.BeFalseBecause("selected-node should not have been reset"))
 					}
 				}
 			})

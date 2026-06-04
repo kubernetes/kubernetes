@@ -17,16 +17,14 @@ limitations under the License.
 package ktesting_test
 
 import (
+	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
+	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -58,11 +56,80 @@ func TestCancelAutomatic(t *testing.T) {
 	}()
 }
 
+func TestSyncTestInit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// This must work inside a synctest bubble, despite Deadline panicking there.
+		// We then don't have a deadline.
+		tCtx := ktesting.Init(t)
+		deadline, ok := tCtx.Deadline()
+		if ok {
+			tCtx.Errorf("Expected no deadline, got %s", deadline)
+		}
+		if !tCtx.IsSyncTest() {
+			tCtx.Errorf("Expected to run as synctest")
+		}
+	})
+}
+
+func TestNormalInit(t *testing.T) {
+	// The outcome depends on how the unit test was started.
+	// See below for deterministic deadline/no deadline testing.
+	expectDeadline, expectOK := t.Deadline()
+	expectDeadline = expectDeadline.Add(-ktesting.CleanupGracePeriod)
+	tCtx := ktesting.Init(t)
+	actualDeadline, actualOK := tCtx.Deadline()
+	tCtx.Expect(actualOK).To(gomega.Equal(expectOK), "have deadline")
+	if expectOK {
+		tCtx.Expect(actualDeadline).To(gomega.BeTemporally("~", expectDeadline, 2*time.Second), "deadline")
+	}
+	if tCtx.IsSyncTest() {
+		tCtx.Errorf("Expected to not run as synctest")
+	}
+}
+
+func TestNoDeadline(t *testing.T) {
+	mockT := &deadlineT{T: t, deadline: nil}
+	tCtx := ktesting.Init(mockT)
+	deadline, ok := tCtx.Deadline()
+	if ok {
+		tCtx.Errorf("Expected no deadline, got %s", deadline)
+	}
+}
+
+func TestDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Inside a synctest bubble this is always in the future.
+		mockDeadline := time.Date(2000, 01, 01, 0, 0, 0, 0, time.UTC)
+		mockT := &deadlineT{T: t, deadline: &mockDeadline}
+		tCtx := ktesting.Init(mockT)
+		actualDeadline, ok := tCtx.Deadline()
+		if ok {
+			expectDeadline := mockDeadline.Add(-ktesting.CleanupGracePeriod)
+			tCtx.Expect(actualDeadline).To(gomega.BeTemporally("==", expectDeadline), "deadline")
+		} else {
+			tCtx.Error("Expected a deadline, got none")
+		}
+	})
+}
+
+// deadlineT overrides Deadline, returning false if no
+// deadline is configured and the deadline otherwise.
+type deadlineT struct {
+	*testing.T
+	deadline *time.Time
+}
+
+func (t *deadlineT) Deadline() (time.Time, bool) {
+	if t.deadline == nil {
+		return time.Time{}, false
+	}
+	return *t.deadline, true
+}
+
 func TestCancelCtx(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var discardLogger klog.Logger
-	tCtx = ktesting.WithLogger(tCtx, discardLogger)
-	tCtx = ktesting.WithRESTConfig(tCtx, new(rest.Config))
+	tCtx = tCtx.WithLogger(discardLogger)
 	baseCtx := tCtx
 
 	tCtx.Cleanup(func() {
@@ -71,15 +138,8 @@ func TestCancelCtx(t *testing.T) {
 		}
 	})
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		if tCtx.Err() != nil {
-			t.Errorf("context should not be canceled but is: %v", tCtx.Err())
-		}
-		assert.Equal(t, baseCtx.Logger(), tCtx.Logger(), "Logger()")
-		assert.Equal(t, baseCtx.RESTConfig(), tCtx.RESTConfig(), "RESTConfig()")
-		assert.Equal(t, baseCtx.RESTMapper(), tCtx.RESTMapper(), "RESTMapper()")
-		assert.Equal(t, baseCtx.Client(), tCtx.Client(), "Client()")
-		assert.Equal(t, baseCtx.Dynamic(), tCtx.Dynamic(), "Dynamic()")
-		assert.Equal(t, baseCtx.APIExtensions(), tCtx.APIExtensions(), "APIExtensions()")
+		tCtx.Assert(tCtx.Err()).To(gomega.Succeed(), "context should not be canceled but is")
+		tCtx.Assert(tCtx.Logger()).To(gomega.Equal(baseCtx.Logger()), "Logger()")
 	})
 
 	// Cancel, then let testing.T invoke test cleanup.
@@ -103,24 +163,15 @@ func TestParallel(t *testing.T) {
 	tCtx.Run("three", test)
 }
 
-func TestWithTB(t *testing.T) {
+func TestRun(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	cfg := new(rest.Config)
-	mapper := new(restmapper.DeferredDiscoveryRESTMapper)
-	client := clientset.New(nil)
-	dynamic := dynamic.New(nil)
-	apiextensions := apiextensions.New(nil)
-	tCtx = ktesting.WithClients(tCtx, cfg, mapper, client, dynamic, apiextensions)
+	key := 42
+	value := "fish"
+	tCtx = tCtx.WithValue(key, value)
 
-	t.Run("sub", func(t *testing.T) {
-		tCtx := ktesting.WithTB(tCtx, t)
-
-		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
-		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
-		assert.Equal(t, client, tCtx.Client(), "Client")
-		assert.Equal(t, dynamic, tCtx.Dynamic(), "Dynamic")
-		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
+		tCtx.Assert(tCtx.Value(key)).To(gomega.Equal(value))
 
 		tCtx.Cancel("test is complete")
 		<-tCtx.Done()
@@ -131,28 +182,22 @@ func TestWithTB(t *testing.T) {
 	}
 }
 
-func TestRun(t *testing.T) {
+func TestWithNamespace(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	namespace := "foo"
+	tCtxWithNamespace := tCtx.WithNamespace(namespace)
+	tCtx.Expect(tCtxWithNamespace.Namespace()).To(gomega.Equal(namespace))
+}
 
-	cfg := new(rest.Config)
-	mapper := new(restmapper.DeferredDiscoveryRESTMapper)
-	client := clientset.New(nil)
-	dynamic := dynamic.New(nil)
-	apiextensions := apiextensions.New(nil)
-	tCtx = ktesting.WithClients(tCtx, cfg, mapper, client, dynamic, apiextensions)
-
-	tCtx.Run("sub", func(tCtx ktesting.TContext) {
-		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
-		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
-		assert.Equal(t, client, tCtx.Client(), "Client")
-		assert.Equal(t, dynamic, tCtx.Dynamic(), "Dynamic")
-		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
-
-		tCtx.Cancel("test is complete")
-		<-tCtx.Done()
-	})
-
-	if err := tCtx.Err(); err != nil {
-		t.Errorf("parent TContext should not have been cancelled: %v", err)
-	}
+func TestWithContext(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.Cancel("done")
+	tCtx = tCtx.WithValue("foo", "bar")
+	deadline := time.Now().Add(-time.Minute)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+	newCtx := tCtx.WithContext(ctx)
+	tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(gomega.ContainSubstring("done")))
+	tCtx.Expect(newCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded))
+	tCtx.Expect(newCtx.Value("foo")).To(gomega.Equal("bar"))
 }

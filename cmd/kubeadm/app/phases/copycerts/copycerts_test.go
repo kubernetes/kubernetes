@@ -35,14 +35,13 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestGetDataFromInitConfig(t *testing.T) {
 	certData := []byte("cert-data")
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 	cfg := &kubeadmapi.InitConfiguration{}
 	cfg.CertificatesDir = tmpdir
 
@@ -159,15 +158,14 @@ func TestCertOrKeyNameToSecretName(t *testing.T) {
 }
 
 func TestUploadCerts(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	secretKey, err := CreateCertificateKey()
 	if err != nil {
 		t.Fatalf("could not create certificate key: %v", err)
 	}
 
-	initConfiguration := testutil.GetDefaultInternalConfig(t)
+	initConfiguration := configutil.GetDefaultInternalConfig(t)
 	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
 
 	if err := certs.CreatePKIAssets(initConfiguration); err != nil {
@@ -210,15 +208,13 @@ func TestDownloadCerts(t *testing.T) {
 	}
 
 	// Temporary directory where certificates will be generated
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-	initConfiguration := testutil.GetDefaultInternalConfig(t)
+	tmpdir := t.TempDir()
+	initConfiguration := configutil.GetDefaultInternalConfig(t)
 	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
 
 	// Temporary directory where certificates will be downloaded to
-	targetTmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(targetTmpdir)
-	initForDownloadConfiguration := testutil.GetDefaultInternalConfig(t)
+	targetTmpdir := t.TempDir()
+	initForDownloadConfiguration := configutil.GetDefaultInternalConfig(t)
 	initForDownloadConfiguration.ClusterConfiguration.CertificatesDir = targetTmpdir
 
 	if err := certs.CreatePKIAssets(initConfiguration); err != nil {

@@ -41,7 +41,8 @@ const (
 	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 	DefaultPodLogsDir            = "/var/log/pods"
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
-	DefaultMemoryThrottlingFactor = 0.9
+	DefaultMemoryThrottlingFactor  = 0.9
+	DefaultMemoryReservationPolicy = kubeletconfigv1beta1.NoneMemoryReservationPolicy
 	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
 )
@@ -290,10 +291,13 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.SeccompDefault = ptr.To(false)
 	}
 	if obj.FailCgroupV1 == nil {
-		obj.FailCgroupV1 = ptr.To(false)
+		obj.FailCgroupV1 = ptr.To(true)
 	}
 	if obj.MemoryThrottlingFactor == nil {
 		obj.MemoryThrottlingFactor = ptr.To(DefaultMemoryThrottlingFactor)
+	}
+	if obj.MemoryReservationPolicy == "" {
+		obj.MemoryReservationPolicy = DefaultMemoryReservationPolicy
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = ptr.To(true)

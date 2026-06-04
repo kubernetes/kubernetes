@@ -25,14 +25,11 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/utils/ptr"
 )
 
-func newUint64Pointer(i uint64) *uint64 {
-	return &i
-}
-
 func TestVolumeStatsCollector(t *testing.T) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -61,12 +58,12 @@ func TestVolumeStatsCollector(t *testing.T) {
 					{
 						FsStats: statsapi.FsStats{
 							Time:           metav1.Now(),
-							AvailableBytes: newUint64Pointer(5.663154176e+09),
-							CapacityBytes:  newUint64Pointer(1.0434699264e+10),
-							UsedBytes:      newUint64Pointer(4.21789696e+09),
-							InodesFree:     newUint64Pointer(655344),
-							Inodes:         newUint64Pointer(655360),
-							InodesUsed:     newUint64Pointer(16),
+							AvailableBytes: ptr.To[uint64](5.663154176e+09),
+							CapacityBytes:  ptr.To[uint64](1.0434699264e+10),
+							UsedBytes:      ptr.To[uint64](4.21789696e+09),
+							InodesFree:     ptr.To[uint64](655344),
+							Inodes:         ptr.To[uint64](655360),
+							InodesUsed:     ptr.To[uint64](16),
 						},
 						Name:   "test",
 						PVCRef: nil,
@@ -74,12 +71,12 @@ func TestVolumeStatsCollector(t *testing.T) {
 					{
 						FsStats: statsapi.FsStats{
 							Time:           metav1.Now(),
-							AvailableBytes: newUint64Pointer(5.663154176e+09),
-							CapacityBytes:  newUint64Pointer(1.0434699264e+10),
-							UsedBytes:      newUint64Pointer(4.21789696e+09),
-							InodesFree:     newUint64Pointer(655344),
-							Inodes:         newUint64Pointer(655360),
-							InodesUsed:     newUint64Pointer(16),
+							AvailableBytes: ptr.To[uint64](5.663154176e+09),
+							CapacityBytes:  ptr.To[uint64](1.0434699264e+10),
+							UsedBytes:      ptr.To[uint64](4.21789696e+09),
+							InodesFree:     ptr.To[uint64](655344),
+							Inodes:         ptr.To[uint64](655360),
+							InodesUsed:     ptr.To[uint64](16),
 						},
 						Name: "test",
 						PVCRef: &statsapi.PVCReference{
@@ -100,12 +97,12 @@ func TestVolumeStatsCollector(t *testing.T) {
 					{
 						FsStats: statsapi.FsStats{
 							Time:           metav1.Now(),
-							AvailableBytes: newUint64Pointer(5.663154176e+09),
-							CapacityBytes:  newUint64Pointer(1.0434699264e+10),
-							UsedBytes:      newUint64Pointer(4.21789696e+09),
-							InodesFree:     newUint64Pointer(655344),
-							Inodes:         newUint64Pointer(655360),
-							InodesUsed:     newUint64Pointer(16),
+							AvailableBytes: ptr.To[uint64](5.663154176e+09),
+							CapacityBytes:  ptr.To[uint64](1.0434699264e+10),
+							UsedBytes:      ptr.To[uint64](4.21789696e+09),
+							InodesFree:     ptr.To[uint64](655344),
+							Inodes:         ptr.To[uint64](655360),
+							InodesUsed:     ptr.To[uint64](16),
 						},
 						Name: "test",
 						PVCRef: &statsapi.PVCReference{
@@ -151,7 +148,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 }
 
 func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -178,12 +175,12 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 					{
 						FsStats: statsapi.FsStats{
 							Time:           metav1.Now(),
-							AvailableBytes: newUint64Pointer(5.663154176e+09),
-							CapacityBytes:  newUint64Pointer(1.0434699264e+10),
-							UsedBytes:      newUint64Pointer(4.21789696e+09),
-							InodesFree:     newUint64Pointer(655344),
-							Inodes:         newUint64Pointer(655360),
-							InodesUsed:     newUint64Pointer(16),
+							AvailableBytes: ptr.To[uint64](5.663154176e+09),
+							CapacityBytes:  ptr.To[uint64](1.0434699264e+10),
+							UsedBytes:      ptr.To[uint64](4.21789696e+09),
+							InodesFree:     ptr.To[uint64](655344),
+							Inodes:         ptr.To[uint64](655360),
+							InodesUsed:     ptr.To[uint64](16),
 						},
 						Name:   "test",
 						PVCRef: nil,
@@ -191,12 +188,12 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 					{
 						FsStats: statsapi.FsStats{
 							Time:           metav1.Now(),
-							AvailableBytes: newUint64Pointer(5.663154176e+09),
-							CapacityBytes:  newUint64Pointer(1.0434699264e+10),
-							UsedBytes:      newUint64Pointer(4.21789696e+09),
-							InodesFree:     newUint64Pointer(655344),
-							Inodes:         newUint64Pointer(655360),
-							InodesUsed:     newUint64Pointer(16),
+							AvailableBytes: ptr.To[uint64](5.663154176e+09),
+							CapacityBytes:  ptr.To[uint64](1.0434699264e+10),
+							UsedBytes:      ptr.To[uint64](4.21789696e+09),
+							InodesFree:     ptr.To[uint64](655344),
+							Inodes:         ptr.To[uint64](655360),
+							InodesUsed:     ptr.To[uint64](16),
 						},
 						Name: "test",
 						PVCRef: &statsapi.PVCReference{

@@ -774,7 +774,7 @@ func nonStructuralCrdWithValidations() *apiextensionsv1beta1.CustomResourceDefin
 
 func genLargeArray(n, x int64) []int64 {
 	arr := make([]int64, n)
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		arr[i] = x
 	}
 	return arr

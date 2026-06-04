@@ -20,9 +20,36 @@ import (
 	"testing"
 
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
-func Test(t *testing.T) {
+func TestUniqueness(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&Struct{
+		ListField: []OtherStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+			{"key2", "two"},
+		},
+		ListTypedefField: []OtherTypedefStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+			{"key2", "two"},
+		},
+		TypedefField: ListType{
+			{"key1", "one"},
+			{"key2", "two"},
+			{"key2", "two"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("listField").Index(2), nil),
+		field.Duplicate(field.NewPath("listTypedefField").Index(2), nil),
+		field.Duplicate(field.NewPath("typedefField").Index(2), nil),
+	})
+}
+
+func TestUpdateCorrelation(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	structA1 := Struct{
@@ -31,6 +58,10 @@ func Test(t *testing.T) {
 			{"key2", "two"},
 		},
 		ListTypedefField: []OtherTypedefStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+		},
+		TypedefField: ListType{
 			{"key1", "one"},
 			{"key2", "two"},
 		},
@@ -43,6 +74,10 @@ func Test(t *testing.T) {
 			{"key1", "one"},
 		},
 		ListTypedefField: []OtherTypedefStruct{
+			{"key2", "two"},
+			{"key1", "one"},
+		},
+		TypedefField: ListType{
 			{"key2", "two"},
 			{"key1", "one"},
 		},
@@ -60,25 +95,87 @@ func Test(t *testing.T) {
 			{"key1", "ONE"},
 			{"key2", "TWO"},
 		},
+		TypedefField: ListType{
+			{"key3", "THREE"},
+			{"key1", "ONE"},
+			{"key2", "TWO"},
+		},
 	}
 
 	st.Value(&structA1).OldValue(&structA2).ExpectValid()
 
 	st.Value(&structA2).OldValue(&structA1).ExpectValid()
 
-	st.Value(&structA1).OldValue(&structB).ExpectInvalid(
-		field.Forbidden(field.NewPath("listField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1), "field is immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(1), "field is immutable"),
-	)
+	st.Value(&structA1).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+	})
 
-	st.Value(&structB).OldValue(&structA1).ExpectInvalid(
-		field.Forbidden(field.NewPath("listField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listField").Index(1), "field is immutable"),
-		field.Forbidden(field.NewPath("listField").Index(2), "field is immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(1), "field is immutable"),
-		field.Forbidden(field.NewPath("listTypedefField").Index(2), "field is immutable"),
-	)
+	st.Value(&structB).OldValue(&structA1).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("listField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listField").Index(2), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("listTypedefField").Index(2), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(0), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(1), nil, "immutable").WithOrigin("immutable"),
+		field.Invalid(field.NewPath("typedefField").Index(2), nil, "immutable").WithOrigin("immutable"),
+	})
+}
+
+func TestRatcheting(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	struct1 := Struct{
+		ListComparableField: []OtherStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+		},
+		ListNonComparableField: []NonComparableStruct{
+			{"key1", ptr.To("one")},
+			{"key2", ptr.To("two")},
+		},
+	}
+
+	// Same data, different order.
+	struct2 := Struct{
+		ListComparableField: []OtherStruct{
+			{"key2", "two"},
+			{"key1", "one"},
+		},
+		ListNonComparableField: []NonComparableStruct{
+			{"key2", ptr.To("two")},
+			{"key1", ptr.To("one")},
+		},
+	}
+	st.Value(&struct1).ExpectValidateFalseByPath(map[string][]string{
+		"listComparableField[0]":    {"field Struct.ListComparableField[*]"},
+		"listComparableField[1]":    {"field Struct.ListComparableField[*]"},
+		"listNonComparableField[0]": {"field Struct.ListNonComparableField[*]"},
+		"listNonComparableField[1]": {"field Struct.ListNonComparableField[*]"},
+	})
+	st.Value(&struct1).OldValue(&struct2).ExpectValid()
+	st.Value(&struct2).OldValue(&struct1).ExpectValid()
+}
+
+func TestUniquenessPtrKey(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&Struct{
+		ListPtrKeyField: []PtrKeyStruct{
+			{ptr.To("key1"), "one"},
+			{ptr.To("key2"), "two"},
+			{ptr.To("key2"), "three"}, // duplicate key
+			{nil, "four"},
+			{nil, "five"}, // duplicate nil key
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("listPtrKeyField").Index(2), nil),
+		field.Duplicate(field.NewPath("listPtrKeyField").Index(4), nil),
+	})
 }

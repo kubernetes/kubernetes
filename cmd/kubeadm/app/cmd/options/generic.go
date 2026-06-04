@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/pflag"
 
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -106,7 +105,7 @@ func AddPatchesFlag(fs *pflag.FlagSet, patchesDir *string) {
 	const usage = `Path to a directory that contains files named ` +
 		`"target[suffix][+patchtype].extension". For example, ` +
 		`"kube-apiserver0+merge.yaml" or just "etcd.json". ` +
-		`"target" can be one of "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd", "kubeletconfiguration", "corednsdeployment". ` +
+		`"target" can be one of "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd", "kubeletconfiguration", "corednsdeployment", "kubeproxydaemonset". ` +
 		`"patchtype" can be one of "strategic", "merge" or "json" and they match the patch formats ` +
 		`supported by kubectl. The default "patchtype" is "strategic". "extension" must be either ` +
 		`"json" or "yaml". "suffix" is an optional string that can be used to determine ` +

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -107,6 +108,9 @@ func runSerial(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig t
 	if reporterConfig.JSONReport != "" {
 		reporterConfig.JSONReport = AbsPathForGeneratedAsset(reporterConfig.JSONReport, suite, cliConfig, 0)
 	}
+	if reporterConfig.GoJSONReport != "" {
+		reporterConfig.GoJSONReport = AbsPathForGeneratedAsset(reporterConfig.GoJSONReport, suite, cliConfig, 0)
+	}
 	if reporterConfig.JUnitReport != "" {
 		reporterConfig.JUnitReport = AbsPathForGeneratedAsset(reporterConfig.JUnitReport, suite, cliConfig, 0)
 	}
@@ -156,12 +160,15 @@ func runSerial(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig t
 
 func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig types.ReporterConfig, cliConfig types.CLIConfig, goFlagsConfig types.GoFlagsConfig, additionalArgs []string) TestSuite {
 	type procResult struct {
+		proc                 int
+		exitResult           string
 		passed               bool
 		hasProgrammaticFocus bool
 	}
 
 	numProcs := cliConfig.ComputedProcs()
 	procOutput := make([]*bytes.Buffer, numProcs)
+	procExitResult := make([]string, numProcs)
 	coverProfiles := []string{}
 
 	blockProfiles := []string{}
@@ -178,6 +185,9 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 
 	if reporterConfig.JSONReport != "" {
 		reporterConfig.JSONReport = AbsPathForGeneratedAsset(reporterConfig.JSONReport, suite, cliConfig, 0)
+	}
+	if reporterConfig.GoJSONReport != "" {
+		reporterConfig.GoJSONReport = AbsPathForGeneratedAsset(reporterConfig.GoJSONReport, suite, cliConfig, 0)
 	}
 	if reporterConfig.JUnitReport != "" {
 		reporterConfig.JUnitReport = AbsPathForGeneratedAsset(reporterConfig.JUnitReport, suite, cliConfig, 0)
@@ -218,16 +228,20 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		args = append(args, additionalArgs...)
 
 		cmd, buf := buildAndStartCommand(suite, args, false)
+		var exited atomic.Bool
 		procOutput[proc-1] = buf
-		server.RegisterAlive(proc, func() bool { return cmd.ProcessState == nil || !cmd.ProcessState.Exited() })
+		server.RegisterAlive(proc, func() bool { return !exited.Load() })
 
 		go func() {
 			cmd.Wait()
 			exitStatus := cmd.ProcessState.Sys().(syscall.WaitStatus).ExitStatus()
 			procResults <- procResult{
+				proc:                 proc,
+				exitResult:           cmd.ProcessState.String(),
 				passed:               (exitStatus == 0) || (exitStatus == types.GINKGO_FOCUS_EXIT_CODE),
 				hasProgrammaticFocus: exitStatus == types.GINKGO_FOCUS_EXIT_CODE,
 			}
+			exited.Store(true)
 		}()
 	}
 
@@ -236,6 +250,7 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		result := <-procResults
 		passed = passed && result.passed
 		suite.HasProgrammaticFocus = suite.HasProgrammaticFocus || result.hasProgrammaticFocus
+		procExitResult[result.proc-1] = result.exitResult
 	}
 	if passed {
 		suite.State = TestSuiteStatePassed
@@ -253,8 +268,10 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		fmt.Fprint(formatter.ColorableStdErr, formatter.Fiw(0, formatter.COLS, "This occurs if a parallel process exits before it reports its results to the Ginkgo CLI.  The CLI will now print out all the stdout/stderr output it's collected from the running processes.  However you may not see anything useful in these logs because the individual test processes usually intercept output to stdout/stderr in order to capture it in the spec reports.\n\nYou may want to try rerunning your test suite with {{light-gray}}--output-interceptor-mode=none{{/}} to see additional output here and debug your suite.\n"))
 		fmt.Fprintln(formatter.ColorableStdErr, "  ")
 		for proc := 1; proc <= cliConfig.ComputedProcs(); proc++ {
-			fmt.Fprintf(formatter.ColorableStdErr, formatter.F("{{bold}}Output from proc %d:{{/}}\n", proc))
+			fmt.Fprint(formatter.ColorableStdErr, formatter.F("{{bold}}Output from proc %d:{{/}}\n", proc))
 			fmt.Fprintln(os.Stderr, formatter.Fi(1, "%s", procOutput[proc-1].String()))
+			fmt.Fprint(formatter.ColorableStdErr, formatter.F("{{bold}}Exit result of proc %d:{{/}}\n", proc))
+			fmt.Fprintln(os.Stderr, formatter.Fi(1, "%s\n", procExitResult[proc-1]))
 		}
 		fmt.Fprintf(os.Stderr, "** End **")
 	}

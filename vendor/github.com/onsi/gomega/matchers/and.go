@@ -14,7 +14,7 @@ type AndMatcher struct {
 	firstFailedMatcher types.GomegaMatcher
 }
 
-func (m *AndMatcher) Match(actual interface{}) (success bool, err error) {
+func (m *AndMatcher) Match(actual any) (success bool, err error) {
 	m.firstFailedMatcher = nil
 	for _, matcher := range m.Matchers {
 		success, err := matcher.Match(actual)
@@ -26,16 +26,16 @@ func (m *AndMatcher) Match(actual interface{}) (success bool, err error) {
 	return true, nil
 }
 
-func (m *AndMatcher) FailureMessage(actual interface{}) (message string) {
+func (m *AndMatcher) FailureMessage(actual any) (message string) {
 	return m.firstFailedMatcher.FailureMessage(actual)
 }
 
-func (m *AndMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *AndMatcher) NegatedFailureMessage(actual any) (message string) {
 	// not the most beautiful list of matchers, but not bad either...
 	return format.Message(actual, fmt.Sprintf("To not satisfy all of these matchers: %s", m.Matchers))
 }
 
-func (m *AndMatcher) MatchMayChangeInTheFuture(actual interface{}) bool {
+func (m *AndMatcher) MatchMayChangeInTheFuture(actual any) bool {
 	/*
 		Example with 3 matchers: A, B, C
 

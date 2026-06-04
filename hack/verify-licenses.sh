@@ -33,7 +33,7 @@ kube::util::ensure-temp-dir
 ARTIFACTS="${ARTIFACTS:-${PWD}/_artifacts}"
 mkdir -p "$ARTIFACTS/logs/"
 
-# Creating a new repository tree 
+# Creating a new repository tree
 # Deleting vendor directory to make go-licenses fetch license URLs from go-packages source repository
 git worktree add -f "${KUBE_TEMP}"/tmp_test_licenses/kubernetes HEAD >/dev/null 2>&1 || true
 cd "${KUBE_TEMP}"/tmp_test_licenses/kubernetes && rm -rf vendor
@@ -55,7 +55,7 @@ echo '[INFO] Installing go-licenses...'
 go install github.com/google/go-licenses@latest
 
 # Fetching CNCF Approved List Of Licenses
-# Refer: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md
+# Refer: https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md
 curl -s 'https://spdx.org/licenses/licenses.json' -o "${ARTIFACTS}"/licenses.json
 
 echo '[INFO] Fetching current list of CNCF approved licenses...'
@@ -122,11 +122,11 @@ fi
 
 
 if [[ ${#packages_flagged[@]} -gt 0 ]]; then
-    echo -e "\n[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
+    echo -e "\n[ERROR] The following go-packages in the project are using non-CNCF approved licenses. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md"
     awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${ARTIFACTS}"/notapproved_licenses.dump
     exit_code=1
 elif [[ "${exit_code}" -eq 1 ]]; then
-    echo -e "\n[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/allowed-third-party-license-policy.md"
+    echo -e "\n[ERROR] Project is using go-packages with unknown or unreachable license URLs. Please refer to the CNCF's approved licence list for further information: https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md"
 else
     echo -e "\n[SUCCESS] Scan complete! All go-packages under the project are using current CNCF approved licenses!"
 fi

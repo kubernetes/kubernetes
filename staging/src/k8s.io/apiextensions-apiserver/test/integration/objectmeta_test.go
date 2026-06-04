@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -122,7 +121,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 				"embedded": {
 					Type:                   "object",
 					XEmbeddedResource:      true,
-					XPreserveUnknownFields: pointer.BoolPtr(true),
+					XPreserveUnknownFields: ptr.To(true),
 				},
 			},
 		},
@@ -149,10 +148,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 	etcdConfig := clientv3.Config{
 		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
 		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
+		TLS:         tlsConfig,
 	}
 	etcdclient, err := clientv3.New(etcdConfig)
 	if err != nil {

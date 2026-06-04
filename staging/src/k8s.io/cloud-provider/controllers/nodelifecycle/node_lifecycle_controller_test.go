@@ -909,8 +909,14 @@ func Test_NodesShutdown(t *testing.T) {
 				nodeMonitorPeriod: 1 * time.Second,
 			}
 
-			w := eventBroadcaster.StartStructuredLogging(0)
-			defer w.Stop()
+			e := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
+				loggerV := klog.FromContext(t.Context()).V(0)
+				loggerV.Info("Event occurred", "object", klog.KRef(e.InvolvedObject.Namespace, e.InvolvedObject.Name), "fieldPath", e.InvolvedObject.FieldPath, "kind", e.InvolvedObject.Kind, "apiVersion", e.InvolvedObject.APIVersion, "type", e.Type, "reason", e.Reason, "message", e.Message)
+				if e.InvolvedObject.APIVersion == "" {
+					t.Fatalf("event involvedObject.apiVersion is empty")
+				}
+			})
+			defer e.Stop()
 			cloudNodeLifecycleController.MonitorNodes(ctx)
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, testcase.existingNode.Name, metav1.GetOptions{})

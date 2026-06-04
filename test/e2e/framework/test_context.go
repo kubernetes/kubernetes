@@ -17,7 +17,6 @@ limitations under the License.
 package framework
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -30,7 +29,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/reporters"
@@ -187,9 +185,6 @@ type TestContextType struct {
 	// The DNS Domain of the cluster.
 	ClusterDNSDomain string
 
-	// The configuration of NodeKiller.
-	NodeKiller NodeKillerConfig
-
 	// The Default IP Family of the cluster ("ipv4" or "ipv6")
 	IPFamily string
 
@@ -227,30 +222,6 @@ type TestContextType struct {
 
 	// Enable volume drivers which are disabled by default. See test/e2e/storage/in_tree_volumes.go for details.
 	EnabledVolumeDrivers []string
-}
-
-// NodeKillerConfig describes configuration of NodeKiller -- a utility to
-// simulate node failures.
-//
-// TODO: move this and the corresponding command line flags into
-// test/e2e/framework/node.
-type NodeKillerConfig struct {
-	// Enabled determines whether NodeKill should do anything at all.
-	// All other options below are ignored if Enabled = false.
-	Enabled bool
-	// FailureRatio is a percentage of all nodes that could fail simultinously.
-	FailureRatio float64
-	// Interval is time between node failures.
-	Interval time.Duration
-	// JitterFactor is factor used to jitter node failures.
-	// Node will be killed between [Interval, Interval + (1.0 + JitterFactor)].
-	JitterFactor float64
-	// SimulatedDowntime is a duration between node is killed and recreated.
-	SimulatedDowntime time.Duration
-	// NodeKillerStopCtx is a context that is used to notify NodeKiller to stop killing nodes.
-	NodeKillerStopCtx context.Context
-	// NodeKillerStop is the cancel function for NodeKillerStopCtx.
-	NodeKillerStop func()
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
@@ -443,7 +414,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flags.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flags.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
-	flags.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%q' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
+	flags.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%d' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
 	flags.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flags.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
 	flags.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
@@ -458,13 +429,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flags.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
-
-	nodeKiller := &TestContext.NodeKiller
-	flags.BoolVar(&nodeKiller.Enabled, "node-killer", false, "Whether NodeKiller should kill any nodes.")
-	flags.Float64Var(&nodeKiller.FailureRatio, "node-killer-failure-ratio", 0.01, "Percentage of nodes to be killed")
-	flags.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
-	flags.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
-	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
 // generateSecureToken returns a string of length tokenLen, consisting

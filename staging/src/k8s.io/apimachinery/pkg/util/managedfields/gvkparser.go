@@ -22,8 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	smdschema "sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 )
 
 // groupVersionKindExtensionKey is the key used to lookup the

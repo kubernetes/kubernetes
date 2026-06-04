@@ -57,8 +57,9 @@ limitations under the License.
 // the node the DaemonSet runs on supports that. Trying
 // to do a rolling update with a kubelet which does not support it yet
 // will fail because shutting down the old Pod unregisters the driver
-// even though the new Pod is running. See https://github.com/kubernetes/kubernetes/pull/129832
-// for details (TODO: link to doc after merging instead).
+// even though the new Pod is running. See
+// https://github.com/kubernetes/kubernetes/blob/v1.33.0/pkg/kubelet/pluginmanager/pluginwatcher/README.md#seamless-upgrade
+// for details.
 //
 // A DRA driver can either require 1.33 as minimal Kubernetes version or
 // provide two variants of its DaemonSet deployment. In the variant with

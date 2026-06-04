@@ -390,6 +390,12 @@ type CustomResourceDefinitionCondition struct {
 	// message is a human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
+	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+	// with respect to the current state of the instance.
+	// +featureGate=CRDObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,6,opt,name=observedGeneration"`
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
@@ -414,6 +420,10 @@ type CustomResourceDefinitionStatus struct {
 	// +optional
 	// +listType=atomic
 	StoredVersions []string `json:"storedVersions" protobuf:"bytes,3,rep,name=storedVersions"`
+	// The generation observed by the CRD controller.
+	// +featureGate=CRDObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,4,opt,name=observedGeneration"`
 }
 
 // CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of
@@ -432,7 +442,7 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // <.spec.name>.<.spec.group>.
 // Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 type CustomResourceDefinition struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -453,7 +463,7 @@ type CustomResourceDefinition struct {
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -526,7 +536,7 @@ type CustomResourceSubresourceScale struct {
 
 // ConversionReview describes a conversion request/response.
 type ConversionReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// request describes the attributes for the conversion request.
 	// +optional
 	Request *ConversionRequest `json:"request,omitempty" protobuf:"bytes,1,opt,name=request"`

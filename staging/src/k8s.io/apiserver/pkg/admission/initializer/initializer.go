@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -30,8 +31,9 @@ type pluginInitializer struct {
 	externalClient    kubernetes.Interface
 	dynamicClient     dynamic.Interface
 	externalInformers informers.SharedInformerFactory
-	authorizer        authorizer.Authorizer
+	authorizer        authorizer.UnconditionalAuthorizer
 	featureGates      featuregate.FeatureGate
+	effectiveVersion  compatibility.EffectiveVersion
 	stopCh            <-chan struct{}
 	restMapper        meta.RESTMapper
 }
@@ -43,8 +45,9 @@ func New(
 	extClientset kubernetes.Interface,
 	dynamicClient dynamic.Interface,
 	extInformers informers.SharedInformerFactory,
-	authz authorizer.Authorizer,
+	authz authorizer.UnconditionalAuthorizer,
 	featureGates featuregate.FeatureGate,
+	effectiveVersion compatibility.EffectiveVersion,
 	stopCh <-chan struct{},
 	restMapper meta.RESTMapper,
 ) pluginInitializer {
@@ -54,6 +57,7 @@ func New(
 		externalInformers: extInformers,
 		authorizer:        authz,
 		featureGates:      featureGates,
+		effectiveVersion:  effectiveVersion,
 		stopCh:            stopCh,
 		restMapper:        restMapper,
 	}
@@ -68,6 +72,9 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 	}
 
 	// Second tell the plugin about enabled features, so it can decide whether to start informers or not
+	if wants, ok := plugin.(WantsEffectiveVersion); ok {
+		wants.InspectEffectiveVersion(i.effectiveVersion)
+	}
 	if wants, ok := plugin.(WantsFeatures); ok {
 		wants.InspectFeatureGates(i.featureGates)
 	}
@@ -84,8 +91,8 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetExternalKubeInformerFactory(i.externalInformers)
 	}
 
-	if wants, ok := plugin.(WantsAuthorizer); ok {
-		wants.SetAuthorizer(i.authorizer)
+	if wants, ok := plugin.(WantsUnconditionalAuthorizer); ok {
+		wants.SetUnconditionalAuthorizer(i.authorizer)
 	}
 	if wants, ok := plugin.(WantsRESTMapper); ok {
 		wants.SetRESTMapper(i.restMapper)

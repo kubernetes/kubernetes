@@ -18,7 +18,6 @@ package factory
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -81,12 +80,12 @@ func TestTLSConnection(t *testing.T) {
 		},
 		Codec: codec,
 	}
-	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "")
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "/pods")
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = storage.Create(context.TODO(), "/abc", &example.Pod{}, nil, 0)
+	err = storage.Create(context.TODO(), "/pods/abc", &example.Pod{}, nil, 0)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -94,20 +93,20 @@ func TestTLSConnection(t *testing.T) {
 
 func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 	baseDir := os.TempDir()
-	tempDir, err := ioutil.TempDir(baseDir, "etcd_certificates")
+	tempDir, err := os.MkdirTemp(baseDir, "etcd_certificates")
 	if err != nil {
 		t.Fatal(err)
 	}
 	certFile = path.Join(tempDir, "etcdcert.pem")
-	if err := ioutil.WriteFile(certFile, []byte(testingcert.CertFileContent), 0644); err != nil {
+	if err := os.WriteFile(certFile, []byte(testingcert.CertFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 	keyFile = path.Join(tempDir, "etcdkey.pem")
-	if err := ioutil.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
+	if err := os.WriteFile(keyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 	caFile = path.Join(tempDir, "ca.pem")
-	if err := ioutil.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
+	if err := os.WriteFile(caFile, []byte(testingcert.CAFileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 	return certFile, keyFile, caFile

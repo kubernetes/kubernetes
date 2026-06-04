@@ -32,9 +32,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -46,6 +45,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const (
@@ -127,12 +127,7 @@ func NewCSRAndKey(config *CertConfig) (*x509.CertificateRequest, crypto.Signer, 
 
 // HasServerAuth returns true if the given certificate is a ServerAuth
 func HasServerAuth(cert *x509.Certificate) bool {
-	for i := range cert.ExtKeyUsage {
-		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
 }
 
 // WriteCertAndKey stores certificate and key at the specified location
@@ -345,11 +340,20 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 	}
 
 	// Allow RSA and ECDSA formats only
+	mismatchErrFmt := "the private key file %[2]s is in %[1]s format but the public key file %[3]s is not in %[1]s format"
 	switch k := privKey.(type) {
 	case *rsa.PrivateKey:
-		return k, pubKeys[0].(*rsa.PublicKey), nil
+		pubKey, ok := pubKeys[0].(*rsa.PublicKey)
+		if !ok {
+			return nil, nil, errors.Errorf(mismatchErrFmt, "RSA", privateKeyPath, publicKeyPath)
+		}
+		return k, pubKey, nil
 	case *ecdsa.PrivateKey:
-		return k, pubKeys[0].(*ecdsa.PublicKey), nil
+		pubKey, ok := pubKeys[0].(*ecdsa.PublicKey)
+		if !ok {
+			return nil, nil, errors.Errorf(mismatchErrFmt, "ECDSA", privateKeyPath, publicKeyPath)
+		}
+		return k, pubKey, nil
 	default:
 		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
@@ -390,15 +394,18 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR: %v", cfg.Networking.ServiceSubnet)
 	}
 
+	var dnsNames []string
+	if len(cfg.NodeRegistration.Name) > 0 {
+		dnsNames = append(dnsNames, cfg.NodeRegistration.Name)
+	}
+	dnsNames = append(dnsNames, "kubernetes", "kubernetes.default", "kubernetes.default.svc")
+	if len(cfg.Networking.DNSDomain) > 0 {
+		dnsNames = append(dnsNames, fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain))
+	}
+
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
-		DNSNames: []string{
-			cfg.NodeRegistration.Name,
-			"kubernetes",
-			"kubernetes.default",
-			"kubernetes.default.svc",
-			fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
-		},
+		DNSNames: dnsNames,
 		IPs: []net.IP{
 			internalAPIServerVirtualIP,
 			advertiseAddress,
@@ -446,9 +453,16 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
+	var dnsNames []string
+	if len(cfg.NodeRegistration.Name) > 0 {
+		dnsNames = []string{cfg.NodeRegistration.Name, "localhost"}
+	} else {
+		dnsNames = []string{"localhost"}
+	}
+
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
-		DNSNames: []string{cfg.NodeRegistration.Name, "localhost"},
+		DNSNames: dnsNames,
 		IPs:      []net.IP{advertiseAddress, net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 	}
 
@@ -578,8 +592,11 @@ func rsaKeySizeFromAlgorithmType(keyType kubeadmapi.EncryptionAlgorithmType) int
 
 // GeneratePrivateKey is the default function for generating private keys.
 func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
-	if keyType == kubeadmapi.EncryptionAlgorithmECDSAP256 {
+	switch keyType {
+	case kubeadmapi.EncryptionAlgorithmECDSAP256:
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	case kubeadmapi.EncryptionAlgorithmECDSAP384:
+		return ecdsa.GenerateKey(elliptic.P384(), cryptorand.Reader)
 	}
 
 	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)
@@ -667,12 +684,14 @@ func NewSelfSignedCACert(cfg *CertConfig, key crypto.Signer) (*x509.Certificate,
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
-		DNSNames:              []string{cfg.CommonName},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              keyUsage,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+	}
+	if len(cfg.CommonName) > 0 {
+		tmpl.DNSNames = []string{cfg.CommonName}
 	}
 
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &tmpl, &tmpl, key.Public(), key)

@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -25,13 +24,15 @@ import (
 	"unsafe"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/klog/v2"
 )
 
 var (
 	procGetLogicalProcessorInformationEx = modkernel32.NewProc("GetLogicalProcessorInformationEx")
 	getNumaAvailableMemoryNodeEx         = modkernel32.NewProc("GetNumaAvailableMemoryNodeEx")
-	procGetNumaNodeProcessorMaskEx       = modkernel32.NewProc("GetNumaNodeProcessorMaskEx")
+	procGetNumaNodeProcessorMask2        = modkernel32.NewProc("GetNumaNodeProcessorMask2")
+	procGetMaximumProcessorGroupCount    = modkernel32.NewProc("GetMaximumProcessorGroupCount")
 )
 
 type relationType int
@@ -109,18 +110,30 @@ func CpusToGroupAffinity(cpus []int) map[int]*GroupAffinity {
 }
 
 // GetCPUsForNUMANode queries the system for the CPUs that are part of the given NUMA node.
-func GetCPUsforNUMANode(nodeNumber uint16) (*GroupAffinity, error) {
-	var affinity GroupAffinity
-
-	r1, _, err := procGetNumaNodeProcessorMaskEx.Call(
-		uintptr(nodeNumber),
-		uintptr(unsafe.Pointer(&affinity)),
-	)
-	if r1 == 0 {
-		return nil, fmt.Errorf("Error getting CPU mask for NUMA node %d: %v", nodeNumber, err)
+// Uses GetNumaNodeProcessorMask2 which correctly returns all processor groups for NUMA nodes
+// spanning multiple groups (>64 logical processors). Requires Windows Server 2022+ (Build 20348+).
+func GetCPUsforNUMANode(nodeNumber uint16) ([]GroupAffinity, error) {
+	// Query the maximum number of processor groups to size the buffer.
+	r1, _, _ := procGetMaximumProcessorGroupCount.Call()
+	maxGroupCount := uint16(r1)
+	if maxGroupCount == 0 {
+		maxGroupCount = 1
 	}
 
-	return &affinity, nil
+	masks := make([]GroupAffinity, maxGroupCount)
+	var requiredCount uint16
+
+	r1, _, err := procGetNumaNodeProcessorMask2.Call(
+		uintptr(nodeNumber),
+		uintptr(unsafe.Pointer(&masks[0])),
+		uintptr(maxGroupCount),
+		uintptr(unsafe.Pointer(&requiredCount)),
+	)
+	if r1 == 0 {
+		return nil, fmt.Errorf("GetNumaNodeProcessorMask2 failed for NUMA node %d: %v", nodeNumber, err)
+	}
+
+	return masks[:requiredCount], nil
 }
 
 type numaNodeRelationship struct {
@@ -136,7 +149,7 @@ type processor struct {
 	NodeID   int
 }
 
-func processorInfo(relationShip relationType) (int, int, []cadvisorapi.Node, error) {
+func processorInfo(logger klog.Logger, relationShip relationType) (int, int, []cadvisorapi.Node, error) {
 	// Call once to get the length of data to return
 	var returnLength uint32 = 0
 	r1, _, err := procGetLogicalProcessorInformationEx.Call(
@@ -161,10 +174,10 @@ func processorInfo(relationShip relationType) (int, int, []cadvisorapi.Node, err
 		return 0, 0, nil, fmt.Errorf("call to GetLogicalProcessorInformationEx failed: %v", err)
 	}
 
-	return convertWinApiToCadvisorApi(buffer)
+	return convertWinApiToCadvisorApi(logger, buffer)
 }
 
-func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, error) {
+func convertWinApiToCadvisorApi(logger klog.Logger, buffer []byte) (int, int, []cadvisorapi.Node, error) {
 	logicalProcessors := make(map[int]*processor)
 	numofSockets := 0
 	numOfcores := 0
@@ -233,7 +246,7 @@ func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, er
 			}
 
 		default:
-			klog.V(4).Infof("Not using Windows CPU relationship type: %d", info.Relationship)
+			logger.V(4).Info("Not using Windows CPU relationship type", "relationship", info.Relationship)
 		}
 
 		// Move the offset to the next SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct

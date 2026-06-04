@@ -122,7 +122,7 @@ func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMe
 }
 
 type noxuDelayingAuthorizer struct {
-	Authorizer authorizer.Authorizer
+	Authorizer authorizer.UnconditionalAuthorizer
 }
 
 func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -130,6 +130,16 @@ func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 		time.Sleep(fakeworkDuration) // simulate fake work with sleep
 	}
 	return d.Authorizer.Authorize(ctx, a)
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (d *noxuDelayingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(d.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*noxuDelayingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // TestConcurrencyIsolation tests the concurrency isolation between priority levels.
@@ -279,10 +289,9 @@ func TestConcurrencyIsolation(t *testing.T) {
 	// There are uncontrolled overheads that introduce noise into the system. The coefficient of variation (CV), that is,
 	// standard deviation divided by mean, for a class of traffic is a characterization of all the noise that applied to
 	// that class. We found that noxu1 generally had a much bigger CV than noxu2. This makes sense, because noxu1 probes
-	// more behavior --- the waiting in queues. So we take the minimum of the two as an indicator of the relative amount
-	// of noise that comes from all the other behavior. Currently, we use 3 times the experienced coefficient of variation
-	// as the margin of error.
-	margin := 3 * math.Min(noxu1LatStats.cv, noxu2LatStats.cv)
+	// more behavior --- the waiting in queues. Both are relevant, so we mix them to get the
+	// threshold to apply in this test.
+	margin := noxu1LatStats.cv + 2*noxu2LatStats.cv
 	t.Logf("Error margin is %v", margin)
 
 	isConcurrencyExpected := func(name string, observed float64, expected float64) bool {

@@ -165,6 +165,35 @@ Usage:
 ```
 
 
+### external-metrics
+
+Starts an HTTPS server that implements the external metrics API for testing Horizontal Pod Autoscaler (HPA) with external metrics. The server provides a mock implementation of the `external.metrics.k8s.io` API group.
+
+The server comes with two pre-configured metrics:
+- `queue_messages_ready` (value: 100)
+- `http_requests_total` (value: 500)
+
+The server exposes the following endpoints:
+- `/apis/external.metrics.k8s.io/v1beta1/namespaces/{namespace}/{metric-name}`: Get external metric values (supports label selectors via query parameter)
+- `/healthz` and `/readyz`: Health check endpoints
+- `/create/{metric-name}?value={value}&labels={key1=value1,key2=value2}&fail={true|false}`: Create a new metric with optional labels
+- `/set/{metric-name}?value={value}&labels={key1=value1,key2=value2}`: Update an existing metric's value
+- `/fail/{metric-name}?fail={true|false}&labels={key1=value1,key2=value2}`: Configure a metric to return errors
+
+The subcommand can accept the following flags:
+- `port` (default: `6443`): Port number for the HTTPS server.
+- `service-name` (default: `external-metrics-server`): Name of the external metrics service.
+- `service-namespace` (default: `default`): Namespace of the external metrics service.
+
+The server generates self-signed TLS certificates automatically on startup.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost external-metrics [--port <port>] [--service-name <name>] [--service-namespace <namespace>]
+```
+
+
 ### fake-gitserver
 
 Fakes a git server. When doing `git clone http://localhost:8000`, you will clone an empty git
@@ -182,6 +211,23 @@ Usage:
     kubectl exec test-agnhost -- /agnhost fake-gitserver
 ```
 
+### fake-registry-server
+
+Starts a fake OCI registry server that serves static image files. This can be used to test
+pulling images from a private (with `--private` flag) or public registry.
+
+Private registry has static credentials `user:password`
+
+Usage:
+
+```console
+kubectl exec test-agnhost -- /agnhost fake-registry-server [--private]
+```
+
+#### Adding new image to the registry
+
+Adding a new image requires a new version of agnhost. To add new image, add a new line 
+to `test/images/agnhost/fakeregistryserver/images.txt` in format `<image> <tag> <internal tag>`
 
 ### guestbook
 
@@ -350,6 +396,33 @@ Usage:
         [--retry_time <seconds>] [--break_on_expected_content <true_or_false>]
 ```
 
+### mtlsclient
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.58 \
+      --restart=Always \
+      -- \
+      mtlsclient \
+      --fetch-url=<server-address> \ 
+      --server-trust-bundle=<server-trust-bundle.pem> \ 
+      --client-cred-bundle=<client-cred-bundle.pem>
+```
+
+### mtlsserver
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.58 \
+      --restart=Always \
+      -- \
+      mtlsserver \
+      --listen=<0.0.0.0:443> \
+      --server-creds=<server-cred-bundle.pem> \ 
+      --spiffe-trust-bundle=<spiffe-trust-bundle.pem> 
+```
 
 ### net
 
@@ -392,6 +465,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
 
 - `/`: Returns the request's timestamp.
 - `/clientip`: Returns the request's IP address.
+- `/serverport`: Returns the server port.
 - `/dial`: Creates a given number of requests to the given host and port using the given protocol,
   and returns a JSON with the fields `responses` (successful request responses) and `errors` (
   failed request responses). Returns `200 OK` status code if the last request succeeded,
@@ -530,6 +604,21 @@ Usage:
 ```
 
 
+### podcertificatesigner
+
+Runs a controller that signs PodCertificateRequests addressed to the signer name specified in the `--signer-name` flag.  It generates a CA hierarchy in-memory at startup.
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
+      --restart=Always \
+      -- \
+      podcertificatesigner \
+      --signer-name=agnhost.k8s.io/testsigner
+```
+
+
 ### port-forward-tester
 
 Listens for TCP connections on a given address and port, optionally checks the data received,
@@ -563,10 +652,11 @@ Usage:
 
 ### porter
 
-Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT}_[NNNN]`. eg:
-    - `SERVE_PORT_9001` - serve TCP connections on port 9001
+Serves requested data on ports specified in environment variables of the form `SERVE_{PORT,TLS_PORT,SCTP_PORT,UDP_PORT}_[NNNN]`. eg:
+    - `SERVE_PORT_9001` (or `SERVE_TCP_PORT_9001`) - serve TCP connections on port 9001
     - `SERVE_TLS_PORT_9002` - serve TLS-encrypted TCP connections on port 9002
     - `SERVE_SCTP_PORT_9003` - serve SCTP connections on port 9003
+    - `SERVE_UDP_PORT_9004` - serve UDP connections on port 9004
 
 The included `localhost.crt` is a PEM-encoded TLS cert with SAN IPs `127.0.0.1` and `[::1]`,
 expiring in January 2084, generated from `src/crypto/tls`:

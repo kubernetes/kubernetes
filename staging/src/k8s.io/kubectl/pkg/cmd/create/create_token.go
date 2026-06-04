@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/ptr"
 )
 
@@ -264,7 +264,7 @@ func (o *TokenOptions) Run() error {
 		return o.PrintObj(response)
 	}
 
-	if term.IsTerminal(o.Out) {
+	if printers.IsTerminal(o.Out) {
 		// include a newline when printing interactively
 		fmt.Fprintf(o.Out, "%s\n", response.Status.Token)
 	} else {

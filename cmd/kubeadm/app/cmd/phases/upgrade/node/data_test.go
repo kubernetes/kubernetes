@@ -42,3 +42,5 @@ func (t *testData) IgnorePreflightErrors() sets.Set[string] { return nil }
 func (t *testData) PatchesDir() string                      { return "" }
 func (t *testData) KubeConfigPath() string                  { return "" }
 func (t *testData) OutputWriter() io.Writer                 { return nil }
+func (t *testData) KubeConfigDir() string                   { return "" }
+func (t *testData) KubeletDir() string                      { return "" }

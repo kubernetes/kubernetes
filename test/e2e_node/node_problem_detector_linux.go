@@ -1,5 +1,4 @@
 //go:build cgo && linux
-// +build cgo,linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -24,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -108,7 +109,7 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 			var err error
 
 			nodeTime = time.Now()
-			bootTime, err = util.GetBootTime()
+			bootTime, err = util.GetBootTime(klog.FromContext(ctx))
 			framework.ExpectNoError(err)
 
 			// Set lookback duration longer than node up time.
@@ -296,9 +297,7 @@ current-context: local-context
 					},
 				},
 			})
-			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
-			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
+			hostLogFile = filepath.Join(framework.TestContext.KubeletRootDir, "pods", string(pod.UID), "volumes/kubernetes.io~empty-dir") + logFile
 		})
 
 		ginkgo.It("should generate node condition and events for corresponding errors", func(ctx context.Context) {
@@ -453,7 +452,7 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 		return err
 	}
 	defer f.Close()
-	for i := 0; i < num; i++ {
+	for range num {
 		_, err := f.WriteString(fmt.Sprintf("%s kernel: [0.000000] %s\n", timestamp.Format(time.Stamp), log))
 		if err != nil {
 			return err

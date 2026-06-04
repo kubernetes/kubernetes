@@ -23,6 +23,7 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/klog/v2"
@@ -56,9 +57,9 @@ func (we *WorkEstimate) MaxSeats() int {
 	return int(we.FinalSeats)
 }
 
-// objectCountGetterFunc represents a function that gets the total
+// statsGetterFunc represents a function that gets the total
 // number of objects for a given resource.
-type objectCountGetterFunc func(string) (int64, error)
+type statsGetterFunc func(string) (storage.Stats, error)
 
 // watchCountGetterFunc represents a function that gets the total
 // number of watchers potentially interested in a given request.
@@ -71,11 +72,12 @@ type maxSeatsFunc func(priorityLevelName string) uint64
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
+func NewWorkEstimator(objectCountFn statsGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
+		maxSeatsFn:            maxSeatsFn,
 		minimumSeats:          config.MinimumSeats,
-		maximumSeatsLimit:     config.MaximumSeatsLimit,
-		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn),
+		maximumSeatsLimit:     max(config.MaximumListSeatsLimit, config.MaximumMutatingSeatsLimit),
+		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn).estimate,
 		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn, config, maxSeatsFn),
 	}
 	return estimator.estimate
@@ -91,6 +93,7 @@ func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorit
 }
 
 type workEstimator struct {
+	maxSeatsFn maxSeatsFunc
 	// the minimum number of seats a request must occupy
 	minimumSeats uint64
 	// the default maximum number of seats a request can occupy
@@ -106,7 +109,11 @@ func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelN
 	if !ok {
 		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
 		// no RequestInfo should never happen, but to be on the safe side let's return maximumSeats
-		return WorkEstimate{InitialSeats: e.maximumSeatsLimit}
+		maxSeats := e.maxSeatsFn(priorityLevelName)
+		if maxSeats == 0 || maxSeats > e.maximumSeatsLimit {
+			maxSeats = e.maximumSeatsLimit
+		}
+		return WorkEstimate{InitialSeats: maxSeats}
 	}
 
 	switch requestInfo.Verb {

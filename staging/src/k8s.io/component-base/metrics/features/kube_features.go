@@ -19,22 +19,24 @@ package features
 import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	internalmetrics "k8s.io/component-base/metrics/internal"
 )
 
 const (
-	// owner: @logicalhan
-	// kep: https://kep.k8s.io/3466
-	ComponentSLIs featuregate.Feature = "ComponentSLIs"
+	// owner: @richabanker
+	// kep: https://kep.k8s.io/5808
+	// alpha: v1.36
+	//
+	// Enables native histogram support for Kubernetes metrics.
+	// When enabled, histogram metrics will be exposed in both classic
+	// and native histogram formats.
+	NativeHistograms featuregate.Feature = "NativeHistograms"
 )
 
 func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
 	return map[featuregate.Feature]featuregate.VersionedSpecs{
-		ComponentSLIs: {
-			{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-			{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-			// ComponentSLIs officially graduated to GA in v1.29 but the gate was not updated until v1.32.
-			// To support emulated versions, keep the gate until v1.35.
-			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		NativeHistograms: {
+			{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 		},
 	}
 }
@@ -42,4 +44,11 @@ func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
 // AddFeatureGates adds all feature gates used by this package.
 func AddFeatureGates(mutableFeatureGate featuregate.MutableVersionedFeatureGate) error {
 	return mutableFeatureGate.AddVersioned(featureGates())
+}
+
+// ApplyFeatureGates propagates the current feature gate state to the metrics
+// subsystem. It must be called after feature gates are finalised and before
+// any histogram metrics are registered.
+func ApplyFeatureGates(featureGate featuregate.FeatureGate) {
+	internalmetrics.SetNativeHistogramsEnabled(featureGate.Enabled(NativeHistograms))
 }

@@ -1,13 +1,7 @@
 syntax = "proto3";
 package mvccpb;
 
-import "gogoproto/gogo.proto";
-
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_getters_all) = false;
-option (gogoproto.goproto_enum_prefix_all) = false;
+option go_package = "go.etcd.io/etcd/api/v3/mvccpb";
 
 message KeyValue {
   // key is the key in bytes. An empty key is not allowed.

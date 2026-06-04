@@ -102,8 +102,7 @@ var errUnknown = errors.New("unknown")
 
 func (mi *MessageInfo) unmarshalPointer(b []byte, p pointer, groupTag protowire.Number, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	mi.init()
-	opts.depth--
-	if opts.depth < 0 {
+	if opts.depth--; opts.depth < 0 {
 		return out, errRecursionDepth
 	}
 	if flags.ProtoLegacy && mi.isMessageSet {

@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -274,9 +275,9 @@ func TestDecodeBrokenJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error with json: prefix, got no error")
 	}
-	const msg = `json: offset 28: invalid character '"' after object key:value pair`
-	if msg != err.Error() {
-		t.Fatalf("expected %q, got %q", msg, err.Error())
+	const msg = `json: .*invalid character.*".*after object key:value pair`
+	if matched, _ := regexp.MatchString(msg, err.Error()); !matched {
+		t.Fatalf("expected string matching %q, got %q", msg, err.Error())
 	}
 }
 
@@ -342,6 +343,17 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		{"{\"foo\": \"bar\"}\n---\n{baz: biz}", 100, false, false, []generic{
 			{"foo": "bar"},
 			{"baz": "biz"},
+		}},
+		// First document is JSON, second is YAML but with smaller size.
+		{"{\"foo\": \"bar\"}\n---\na: b", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"a": "b"},
+		}},
+		// First document is JSON, second is YAML,but with smaller size and
+		// trailing whitespace.
+		{"{\"foo\": \"bar\"}    \n---\na: b", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"a": "b"},
 		}},
 		// First document is JSON, second is YAML, longer than the buffer
 		{"{\"foo\": \"bar\"}\n---\n{baz: biz0123456780123456780123456780123456780123456789}", 20, false, false, []generic{

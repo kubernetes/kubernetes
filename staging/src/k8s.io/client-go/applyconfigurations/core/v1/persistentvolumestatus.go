@@ -25,11 +25,20 @@ import (
 
 // PersistentVolumeStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeStatus type for use
 // with apply.
+//
+// PersistentVolumeStatus is the current status of a persistent volume.
 type PersistentVolumeStatusApplyConfiguration struct {
-	Phase                   *corev1.PersistentVolumePhase `json:"phase,omitempty"`
-	Message                 *string                       `json:"message,omitempty"`
-	Reason                  *string                       `json:"reason,omitempty"`
-	LastPhaseTransitionTime *metav1.Time                  `json:"lastPhaseTransitionTime,omitempty"`
+	// phase indicates if a volume is available, bound to a claim, or released by a claim.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase
+	Phase *corev1.PersistentVolumePhase `json:"phase,omitempty"`
+	// message is a human-readable message indicating details about why the volume is in this state.
+	Message *string `json:"message,omitempty"`
+	// reason is a brief CamelCase string that describes any failure and is meant
+	// for machine parsing and tidy display in the CLI.
+	Reason *string `json:"reason,omitempty"`
+	// lastPhaseTransitionTime is the time the phase transitioned from one to another
+	// and automatically resets to current time everytime a volume phase transitions.
+	LastPhaseTransitionTime *metav1.Time `json:"lastPhaseTransitionTime,omitempty"`
 }
 
 // PersistentVolumeStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeStatus type for use with

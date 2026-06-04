@@ -200,16 +200,17 @@ func TestPodVolumesExist(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
+
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
-		err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
+		err := kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod)
 		assert.NoError(t, err)
 	}
 
 	for _, pod := range pods {
-		podVolumesExist := kubelet.podVolumesExist(pod.UID)
+		podVolumesExist := kubelet.podVolumesExist(tCtx.Logger(), pod.UID)
 		assert.True(t, podVolumesExist, "pod %q", pod.UID)
 	}
 }
@@ -220,7 +221,7 @@ func TestPodVolumeDeadlineAttachAndMount(t *testing.T) {
 	}
 
 	testKubelet := newTestKubeletWithImageList(t, nil /*imageList*/, false, /* controllerAttachDetachEnabled */
-		false /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+		false /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/, false /*enableResizing*/)
 
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -282,7 +283,7 @@ func TestPodVolumeDeadlineUnmount(t *testing.T) {
 	}
 
 	testKubelet := newTestKubeletWithImageList(t, nil /*imageList*/, false, /* controllerAttachDetachEnabled */
-		true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+		true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/, false /*enableResizing*/)
 
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -470,16 +471,12 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(context.Background(), pod))
-	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
-		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
-	}
 
 	// Verify volumes unmounted
-	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
+	hasMountedVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
 
-	assert.Empty(t, podVolumes,
-		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
+	assert.False(t, hasMountedVolumes, "Expected volumes to be unmounted and detached. But some volumes are still mounted")
 
 	assert.NoError(t, volumetest.VerifyTearDownCallCount(
 		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
@@ -557,9 +554,9 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+	hasVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.True(t, hasVolumes, "HasPossiblyMountedVolumesForPod should return true")
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -644,9 +641,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+	hasVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.True(t, hasVolumes, "HasPossiblyMountedVolumesForPod should return true")
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -672,9 +669,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	allPodVolumes = kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+	hasVolumes = kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
 		util.GetUniquePodName(pod))
-	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
+	assert.False(t, hasVolumes, "HasPossiblyMountedVolumesForPod should return false")
 
 	assert.Empty(t, podVolumes,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted")

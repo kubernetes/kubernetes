@@ -45,6 +45,7 @@ type Info struct {
 	StorageDriver string `json:"storage_driver"`
 	StorageRoot   string `json:"storage_root"`
 	StorageImage  string `json:"storage_image"`
+	CgroupDriver  string `json:"cgroup_driver"`
 }
 
 // ContainerInfo represents a given container information
@@ -72,7 +73,7 @@ type crioClientImpl struct {
 
 func configureUnixTransport(tr *http.Transport, proto, addr string) error {
 	if len(addr) > maxUnixSocketPathSize {
-		return fmt.Errorf("Unix socket path %q is too long", addr)
+		return fmt.Errorf("unix socket path %q is too long", addr)
 	}
 	// No need for compression in local communications.
 	tr.DisableCompression = true
@@ -149,9 +150,9 @@ func (c *crioClientImpl) ContainerInfo(id string) (*ContainerInfo, error) {
 	if resp.StatusCode != http.StatusOK {
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("Error finding container %s: Status %d", id, resp.StatusCode)
+			return nil, fmt.Errorf("error finding container %s: status %d", id, resp.StatusCode)
 		}
-		return nil, fmt.Errorf("Error finding container %s: Status %d returned error %s", id, resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("error finding container %s: status %d returned error %s", id, resp.StatusCode, string(respBody))
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&cInfo); err != nil {

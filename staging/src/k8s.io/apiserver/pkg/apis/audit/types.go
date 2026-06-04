@@ -97,6 +97,10 @@ type Event struct {
 	// Impersonated user information.
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo
+	// AuthenticationMetadata contains details about how the request was authenticated.
+	// +optional
+	AuthenticationMetadata *AuthenticationMetadata
+
 	// Source IPs, from where the request originated and intermediate proxies.
 	// The source IPs are listed from (in order):
 	// 1. X-Forwarded-For request header IPs
@@ -145,6 +149,13 @@ type Event struct {
 	// should be short. Annotations are included in the Metadata level.
 	// +optional
 	Annotations map[string]string
+}
+
+type AuthenticationMetadata struct {
+	// ImpersonationConstraint is the verb associated with the constrained impersonation mode that was used to authorize
+	// the ImpersonatedUser associated with this audit event.  It is only set when constrained impersonation was used.
+	// +optional
+	ImpersonationConstraint string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -264,6 +275,7 @@ type PolicyRule struct {
 type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
+	// `*` matches all groups
 	// +optional
 	Group string
 	// Resources is a list of resources this rule applies to.

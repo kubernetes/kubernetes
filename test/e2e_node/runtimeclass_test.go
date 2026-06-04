@@ -90,7 +90,7 @@ func makePodToVerifyCgroupSize(cgroupNames []string, expectedCPU string, expecte
 	return pod
 }
 
-var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
+var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("podoverhead-handling")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("PodOverhead cgroup accounting", func() {

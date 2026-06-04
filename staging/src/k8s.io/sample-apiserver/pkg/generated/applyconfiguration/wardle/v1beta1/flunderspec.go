@@ -24,10 +24,15 @@ import (
 
 // FlunderSpecApplyConfiguration represents a declarative configuration of the FlunderSpec type for use
 // with apply.
+//
+// FlunderSpec is the specification of a Flunder.
 type FlunderSpecApplyConfiguration struct {
-	FlunderReference *string                      `json:"flunderReference,omitempty"`
-	FischerReference *string                      `json:"fischerReference,omitempty"`
-	ReferenceType    *wardlev1beta1.ReferenceType `json:"referenceType,omitempty"`
+	// A name of another flunder, mutually exclusive to the FischerReference.
+	FlunderReference *string `json:"flunderReference,omitempty"`
+	// A name of a fischer, mutually exclusive to the FlunderReference.
+	FischerReference *string `json:"fischerReference,omitempty"`
+	// The reference type.
+	ReferenceType *wardlev1beta1.ReferenceType `json:"referenceType,omitempty"`
 }
 
 // FlunderSpecApplyConfiguration constructs a declarative configuration of the FlunderSpec type for use with

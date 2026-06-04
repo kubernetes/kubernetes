@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 package containerd
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"path"
 	"regexp"
 	"strings"
 
-	"golang.org/x/net/context"
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
@@ -112,7 +114,8 @@ func (f *containerdFactory) CanHandleAndAccept(name string) (bool, bool, error) 
 	id := ContainerNameToContainerdID(name)
 	// If container and task lookup in containerd fails then we assume
 	// that the container state is not known to containerd
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
 	_, err := f.client.LoadContainer(ctx, id)
 	if err != nil {
 		return false, false, fmt.Errorf("failed to load container: %v", err)

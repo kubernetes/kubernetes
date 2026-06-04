@@ -309,7 +309,7 @@ func sendReq(t *testing.T, handler http.Handler, path string) []byte {
 
 func getTestAPIServiceOpenAPIDefinitions(_ openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition {
 	return map[string]openapicommon.OpenAPIDefinition{
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIService": buildTestAPIServiceOpenAPIDefinition(),
+		"io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService": buildTestAPIServiceOpenAPIDefinition(),
 	}
 }
 

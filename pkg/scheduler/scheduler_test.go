@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -28,13 +29,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -44,17 +47,19 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/ptr"
-
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -62,6 +67,8 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
+	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -236,7 +243,7 @@ func TestSchedulerCreation(t *testing.T) {
 					t.Errorf("unexpected extenders (-want, +got):\n%s", diff)
 				}
 
-				// framework.Handle.Extenders()
+				// fwk.Handle.Extenders()
 				for _, p := range s.Profiles {
 					extenders := make([]string, 0, len(p.Extenders()))
 					for _, e := range p.Extenders() {
@@ -279,94 +286,122 @@ func TestFailureHandler(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", tt.name, asyncAPICallsEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+				podInformer := informerFactory.Core().V1().Pods()
+				// Need to add/update/delete testPod to the store.
+				if err := podInformer.Informer().GetStore().Add(testPod); err != nil {
+					t.Fatal(err)
+				}
+
+				var apiDispatcher *apidispatcher.APIDispatcher
+				if asyncAPICallsEnabled {
+					apiDispatcher = apidispatcher.New(client, 16, apicalls.Relevances)
+					apiDispatcher.Run(logger)
+					defer apiDispatcher.Close()
+				}
+
+				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
+				schedulerCache := internalcache.New(ctx, apiDispatcher, false)
+
+				queue.Add(ctx, testPod)
+
+				if _, err := queue.Pop(logger); err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+
+				if tt.podUpdatedDuringScheduling {
+					if err := podInformer.Informer().GetStore().Update(testPodUpdated); err != nil {
+						t.Fatal(err)
+					}
+					queue.Update(ctx, testPod, testPodUpdated)
+				}
+				if tt.podDeletedDuringScheduling {
+					if err := podInformer.Informer().GetStore().Delete(testPod); err != nil {
+						t.Fatal(err)
+					}
+					queue.Delete(logger, testPod)
+				}
+
+				s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+				s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
+
+				var got *v1.Pod
+				if tt.podUpdatedDuringScheduling {
+					pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
+					if !ok {
+						t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
+					}
+					got = pInfo.Pod
+				} else {
+					got = getPodFromPriorityQueue(queue, testPod)
+				}
+
+				if diff := cmp.Diff(tt.expect, got); diff != "" {
+					t.Errorf("Unexpected pod (-want, +got): %s", diff)
+				}
+			})
+		}
+	}
+}
+
+func TestFailureHandler_PodAlreadyBound(t *testing.T) {
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+			nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+			testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Node("foo").Obj()
+
+			client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()
-			// Need to add/update/delete testPod to the store.
-			podInformer.Informer().GetStore().Add(testPod)
-
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(*recorder))
-			schedulerCache := internalcache.New(ctx, 30*time.Second)
-
-			queue.Add(logger, testPod)
-
-			if _, err := queue.Pop(logger); err != nil {
-				t.Fatalf("Pop failed: %v", err)
+			// Need to add testPod to the store.
+			if err := podInformer.Informer().GetStore().Add(testPod); err != nil {
+				t.Fatal(err)
 			}
 
-			if tt.podUpdatedDuringScheduling {
-				podInformer.Informer().GetStore().Update(testPodUpdated)
-				queue.Update(logger, testPod, testPodUpdated)
-			}
-			if tt.podDeletedDuringScheduling {
-				podInformer.Informer().GetStore().Delete(testPod)
-				queue.Delete(testPod)
+			var apiDispatcher *apidispatcher.APIDispatcher
+			if asyncAPICallsEnabled {
+				apiDispatcher = apidispatcher.New(client, 16, apicalls.Relevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
 			}
 
-			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithAPIDispatcher(apiDispatcher))
+			schedulerCache := internalcache.New(ctx, apiDispatcher, false)
+
+			// Add node to schedulerCache no matter it's deleted in API server or not.
+			schedulerCache.AddNode(logger, &nodeFoo)
+
+			s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable), nil, time.Now())
+			s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
-			var got *v1.Pod
-			if tt.podUpdatedDuringScheduling {
-				head, e := queue.Pop(logger)
-				if e != nil {
-					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
-				}
-				got = head.Pod
-			} else {
-				got = getPodFromPriorityQueue(queue, testPod)
-			}
-
-			if diff := cmp.Diff(tt.expect, got); diff != "" {
-				t.Errorf("Unexpected pod (-want, +got): %s", diff)
+			pod := getPodFromPriorityQueue(queue, testPod)
+			if pod != nil {
+				t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
 			}
 		})
-	}
-}
-
-func TestFailureHandler_PodAlreadyBound(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Node("foo").Obj()
-
-	client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podInformer := informerFactory.Core().V1().Pods()
-	// Need to add testPod to the store.
-	podInformer.Informer().GetStore().Add(testPod)
-
-	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(ctx, 30*time.Second)
-
-	// Add node to schedulerCache no matter it's deleted in API server or not.
-	schedulerCache.AddNode(logger, &nodeFoo)
-
-	s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-	s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
-
-	pod := getPodFromPriorityQueue(queue, testPod)
-	if pod != nil {
-		t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
 	}
 }
 
@@ -442,7 +477,7 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 	return nil
 }
 
-func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue,
+func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue, apiDispatcher *apidispatcher.APIDispatcher,
 	client kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Scheduler, framework.Framework, error) {
 	logger := klog.FromContext(ctx)
 	registerPluginFuncs := []tf.RegisterPluginFunc{
@@ -455,6 +490,7 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 		registerPluginFuncs,
 		testSchedulerName,
 		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
 		frameworkruntime.WithWaitingPods(waitingPods),
@@ -462,12 +498,16 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 	if err != nil {
 		return nil, nil, err
 	}
+	if apiDispatcher != nil {
+		fwk.SetAPICacher(apicache.New(queue, cache))
+	}
 
 	s := &Scheduler{
 		Cache:           cache,
 		client:          client,
 		StopEverything:  ctx.Done(),
 		SchedulingQueue: queue,
+		APIDispatcher:   apiDispatcher,
 		Profiles:        profile.Map{testSchedulerName: fwk},
 		logger:          logger,
 	}
@@ -486,7 +526,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 		{
 			name: "register indexer, no conflicts",
 			entrypoints: map[string]frameworkruntime.PluginFactory{
-				"AddIndexer": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodSpecNodeName,
@@ -499,14 +539,14 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			name: "register the same indexer name multiple times, conflict",
 			// order of registration doesn't matter
 			entrypoints: map[string]frameworkruntime.PluginFactory{
-				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
 				},
-				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName": indexByPodAnnotationNodeName,
@@ -520,14 +560,14 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 			name: "register the same indexer body with different names, no conflicts",
 			// order of registration doesn't matter
 			entrypoints: map[string]frameworkruntime.PluginFactory{
-				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer1": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName1": indexByPodSpecNodeName,
 					})
 					return &TestPlugin{name: "AddIndexer1"}, err
 				},
-				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				"AddIndexer2": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().AddIndexers(cache.Indexers{
 						"nodeName2": indexByPodAnnotationNodeName,
@@ -608,114 +648,127 @@ const (
 	fakeBind                       = "bind-plugin"
 	emptyEventExtensions           = "emptyEventExtensions"
 	fakePermit                     = "fakePermit"
+	fakeAssignedPod                = "fakeAssignedPodPlugin"
 )
 
 func Test_buildQueueingHintMap(t *testing.T) {
 	tests := []struct {
-		name                string
-		plugins             []framework.Plugin
-		want                map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
-		featuregateDisabled bool
-		wantErr             error
+		name    string
+		plugins []fwk.Plugin
+		want    map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction
+		wantErr error
 	}{
 		{
 			name:    "filter without EnqueueExtensions plugin",
-			plugins: []framework.Plugin{&filterWithoutEnqueueExtensionsPlugin{}},
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.All}: {
+			plugins: []fwk.Plugin{&filterWithoutEnqueueExtensionsPlugin{}},
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.AssignedPod, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.Node, ActionType: framework.All}: {
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.CSINode, ActionType: framework.All}: {
+				{Resource: fwk.TargetPod, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.CSIDriver, ActionType: framework.All}: {
+				{Resource: fwk.Node, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.CSIStorageCapacity, ActionType: framework.All}: {
+				{Resource: fwk.CSINode, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.PersistentVolume, ActionType: framework.All}: {
+				{Resource: fwk.CSIDriver, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.StorageClass, ActionType: framework.All}: {
+				{Resource: fwk.CSIStorageCapacity, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: {
+				{Resource: fwk.PersistentVolume, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.ResourceClaim, ActionType: framework.All}: {
+				{Resource: fwk.StorageClass, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.DeviceClass, ActionType: framework.All}: {
+				{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: fwk.ResourceClaim, ActionType: fwk.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: fwk.DeviceClass, ActionType: fwk.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: fwk.PodGroup, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 			},
 		},
 		{
 			name:    "node and pod plugin",
-			plugins: []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.Add}: {
+			plugins: []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.AssignedPod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.Add}: {
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.TargetPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.Node, ActionType: fwk.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
-					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
-				},
-			},
-		},
-		{
-			name:                "node and pod plugin (featuregate is disabled)",
-			plugins:             []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
-			featuregateDisabled: true,
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.Add}: {
-					{PluginName: fakePod, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
-				},
-				{Resource: framework.Node, ActionType: framework.Add}: {
-					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
-				},
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
 		{
 			name:    "register plugin with empty event",
-			plugins: []framework.Plugin{&emptyEventPlugin{}},
-			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
+			plugins: []fwk.Plugin{&emptyEventPlugin{}},
+			want:    map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{},
 		},
 		{
 			name:    "register plugins including emptyEventPlugin",
-			plugins: []framework.Plugin{&emptyEventPlugin{}, &fakeNodePlugin{}},
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.Add}: {
+			plugins: []fwk.Plugin{&emptyEventPlugin{}, &fakeNodePlugin{}},
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.AssignedPod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.Add}: {
+				{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.TargetPod, ActionType: fwk.Add}: {
+					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
+				},
+				{Resource: fwk.Node, ActionType: fwk.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
 		{
 			name:    "one EventsToRegister returns an error",
-			plugins: []framework.Plugin{&errorEventsToRegisterPlugin{}},
-			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
+			plugins: []fwk.Plugin{&errorEventsToRegisterPlugin{}},
+			want:    map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{},
 			wantErr: errors.New("mock error"),
+		},
+		{
+			name:    "plugin registering to a specific pod resource 'AssignedPod'",
+			plugins: []fwk.Plugin{&fakeAssignedPodPlugin{}},
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.AssignedPod, ActionType: fwk.Update}: {
+					{PluginName: fakeAssignedPod, QueueingHintFn: fakeAssignedPodPluginQueueingFn},
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -723,9 +776,8 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			cfgPls := &schedulerapi.Plugins{}
 			plugins := append(tt.plugins, &fakebindPlugin{}, &fakeQueueSortPlugin{})
 			for _, pl := range plugins {
-				tmpPl := pl
-				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-					return tmpPl, nil
+				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return pl, nil
 				}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
 				}
@@ -783,13 +835,16 @@ func Test_buildQueueingHintMap(t *testing.T) {
 }
 
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
+// It verifies that a given set of plugins is correctly registered for a specific set of cluster events.
 func Test_UnionedGVKs(t *testing.T) {
 	tests := []struct {
 		name                            string
 		plugins                         schedulerapi.PluginSet
-		want                            map[framework.EventResource]framework.ActionType
+		want                            map[fwk.EventResource]fwk.ActionType
 		enableInPlacePodVerticalScaling bool
-		enableSchedulerQueueingHints    bool
+		enableDynamicResourceAllocation bool
+		enableNodeDeclaredFeatures      bool
+		enableGangScheduling            bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -801,18 +856,49 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.All,
-				framework.Node:                  framework.All,
-				framework.CSINode:               framework.All,
-				framework.CSIDriver:             framework.All,
-				framework.CSIStorageCapacity:    framework.All,
-				framework.PersistentVolume:      framework.All,
-				framework.PersistentVolumeClaim: framework.All,
-				framework.StorageClass:          framework.All,
-				framework.ResourceClaim:         framework.All,
-				framework.DeviceClass:           framework.All,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:           fwk.All,
+				fwk.UnscheduledPod:        fwk.All,
+				fwk.TargetPod:             fwk.All,
+				fwk.Node:                  fwk.All,
+				fwk.CSINode:               fwk.All,
+				fwk.CSIDriver:             fwk.All,
+				fwk.CSIStorageCapacity:    fwk.All,
+				fwk.PersistentVolume:      fwk.All,
+				fwk.PersistentVolumeClaim: fwk.All,
+				fwk.StorageClass:          fwk.All,
+				fwk.ResourceClaim:         fwk.All,
+				fwk.DeviceClass:           fwk.All,
 			},
+		},
+		{
+			name: "filter without EnqueueExtensions plugin (GenericWorkload enabled)",
+			plugins: schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: filterWithoutEnqueueExtensions},
+					{Name: queueSort},
+					{Name: fakeBind},
+				},
+				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
+			},
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:           fwk.All,
+				fwk.UnscheduledPod:        fwk.All,
+				fwk.TargetPod:             fwk.All,
+				fwk.Node:                  fwk.All,
+				fwk.CSINode:               fwk.All,
+				fwk.CSIDriver:             fwk.All,
+				fwk.CSIStorageCapacity:    fwk.All,
+				fwk.PersistentVolume:      fwk.All,
+				fwk.PersistentVolumeClaim: fwk.All,
+				fwk.StorageClass:          fwk.All,
+				fwk.ResourceClaim:         fwk.All,
+				fwk.DeviceClass:           fwk.All,
+				fwk.PodGroup:              fwk.All,
+			},
+			enableGangScheduling:            true,
+			enableInPlacePodVerticalScaling: true,
+			enableDynamicResourceAllocation: true,
 		},
 		{
 			name: "node plugin",
@@ -824,8 +910,8 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Node: fwk.Add,
 			},
 		},
 		{
@@ -838,8 +924,10 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod: framework.Add,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:    fwk.Add,
+				fwk.UnscheduledPod: fwk.Add,
+				fwk.TargetPod:      fwk.Add,
 			},
 		},
 		{
@@ -853,9 +941,11 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:  framework.Add,
-				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:    fwk.Add,
+				fwk.UnscheduledPod: fwk.Add,
+				fwk.TargetPod:      fwk.Add,
+				fwk.Node:           fwk.Add,
 			},
 		},
 		{
@@ -868,61 +958,139 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{},
-		},
-		{
-			name:    "plugins with default profile (No feature gate enabled)",
-			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete,
-				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
-				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.Update,
-				framework.CSIStorageCapacity:    framework.All - framework.Delete,
-				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
-				framework.StorageClass:          framework.All - framework.Delete,
-				framework.VolumeAttachment:      framework.Delete,
-			},
-		},
-		{
-			name:    "plugins with default profile (InPlacePodVerticalScaling: enabled)",
-			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
-				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
-				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.Update,
-				framework.CSIStorageCapacity:    framework.All - framework.Delete,
-				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
-				framework.StorageClass:          framework.All - framework.Delete,
-				framework.VolumeAttachment:      framework.Delete,
-			},
-			enableInPlacePodVerticalScaling: true,
+			want: map[fwk.EventResource]fwk.ActionType{},
 		},
 		{
 			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodToleration | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
-				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
-				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.Update,
-				framework.CSIStorageCapacity:    framework.All - framework.Delete,
-				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
-				framework.StorageClass:          framework.All - framework.Delete,
-				framework.VolumeAttachment:      framework.Delete,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.UpdatePodScaleDown,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
-			enableSchedulerQueueingHints:    true,
+		},
+		{
+			name:    "plugins with default profile (queueingHint/DynamicResourceAllocation: enabled)",
+			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
+				fwk.DeviceClass:           fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceSlice:         fwk.All - fwk.Delete,
+			},
+			enableDynamicResourceAllocation: true,
+		},
+		{
+			name:    "plugins with default profile (NodeDeclaredFeatures: enabled)",
+			plugins: defaults.PluginsV1.MultiPoint,
+			want: map[fwk.EventResource]fwk.ActionType{
+				// NodeDeclaredFeatures adds fwk.Update
+				fwk.AssignedPod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:   fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
+				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
+				fwk.DeviceClass:           fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceSlice:         fwk.All - fwk.Delete,
+			},
+			enableDynamicResourceAllocation: true,
+			enableNodeDeclaredFeatures:      true,
+			enableInPlacePodVerticalScaling: true,
+		},
+		{
+			name: "plugin registering to a specific pod resource 'AssignedPod'",
+			plugins: schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: fakeAssignedPod},
+					{Name: queueSort},
+					{Name: fakeBind},
+				},
+				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
+			},
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod: fwk.Update,
+			},
+		},
+		{
+			name:    "plugins with default profile and GangScheduling",
+			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.GangScheduling})},
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
+				fwk.UnscheduledPod:        fwk.Add,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
+				fwk.DeviceClass:           fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceSlice:         fwk.All - fwk.Delete,
+				fwk.PodGroup:              fwk.Add,
+			},
+			enableGangScheduling:            true,
+			enableInPlacePodVerticalScaling: true,
+			enableDynamicResourceAllocation: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.enableSchedulerQueueingHints)
+			pluginConfig := defaults.PluginConfigsV1
+
+			if !tt.enableDynamicResourceAllocation {
+				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+			} else if !tt.enableInPlacePodVerticalScaling {
+				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
+				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
+				// Strip BindingTimeout from DynamicResources args to avoid validation failure.
+				pluginConfig = slices.Clone(pluginConfig)
+				for i := range pluginConfig {
+					if pluginConfig[i].Name == "DynamicResources" {
+						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
+						break
+					}
+				}
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.enableNodeDeclaredFeatures)
+				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.NodeDeclaredFeatures: tt.enableNodeDeclaredFeatures,
+					features.GenericWorkload:      tt.enableGangScheduling,
+					features.GangScheduling:       tt.enableGangScheduling,
+				})
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,
+				features.DynamicResourceAllocation: tt.enableDynamicResourceAllocation,
+			})
 
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -930,17 +1098,16 @@ func Test_UnionedGVKs(t *testing.T) {
 			registry := plugins.NewInTreeRegistry()
 
 			cfgPls := &schedulerapi.Plugins{MultiPoint: tt.plugins}
-			plugins := []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &filterWithoutEnqueueExtensionsPlugin{}, &emptyEventsToRegisterPlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
+			plugins := []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &fakeAssignedPodPlugin{}, &filterWithoutEnqueueExtensionsPlugin{}, &emptyEventsToRegisterPlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
 			for _, pl := range plugins {
-				tmpPl := pl
-				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-					return tmpPl, nil
+				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return pl, nil
 				}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
 				}
 			}
 
-			profile := schedulerapi.KubeSchedulerProfile{Plugins: cfgPls, PluginConfig: defaults.PluginConfigsV1}
+			profile := schedulerapi.KubeSchedulerProfile{Plugins: cfgPls, PluginConfig: pluginConfig}
 			fwk, err := newFramework(ctx, registry, profile)
 			if err != nil {
 				t.Fatal(err)
@@ -1106,11 +1273,11 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			// Wait all pods in waitSchedulingPods to be scheduled.
 			wg.Wait()
 
-			utiltesting.Eventually(tCtx, func(utiltesting.TContext) sets.Set[string] {
+			tCtx.Eventually(func(utiltesting.TContext) sets.Set[string] {
 				// Ensure that all waitingPods in scheduler can be obtained from any profiles.
 				actualPodNamesInWaitingPods := sets.New[string]()
-				for _, fwk := range scheduler.Profiles {
-					fwk.IterateOverWaitingPods(func(pod framework.WaitingPod) {
+				for _, schedFramework := range scheduler.Profiles {
+					schedFramework.IterateOverWaitingPods(func(pod fwk.WaitingPod) {
 						actualPodNamesInWaitingPods.Insert(pod.GetPod().Name)
 					})
 				}
@@ -1120,7 +1287,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 	}
 }
 
-var _ framework.QueueSortPlugin = &fakeQueueSortPlugin{}
+var _ fwk.QueueSortPlugin = &fakeQueueSortPlugin{}
 
 // fakeQueueSortPlugin is a no-op implementation for QueueSort extension point.
 type fakeQueueSortPlugin struct{}
@@ -1129,11 +1296,11 @@ func (pl *fakeQueueSortPlugin) Name() string {
 	return queueSort
 }
 
-func (pl *fakeQueueSortPlugin) Less(_, _ *framework.QueuedPodInfo) bool {
+func (pl *fakeQueueSortPlugin) Less(_, _ fwk.QueuedEntityInfo) bool {
 	return false
 }
 
-var _ framework.BindPlugin = &fakebindPlugin{}
+var _ fwk.BindPlugin = &fakebindPlugin{}
 
 // fakebindPlugin is a no-op implementation for Bind extension point.
 type fakebindPlugin struct{}
@@ -1142,7 +1309,7 @@ func (t *fakebindPlugin) Name() string {
 	return fakeBind
 }
 
-func (t *fakebindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (t *fakebindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	return nil
 }
 
@@ -1151,47 +1318,67 @@ type filterWithoutEnqueueExtensionsPlugin struct{}
 
 func (*filterWithoutEnqueueExtensionsPlugin) Name() string { return filterWithoutEnqueueExtensions }
 
-func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
-var hintFromFakeNode = framework.QueueingHint(100)
+var hintFromFakeNode = fwk.QueueingHint(100)
 
 type fakeNodePlugin struct{}
 
-var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
 	return hintFromFakeNode, nil
 }
 
 func (*fakeNodePlugin) Name() string { return fakeNode }
 
-func (*fakeNodePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
-func (pl *fakeNodePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
+func (pl *fakeNodePlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
 	}, nil
 }
 
-var hintFromFakePod = framework.QueueingHint(101)
+var hintFromFakePod = fwk.QueueingHint(101)
 
 type fakePodPlugin struct{}
 
-var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
 	return hintFromFakePod, nil
 }
 
 func (*fakePodPlugin) Name() string { return fakePod }
 
-func (*fakePodPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
-func (pl *fakePodPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}, QueueingHintFn: fakePodPluginQueueingFn},
+func (pl *fakePodPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: fakePodPluginQueueingFn},
+	}, nil
+}
+
+var hintFromFakeAssignedPod = fwk.QueueingHint(102)
+
+type fakeAssignedPodPlugin struct{}
+
+var fakeAssignedPodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
+	return hintFromFakeAssignedPod, nil
+}
+
+func (*fakeAssignedPodPlugin) Name() string { return fakeAssignedPod }
+
+func (*fakeAssignedPodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+func (pl *fakeAssignedPodPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update}, QueueingHintFn: fakeAssignedPodPluginQueueingFn},
 	}, nil
 }
 
@@ -1199,11 +1386,11 @@ type emptyEventPlugin struct{}
 
 func (*emptyEventPlugin) Name() string { return emptyEventExtensions }
 
-func (*emptyEventPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
-func (pl *emptyEventPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *emptyEventPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -1212,36 +1399,36 @@ type errorEventsToRegisterPlugin struct{}
 
 func (*errorEventsToRegisterPlugin) Name() string { return errorEventsToRegister }
 
-func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
-func (*errorEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (*errorEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, errors.New("mock error")
 }
 
-// emptyEventsToRegisterPlugin implement interface framework.EnqueueExtensions, but returns nil from EventsToRegister.
+// emptyEventsToRegisterPlugin implement interface fwk.EnqueueExtensions, but returns nil from EventsToRegister.
 // This can simulate a plugin registered at scheduler setup, but does nothing
 // due to some disabled feature gate.
 type emptyEventsToRegisterPlugin struct{}
 
 func (*emptyEventsToRegisterPlugin) Name() string { return emptyEventsToRegister }
 
-func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
-func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
 // fakePermitPlugin only implements PermitPlugin interface.
 type fakePermitPlugin struct {
-	eventRecorder events.EventRecorder
+	eventRecorder events.EventRecorderLogger
 }
 
-func newFakePermitPlugin(eventRecorder events.EventRecorder) frameworkruntime.PluginFactory {
-	return func(ctx context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newFakePermitPlugin(eventRecorder events.EventRecorderLogger) frameworkruntime.PluginFactory {
+	return func(ctx context.Context, configuration runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 		pl := &fakePermitPlugin{
 			eventRecorder: eventRecorder,
 		}
@@ -1258,13 +1445,42 @@ const (
 	permitTimeout    = 10 * time.Second
 )
 
-func (f fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	defer func() {
 		// Send event with podWaiting reason to broadcast this pod is already waiting in the permit stage.
-		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
+		f.eventRecorder.WithLogger(klog.FromContext(ctx)).Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
 	}()
 
-	return framework.NewStatus(framework.Wait), permitTimeout
+	return fwk.NewStatus(fwk.Wait), permitTimeout
 }
 
-var _ framework.PermitPlugin = &fakePermitPlugin{}
+var _ fwk.PermitPlugin = &fakePermitPlugin{}
+
+func TestNewInformerFactoryTrim(t *testing.T) {
+	cs := fake.NewClientset()
+
+	pd := &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name:      "test",
+		Namespace: "default",
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			{
+				Manager:    "update",
+				Operation:  metav1.ManagedFieldsOperationApply,
+				APIVersion: "apps/v1",
+			},
+		},
+	}}
+	require.NoError(t, cs.Tracker().Add(pd))
+
+	informerFactory := NewInformerFactory(cs, 0)
+	lister := informerFactory.Core().V1().Pods().Lister()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	p, err := lister.Pods("default").Get("test")
+	require.NoError(t, err)
+	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
+}

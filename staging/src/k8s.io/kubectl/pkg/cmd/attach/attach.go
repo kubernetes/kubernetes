@@ -28,7 +28,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -42,6 +41,8 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 var (
@@ -65,6 +66,8 @@ var (
 const (
 	defaultPodAttachTimeout = 60 * time.Second
 	defaultPodLogsTimeout   = 20 * time.Second
+
+	defaultDetachSequence = "ctrl-p,ctrl-q"
 )
 
 // AttachOptions declare the arguments accepted by the Attach command
@@ -73,6 +76,8 @@ type AttachOptions struct {
 
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
+
+	DetachKeys string
 
 	CommandName string
 
@@ -121,6 +126,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
+	cmd.Flags().StringVar(&o.DetachKeys, "detach-keys", defaultDetachSequence, "Override the key sequence for detaching a container")
 	return cmd
 }
 
@@ -148,8 +154,17 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			Stderr:    !o.DisableStderr,
 			TTY:       raw,
 		}, scheme.ParameterCodec)
-
-		return o.Attach.Attach(req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
+		stdin := o.In
+		if o.Stdin && raw {
+			if o.DetachKeys == "" {
+				o.DetachKeys = defaultDetachSequence
+			}
+			stdin, err = term.NewDetachableReader(stdin, o.DetachKeys)
+			if err != nil {
+				return fmt.Errorf("could not bind detach keys: %w", err)
+			}
+		}
+		return o.Attach.Attach(req.URL(), o.Config, stdin, o.Out, o.ErrOut, raw, sizeQueue)
 	}
 }
 
@@ -300,13 +315,16 @@ func (o *AttachOptions) Run() error {
 			sizePlusOne.Height++
 
 			// this call spawns a goroutine to monitor/update the terminal size
-			sizeQueue = t.MonitorSize(&sizePlusOne, size)
+			sizeQueue = &terminalSizeQueueAdapter{
+				delegate: t.MonitorSize(&sizePlusOne, size),
+			}
 		}
 
 		o.DisableStderr = true
 	}
 
 	if !o.Quiet {
+		_, _ = fmt.Fprintln(o.ErrOut, "All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.")
 		fmt.Fprintln(o.ErrOut, "If you don't see a command prompt, try pressing enter.")
 	}
 	if err := t.Safe(o.AttachFunc(o, containerToAttach, t.Raw, sizeQueue)); err != nil {
@@ -348,11 +366,26 @@ func (o *AttachOptions) GetContainerName(pod *corev1.Pod) (string, error) {
 // reattachMessage returns a message to print after attach has completed, or
 // the empty string if no message should be printed.
 func (o *AttachOptions) reattachMessage(containerName string, rawTTY bool) string {
-	if o.Quiet || !o.Stdin || !rawTTY || o.Pod.Spec.RestartPolicy != corev1.RestartPolicyAlways {
+	if o.Quiet || !o.Stdin || !rawTTY {
 		return ""
 	}
 	if _, path := podcmd.FindContainerByName(o.Pod, containerName); strings.HasPrefix(path, "spec.ephemeralContainers") {
-		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName)
+		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -n %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
 	}
-	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -i -t' command when the pod is running", o.CommandName, o.Pod.Name, containerName)
+	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -n %s -i -t' command", o.CommandName, o.Pod.Name, containerName, o.Pod.Namespace)
+}
+
+type terminalSizeQueueAdapter struct {
+	delegate term.TerminalSizeQueue
+}
+
+func (a *terminalSizeQueueAdapter) Next() *remotecommand.TerminalSize {
+	next := a.delegate.Next()
+	if next == nil {
+		return nil
+	}
+	return &remotecommand.TerminalSize{
+		Width:  next.Width,
+		Height: next.Height,
+	}
 }

@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -56,6 +55,7 @@ type Base64Plugin struct {
 	inFailedState      bool
 	ver                string
 	socketPath         string
+	kmsapi.UnsafeKeyManagementServiceServer
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
@@ -68,6 +68,8 @@ func NewBase64Plugin(t *testing.T, socketPath string) *Base64Plugin {
 		socketPath: socketPath,
 	}
 
+	// Make sure we don't have a leftover socket.
+	_ = os.Remove(socketPath)
 	kmsapi.RegisterKeyManagementServiceServer(server, result)
 	if err := result.start(); err != nil {
 		t.Fatalf("failed to start KMS plugin, err: %v", err)

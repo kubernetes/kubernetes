@@ -17,13 +17,15 @@ limitations under the License.
 package stats
 
 import (
-	"k8s.io/client-go/tools/record"
+	"context"
 	"time"
+
+	"k8s.io/client-go/tools/record"
 )
 
 // ResourceAnalyzer provides statistics on node resource consumption
 type ResourceAnalyzer interface {
-	Start()
+	Start(context.Context)
 
 	fsResourceAnalyzerInterface
 	SummaryProvider
@@ -38,13 +40,13 @@ type resourceAnalyzer struct {
 var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
-func NewResourceAnalyzer(statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
+func NewResourceAnalyzer(ctx context.Context, statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
 	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency, eventRecorder)
-	summaryProvider := NewSummaryProvider(statsProvider)
+	summaryProvider := NewSummaryProvider(ctx, statsProvider)
 	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
 }
 
 // Start starts background functions necessary for the ResourceAnalyzer to function
-func (ra *resourceAnalyzer) Start() {
-	ra.fsResourceAnalyzer.Start()
+func (ra *resourceAnalyzer) Start(ctx context.Context) {
+	ra.fsResourceAnalyzer.Start(ctx)
 }

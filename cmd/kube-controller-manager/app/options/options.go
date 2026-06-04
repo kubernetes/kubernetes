@@ -18,33 +18,32 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/server/flagz"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	cpnames "k8s.io/cloud-provider/names"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	basecompatibility "k8s.io/component-base/compatibility"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/zpages/flagz"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	cmoptions "k8s.io/controller-manager/options"
-	"k8s.io/klog/v2"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -67,14 +66,15 @@ const (
 
 // KubeControllerManagerOptions is the main context object for the kube-controller manager.
 type KubeControllerManagerOptions struct {
-	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
-	KubeCloudShared   *cpoptions.KubeCloudSharedOptions
-	ServiceController *cpoptions.ServiceControllerOptions
+	Generic         *cmoptions.GenericControllerManagerConfigurationOptions
+	KubeCloudShared *cpoptions.KubeCloudSharedOptions
 
 	AttachDetachController                    *AttachDetachControllerOptions
 	CSRSigningController                      *CSRSigningControllerOptions
 	DaemonSetController                       *DaemonSetControllerOptions
 	DeploymentController                      *DeploymentControllerOptions
+	DeviceTaintEvictionController             *DeviceTaintEvictionControllerOptions
+	ResourceClaimController                   *ResourceClaimControllerOptions
 	StatefulSetController                     *StatefulSetControllerOptions
 	DeprecatedFlags                           *DeprecatedControllerOptions
 	EndpointController                        *EndpointControllerOptions
@@ -98,7 +98,7 @@ type KubeControllerManagerOptions struct {
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
 	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
-	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	SecureServing  *apiserveroptions.SecureServingOptions
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics        *metrics.Options
@@ -106,6 +106,8 @@ type KubeControllerManagerOptions struct {
 
 	Master                      string
 	ShowHiddenMetricsForVersion string
+
+	ControllerShutdownTimeout time.Duration
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
@@ -132,9 +134,6 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s := KubeControllerManagerOptions{
 		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
 		KubeCloudShared: cpoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
-		ServiceController: &cpoptions.ServiceControllerOptions{
-			ServiceControllerConfiguration: &componentConfig.ServiceController,
-		},
 		AttachDetachController: &AttachDetachControllerOptions{
 			&componentConfig.AttachDetachController,
 		},
@@ -146,6 +145,12 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		DeploymentController: &DeploymentControllerOptions{
 			&componentConfig.DeploymentController,
+		},
+		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
+			&componentConfig.DeviceTaintEvictionController,
+		},
+		ResourceClaimController: &ResourceClaimControllerOptions{
+			&componentConfig.ResourceClaimController,
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
 			&componentConfig.StatefulSetController,
@@ -213,7 +218,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		ValidatingAdmissionPolicyStatusController: &ValidatingAdmissionPolicyStatusControllerOptions{
 			&componentConfig.ValidatingAdmissionPolicyStatusController,
 		},
-		SecureServing:            apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		SecureServing:            apiserveroptions.NewSecureServingOptions(),
 		Authentication:           apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:            apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Metrics:                  metrics.NewOptions(),
@@ -237,6 +242,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
 	s.Generic.LeaderElection.ResourceName = "kube-controller-manager"
 	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
+
+	s.ControllerShutdownTimeout = 10 * time.Second
 	return &s, nil
 }
 
@@ -257,8 +264,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fss := cliflag.NamedFlagSets{}
 	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	s.ServiceController.AddFlags(fss.FlagSet(cpnames.ServiceLBController))
-
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
@@ -266,6 +271,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.AttachDetachController.AddFlags(fss.FlagSet(names.PersistentVolumeAttachDetachController))
 	s.CSRSigningController.AddFlags(fss.FlagSet(names.CertificateSigningRequestSigningController))
 	s.DeploymentController.AddFlags(fss.FlagSet(names.DeploymentController))
+	s.DeviceTaintEvictionController.AddFlags(fss.FlagSet(names.DeviceTaintEvictionController))
+	s.ResourceClaimController.AddFlags(fss.FlagSet(names.ResourceClaimController))
 	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
 	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
@@ -297,14 +304,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
 
-	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
-		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefault(featuregate.Feature(clientgofeaturegate.WatchListClient), true); err != nil {
-			// it turns out that there are some integration tests that start multiple control plane components which
-			// share global DefaultFeatureGate/DefaultMutableFeatureGate variables.
-			// in those cases, the above call will fail (FG already registered and cannot be overridden), and the error will be logged.
-			klog.Errorf("unable to set %s feature gate, err: %v", clientgofeaturegate.WatchListClient, err)
-		}
-	}
+	fss.FlagSet("generic").DurationVar(&s.ControllerShutdownTimeout, "controller-shutdown-timeout",
+		s.ControllerShutdownTimeout, "Time to wait for the controllers to shut down before terminating the executable")
 
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
 
@@ -332,6 +333,12 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.DeploymentController.ApplyTo(&c.ComponentConfig.DeploymentController); err != nil {
+		return err
+	}
+	if err := s.DeviceTaintEvictionController.ApplyTo(&c.ComponentConfig.DeviceTaintEvictionController); err != nil {
+		return err
+	}
+	if err := s.ResourceClaimController.ApplyTo(&c.ComponentConfig.ResourceClaimController); err != nil {
 		return err
 	}
 	if err := s.StatefulSetController.ApplyTo(&c.ComponentConfig.StatefulSetController); err != nil {
@@ -394,16 +401,13 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.SAController.ApplyTo(&c.ComponentConfig.SAController); err != nil {
 		return err
 	}
-	if err := s.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
-		return err
-	}
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
 		return err
 	}
 	if err := s.ValidatingAdmissionPolicyStatusController.ApplyTo(&c.ComponentConfig.ValidatingAdmissionPolicyStatusController); err != nil {
 		return err
 	}
-	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := s.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
 	if s.SecureServing.BindPort != 0 || s.SecureServing.Listener != nil {
@@ -414,6 +418,7 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 			return err
 		}
 	}
+	c.ControllerShutdownTimeout = s.ControllerShutdownTimeout
 	return nil
 }
 
@@ -432,6 +437,8 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.CSRSigningController.Validate()...)
 	errs = append(errs, s.DaemonSetController.Validate()...)
 	errs = append(errs, s.DeploymentController.Validate()...)
+	errs = append(errs, s.DeviceTaintEvictionController.Validate()...)
+	errs = append(errs, s.ResourceClaimController.Validate()...)
 	errs = append(errs, s.StatefulSetController.Validate()...)
 	errs = append(errs, s.DeprecatedFlags.Validate()...)
 	errs = append(errs, s.EndpointController.Validate()...)
@@ -452,7 +459,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ReplicationController.Validate()...)
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
-	errs = append(errs, s.ServiceController.Validate()...)
 	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)
@@ -475,7 +481,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 }
 
 // Config return a controller manager config objective
-func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) (*kubecontrollerconfig.Config, error) {
+func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) (*kubecontrollerconfig.Config, error) {
 	if err := s.Validate(allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
@@ -499,19 +505,21 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventRecorder := eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: KubeControllerManagerUserAgent})
 
 	c := &kubecontrollerconfig.Config{
-		Client:                   client,
-		Kubeconfig:               kubeconfig,
-		EventBroadcaster:         eventBroadcaster,
-		EventRecorder:            eventRecorder,
-		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
+		Client:                    client,
+		Kubeconfig:                kubeconfig,
+		EventBroadcaster:          eventBroadcaster,
+		EventRecorder:             eventRecorder,
+		ControllerShutdownTimeout: s.ControllerShutdownTimeout,
+		ComponentGlobalsRegistry:  s.ComponentGlobalsRegistry,
 	}
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultMutableFeatureGate)
 	s.Metrics.Apply()
 
 	if s.ParsedFlags != nil {

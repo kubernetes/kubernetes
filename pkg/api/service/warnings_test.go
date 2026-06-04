@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetWarningsForService(t *testing.T) {
@@ -46,7 +47,7 @@ func TestGetWarningsForService(t *testing.T) {
 		name: "externalIPs set when type is ExternalName",
 		tweakSvc: func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeExternalName
-			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+			s.Spec.ExternalIPs = []string{"1.2.3.4"} //nolint:staticcheck // SA1019 testing deprecated field
 		},
 		numWarnings: 1,
 	}, {
@@ -54,6 +55,70 @@ func TestGetWarningsForService(t *testing.T) {
 		tweakSvc: func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ExternalName = "example.com"
+		},
+		numWarnings: 1,
+	}, {
+		name: "LoadBalancerIP set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.LoadBalancerIP = "1.2.3.4"
+			s.Spec.SessionAffinity = api.ServiceAffinityNone // default value
+		},
+		numWarnings: 1,
+	}, {
+		name: "ExternalIPs set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+			s.Spec.SessionAffinity = api.ServiceAffinityNone // default value
+		},
+		numWarnings: 1,
+	}, {
+		name: "SessionAffinity Client IP set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+		},
+		numWarnings: 1,
+	}, {
+		name: "SessionAffinity None set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.SessionAffinity = api.ServiceAffinityNone
+		},
+		numWarnings: 0,
+	}, {
+		name: "ExternalIPs, LoadBalancerIP and SessionAffinity set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+			s.Spec.LoadBalancerIP = "1.2.3.4"
+			s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+		},
+		numWarnings: 3,
+	}, {
+		name: "trafficDistribution: PreferSameZone",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.TrafficDistribution = ptr.To(api.ServiceTrafficDistributionPreferSameZone)
+		},
+		numWarnings: 0,
+	}, {
+		name: "trafficDistribution: PreferClose",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.TrafficDistribution = ptr.To(api.ServiceTrafficDistributionPreferClose)
+		},
+		numWarnings: 1,
+	}, {
+		name: "ExternalIPs set on ClusterIP service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.ExternalIPs = []string{"1.2.3.4"} //nolint:staticcheck // SA1019 testing deprecated field
 		},
 		numWarnings: 1,
 	}}
@@ -107,21 +172,21 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			name:    "IPv4 with leading zeros",
 			service: service([]string{"192.012.2.2"}),
 			want: []string{
-				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 			},
 		},
 		{
 			name:    "Dual Stack IPv4-IPv6 and IPv4 with leading zeros",
 			service: service([]string{"192.012.2.2", "2001:db8::2"}),
 			want: []string{
-				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 			},
 		},
 		{
 			name:    "Dual Stack IPv6-IPv4 and IPv4 with leading zeros",
 			service: service([]string{"2001:db8::2", "192.012.2.2"}),
 			want: []string{
-				`spec.clusterIPs[1]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[1]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 			},
 		},
 		{
@@ -149,7 +214,7 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			name:    "Dual Stack IPv4-IPv6 and IPv4 with leading zeros and IPv6 non-canonical format",
 			service: service([]string{"192.012.2.2", "2001:db8:0:0::2"}),
 			want: []string{
-				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[0]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 				`spec.clusterIPs[1]: IPv6 address "2001:db8:0:0::2" should be in RFC 5952 canonical format ("2001:db8::2")`,
 			},
 		},
@@ -158,7 +223,7 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			service: service([]string{"2001:db8:0:0::2", "192.012.2.2"}),
 			want: []string{
 				`spec.clusterIPs[0]: IPv6 address "2001:db8:0:0::2" should be in RFC 5952 canonical format ("2001:db8::2")`,
-				`spec.clusterIPs[1]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[1]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 			},
 		},
 		{
@@ -179,12 +244,13 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 			},
 			want: []string{
 				`spec.clusterIPs[0]: IPv6 address "2001:db8:0:0::2" should be in RFC 5952 canonical format ("2001:db8::2")`,
-				`spec.clusterIPs[1]: non-standard IP address "192.012.2.2" will be considered invalid in a future Kubernetes release: use "192.12.2.2"`,
+				`spec.clusterIPs[1]: non-standard IP address "192.012.2.2" is invalid: use "192.12.2.2"`,
 				`spec.externalIPs[0]: IPv6 address "2001:db8:1:0::2" should be in RFC 5952 canonical format ("2001:db8:1::2")`,
-				`spec.externalIPs[1]: non-standard IP address "10.012.2.2" will be considered invalid in a future Kubernetes release: use "10.12.2.2"`,
-				`spec.loadBalancerIP: non-standard IP address "10.001.1.1" will be considered invalid in a future Kubernetes release: use "10.1.1.1"`,
+				`spec.externalIPs[1]: non-standard IP address "10.012.2.2" is invalid: use "10.12.2.2"`,
+				`spec.externalIPs is deprecated and may no longer be implemented in some clusters`,
+				`spec.loadBalancerIP: non-standard IP address "10.001.1.1" is invalid: use "10.1.1.1"`,
 				`spec.loadBalancerSourceRanges[0]: IPv6 CIDR value "2001:db8:1:0::/64" should be in RFC 5952 canonical format ("2001:db8:1::/64")`,
-				`spec.loadBalancerSourceRanges[1]: non-standard CIDR value "10.012.2.0/24" will be considered invalid in a future Kubernetes release: use "10.12.2.0/24"`,
+				`spec.loadBalancerSourceRanges[1]: non-standard CIDR value "10.012.2.0/24" is invalid: use "10.12.2.0/24"`,
 			},
 		},
 	}

@@ -146,6 +146,10 @@ type TLSConfig struct {
 	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientCert string
+
+	// tlsServerName is used to check server certificate. If tlsServerName is empty, the hostname used to contact the server is used.
+	// +optional
+	TLSServerName string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -234,6 +238,7 @@ type Issuer struct {
 	CertificateAuthority string
 	Audiences            []string
 	AudienceMatchPolicy  AudienceMatchPolicyType
+	EgressSelectorType   EgressSelectorType
 }
 
 // AudienceMatchPolicyType is a set of valid values for Issuer.AudienceMatchPolicy
@@ -242,6 +247,14 @@ type AudienceMatchPolicyType string
 // Valid types for AudienceMatchPolicyType
 const (
 	AudienceMatchPolicyMatchAny AudienceMatchPolicyType = "MatchAny"
+)
+
+type EgressSelectorType string
+
+const (
+	EgressSelectorControlPlane EgressSelectorType = "controlplane"
+
+	EgressSelectorCluster EgressSelectorType = "cluster"
 )
 
 // ClaimValidationRule provides the configuration for a single claim validation rule.
@@ -334,11 +347,21 @@ type WebhookConfiguration struct {
 	// Same as setting `--authorization-webhook-cache-authorized-ttl` flag
 	// Default: 5m0s
 	AuthorizedTTL metav1.Duration
+	// CacheAuthorizedRequests specifies whether authorized requests should be cached.
+	// If set to true, the TTL for cached decisions can be configured via the
+	// AuthorizedTTL field.
+	// Default: true
+	CacheAuthorizedRequests bool
 	// The duration to cache 'unauthorized' responses from the webhook
 	// authorizer.
 	// Same as setting `--authorization-webhook-cache-unauthorized-ttl` flag
 	// Default: 30s
 	UnauthorizedTTL metav1.Duration
+	// CacheUnauthorizedRequests specifies whether unauthorized requests should be cached.
+	// If set to true, the TTL for cached decisions can be configured via the
+	// UnauthorizedTTL field.
+	// Default: true
+	CacheUnauthorizedRequests bool
 	// Timeout for the webhook request
 	// Maximum allowed value is 30s.
 	// Required, no default value.

@@ -158,7 +158,8 @@ type PartialActivation interface {
 
 // partialActivationConverter indicates whether an Activation implementation supports conversion to a PartialActivation
 type partialActivationConverter interface {
-	asPartialActivation() (PartialActivation, bool)
+	// AsPartialActivation converts the current activation to a PartialActivation
+	AsPartialActivation() (PartialActivation, bool)
 }
 
 // partActivation is the default implementations of the PartialActivation interface.
@@ -172,19 +173,20 @@ func (a *partActivation) UnknownAttributePatterns() []*AttributePattern {
 	return a.unknowns
 }
 
-// asPartialActivation returns the partActivation as a PartialActivation interface.
-func (a *partActivation) asPartialActivation() (PartialActivation, bool) {
+// AsPartialActivation returns the partActivation as a PartialActivation interface.
+func (a *partActivation) AsPartialActivation() (PartialActivation, bool) {
 	return a, true
 }
 
-func asPartialActivation(vars Activation) (PartialActivation, bool) {
+// AsPartialActivation walks the activation hierarchy and returns the first PartialActivation, if found.
+func AsPartialActivation(vars Activation) (PartialActivation, bool) {
 	// Only internal activation instances may implement this interface
 	if pv, ok := vars.(partialActivationConverter); ok {
-		return pv.asPartialActivation()
+		return pv.AsPartialActivation()
 	}
 	// Since Activations may be hierarchical, test whether a parent converts to a PartialActivation
 	if vars.Parent() != nil {
-		return asPartialActivation(vars.Parent())
+		return AsPartialActivation(vars.Parent())
 	}
 	return nil, false
 }

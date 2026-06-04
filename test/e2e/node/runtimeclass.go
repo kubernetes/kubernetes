@@ -128,7 +128,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func(ctx context.Context) {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints", func(ctx context.Context) {
 		if err := e2eruntimeclass.NodeSupportsPreconfiguredRuntimeClassHandler(ctx, f); err != nil {
 			e2eskipper.Skipf("Skipping test as node does not have E2E runtime class handler preconfigured in container runtime config: %v", err)
 		}

@@ -121,10 +121,16 @@ spec:
         - containerPort: 9153
           name: metrics
           protocol: TCP
+        - containerPort: 8080
+          name: liveness-probe
+          protocol: TCP
+        - containerPort: 8181
+          name: readiness-probe
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /health
-            port: 8080
+            port: liveness-probe
             scheme: HTTP
           initialDelaySeconds: 60
           timeoutSeconds: 5
@@ -133,7 +139,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8181
+            port: readiness-probe
             scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false

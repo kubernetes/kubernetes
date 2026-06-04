@@ -2,20 +2,20 @@
 
 module k8s.io/externaljwt
 
-go 1.24.0
+go 1.26.0
 
-godebug default=go1.24
+godebug default=go1.26
 
 require (
-	github.com/gogo/protobuf v1.3.2
-	google.golang.org/grpc v1.68.1
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/grpc v1.81.1
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
 
 require (
-	github.com/google/go-cmp v0.7.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576 // indirect
+	go.opentelemetry.io/otel v1.44.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
+	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 )

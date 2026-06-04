@@ -1,0 +1,7 @@
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.0
+    out: .
+    opt:
+      - paths=source_relative
+      - default_api_level=API_HYBRID

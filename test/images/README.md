@@ -12,12 +12,12 @@ new images, test the changes made, promote the newly built staging images.
 ## Prerequisites
 
 In order to build the docker test images, a Linux node is required. The node will require `make`,
-`docker (version 19.03.0 or newer)`, and ``docker buildx``, which will be used to build multiarch
+`docker`, and ``docker buildx``, which will be used to build multiarch
 images, as well as Windows images. In order to properly build multi-arch and Windows images, some
 initialization is required (in CI this is done in [cloudbuild.yaml](cloudbuild.yaml)):
 
 ```shell
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+docker run --privileged --rm tonistiigi/binfmt --install all
 docker buildx create --name img-builder --use
 docker buildx inspect --bootstrap
 ```
@@ -37,7 +37,7 @@ last known stable version.
 
 Most tests used in E2E testing suite use the `agnhost` image. It contains several subcommands with
 different [functionalities](agnhost/README.md) used to validate different Kubernetes behaviors. If
-a new functionality needs testing, consider adding an `agnhost` subcommand for it first, before
+a new functionality needs testing, add it as an `agnhost` subcommand first, before
 creating an entirely separate test image.
 
 The general process of making updates to the images is as follows:
@@ -52,8 +52,19 @@ After going through these steps your image will be used in the e2e tests. There 
 
 ### Creating and promoting new images
 
-If you intend to add an entirely different image and have it automatically built by the Image Builder
-and used in E2E tests, you will also have to define the postsubmit prow job for it. This can easily
+Please reach out to SIG Testing to see if we can meet your needs with the agnhost image first,
+including adding new functionality to that image.
+
+Consolidating images has many benefits including:
+- Reduced patching toil (dependencies, base images, go, ...)
+- Less dependency on pulling images at runtime and therefore faster test results
+- Simplified airgap testing (fewer images to mirror / airgap)
+
+We are working to reduce the number of existing images.
+
+If you still truly need to add an entirely different image, confirm with SIG Testing.
+You will need to have it automatically built by the Image Builder, to do this
+you will have to define the postsubmit prow job for it. This can easily
 be done by running [this script](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh)
 in `kubernetes/test-infra`.
 
@@ -95,7 +106,8 @@ It can be used by anyone, but if you need to build your own, you can read more a
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
 the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019)
-and ltsc2022 (Windows Server 2022). In order to add support for a new Windows OS version, a new entry for that OS version will have
+, ltsc2022 (Windows Server 2022), and ltsc2025 (Windows Server 2025).
+In order to add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
@@ -210,7 +222,7 @@ sudo chmod o+x /etc/docker
 ```
 
 A few images have been mirrored from dockerhub into the `gcr.io/k8s-staging-e2e-test-images` registry
-(`busybox`,`httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
+(`busybox`, `nginx`, `nginx-new`, `perl`), and they
 only have a noop Dockerfile. However, due to an [issue](https://github.com/kubernetes/test-infra/issues/20884),
 the same SHA cannot be pushed twice. A small change to them is required in order to generate a new SHA,
 which can then be pushed and promoted.

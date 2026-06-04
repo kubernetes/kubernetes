@@ -137,6 +137,16 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.ServiceAccountTokenInSecrets != nil {
+		in, out := &in.ServiceAccountTokenInSecrets, &out.ServiceAccountTokenInSecrets
+		*out = new(bool)
+		**out = **in
+	}
+	if in.PreventPodSchedulingIfMissing != nil {
+		in, out := &in.PreventPodSchedulingIfMissing, &out.PreventPodSchedulingIfMissing
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

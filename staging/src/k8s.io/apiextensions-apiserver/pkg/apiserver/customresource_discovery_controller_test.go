@@ -232,6 +232,8 @@ func (env *testEnvironment) Start(ctx context.Context) {
 	)
 
 	factory.Start(ctx.Done())
+	factory.WaitForCacheSync(ctx.Done())
+
 	go discoveryController.Run(ctx.Done(), discoverySyncedCh)
 
 	select {

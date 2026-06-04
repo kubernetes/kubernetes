@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,6 +53,7 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -87,12 +89,9 @@ const (
 	// PodNodeNameKeyIndex is the name of the index used by PodInformer to index pods by their node name.
 	PodNodeNameKeyIndex = "spec.nodeName"
 
-	// OrphanPodIndexKey is used to index all Orphan pods to this key
-	OrphanPodIndexKey = "_ORPHAN_POD"
-
-	// podControllerUIDIndex is the name for the Pod store's index function,
-	// which is to index by pods's controllerUID.
-	PodControllerUIDIndex = "podControllerUID"
+	// PodControllerIndex is the name for the Pod store's index function,
+	// which indexes by the key returned from PodControllerIndexKey.
+	PodControllerIndex = "podController"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -483,6 +482,7 @@ type PodControlInterface interface {
 type RealPodControl struct {
 	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
+	OnWrite    func(*v1.Pod, *metav1.OwnerReference)
 }
 
 var _ PodControlInterface = &RealPodControl{}
@@ -552,11 +552,15 @@ func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespac
 	if len(generateName) > 0 {
 		pod.ObjectMeta.GenerateName = generateName
 	}
-	return r.createPods(ctx, namespace, pod, controllerObject)
+	return r.createPods(ctx, namespace, pod, controllerObject, controllerRef)
 }
 
 func (r RealPodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
-	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	pod, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	if err == nil && r.OnWrite != nil {
+		ownerRef := metav1.GetControllerOfNoCopy(pod)
+		r.OnWrite(pod, ownerRef)
+	}
 	return err
 }
 
@@ -585,7 +589,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object) error {
+func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
@@ -598,6 +602,9 @@ func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v
 		return err
 	}
 	logger := klog.FromContext(ctx)
+	if r.OnWrite != nil {
+		r.OnWrite(newPod, controllerRef)
+	}
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		logger.Error(err, "parentObject does not have ObjectMeta")
@@ -873,18 +880,14 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		readyTime1 := podReadyTime(s.Pods[i])
 		readyTime2 := podReadyTime(s.Pods[j])
 		if !readyTime1.Equal(readyTime2) {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.LogarithmicScaleDown) {
+			if s.Now.IsZero() || readyTime1.IsZero() || readyTime2.IsZero() {
 				return afterOrZero(readyTime1, readyTime2)
-			} else {
-				if s.Now.IsZero() || readyTime1.IsZero() || readyTime2.IsZero() {
-					return afterOrZero(readyTime1, readyTime2)
-				}
-				rankDiff := logarithmicRankDiff(*readyTime1, *readyTime2, s.Now)
-				if rankDiff == 0 {
-					return s.Pods[i].UID < s.Pods[j].UID
-				}
-				return rankDiff < 0
 			}
+			rankDiff := logarithmicRankDiff(*readyTime1, *readyTime2, s.Now)
+			if rankDiff == 0 {
+				return s.Pods[i].UID < s.Pods[j].UID
+			}
+			return rankDiff < 0
 		}
 	}
 	// 7. Pods with containers with higher restart counts < lower restart counts
@@ -893,18 +896,14 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 	}
 	// 8. Empty creation time pods < newer pods < older pods
 	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.LogarithmicScaleDown) {
+		if s.Now.IsZero() || s.Pods[i].CreationTimestamp.IsZero() || s.Pods[j].CreationTimestamp.IsZero() {
 			return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
-		} else {
-			if s.Now.IsZero() || s.Pods[i].CreationTimestamp.IsZero() || s.Pods[j].CreationTimestamp.IsZero() {
-				return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
-			}
-			rankDiff := logarithmicRankDiff(s.Pods[i].CreationTimestamp, s.Pods[j].CreationTimestamp, s.Now)
-			if rankDiff == 0 {
-				return s.Pods[i].UID < s.Pods[j].UID
-			}
-			return rankDiff < 0
 		}
+		rankDiff := logarithmicRankDiff(s.Pods[i].CreationTimestamp, s.Pods[j].CreationTimestamp, s.Now)
+		if rankDiff == 0 {
+			return s.Pods[i].UID < s.Pods[j].UID
+		}
+		return rankDiff < 0
 	}
 	return false
 }
@@ -1029,6 +1028,60 @@ func CountTerminatingPods(pods []*v1.Pod) int32 {
 	return int32(numberOfTerminatingPods)
 }
 
+// nextPodAvailabilityCheck implements similar logic to podutil.IsPodAvailable
+func nextPodAvailabilityCheck(pod *v1.Pod, minReadySeconds int32, now time.Time) *time.Duration {
+	if !podutil.IsPodReady(pod) || minReadySeconds <= 0 {
+		return nil
+	}
+
+	c := podutil.GetPodReadyCondition(pod.Status)
+	if c.LastTransitionTime.IsZero() {
+		return nil
+	}
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	nextCheck := c.LastTransitionTime.Add(minReadySecondsDuration).Sub(now)
+	if nextCheck > 0 {
+		return ptr.To(nextCheck)
+	}
+	return nil
+}
+
+// findMinNextPodAvailabilitySimpleCheck finds a duration when the next availability check should occur. It also returns the
+// first pod affected by the future availability recalculation (there might be more pods if they became ready at the same time;
+// this helps to implement FindMinNextPodAvailabilityCheck).
+func findMinNextPodAvailabilitySimpleCheck(pods []*v1.Pod, minReadySeconds int32, now time.Time) (*time.Duration, *v1.Pod) {
+	var minAvailabilityCheck *time.Duration
+	var checkPod *v1.Pod
+	for _, p := range pods {
+		nextCheck := nextPodAvailabilityCheck(p, minReadySeconds, now)
+		if nextCheck != nil && (minAvailabilityCheck == nil || *nextCheck < *minAvailabilityCheck) {
+			minAvailabilityCheck = nextCheck
+			checkPod = p
+		}
+	}
+	return minAvailabilityCheck, checkPod
+}
+
+// FindMinNextPodAvailabilityCheck finds a duration when the next availability check should occur.
+// We should check for the availability at the same time as the status evaluation/update occurs (e.g. .status.availableReplicas) by
+// passing lastOwnerStatusEvaluation. This ensures that we will not skip any pods that might become available
+// (findMinNextPodAvailabilitySimpleCheck would return nil in the future time), since the owner status evaluation.
+// clock is then used to calculate the precise time for the next availability check.
+func FindMinNextPodAvailabilityCheck(pods []*v1.Pod, minReadySeconds int32, lastOwnerStatusEvaluation time.Time, clock clock.PassiveClock) *time.Duration {
+	nextCheckAccordingToOwnerStatusEvaluation, checkPod := findMinNextPodAvailabilitySimpleCheck(pods, minReadySeconds, lastOwnerStatusEvaluation)
+	if nextCheckAccordingToOwnerStatusEvaluation == nil || checkPod == nil {
+		return nil
+	}
+	// There must be a nextCheck. We try to calculate a more precise value for the next availability check.
+	// Check the earliest pod to avoid being preempted by a later pod.
+	if updatedNextCheck := nextPodAvailabilityCheck(checkPod, minReadySeconds, clock.Now()); updatedNextCheck != nil {
+		// There is a delay since the last Now() call (lastOwnerStatusEvaluation). Use the updatedNextCheck.
+		return updatedNextCheck
+	}
+	// Fall back to 0 (immediate check) in case the last nextPodAvailabilityCheck call (with a refreshed Now) returns nil, as we might be past the check.
+	return ptr.To(time.Duration(0))
+}
+
 func IsPodActive(p *v1.Pod) bool {
 	return v1.PodSucceeded != p.Status.Phase &&
 		v1.PodFailed != p.Status.Phase &&
@@ -1083,28 +1136,72 @@ func AddPodNodeNameIndexer(podInformer cache.SharedIndexInformer) error {
 	})
 }
 
-// AddPodControllerUIDIndexer adds an indexer for Pod's controllerRef.UID to the given PodInformer.
+// PodControllerIndexKey returns the index key to locate pods with the specified controller ownerReference.
+// If ownerReference is nil, the returned key locates pods in the namespace without a controller ownerReference.
+func PodControllerIndexKey(namespace string, ownerReference *metav1.OwnerReference) string {
+	if ownerReference == nil {
+		return namespace
+	}
+	return namespace + "/" + ownerReference.Kind + "/" + ownerReference.Name + "/" + string(ownerReference.UID)
+}
+
+// AddPodControllerIndexer adds an indexer for Pod's controllerRef.UID to the given PodInformer.
 // This indexer is used to efficiently look up pods by their ControllerRef.UID
-func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
-	if _, exists := podInformer.GetIndexer().GetIndexers()[PodControllerUIDIndex]; exists {
+func AddPodControllerIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodControllerIndex]; exists {
 		// indexer already exists, do nothing
 		return nil
 	}
 	return podInformer.AddIndexers(cache.Indexers{
-		PodControllerUIDIndex: func(obj interface{}) ([]string, error) {
+		PodControllerIndex: func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
 				return nil, nil
 			}
-			// Get the ControllerRef of the Pod to check if it's managed by a controller
-			if ref := metav1.GetControllerOf(pod); ref != nil {
-				return []string{string(ref.UID)}, nil
-			}
-			// If the Pod has no controller (i.e., it's orphaned), index it with the OrphanPodIndexKey
-			// This helps identify orphan pods for reconciliation and adoption by controllers
-			return []string{OrphanPodIndexKey}, nil
+			// Get the ControllerRef of the Pod to check if it's managed by a controller.
+			// Index with a non-nil controller (indicating an owned pod) or a nil controller (indicating an orphan pod).
+			return []string{PodControllerIndexKey(pod.Namespace, metav1.GetControllerOf(pod))}, nil
 		},
 	})
+}
+
+// FilterPodsByOwner gets the Pods managed by an owner or orphan Pods in the owner's namespace
+func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta, ownerKind string, includeOrphanedPods bool) ([]*v1.Pod, error) {
+	result := []*v1.Pod{}
+
+	if len(owner.Namespace) == 0 {
+		return nil, fmt.Errorf("no owner namespace provided")
+	}
+	if len(owner.Name) == 0 {
+		return nil, fmt.Errorf("no owner name provided")
+	}
+	if len(owner.UID) == 0 {
+		return nil, fmt.Errorf("no owner uid provided")
+	}
+	if len(ownerKind) == 0 {
+		return nil, fmt.Errorf("no owner kind provided")
+	}
+	// Always include the owner key, which identifies Pods that are controlled by the owner
+	keys := []string{PodControllerIndexKey(owner.Namespace, &metav1.OwnerReference{Name: owner.Name, Kind: ownerKind, UID: owner.UID})}
+	if includeOrphanedPods {
+		// Optionally include the unowned key, which identifies orphaned Pods in the owner's namespace and might be adopted by the owner later
+		keys = append(keys, PodControllerIndexKey(owner.Namespace, nil))
+	}
+	for _, key := range keys {
+		pods, err := podIndexer.ByIndex(PodControllerIndex, key)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range pods {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			result = append(result, pod)
+		}
+	}
+	return result, nil
 }
 
 // PodKey returns a key unique to the given pod within a cluster.

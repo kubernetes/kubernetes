@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -20,82 +19,50 @@ limitations under the License.
 package conntrack
 
 import (
-	"net"
+	"fmt"
 
 	"github.com/vishvananda/netlink"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
 
-type connectionTuple struct {
-	srcIP   net.IP
-	srcPort uint16
-	dstIP   net.IP
-	dstPort uint16
+type flowFilter struct {
+	flows sets.Set[string]
 }
 
-type conntrackFilter struct {
-	protocol uint8
-	original *connectionTuple
-	reply    *connectionTuple
+var _ netlink.CustomConntrackFilter = (*flowFilter)(nil)
+
+func newFlowFilter(flows []*netlink.ConntrackFlow) *flowFilter {
+	f := &flowFilter{
+		flows: sets.New[string](),
+	}
+	for _, flow := range flows {
+		f.flows.Insert(flowKey(flow))
+	}
+	return f
 }
 
-var _ netlink.CustomConntrackFilter = (*conntrackFilter)(nil)
+// flowKey returns a unique key for the given flow.
+func flowKey(flow *netlink.ConntrackFlow) string {
+	return fmt.Sprintf("%d#%s#%d#%s#%d#%s#%d#%s#%d",
+		flow.Forward.Protocol,
+		flow.Forward.SrcIP.String(),
+		flow.Forward.SrcPort,
+		flow.Forward.DstIP.String(),
+		flow.Forward.DstPort,
+		flow.Reverse.SrcIP.String(),
+		flow.Reverse.SrcPort,
+		flow.Reverse.DstIP.String(),
+		flow.Reverse.DstPort)
+}
 
 // MatchConntrackFlow applies the filter to the flow and returns true if the flow matches the filter
-// false otherwise.
-func (f *conntrackFilter) MatchConntrackFlow(flow *netlink.ConntrackFlow) bool {
-	// return false in case of empty filter
-	if f.protocol == 0 && f.original == nil && f.reply == nil {
-		return false
+func (f *flowFilter) MatchConntrackFlow(flow *netlink.ConntrackFlow) bool {
+	if f.flows.Has(flowKey(flow)) {
+		// for debugging conntrack issues and understanding what entries are deleted
+		klog.V(6).InfoS("Deleting conntrack entry", "flow", flow)
+		return true
 	}
-
-	// -p, --protonum proto [Layer 4 Protocol, eg. 'tcp']
-	if f.protocol != 0 && f.protocol != flow.Forward.Protocol {
-		return false
-	}
-
-	// filter on original direction
-	if f.original != nil {
-		// --orig-src ip  [Source address from original direction]
-		if f.original.srcIP != nil && !f.original.srcIP.Equal(flow.Forward.SrcIP) {
-			return false
-		}
-		// --orig-dst ip  [Destination address from original direction]
-		if f.original.dstIP != nil && !f.original.dstIP.Equal(flow.Forward.DstIP) {
-			return false
-		}
-		// --orig-port-src port [Source port from original direction]
-		if f.original.srcPort != 0 && f.original.srcPort != flow.Forward.SrcPort {
-			return false
-		}
-		// --orig-port-dst port	[Destination port from original direction]
-		if f.original.dstPort != 0 && f.original.dstPort != flow.Forward.DstPort {
-			return false
-		}
-	}
-
-	// filter on reply direction
-	if f.reply != nil {
-		// --reply-src ip  [Source NAT ip]
-		if f.reply.srcIP != nil && !f.reply.srcIP.Equal(flow.Reverse.SrcIP) {
-			return false
-		}
-		// --reply-dst ip [Destination NAT ip]
-		if f.reply.dstIP != nil && !f.reply.dstIP.Equal(flow.Reverse.DstIP) {
-			return false
-		}
-		// --reply-port-src port [Source port from reply direction]
-		if f.reply.srcPort != 0 && f.reply.srcPort != flow.Reverse.SrcPort {
-			return false
-		}
-		// --reply-port-dst port	[Destination port from reply direction]
-		if f.reply.dstPort != 0 && f.reply.dstPort != flow.Reverse.DstPort {
-			return false
-		}
-	}
-
-	// appending a new line to the flow makes klog print multiline log which is easier to debug and understand.
-	klog.V(5).InfoS("Deleting conntrack entry", "flow", flow.String()+"\n")
-	return true
+	return false
 }

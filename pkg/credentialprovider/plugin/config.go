@@ -17,8 +17,12 @@ limitations under the License.
 package plugin
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,24 +33,91 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
-// readCredentialProviderConfigFile receives a path to a config file and decodes it
-// into the internal CredentialProviderConfig type.
-func readCredentialProviderConfigFile(configPath string) (*kubeletconfig.CredentialProviderConfig, error) {
+var (
+	validCacheTypes = sets.New[string](
+		string(kubeletconfig.ServiceAccountServiceAccountTokenCacheType),
+		string(kubeletconfig.TokenServiceAccountTokenCacheType),
+	)
+)
+
+// readCredentialProviderConfig receives a path to a config file or directory.
+// If the path is a directory, it reads all "*.json", "*.yaml" and "*.yml" files in lexicographic order,
+// decodes them, and merges their entries into a single CredentialProviderConfig object.
+// If the path is a file, it decodes the file into a CredentialProviderConfig object directly.
+// It also returns the SHA256 hash of all the raw file content. This hash is exposed via metrics
+// as an external API to allow monitoring of configuration changes.
+// The hash format follows container digest conventions (sha256:hexstring) for consistency.
+func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialProviderConfig, string, error) {
 	if configPath == "" {
-		return nil, fmt.Errorf("credential provider config path is empty")
+		return nil, "", fmt.Errorf("credential provider config path is empty")
 	}
 
-	data, err := os.ReadFile(configPath)
+	fileInfo, err := os.Stat(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read external registry credential provider configuration from %q: %w", configPath, err)
+		return nil, "", fmt.Errorf("unable to access path %q: %w", configPath, err)
 	}
 
-	config, err := decode(data)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding config %s: %w", configPath, err)
+	var configs []*kubeletconfig.CredentialProviderConfig
+	var configFiles []string
+
+	if fileInfo.IsDir() {
+		entries, err := os.ReadDir(configPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to read directory %q: %w", configPath, err)
+		}
+
+		// Filter and sort *.json/*.yaml/*.yml files in lexicographic order
+		for _, entry := range entries {
+			ext := filepath.Ext(entry.Name())
+			if !entry.IsDir() && (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+				configFiles = append(configFiles, filepath.Join(configPath, entry.Name()))
+			}
+		}
+		sort.Strings(configFiles)
+
+		if len(configFiles) == 0 {
+			return nil, "", fmt.Errorf("no configuration files found in directory %q", configPath)
+		}
+	} else {
+		configFiles = append(configFiles, configPath)
 	}
 
-	return config, nil
+	hasher := sha256.New()
+	for _, filePath := range configFiles {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to read file %q: %w", filePath, err)
+		}
+
+		// Use length prefix to prevent hash collisions
+		dataLen := uint64(len(data))
+		if err := binary.Write(hasher, binary.BigEndian, dataLen); err != nil {
+			return nil, "", fmt.Errorf("error writing length prefix for file %q: %w", filePath, err)
+		}
+		hasher.Write(data)
+
+		config, err := decode(data)
+		if err != nil {
+			return nil, "", fmt.Errorf("error decoding config %q: %w", filePath, err)
+		}
+		configs = append(configs, config)
+	}
+
+	// Merge all configs into a single CredentialProviderConfig
+	mergedConfig := &kubeletconfig.CredentialProviderConfig{}
+	providerNames := sets.NewString()
+	for _, config := range configs {
+		for _, provider := range config.Providers {
+			if providerNames.Has(provider.Name) {
+				return nil, "", fmt.Errorf("duplicate provider name %q found in configuration file(s)", provider.Name)
+			}
+			providerNames.Insert(provider.Name)
+			mergedConfig.Providers = append(mergedConfig.Providers, provider)
+		}
+	}
+
+	configHash := fmt.Sprintf("sha256:%x", hasher.Sum(nil))
+	return mergedConfig, configHash, nil
 }
 
 // decode decodes data into the internal CredentialProviderConfig type.
@@ -104,7 +175,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		seenProviderNames.Insert(provider.Name)
 
 		if provider.APIVersion == "" {
-			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), "apiVersion is required"))
+			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), ""))
 		} else if _, ok := apiVersions[provider.APIVersion]; !ok {
 			validAPIVersions := sets.StringKeySet(apiVersions).List()
 			allErrs = append(allErrs, field.NotSupported(fieldPath.Child("apiVersion"), provider.APIVersion, validAPIVersions))
@@ -121,11 +192,11 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		}
 
 		if provider.DefaultCacheDuration == nil {
-			allErrs = append(allErrs, field.Required(fieldPath.Child("defaultCacheDuration"), "defaultCacheDuration is required"))
+			allErrs = append(allErrs, field.Required(fieldPath.Child("defaultCacheDuration"), ""))
 		}
 
 		if provider.DefaultCacheDuration != nil && provider.DefaultCacheDuration.Duration < 0 {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("defaultCacheDuration"), provider.DefaultCacheDuration.Duration, "defaultCacheDuration must be greater than or equal to 0"))
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("defaultCacheDuration"), provider.DefaultCacheDuration, "must be greater than or equal to 0"))
 		}
 
 		if provider.TokenAttributes != nil {
@@ -134,10 +205,10 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 				allErrs = append(allErrs, field.Forbidden(fldPath, "tokenAttributes is not supported when KubeletServiceAccountTokenForCredentialProviders feature gate is disabled"))
 			}
 			if len(provider.TokenAttributes.ServiceAccountTokenAudience) == 0 {
-				allErrs = append(allErrs, field.Required(fldPath.Child("serviceAccountTokenAudience"), "serviceAccountTokenAudience is required"))
+				allErrs = append(allErrs, field.Required(fldPath.Child("serviceAccountTokenAudience"), ""))
 			}
 			if provider.TokenAttributes.RequireServiceAccount == nil {
-				allErrs = append(allErrs, field.Required(fldPath.Child("requireServiceAccount"), "requireServiceAccount is required"))
+				allErrs = append(allErrs, field.Required(fldPath.Child("requireServiceAccount"), ""))
 			}
 			if provider.APIVersion != credentialproviderv1.SchemeGroupVersion.String() {
 				allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("tokenAttributes is only supported for %s API version", credentialproviderv1.SchemeGroupVersion.String())))
@@ -155,6 +226,15 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 			duplicateAnnotationKeys := requiredServiceAccountAnnotationKeys.Intersection(optionalServiceAccountAnnotationKeys)
 			if duplicateAnnotationKeys.Len() > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath, sets.List(duplicateAnnotationKeys), "annotation keys cannot be both required and optional"))
+			}
+
+			switch {
+			case len(provider.TokenAttributes.CacheType) == 0:
+				allErrs = append(allErrs, field.Required(fldPath.Child("cacheType"), fmt.Sprintf("cacheType is required to be set when tokenAttributes is specified. Supported values are: %s", strings.Join(sets.List(validCacheTypes), ", "))))
+			case validCacheTypes.Has(string(provider.TokenAttributes.CacheType)):
+				// ok
+			default:
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child("cacheType"), provider.TokenAttributes.CacheType, sets.List(validCacheTypes)))
 			}
 		}
 	}

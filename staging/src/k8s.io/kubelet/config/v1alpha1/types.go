@@ -26,7 +26,7 @@ import (
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials
@@ -101,7 +101,7 @@ type ExecEnvVar struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePullIntent struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Image is the image spec from a Container's `image` field.
 	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
@@ -117,7 +117,7 @@ type ImagePullIntent struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePulledRecord struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// LastUpdatedTime is the time of the last update to this record
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`
@@ -147,7 +147,13 @@ type ImagePullCredentials struct {
 	// secrets that were used to pull the image.
 	// +optional
 	// +listType=set
-	KubernetesSecrets []ImagePullSecret `json:"kubernetesSecrets"`
+	KubernetesSecrets []ImagePullSecret `json:"kubernetesSecrets,omitempty"`
+
+	// KubernetesServiceAccounts is an index of coordinates of all the kubernetes
+	// service accounts that were used to pull the image.
+	// +optional
+	// +listType=set
+	KubernetesServiceAccounts []ImagePullServiceAccount `json:"kubernetesServiceAccounts,omitempty"`
 
 	// NodePodsAccessible is a flag denoting the pull credentials are accessible
 	// by all the pods on the node, or that no credentials are needed for the pull.
@@ -167,4 +173,12 @@ type ImagePullSecret struct {
 	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
 	// content of the secret specified by the UID/Namespace/Name coordinates.
 	CredentialHash string `json:"credentialHash"`
+}
+
+// ImagePullServiceAccount is a representation of a Kubernetes service account object coordinates
+// for which the kubelet sent service account token to the credential provider plugin for image pull credentials.
+type ImagePullServiceAccount struct {
+	UID       string `json:"uid"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
 }

@@ -85,7 +85,7 @@ func (f *FlagSet) CountP(name, shorthand string, usage string) *int {
 
 // Count defines a count flag with specified name, default value, and usage string.
 // The return value is the address of an int variable that stores the value of the flag.
-// A count flag will add 1 to its value evey time it is found on the command line
+// A count flag will add 1 to its value every time it is found on the command line
 func Count(name string, usage string) *int {
 	return CommandLine.CountP(name, "", usage)
 }

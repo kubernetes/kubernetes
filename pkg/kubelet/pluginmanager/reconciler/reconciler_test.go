@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -57,8 +58,9 @@ func cleanup(t *testing.T) {
 	os.MkdirAll(socketDir, 0755)
 }
 
-func runReconciler(reconciler Reconciler) {
-	go reconciler.Run(wait.NeverStop)
+func runReconciler(t *testing.T, reconciler Reconciler) {
+	tCtx := ktesting.Init(t)
+	go reconciler.Run(tCtx)
 }
 
 func waitForRegistration(
@@ -153,7 +155,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		asw,
 	)
 	// Act
-	runReconciler(reconciler)
+	runReconciler(t, reconciler)
 
 	// Get dsw and asw plugins; they should both be empty
 	if len(asw.GetRegisteredPlugins()) != 0 {
@@ -170,6 +172,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 func Test_Run_Positive_Register(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
@@ -186,17 +189,18 @@ func Test_Run_Positive_Register(t *testing.T) {
 	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go reconciler.Run(stopChan)
+	reconcilerCtx := tCtx.WithCancel()
+	defer reconcilerCtx.Cancel("stop reconciler")
+	go reconciler.Run(reconcilerCtx)
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+	require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
 	defer func() {
-		require.NoError(t, p.Stop())
+		require.NoError(t, p.Stop(tCtx))
 	}()
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
+
 	plugins := dsw.GetPluginsToRegister()
 	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
 
@@ -218,6 +222,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
@@ -234,15 +239,15 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go reconciler.Run(stopChan)
+	reconcilerCtx := tCtx.WithCancel()
+	defer reconcilerCtx.Cancel("stop reconciler")
+	go reconciler.Run(reconcilerCtx)
 
 	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
 	plugins := dsw.GetPluginsToRegister()
 	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
 
@@ -274,6 +279,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 func Test_Run_Positive_ReRegister(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
@@ -290,20 +296,20 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	reconciler.AddHandler(registerapi.DevicePlugin, cache.PluginHandler(di))
 
 	// Start the reconciler to fill ASW.
-	stopChan := make(chan struct{})
-	defer close(stopChan)
-	go reconciler.Run(stopChan)
+	reconcilerCtx := tCtx.WithCancel()
+	defer reconcilerCtx.Cancel("stop reconciler")
+	go reconciler.Run(reconcilerCtx)
 
 	socketPath := filepath.Join(socketDir, "plugin2.sock")
 	pluginName := fmt.Sprintf("example-plugin2")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
 	plugins := dsw.GetPluginsToRegister()
 	waitForRegistration(t, socketPath, plugins[0].UUID, asw)
 
 	// Add the plugin again to update the timestamp
-	dsw.AddOrUpdatePlugin(socketPath)
+	require.NoError(t, dsw.AddOrUpdatePlugin(tCtx, socketPath))
 	// This should trigger a deregistration and a regitration
 	// The process of unregistration and reregistration can happen so fast that
 	// we are not able to catch it with waitForUnregistration, so here we are checking

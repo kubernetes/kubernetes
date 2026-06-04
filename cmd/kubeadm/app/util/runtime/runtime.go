@@ -23,13 +23,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // defaultKnownCRISockets holds the set of known CRI endpoints
@@ -42,7 +45,8 @@ var defaultKnownCRISockets = []string{
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
 	Connect() error
-	SetImpl(impl)
+	Close(ctx context.Context)
+	SetImpl(Impl)
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
@@ -50,11 +54,12 @@ type ContainerRuntime interface {
 	PullImagesInParallel(images []string, ifNotPresent bool) error
 	ImageExists(image string) bool
 	SandboxImage() (string, error)
+	IsRuntimeConfigImplemented() (bool, error)
 }
 
 // CRIRuntime is a struct that interfaces with the CRI
 type CRIRuntime struct {
-	impl           impl
+	impl           Impl
 	criSocket      string
 	runtimeService criapi.RuntimeService
 	imageService   criapi.ImageManagerService
@@ -72,25 +77,39 @@ func NewContainerRuntime(criSocket string) ContainerRuntime {
 }
 
 // SetImpl can be used to set the internal implementation for testing purposes.
-func (runtime *CRIRuntime) SetImpl(impl impl) {
+func (runtime *CRIRuntime) SetImpl(impl Impl) {
 	runtime.impl = impl
 }
 
 // Connect establishes a connection with the CRI runtime.
 func (runtime *CRIRuntime) Connect() error {
-	runtimeService, err := runtime.impl.NewRemoteRuntimeService(runtime.criSocket, defaultTimeout)
+	runtimeService, err := runtime.impl.NewRemoteRuntimeService(context.Background(), runtime.criSocket, defaultTimeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new CRI runtime service")
 	}
 	runtime.runtimeService = runtimeService
 
-	imageService, err := runtime.impl.NewRemoteImageService(runtime.criSocket, defaultTimeout)
+	imageService, err := runtime.impl.NewRemoteImageService(context.Background(), runtime.criSocket, defaultTimeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new CRI image service")
 	}
 	runtime.imageService = imageService
 
 	return nil
+}
+
+// Close closes the connections to the runtime and image services.
+func (runtime *CRIRuntime) Close(ctx context.Context) {
+	if runtime.runtimeService != nil {
+		if err := runtime.runtimeService.Close(ctx); err != nil {
+			klog.Warningf("failed to close runtime service: %v", err)
+		}
+	}
+	if runtime.imageService != nil {
+		if err := runtime.imageService.Close(ctx); err != nil {
+			klog.Warningf("failed to close image service: %v", err)
+		}
+	}
 }
 
 // IsRunning checks if runtime is running.
@@ -138,7 +157,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
 		var lastErr error
-		for i := 0; i < constants.RemoveContainerRetry; i++ {
+		for range constants.RemoveContainerRetry {
 			klog.V(5).Infof("Attempting to remove container %v", container)
 
 			ctx, cancel := defaultContext()
@@ -170,7 +189,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 
 // PullImage pulls the image
 func (runtime *CRIRuntime) PullImage(image string) (err error) {
-	for i := 0; i < constants.PullImageRetry; i++ {
+	for range constants.PullImageRetry {
 		if _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
 			return nil
 		}
@@ -195,8 +214,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 	errChan := make(chan error, len(images))
 
 	klog.V(1).Info("pulling all images in parallel")
-	for _, img := range images {
-		image := img
+	for _, image := range images {
 		go func() {
 			if ifNotPresent {
 				exists := imageExistsFunc(image)
@@ -216,7 +234,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 		}()
 	}
 
-	for i := 0; i < len(images); i++ {
+	for range images {
 		if err := <-errChan; err != nil {
 			errs = append(errs, err)
 		}
@@ -298,4 +316,19 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 	}
 
 	return c.SandboxImage, nil
+}
+
+// IsRuntimeConfigImplemented checks if the container runtime supports the RuntimeConfig gRPC method
+func (runtime *CRIRuntime) IsRuntimeConfigImplemented() (bool, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	_, err := runtime.impl.RuntimeConfig(ctx, runtime.runtimeService)
+	if err != nil {
+		s, ok := status.FromError(err)
+		if !ok || s.Code() != codes.Unimplemented {
+			return false, errors.Wrap(err, "failed to call RuntimeConfig gRPC method")
+		}
+		return false, nil
+	}
+	return true, nil
 }

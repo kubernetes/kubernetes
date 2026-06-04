@@ -18,20 +18,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path"
 	"strings"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/api/v3/version"
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	pioutil "go.etcd.io/etcd/pkg/v3/ioutil"
-	"go.etcd.io/etcd/raft/v3/raftpb"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
-
-	humanize "github.com/dustin/go-humanize"
-	"go.uber.org/zap"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 const (
@@ -93,7 +94,7 @@ func newPipelineHandler(t *Transport, r Raft, cid types.ID) http.Handler {
 }
 
 func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -111,7 +112,7 @@ func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Limit the data size that could be read from the request body, which ensures that read from
 	// connection will not time out accidentally due to possible blocking in underlying implementation.
 	limitedr := pioutil.NewLimitedBufferReader(r.Body, connReadLimitByte)
-	b, err := ioutil.ReadAll(limitedr)
+	b, err := io.ReadAll(limitedr)
 	if err != nil {
 		h.lg.Warn(
 			"failed to read Raft message",
@@ -124,7 +125,7 @@ func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var m raftpb.Message
-	if err := m.Unmarshal(b); err != nil {
+	if err := proto.Unmarshal(b, &m); err != nil {
 		h.lg.Warn(
 			"failed to unmarshal Raft message",
 			zap.String("local-member-id", h.localID.String()),
@@ -135,12 +136,13 @@ func (h *pipelineHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	receivedBytes.WithLabelValues(types.ID(m.From).String()).Add(float64(len(b)))
+	receivedBytes.WithLabelValues(types.ID(m.GetFrom()).String()).Add(float64(len(b)))
 
-	if err := h.r.Process(context.TODO(), m); err != nil {
-		switch v := err.(type) {
-		case writerToResponse:
-			v.WriteTo(w)
+	if err := h.r.Process(context.TODO(), &m); err != nil {
+		var writerErr writerToResponse
+		switch {
+		case errors.As(err, &writerErr):
+			writerErr.WriteTo(w)
 		default:
 			h.lg.Warn(
 				"failed to process Raft message",
@@ -199,7 +201,7 @@ const unknownSnapshotSender = "UNKNOWN_SNAPSHOT_SENDER"
 func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		snapshotReceiveFailures.WithLabelValues(unknownSnapshotSender).Inc()
@@ -219,7 +221,7 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	dec := &messageDecoder{r: r.Body}
 	// let snapshots be very large since they can exceed 512MB for large installations
 	m, err := dec.decodeLimit(snapshotLimitByte)
-	from := types.ID(m.From).String()
+	from := types.ID(m.GetFrom()).String()
 	if err != nil {
 		msg := fmt.Sprintf("failed to decode raft message (%v)", err)
 		h.lg.Warn(
@@ -234,15 +236,15 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msgSize := m.Size()
+	msgSize := proto.Size(m)
 	receivedBytes.WithLabelValues(from).Add(float64(msgSize))
 
-	if m.Type != raftpb.MsgSnap {
+	if m.GetType() != raftpb.MsgSnap {
 		h.lg.Warn(
 			"unexpected Raft message type",
 			zap.String("local-member-id", h.localID.String()),
 			zap.String("remote-snapshot-sender-id", from),
-			zap.String("message-type", m.Type.String()),
+			zap.String("message-type", m.GetType().String()),
 		)
 		http.Error(w, "wrong raft message type", http.StatusBadRequest)
 		snapshotReceiveFailures.WithLabelValues(from).Inc()
@@ -258,21 +260,21 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"receiving database snapshot",
 		zap.String("local-member-id", h.localID.String()),
 		zap.String("remote-snapshot-sender-id", from),
-		zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.Index),
+		zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.GetIndex()),
 		zap.Int("incoming-snapshot-message-size-bytes", msgSize),
 		zap.String("incoming-snapshot-message-size", humanize.Bytes(uint64(msgSize))),
 	)
 
 	// save incoming database snapshot.
 
-	n, err := h.snapshotter.SaveDBFrom(r.Body, m.Snapshot.Metadata.Index)
+	n, err := h.snapshotter.SaveDBFrom(r.Body, m.Snapshot.Metadata.GetIndex())
 	if err != nil {
 		msg := fmt.Sprintf("failed to save KV snapshot (%v)", err)
 		h.lg.Warn(
 			"failed to save incoming database snapshot",
 			zap.String("local-member-id", h.localID.String()),
 			zap.String("remote-snapshot-sender-id", from),
-			zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.Index),
+			zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.GetIndex()),
 			zap.Error(err),
 		)
 		http.Error(w, msg, http.StatusInternalServerError)
@@ -287,18 +289,19 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"received and saved database snapshot",
 		zap.String("local-member-id", h.localID.String()),
 		zap.String("remote-snapshot-sender-id", from),
-		zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.Index),
+		zap.Uint64("incoming-snapshot-index", m.Snapshot.Metadata.GetIndex()),
 		zap.Int64("incoming-snapshot-size-bytes", n),
 		zap.String("incoming-snapshot-size", humanize.Bytes(uint64(n))),
 		zap.String("download-took", downloadTook.String()),
 	)
 
 	if err := h.r.Process(context.TODO(), m); err != nil {
-		switch v := err.(type) {
+		var writerErr writerToResponse
+		switch {
 		// Process may return writerToResponse error when doing some
 		// additional checks before calling raft.Node.Step.
-		case writerToResponse:
-			v.WriteTo(w)
+		case errors.As(err, &writerErr):
+			writerErr.WriteTo(w)
 		default:
 			msg := fmt.Sprintf("failed to process raft message (%v)", err)
 			h.lg.Warn(
@@ -346,7 +349,7 @@ func newStreamHandler(t *Transport, pg peerGetter, r Raft, id, cid types.ID) htt
 }
 
 func (h *streamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -484,7 +487,7 @@ func checkClusterCompatibilityFromHeader(lg *zap.Logger, localID types.ID, heade
 
 	if err != nil {
 		lg.Warn(
-			"failed to check version compatibility",
+			"failed version compatibility check",
 			zap.String("local-member-id", localID.String()),
 			zap.String("local-member-cluster-id", cid.String()),
 			zap.String("local-member-server-version", localVs),

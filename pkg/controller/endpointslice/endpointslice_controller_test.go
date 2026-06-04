@@ -1410,7 +1410,7 @@ func TestPodAddsBatching(t *testing.T) {
 
 				p := newPod(i, ns, true, 0, false)
 				esController.podStore.Add(p)
-				esController.addPod(p)
+				esController.onPodUpdate(nil, p)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1559,7 +1559,7 @@ func TestPodUpdatesBatching(t *testing.T) {
 				resourceVersion++
 
 				esController.podStore.Update(newPod)
-				esController.updatePod(oldPod, newPod)
+				esController.onPodUpdate(oldPod, newPod)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -1687,7 +1687,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				require.NoError(t, err, "error while retrieving old value of %q: %v", update.podName, err)
 				assert.True(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
-				esController.deletePod(old)
+				esController.onPodUpdate(old, nil)
 			}
 
 			time.Sleep(tc.finalDelay)

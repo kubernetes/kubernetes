@@ -53,11 +53,6 @@ func (in *APIServer) DeepCopyInto(out *APIServer) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.TimeoutForControlPlane != nil {
-		in, out := &in.TimeoutForControlPlane, &out.TimeoutForControlPlane
-		*out = new(v1.Duration)
-		**out = **in
-	}
 	return
 }
 
@@ -249,11 +244,6 @@ func (in *Discovery) DeepCopyInto(out *Discovery) {
 		*out = new(FileDiscovery)
 		**out = **in
 	}
-	if in.Timeout != nil {
-		in, out := &in.Timeout, &out.Timeout
-		*out = new(v1.Duration)
-		**out = **in
-	}
 	return
 }
 
@@ -315,6 +305,11 @@ func (in *ExternalEtcd) DeepCopyInto(out *ExternalEtcd) {
 	*out = *in
 	if in.Endpoints != nil {
 		in, out := &in.Endpoints, &out.Endpoints
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.HTTPEndpoints != nil {
+		in, out := &in.HTTPEndpoints, &out.HTTPEndpoints
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

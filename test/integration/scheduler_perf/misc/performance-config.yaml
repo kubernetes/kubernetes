@@ -30,66 +30,71 @@
   workloads:
   - name: 5Nodes
     featureGates:
-      SchedulerQueueingHints: false
+      SchedulerAsyncAPICalls: false
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
-  - name: 5Nodes_QueueingHintsEnabled
+  - name: 5Nodes_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 5
       measurePods: 10
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 500
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 1000
       measurePods: 1000
   - name: 5000Nodes_10000Pods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 270
+    threshold: 680
     params:
       initNodes: 5000
       initPods: 1000
       measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+  - name: 5000Nodes_50000Pods
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
     labels: [performance]
-    threshold: 270
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 10000
-  - name: 5000Nodes_50000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
+    threshold: 790
     params:
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
-
+  - name: 5000Nodes_50000Pods_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    threshold: 790
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
+  - name: 5000Nodes_50000Pods_NodeDeclaredFeaturesDisabled
+    labels: [performance]
+    threshold: 790
+    featureGates:
+      NodeDeclaredFeatures: false
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
 - name: SchedulingDaemonset
   defaultPodTemplatePath: ../templates/daemonset-pod.yaml
   workloadTemplate:
-    # Create one node with a specific name (scheduler-perf-node),
-    # which is supposed to get all Pods created in this test case.
+  # Create one node with a specific name (scheduler-perf-node),
+  # which is supposed to get all Pods created in this test case.
   - opcode: createNodes
     count: 1
     nodeTemplatePath: ../templates/node-with-name.yaml
@@ -105,32 +110,13 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 5
-      measurePods: 10
-  - name: 5Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
       measurePods: 10
   - name: 15000Nodes
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 390
-    params:
-      initNodes: 15000
-      measurePods: 30000
-  - name: 15000Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 390
+    threshold: 1100
     params:
       initNodes: 15000
       measurePods: 30000
@@ -149,15 +135,15 @@
   workloads:
   - name: 5Nodes
     featureGates:
-      SchedulerQueueingHints: false
+      SchedulerAsyncAPICalls: false
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 20
       measurePods: 5
-  - name: 5Nodes_QueueingHintsEnabled
+  - name: 5Nodes_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -165,18 +151,16 @@
       measurePods: 5
   - name: 1000Nodes
     featureGates:
-      SchedulerQueueingHints: false
+      SchedulerAsyncAPICalls: false
     labels: [performance, short]
-    threshold: 18
     params:
       initNodes: 1000
       initPods: 4000
       measurePods: 1000
-  - name: 1000Nodes_QueueingHintsEnabled
+  - name: 1000Nodes_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance, short]
-    threshold: 18
     params:
       initNodes: 1000
       initPods: 4000
@@ -215,50 +199,49 @@
   workloads:
   - name: 5Nodes
     featureGates:
-      SchedulerQueueingHints: false
+      SchedulerAsyncAPICalls: false
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 20
       measurePods: 5
-  - name: 5Nodes_QueueingHintsEnabled
+  - name: 5Nodes_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 20
       measurePods: 5
   - name: 500Nodes
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 2000
       measurePods: 500
   - name: 5000Nodes
     labels: [performance]
-    threshold: 160
+    threshold: 570
     featureGates:
-      SchedulerQueueingHints: false
       SchedulerAsyncPreemption: false
     params:
       initNodes: 5000
       initPods: 20000
       measurePods: 5000
   - name: 5000Nodes_AsyncPreemptionEnabled
-    threshold: 160
+    threshold: 570
     labels: [performance]
     featureGates:
       SchedulerAsyncPreemption: true
+      SchedulerAsyncAPICalls: false
     params:
       initNodes: 5000
       initPods: 20000
       measurePods: 5000
-  - name: 5000Nodes_QueueingHintsEnabled
+  - name: 5000Nodes_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance]
-    threshold: 160
+    threshold: 570
     params:
       initNodes: 5000
       initPods: 20000
@@ -284,62 +267,58 @@
   workloads:
   - name: 5Nodes/1Init/10Pods
     featureGates:
-      SchedulerQueueingHints: false
+      SchedulerAsyncAPICalls: false
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 1
       measurePods: 10
-  - name: 5Nodes/1Init/10Pods_QueueingHintsEnabled
+  - name: 5Nodes/1Init/10Pods_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 1
       measurePods: 10
   - name: 500Nodes/10Init/1kPods
-    labels: [performance, short]
     params:
       initNodes: 500
       initPods: 10
       measurePods: 1000
   - name: 5kNodes/100Init/1kPods
-    labels: [performance, short]
     params:
       initNodes: 5000
       initPods: 100
       measurePods: 1000
   - name: 5kNodes/100Init/10kPods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 140
+    threshold: 590
     params:
       initNodes: 5000
       initPods: 100
       measurePods: 10000
-  - name: 5kNodes/100Init/10kPods_QueueingHintsEnabled
+  - name: 5kNodes/100Init/10kPods_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance]
-    threshold: 170
+    threshold: 590
     params:
       initNodes: 5000
       initPods: 100
       measurePods: 10000
   - name: 5kNodes/20kInit/10kPods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
+    threshold: 600
     params:
       initNodes: 5000
       initPods: 20000
       measurePods: 10000
-  - name: 5kNodes/20kInit/10kPods_QueueingHintsEnabled
+  - name: 5kNodes/20kInit/10kPods_AsyncAPICallsEnabled
     featureGates:
-      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance]
+    threshold: 600
     params:
       initNodes: 5000
       initPods: 20000
@@ -363,42 +342,21 @@
     collectMetrics: true
   workloads:
   - name: 10Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 10
-      measurePods: 100
-  - name: 10Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 10
       measurePods: 100
   - name: 1000Nodes
-    labels: [performance, short]
     params:
       initNodes: 1000
       measurePods: 1000
   - name: 5000Nodes
-    labels: [performance, short]
     params:
       initNodes: 5000
       measurePods: 2000
   - name: 5000Nodes_10000Pods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 265
-    params:
-      initNodes: 5000
-      measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 265
+    threshold: 710
     params:
       initNodes: 5000
       measurePods: 10000
@@ -434,35 +392,14 @@
     collectMetrics: true
   workloads:
   - name: 1Node_10GatedPods
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      gatedPods: 10
-      deletingPods: 10
-      measurePods: 10
-  - name: 1Node_10GatedPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       gatedPods: 10
       deletingPods: 10
       measurePods: 10
   - name: 1Node_10000GatedPods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 130
-    params:
-      gatedPods: 10000
-      deletingPods: 20000
-      measurePods: 20000
-  - name: 1Node_10000GatedPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 130
+    threshold: 910
     params:
       gatedPods: 10000
       deletingPods: 20000
@@ -473,8 +410,6 @@
 # https://github.com/kubernetes/kubernetes/pull/126962
 # Main goal of this test case is to verify if InFlightEvents is empty after the test.
 - name: SchedulingDeletedPodsWithFinalizers
-  featureGates:
-    SchedulerQueueingHints: true
   defaultPodTemplatePath: ../templates/light-pod.yaml
   workloadTemplate:
   - opcode: createNodes
@@ -495,34 +430,63 @@
     collectMetrics: true
   workloads:
   - name: 10Node_100DeletingPods
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 10
-      deletingPods: 10
-      measurePods: 10
-  - name: 10Node_100DeletingPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 10
       deletingPods: 10
       measurePods: 10
   - name: 1000Node_1000DeletingPods
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [performance, short]
     params:
       initNodes: 1000
       deletingPods: 1000
       measurePods: 1000
-  - name: 1000Node_1000DeletingPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
+  - name: 5000Node_5000DeletingPods
+    labels: [performance]
+    threshold: 830
     params:
-      initNodes: 1000
-      deletingPods: 1000
-      measurePods: 1000
+      initNodes: 5000
+      deletingPods: 5000
+      measurePods: 5000
+
+## SchedulingWithExtendedResource uses pods with extended resources requests.
+- name: SchedulingWithExtendedResource
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutExtendedResource
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-extended-resource.yaml
+    countParam: $nodesWithExtendedResource
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-extended-resource.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast_DRAExtendedResourceEnabled
+    featureGates:
+      DRAExtendedResource: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithExtendedResource: 10
+      nodesWithoutExtendedResource: 1
+      measurePods: 10
+  - name: 500pods_500nodes_DRAExtendedResourceEnabled
+    featureGates:
+      DRAExtendedResource: true
+    params:
+      nodesWithExtendedResource: 500
+      nodesWithoutExtendedResource: 0
+      measurePods: 500
+  - name: 5000pods_5000nodes_DRAExtendedResourceEnabled
+    featureGates:
+      DRAExtendedResource: true
+    labels: [performance]
+    threshold: 180
+    params:
+      nodesWithExtendedResource: 5000
+      nodesWithoutExtendedResource: 0
+      measurePods: 5000

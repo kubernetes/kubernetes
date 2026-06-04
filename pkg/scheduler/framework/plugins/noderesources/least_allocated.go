@@ -17,8 +17,8 @@ limitations under the License.
 package noderesources
 
 import (
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // leastResourceScorer favors nodes with fewer requested resources.
@@ -27,8 +27,8 @@ import (
 //
 // Details:
 // (cpu((capacity-requested)*MaxNodeScore*cpuWeight/capacity) + memory((capacity-requested)*MaxNodeScore*memoryWeight/capacity) + ...)/weightSum
-func leastResourceScorer(resources []config.ResourceSpec) func([]int64, []int64) int64 {
-	return func(requested, allocable []int64) int64 {
+func leastResourceScorer(resources []config.ResourceSpec) func([]int64, []int64, []int64) int64 {
+	return func(requested, _, allocable []int64) int64 {
 		var nodeScore, weightSum int64
 		for i := range requested {
 			if allocable[i] == 0 {
@@ -57,5 +57,5 @@ func leastRequestedScore(requested, capacity int64) int64 {
 		return 0
 	}
 
-	return ((capacity - requested) * framework.MaxNodeScore) / capacity
+	return ((capacity - requested) * fwk.MaxNodeScore) / capacity
 }

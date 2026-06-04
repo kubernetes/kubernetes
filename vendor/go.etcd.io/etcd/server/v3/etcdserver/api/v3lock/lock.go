@@ -17,17 +17,19 @@ package v3lock
 import (
 	"context"
 
-	"go.etcd.io/etcd/client/v3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb"
 )
 
 type lockServer struct {
 	c *clientv3.Client
+	// we want compile errors if new methods are added
+	v3lockpb.UnsafeLockServer
 }
 
 func NewLockServer(c *clientv3.Client) v3lockpb.LockServer {
-	return &lockServer{c}
+	return &lockServer{c: c}
 }
 
 func (ls *lockServer) Lock(ctx context.Context, req *v3lockpb.LockRequest) (*v3lockpb.LockResponse, error) {

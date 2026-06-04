@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // Handler for CRI-O containers.
 package crio
 
@@ -359,4 +361,8 @@ func (h *crioContainerHandler) Exists() bool {
 
 func (h *crioContainerHandler) Type() container.ContainerType {
 	return container.ContainerTypeCrio
+}
+
+func (h *crioContainerHandler) GetExitCode() (int, error) {
+	return -1, fmt.Errorf("exit code not available from CRI-O API")
 }

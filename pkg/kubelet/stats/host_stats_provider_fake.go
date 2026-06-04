@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -35,9 +34,9 @@ type fakeHostStatsProvider struct {
 }
 
 // NewFakeHostStatsProvider provides a way to test with fake host statistics
-func NewFakeHostStatsProvider() HostStatsProvider {
+func NewFakeHostStatsProvider(osInterface kubecontainer.OSInterface) HostStatsProvider {
 	return &fakeHostStatsProvider{
-		osInterface: &kubecontainertest.FakeOS{},
+		osInterface: osInterface,
 	}
 }
 

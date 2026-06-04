@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -54,6 +54,8 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/common"
 	_ "k8s.io/kubernetes/test/e2e/dra"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
+	_ "k8s.io/kubernetes/test/e2e/invariants"
+	"k8s.io/kubernetes/test/e2e/invariants/logcheck"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
@@ -69,7 +71,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/format"
+	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -77,6 +79,7 @@ func handleFlags() {
 	config.CopyFlags(config.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
+	logcheck.RegisterFlags(flag.CommandLine)
 	flag.Parse()
 }
 

@@ -46,16 +46,16 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("retryPeriod"), cc.RetryPeriod, "must be greater than zero"))
 	}
 	if cc.LeaseDuration.Duration <= cc.RenewDeadline.Duration {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.RenewDeadline, "LeaseDuration must be greater than RenewDeadline"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.RenewDeadline, "must be greater than `RenewDeadline`"))
 	}
 	if len(cc.ResourceLock) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceLock"), cc.ResourceLock, "resourceLock is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceLock"), ""))
 	}
 	if len(cc.ResourceNamespace) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceNamespace"), cc.ResourceNamespace, "resourceNamespace is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceNamespace"), ""))
 	}
 	if len(cc.ResourceName) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceName"), cc.ResourceName, "resourceName is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceName"), ""))
 	}
 	return allErrs
 }

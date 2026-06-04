@@ -19,6 +19,7 @@ package tester
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/user"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/registry/rest/resttest"
@@ -39,11 +43,92 @@ type Tester struct {
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
-func New(t *testing.T, storage *genericregistry.Store) *Tester {
+// New creates a new Tester for the given storage.
+// RequestInfo is set automatically during testing when the storage has
+// at least one external version registered in it's scheme and a create
+// or update strategy that supports runtime.ObjectTyper, VersionsForGroupKind
+// and NewFunc.
+func New(t *testing.T, storage *genericregistry.Store, subresources ...string) *Tester {
+	tester := resttest.New(t, storage)
+	if info := priorityRequestInfo(storage); info != nil {
+		if len(subresources) > 0 {
+			info.Subresource = strings.Join(subresources, "/")
+		}
+		tester.SetRequestInfo(info)
+	}
 	return &Tester{
-		tester:  resttest.New(t, storage),
+		tester:  tester,
 		storage: storage,
 	}
+}
+
+type priorityRequestInfoScheme interface {
+	runtime.ObjectTyper
+
+	// VersionsForGroupKind returns external versions in priority order.
+	// See Scheme.VersionsForGroupKind.
+	VersionsForGroupKind(schema.GroupKind) []schema.GroupVersion
+}
+
+// priorityRequestInfo returns the highest-priority external API version, or
+// nil if no external versions could be found.
+// The store's CreateStrategy is expected to implement runtime.ObjectTyper,
+// VersionsForGroupKind() and provide a NewFunc implementation. If not,
+// nil is returned.
+func priorityRequestInfo(store *genericregistry.Store) *genericapirequest.RequestInfo {
+	if store == nil || store.NewFunc == nil {
+		return nil
+	}
+	scheme, ok := store.CreateStrategy.(priorityRequestInfoScheme)
+	if !ok {
+		scheme, ok = store.UpdateStrategy.(priorityRequestInfoScheme)
+		if !ok {
+			return nil
+		}
+	}
+	gvks, _, err := scheme.ObjectKinds(store.NewFunc())
+	if err != nil || len(gvks) == 0 {
+		return nil
+	}
+	gvs := scheme.VersionsForGroupKind(gvks[0].GroupKind())
+	if len(gvs) == 0 {
+		return nil
+	}
+	gr := store.DefaultQualifiedResource
+	return &genericapirequest.RequestInfo{
+		APIGroup:   gr.Group,
+		APIVersion: gvs[0].Version,
+		Resource:   gr.Resource,
+	}
+}
+
+// NewClusterScopeContext returns a context for testing cluster-scoped requests
+// against the given store.
+// RequestInfo is set in the context when the storage has at least one external version
+// registered in it's scheme and a create or update strategy
+// that supports runtime.ObjectTyper, VersionsForGroupKind and NewFunc.
+func NewClusterScopeContext(store *genericregistry.Store, subresources ...string) context.Context {
+	return newContext(store, "", subresources)
+}
+
+// NewNamespaceScopeContext returns a context for testing namespace-scoped
+// requests against the given store.
+// RequestInfo is set in the context when the storage has at least one external version
+// registered in it's scheme and a create or update strategy
+// that supports runtime.ObjectTyper, VersionsForGroupKind and NewFunc.
+func NewNamespaceScopeContext(store *genericregistry.Store, namespace string, subresources ...string) context.Context {
+	return newContext(store, namespace, subresources)
+}
+
+func newContext(store *genericregistry.Store, namespace string, subresources []string) context.Context {
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	if info := priorityRequestInfo(store); info != nil {
+		if len(subresources) > 0 {
+			info.Subresource = strings.Join(subresources, "/")
+		}
+		ctx = genericapirequest.WithRequestInfo(ctx, info)
+	}
+	return ctx
 }
 
 func (t *Tester) TestNamespace() string {
@@ -53,6 +138,10 @@ func (t *Tester) TestNamespace() string {
 func (t *Tester) ClusterScope() *Tester {
 	t.tester = t.tester.ClusterScope()
 	return t
+}
+
+func (t *Tester) SetUserInfo(userInfo user.Info) {
+	t.tester.SetUserInfo(userInfo)
 }
 
 func (t *Tester) Namer(namer func(int) string) *Tester {
@@ -72,6 +161,11 @@ func (t *Tester) GeneratesName() *Tester {
 
 func (t *Tester) ReturnDeletedObject() *Tester {
 	t.tester = t.tester.ReturnDeletedObject()
+	return t
+}
+
+func (t *Tester) SetRequestInfo(requestInfo *genericapirequest.RequestInfo) *Tester {
+	t.tester.SetRequestInfo(requestInfo)
 	return t
 }
 

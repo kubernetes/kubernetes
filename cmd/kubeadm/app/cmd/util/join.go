@@ -19,14 +19,13 @@ package util
 import (
 	"bytes"
 	"crypto/x509"
-	"html/template"
+	"html/template" //nolint:depguard
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
 
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
@@ -57,9 +56,9 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	}
 
 	// load the default cluster config
-	_, clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
-	if clusterConfig == nil {
-		return "", errors.New("failed to get default cluster config")
+	_, clusterConfig, err := kubeconfigutil.GetClusterFromKubeConfig(config)
+	if err != nil {
+		return "", errors.Wrapf(err, "malformed kubeconfig file: %s", kubeConfigFile)
 	}
 
 	// load CA certificates from the kubeconfig (either from PEM data or by file path)

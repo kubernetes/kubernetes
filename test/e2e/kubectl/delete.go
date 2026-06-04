@@ -42,14 +42,14 @@ var _ = SIGDescribe("Kubectl delete", func() {
 	var deploymentYaml string
 	f := framework.NewDefaultFramework("kubectl-delete")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
-	deploymentName := "httpd-deployment"
+	deploymentName := "agnhost-deployment"
 
 	var ns string
 	var c clientset.Interface
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		deploymentYaml = commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
+		deploymentYaml = commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment1Filename)))
 	})
 
 	ginkgo.Describe("interactive", func() {
@@ -69,7 +69,7 @@ var _ = SIGDescribe("Kubectl delete", func() {
 			output := e2ekubectl.RunKubectlOrDieInput(ns, "n", "delete", "--interactive", "deployment", deploymentName)
 			expectedOutput := "You are about to delete the following 1 resource(s):"
 			if !strings.Contains(output, expectedOutput) ||
-				!strings.Contains(output, "deployment.apps/httpd-deployment") ||
+				!strings.Contains(output, "deployment.apps/agnhost-deployment") ||
 				!strings.Contains(output, "deletion is cancelled") {
 				framework.Failf("unexpected output %s", output)
 			}

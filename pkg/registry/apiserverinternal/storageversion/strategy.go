@@ -22,21 +22,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // storageVersionStrategy implements verification logic for StorageVersion.
 type storageVersionStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating StorageVersion objects.
-var Strategy = storageVersionStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = storageVersionStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because all StorageVersion's need to be cluster scoped
 func (storageVersionStrategy) NamespaceScoped() bool {
@@ -83,7 +84,7 @@ func (storageVersionStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // Does not allow creating a StorageVersion object with a PUT request.
-func (storageVersionStrategy) AllowCreateOnUpdate() bool {
+func (storageVersionStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -102,7 +103,7 @@ func (storageVersionStrategy) WarningsOnUpdate(ctx context.Context, obj, old run
 
 // AllowUnconditionalUpdate is the default update policy for storageVersion objects. Status update should
 // only be allowed if version match.
-func (storageVersionStrategy) AllowUnconditionalUpdate() bool {
+func (storageVersionStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

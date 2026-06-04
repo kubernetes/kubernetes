@@ -75,7 +75,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			return
 		}
 
-		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Update)
+		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource(), requestmetrics.Update)
 		if err != nil {
 			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
@@ -255,7 +255,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 	}
 }
 
-func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
+func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.UnconditionalAuthorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
 	var once sync.Once
 	var authorizerDecision authorizer.Decision
 	var authorizerReason string

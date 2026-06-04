@@ -55,7 +55,7 @@ func (state *golistState) determineRootDirsModules() (map[string]string, error) 
 		}
 		if mod.Dir != "" && mod.Path != "" {
 			// This is a valid module; add it to the map.
-			absDir, err := filepath.Abs(mod.Dir)
+			absDir, err := state.cfg.abs(mod.Dir)
 			if err != nil {
 				return nil, err
 			}

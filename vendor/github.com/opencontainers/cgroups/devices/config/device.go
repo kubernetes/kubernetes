@@ -20,10 +20,10 @@ type Device struct {
 	FileMode os.FileMode `json:"file_mode"`
 
 	// Uid of the device.
-	Uid uint32 `json:"uid"`
+	Uid uint32 `json:"uid,omitempty"` //nolint:revive // Suppress "var-naming: struct field Uid should be UID".
 
 	// Gid of the device.
-	Gid uint32 `json:"gid"`
+	Gid uint32 `json:"gid,omitempty"` //nolint:revive // Suppress "var-naming: struct field Gid should be GID".
 }
 
 // Permissions is a cgroupv1-style string to represent device access. It

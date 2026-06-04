@@ -34,7 +34,7 @@ func (client *httpClient) Close() error {
 	return nil
 }
 
-func (client *httpClient) post(path string, data interface{}) error {
+func (client *httpClient) post(path string, data any) error {
 	var body io.Reader
 	if data != nil {
 		encoded, err := json.Marshal(data)
@@ -54,7 +54,7 @@ func (client *httpClient) post(path string, data interface{}) error {
 	return nil
 }
 
-func (client *httpClient) poll(path string, data interface{}) error {
+func (client *httpClient) poll(path string, data any) error {
 	for {
 		resp, err := http.Get(client.serverHost + path)
 		if err != nil {
@@ -153,10 +153,7 @@ func (client *httpClient) PostAbort() error {
 
 func (client *httpClient) ShouldAbort() bool {
 	err := client.poll("/abort", nil)
-	if err == ErrorGone {
-		return true
-	}
-	return false
+	return err == ErrorGone
 }
 
 func (client *httpClient) Write(p []byte) (int, error) {

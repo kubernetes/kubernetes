@@ -398,6 +398,52 @@ func TestExtractList(t *testing.T) {
 	}
 }
 
+func TestLenList(t *testing.T) {
+	tests := []struct {
+		name string
+		list runtime.Object
+		want int
+	}{
+		{
+			name: "nil",
+			list: nil,
+			want: 0,
+		},
+		{
+			name: "empty FooList",
+			list: &FooList{},
+			want: 0,
+		},
+		{
+			name: "FooList",
+			list: fakeFooList(fakeObjectItemsNum),
+			want: fakeObjectItemsNum,
+		},
+		{
+			name: "SampleList",
+			list: fakeSampleList(fakeObjectItemsNum),
+			want: fakeObjectItemsNum,
+		},
+		{
+			name: "RawExtensionList",
+			list: fakeExtensionList(fakeObjectItemsNum),
+			want: fakeObjectItemsNum,
+		},
+		{
+			name: "UnstructuredList",
+			list: fakeUnstructuredList(fakeObjectItemsNum).(*unstructured.UnstructuredList),
+			want: fakeObjectItemsNum,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := LenList(tc.list); got != tc.want {
+				t.Errorf("LenList() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 func BenchmarkExtractListItem(b *testing.B) {
 	tests := []struct {
 		name string

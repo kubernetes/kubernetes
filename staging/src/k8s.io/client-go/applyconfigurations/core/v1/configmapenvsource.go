@@ -20,9 +20,18 @@ package v1
 
 // ConfigMapEnvSourceApplyConfiguration represents a declarative configuration of the ConfigMapEnvSource type for use
 // with apply.
+//
+// ConfigMapEnvSource selects a ConfigMap to populate the environment
+// variables with.
+//
+// The contents of the target ConfigMap's Data field will represent the
+// key-value pairs as environment variables.
+// Keys in the BinaryData field are not currently propagated to container env vars.
 type ConfigMapEnvSourceApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Optional                               *bool `json:"optional,omitempty"`
+	// The ConfigMap to select from.
+	LocalObjectReferenceApplyConfiguration `json:""`
+	// Specify whether the ConfigMap must be defined
+	Optional *bool `json:"optional,omitempty"`
 }
 
 // ConfigMapEnvSourceApplyConfiguration constructs a declarative configuration of the ConfigMapEnvSource type for use with

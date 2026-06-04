@@ -166,8 +166,7 @@ type VolumeSource struct {
 	Projected *ProjectedVolumeSource
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	// +optional
 	PortworxVolume *PortworxVolumeSource
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -219,10 +218,9 @@ type VolumeSource struct {
 	// A failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.
 	// The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
 	// The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
-	// The volume will be mounted read-only (ro) and non-executable files (noexec).
+	// The volume will be mounted read-only (ro).
 	// Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
 	// The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
-	// +featureGate=ImageVolume
 	// +optional
 	Image *ImageVolumeSource
 }
@@ -309,8 +307,7 @@ type PersistentVolumeSource struct {
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
-	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
-	// is on.
+	// are redirected to the pxd.portworx.com CSI driver.
 	// +optional
 	PortworxVolume *PortworxVolumeSource
 	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -398,6 +395,7 @@ type PersistentVolumeSpec struct {
 	VolumeMode *PersistentVolumeMode
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 	// This field influences the scheduling of pods that use this volume.
+	// This field is mutable if MutablePVNodeAffinity feature gate is enabled.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity
 	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
@@ -406,7 +404,6 @@ type PersistentVolumeSpec struct {
 	// after a volume has been updated successfully to a new class.
 	// For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
 	// PersistentVolumeClaims during the binding process.
-	// This is a beta field and requires enabling VolumeAttributesClass feature (off by default).
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	VolumeAttributesClassName *string
@@ -562,15 +559,13 @@ type PersistentVolumeClaimSpec struct {
 	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
 	// If specified, the CSI driver will create or update the volume with the attributes defined
 	// in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
-	// it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
-	// will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
-	// If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
-	// will be set by the persistentvolume controller if it exists.
+	// it can be changed after the claim is created. An empty string or nil value indicates that no
+	// VolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,
+	// this field can be reset to its previous value (including nil) to cancel the modification.
 	// If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
 	// set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
 	// exists.
 	// More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-	// (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	VolumeAttributesClassName *string
@@ -621,6 +616,17 @@ const (
 	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
 	// Volume is being modified
 	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
+
+	// PersistentVolumeClaimUnused indicates whether the PVC is currently not in use by any Pod.
+	// When status is True, the PVC is not referenced by any non-terminal Pod.
+	// The lastTransitionTime indicates when the PVC last transitioned to being unused.
+	//
+	// Both in-use time and unused time duration indicated by this condition may be shorter or
+	// slightly longer than actual in-use time or unused time because of processing delays or
+	// when this feature was enabled in the cluster.
+	//
+	// Requires PersistentVolumeClaimUnusedSinceTime alpha featuregate
+	PersistentVolumeClaimUnused PersistentVolumeClaimConditionType = "Unused"
 )
 
 // +enum
@@ -727,9 +733,6 @@ type PersistentVolumeClaimStatus struct {
 	// should ignore the update for the purpose it was designed. For example - a controller that
 	// only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
 	// resources associated with PVC.
-	//
-	// This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
-	// +featureGate=RecoverVolumeExpansionFailure
 	// +optional
 	AllocatedResources ResourceList
 	// AllocatedResourceStatuses stores status of resource being resized for the given PVC.
@@ -765,21 +768,16 @@ type PersistentVolumeClaimStatus struct {
 	// should ignore the update for the purpose it was designed. For example - a controller that
 	// only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
 	// resources associated with PVC.
-	//
-	// This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
-	// +featureGate=RecoverVolumeExpansionFailure
 	// +mapType=granular
 	// +optional
 	AllocatedResourceStatuses map[ResourceName]ClaimResourceStatus
 	// currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
 	// When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
-	// This is a beta field and requires enabling VolumeAttributesClass feature (off by default).
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	CurrentVolumeAttributesClassName *string
 	// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
 	// When this is unset, there is no ModifyVolume operation being attempted.
-	// This is a beta field and requires enabling VolumeAttributesClass feature (off by default).
 	// +featureGate=VolumeAttributesClass
 	// +optional
 	ModifyVolumeStatus *ModifyVolumeStatus
@@ -1856,6 +1854,76 @@ type ClusterTrustBundleProjection struct {
 	Path string
 }
 
+// PodCertificateProjection provides a private key and X.509 certificate in
+// a combined file.
+type PodCertificateProjection struct {
+	// Kubelet's generated CSRs will be addressed to this signer.
+	SignerName string
+
+	// The type of keypair Kubelet will generate for the pod.
+	//
+	// Valid values are "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384",
+	// "ECDSAP521", and "ED25519".
+	KeyType string
+
+	// maxExpirationSeconds is the maximum lifetime permitted for the
+	// certificate.
+	//
+	// Kubelet copies this value verbatim into the PodCertificateRequests it
+	// generates for this projection.
+	//
+	// If omitted, kube-apiserver will set it to 86400(24 hours). kube-apiserver
+	// will reject values shorter than 3600 (1 hour).  The maximum allowable
+	// value is 7862400 (91 days).
+	//
+	// The signer implementation is then free to issue a certificate with any
+	// lifetime *shorter* than MaxExpirationSeconds, but no shorter than 3600
+	// seconds (1 hour).  This constraint is enforced by kube-apiserver.
+	// `kubernetes.io` signers will never issue certificates with a lifetime
+	// longer than 24 hours.
+	MaxExpirationSeconds *int32
+
+	// Write the credential bundle at this path in the projected volume.
+	//
+	// The credential bundle is a single file that contains multiple PEM blocks.
+	// The first PEM block is a PRIVATE KEY block, containing a PKCS#8 private
+	// key.
+	//
+	// The remaining blocks are CERTIFICATE blocks, containing the issued
+	// certificate chain from the signer (leaf and any intermediates).
+	//
+	// Using credentialBundlePath lets your Pod's application code make a single
+	// atomic read that retrieves a consistent key and certificate chain.  If you
+	// project them to separate files, your application code will need to
+	// additionally check that the leaf certificate was issued to the key.
+	CredentialBundlePath string
+
+	// Write the key at this path in the projected volume.
+	//
+	// When using keyPath and certificateChainPath, your application needs to check
+	// that the key and leaf certificate are consistent, because it is possible to
+	// read the files mid-rotation.
+	KeyPath string
+
+	// Write the certificate chain at this path in the projected volume.
+	CertificateChainPath string
+
+	// userAnnotations allow pod authors to pass additional information to
+	// the signer implementation.  Kubernetes does not restrict or validate this
+	// metadata in any way.
+	//
+	// These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+	// the PodCertificateRequest objects that Kubelet creates.
+	//
+	// Entries are subject to the same validation as object metadata annotations,
+	// with the addition that all keys must be domain-prefixed. No restrictions
+	// are placed on values, except an overall size limitation on the entire field.
+	//
+	// Signers should document the keys and values they support. Signers should
+	// deny requests that contain keys they do not recognize.
+	UserAnnotations map[string]string
+}
+
 // ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1883,6 +1951,8 @@ type VolumeProjection struct {
 	ServiceAccountToken *ServiceAccountTokenProjection
 	// information about the ClusterTrustBundle data to project
 	ClusterTrustBundle *ClusterTrustBundleProjection
+	// information about the pod certificate to project.
+	PodCertificate *PodCertificateProjection
 }
 
 // KeyToPath maps a string key to a path within a volume.
@@ -2101,8 +2171,6 @@ type VolumeMount struct {
 	// None (or be unspecified, which defaults to None).
 	//
 	// If this field is not specified, it is treated as an equivalent of Disabled.
-	//
-	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnly *RecursiveReadOnlyMode
 	// Required. If the path is not an absolute path (e.g. some/path) it
@@ -2177,10 +2245,7 @@ type VolumeDevice struct {
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: Name of the environment variable.
-	// When the RelaxedEnvironmentVariableValidation feature gate is disabled, this must consist of alphabetic characters,
-	// digits, '_', '-', or '.', and must not start with a digit.
-	// When the RelaxedEnvironmentVariableValidation feature gate is enabled,
-	// this may contain any printable ASCII characters except '='.
+	// May consist of any printable ASCII characters except '='.
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
@@ -2215,6 +2280,38 @@ type EnvVarSource struct {
 	// Selects a key of a secret in the pod's namespace.
 	// +optional
 	SecretKeyRef *SecretKeySelector
+	// FileKeyRef selects a key of the env file.
+	// Requires the EnvFiles feature gate to be enabled.
+	//
+	// +featureGate=EnvFiles
+	// +optional
+	FileKeyRef *FileKeySelector
+}
+
+// FileKeySelector selects a key of the env file.
+type FileKeySelector struct {
+	// The name of the volume mount containing the env file.
+	// +required
+	VolumeName string
+	// The path within the volume from which to select the file.
+	// Must be relative and may not contain the '..' path or start with '..'.
+	// +required
+	Path string
+	// The key within the env file. An invalid key will prevent the pod from starting.
+	// The keys defined within a source may consist of any printable ASCII characters except '='.
+	// During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+	// +required
+	Key string
+	// Specify whether the file or its key must be defined. If the file or key
+	// does not exist, then the env var is not published.
+	// If optional is set to true and the specified key does not exist,
+	// the environment variable will not be set in the Pod's containers.
+	//
+	// If optional is set to false and the specified key does not exist,
+	// an error will be returned during Pod creation.
+	// +optional
+	// +default=false
+	Optional *bool
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -2263,7 +2360,8 @@ type SecretKeySelector struct {
 
 // EnvFromSource represents the source of a set of ConfigMaps or Secrets
 type EnvFromSource struct {
-	// Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.
+	// Optional text to prepend to the name of each environment variable.
+	// May consist of any printable ASCII characters except '='.
 	// +optional
 	Prefix string
 	// The ConfigMap to select from.
@@ -2487,7 +2585,7 @@ type ResourceRequirements struct {
 	// Claims lists the names of resources, defined in spec.resourceClaims,
 	// that are used by this container.
 	//
-	// This is an alpha field and requires enabling the
+	// This field depends on the
 	// DynamicResourceAllocation feature gate.
 	//
 	// This field is immutable. It can only be set for containers.
@@ -2553,7 +2651,8 @@ type Container struct {
 	// +optional
 	Ports []ContainerPort
 	// List of sources to populate environment variables in the container.
-	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+	// The keys defined within a source may consist of any printable ASCII characters except '='.
+	// All invalid keys
 	// will be reported as an event when the container is starting. When a key exists in multiple
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
@@ -2566,14 +2665,20 @@ type Container struct {
 	// +optional
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
+	// This field cannot be set on ephemeral containers.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// RestartPolicy defines the restart behavior of individual containers in a pod.
-	// This field may only be set for init containers, and the only allowed value is "Always".
-	// For non-init containers or when this field is not specified,
+	// This overrides the pod-level restart policy. When this field is not specified,
 	// the restart behavior is defined by the Pod's restart policy and the container type.
-	// Setting the RestartPolicy as "Always" for the init container will have the following effect:
+	// If restartPolicyRules are specified, the container-level restartPolicy is also
+	// required as the "default" policy if no rules matched. The restartPolicyRules takes
+	// precedence over the container-level restart policies. This is an alpha-level feature
+	// and is controlled by the feature gate "ContainerRestartRules". If the feature is
+	// not enabled, the only allowed value is "Always".
+	// Additionally, setting the RestartPolicy as "Always" for the init container will
+	// have the following effect:
 	// this init container will be continually restarted on
 	// exit until all regular containers have terminated. Once all regular
 	// containers have completed, all init containers with restartPolicy "Always"
@@ -2584,9 +2689,25 @@ type Container struct {
 	// container. Instead, the next init container starts immediately after this
 	// init container is started, or after any startupProbe has successfully
 	// completed.
-	// +featureGate=SidecarContainers
 	// +optional
 	RestartPolicy *ContainerRestartPolicy
+	// Represents a list of rules to be checked to determine if the
+	// container should be restarted on exit. The rules are evaluated in
+	// order. Once a rule matches a container exit condition, the remaining
+	// rules are ignored. If no rule matches the container exit condition,
+	// the Container-level restart policy determines the whether the container
+	// is restarted or not. This is an alpha-level feature, and controlled by
+	// the feature gate "ContainerRestartRules". If the feature is not enabled,
+	// this field is not allowed. Constraints on the rules:
+	// - At most 20 rules are allowed.
+	// - Rules can have the same action.
+	// - Identical rules are not forbidden in validations.
+	// When rules are specified, container MUST set RestartPolicy explicitly
+	// even it if matches the Pod's RestartPolicy.
+	// +featureGate=ContainerRestartRules
+	// +optional
+	// +listType=atomic
+	RestartPolicyRules []ContainerRestartRule
 	// +optional
 	VolumeMounts []VolumeMount
 	// volumeDevices is the list of block devices to be used by the container.
@@ -2655,7 +2776,6 @@ type LifecycleHandler struct {
 	// +optional
 	TCPSocket *TCPSocketAction
 	// Sleep represents the duration that the container should sleep before being terminated.
-	// +featureGate=PodLifecycleSleepAction
 	// +optional
 	Sleep *SleepAction
 }
@@ -2886,7 +3006,6 @@ type ContainerStatus struct {
 	// AllocatedResources represents the compute resources allocated for this container by the
 	// node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
 	// and after successfully admitting desired pod resize.
-	// +featureGate=InPlacePodVerticalScalingAllocatedStatus
 	// +optional
 	AllocatedResources ResourceList
 	// Resources represents the compute resource requests and limits that have been successfully
@@ -2897,7 +3016,6 @@ type ContainerStatus struct {
 	// Status of volume mounts.
 	// +listType=atomic
 	// +optional
-	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus
 	// User represents user identity information initially attached to the first process of the container
 	// +featureGate=SupplementalGroupsPolicy
@@ -2969,6 +3087,9 @@ type ResourceHealth struct {
 	//
 	// In future we may want to introduce the PermanentlyUnhealthy Status.
 	Health ResourceHealthStatus
+	// Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
+	// This field is populated by the kubelet when ResourceHealthStatusMessage is enabled.
+	Message *string
 }
 
 // ContainerUser represents user identity information
@@ -3045,12 +3166,13 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// AllContainersRestarting indicates that all containers of the pod is being restarted.
+	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
 
 // PodCondition represents pod's condition
 type PodCondition struct {
 	Type PodConditionType
-	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64
 	Status             ConditionStatus
@@ -3088,9 +3210,30 @@ type VolumeMountStatus struct {
 	// RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
 	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
 	// depending on the mount result.
-	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnly *RecursiveReadOnlyMode
+	// volumeStatus represents volume-type-specific status about the mounted
+	// volume.
+	// +optional
+	VolumeStatus *VolumeStatus
+}
+
+// VolumeStatus represents the status of a mounted volume.
+// At most one of its members must be specified.
+type VolumeStatus struct {
+	// image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+	// +featureGate=ImageVolumeWithDigest
+	// +optional
+	Image *ImageVolumeStatus
+}
+
+type ImageVolumeStatus struct {
+	// ImageRef is the digest of the image used for this volume.
+	// It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+	// The ImageRef length should not exceed 256 characters.
+	// +kubebuilder:validation:MaxLength=256
+	// +required
+	ImageRef string
 }
 
 // RestartPolicy describes how the container should be restarted.
@@ -3107,11 +3250,69 @@ const (
 )
 
 // ContainerRestartPolicy is the restart policy for a single container.
-// This may only be set for init containers and only allowed value is "Always".
+// The only allowed values are "Always", "Never", and "OnFailure".
 type ContainerRestartPolicy string
 
 const (
-	ContainerRestartPolicyAlways ContainerRestartPolicy = "Always"
+	ContainerRestartPolicyAlways    ContainerRestartPolicy = "Always"
+	ContainerRestartPolicyNever     ContainerRestartPolicy = "Never"
+	ContainerRestartPolicyOnFailure ContainerRestartPolicy = "OnFailure"
+)
+
+// ContainerRestartRule describes how a container exit is handled.
+type ContainerRestartRule struct {
+	// Specifies the action taken on a container exit if the requirements
+	// are satisfied. The only possible value is "Restart" to restart the
+	// container.
+	// +required
+	Action ContainerRestartRuleAction
+
+	// Represents the exit codes to check on container exits.
+	// +optional
+	ExitCodes *ContainerRestartRuleOnExitCodes
+}
+
+// ContainerRestartRuleAction describes the action to take when the
+// container exits.
+type ContainerRestartRuleAction string
+
+// These are valid restart rule actions.
+const (
+	// The container will be restarted if the rule matches. Only valid on normal init container and
+	// regular containers. Not valid on sidecar containers and ephemeral containers.
+	ContainerRestartRuleActionRestart ContainerRestartRuleAction = "Restart"
+	// All containers (except ephemeral containers) inside the pod will be terminated and restarted.
+	// Valid on normal init container, sidecar containers, and regular containers. Not valid on
+	// ephemeral containers.
+	ContainerRestartRuleActionRestartAllContainers ContainerRestartRuleAction = "RestartAllContainers"
+)
+
+// ContainerRestartRuleOnExitCodes describes the condition
+// for handling an exited container based on its exit codes.
+type ContainerRestartRuleOnExitCodes struct {
+	// Represents the relationship between the container exit code(s) and the
+	// specified values. Possible values are:
+	// - In: the requirement is satisfied if the container exit code is in the
+	//   set of specified values.
+	// - NotIn: the requirement is satisfied if the container exit code is
+	//   not in the set of specified values.
+	// +required
+	Operator ContainerRestartRuleOnExitCodesOperator
+
+	// Specifies the set of values to check for container exit codes.
+	// At most 255 elements are allowed.
+	// +optional
+	// +listType=set
+	Values []int32
+}
+
+// ContainerRestartRuleOnExitCodesOperator describes the operator
+// to take for the exit codes.
+type ContainerRestartRuleOnExitCodesOperator string
+
+const (
+	ContainerRestartRuleOnExitCodesOpIn    ContainerRestartRuleOnExitCodesOperator = "In"
+	ContainerRestartRuleOnExitCodesOpNotIn ContainerRestartRuleOnExitCodesOperator = "NotIn"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -3296,8 +3497,8 @@ type PodAntiAffinity struct {
 	// most preferred is the one with the greatest sum of weights, i.e.
 	// for each node that meets all of the scheduling requirements (resource
 	// request, requiredDuringScheduling anti-affinity expressions, etc.),
-	// compute a sum by iterating through the elements of this field and adding
-	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// compute a sum by iterating through the elements of this field and subtracting
+	// "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm
@@ -3423,7 +3624,6 @@ type Taint struct {
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect
 	// TimeAdded represents the time at which the taint was added.
-	// It is only written for NoExecute taints.
 	// +optional
 	TimeAdded *metav1.Time
 }
@@ -3462,9 +3662,10 @@ type Toleration struct {
 	// +optional
 	Key string
 	// Operator represents a key's relationship to the value.
-	// Valid operators are Exists and Equal. Defaults to Equal.
+	// Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
 	// tolerate all taints of a particular category.
+	// Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
 	// +optional
 	Operator TolerationOperator
 	// Value is the taint value the toleration matches to.
@@ -3490,6 +3691,8 @@ type TolerationOperator string
 const (
 	TolerationOpExists TolerationOperator = "Exists"
 	TolerationOpEqual  TolerationOperator = "Equal"
+	TolerationOpLt     TolerationOperator = "Lt"
+	TolerationOpGt     TolerationOperator = "Gt"
 )
 
 // PodReadinessGate contains the reference to a pod condition
@@ -3655,6 +3858,7 @@ type PodSpec struct {
 	// - spec.hostPID
 	// - spec.hostIPC
 	// - spec.hostUsers
+	// - spec.resources
 	// - spec.securityContext.appArmorProfile
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
@@ -3692,8 +3896,8 @@ type PodSpec struct {
 	// will be made available to those containers which consume them
 	// by name.
 	//
-	// This is an alpha field and requires enabling the
-	// DynamicResourceAllocation feature gate.
+	// This is a stable field but requires that the
+	// DynamicResourceAllocation feature gate is enabled.
 	//
 	// This field is immutable.
 	//
@@ -3702,7 +3906,7 @@ type PodSpec struct {
 	ResourceClaims []PodResourceClaim
 	// Resources is the total amount of CPU and Memory resources required by all
 	// containers in the pod. It supports specifying Requests and Limits for
-	// "cpu" and "memory" resource names only. ResourceClaims are not supported.
+	// "cpu", "memory" and "hugepages-" resource names only. ResourceClaims are not supported.
 	//
 	// This field enables fine-grained control over resource allocation for the
 	// entire pod, allowing resource sharing among containers in a pod.
@@ -3714,11 +3918,49 @@ type PodSpec struct {
 	// +featureGate=PodLevelResources
 	// +optional
 	Resources *ResourceRequirements
+	// HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod.
+	// This field only specifies the pod's hostname and does not affect its DNS records.
+	// When this field is set to a non-empty string:
+	// - It takes precedence over the values set in `hostname` and `subdomain`.
+	// - The Pod's hostname will be set to this value.
+	// - `setHostnameAsFQDN` must be nil or set to false.
+	// - `hostNetwork` must be set to false.
+	//
+	// This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
+	// Requires the HostnameOverride feature gate to be enabled.
+	//
+	// +featureGate=HostnameOverride
+	// +optional
+	HostnameOverride *string
+	// SchedulingGroup provides a reference to the immediate scheduling runtime
+	// grouping object that this Pod belongs to.
+	// This field is used by the scheduler to identify the group and apply the
+	// correct group scheduling policies. The association with a group also
+	// impacts other lifecycle aspects of a Pod that are relevant in a wider context
+	// of scheduling like preemption, resource attachment, etc. If not specified,
+	// the Pod is treated as a single unit in all of these aspects.
+	// The group object referenced by this field may not exist at the time the
+	// Pod is created.
+	// This field is immutable, but a group object with the same name may be
+	// recreated with different policies. Doing this during pod scheduling
+	// may result in the placement not conforming to the expected policies.
+	//
+	// +featureGate=GenericWorkload
+	// +optional
+	SchedulingGroup *PodSchedulingGroup
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
+//
+// When the DRAWorkloadResourceClaims feature gate is enabled and this Pod
+// belongs to a PodGroup, a PodResourceClaim is matched to a
+// PodGroupResourceClaim if all of their fields are equal (Name,
+// ResourceClaimName, and ResourceClaimTemplateName). A matched claim references
+// a single ResourceClaim shared across all Pods in the PodGroup, reserved for
+// the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual
+// Pods.
 type PodResourceClaim struct {
 	// Name uniquely identifies this resource claim inside the pod.
 	// This must be a DNS_LABEL.
@@ -3740,6 +3982,16 @@ type PodResourceClaim struct {
 	// generated component, will be used to form a unique name for the
 	// ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
 	//
+	// When the DRAWorkloadResourceClaims feature gate is enabled and the pod
+	// belongs to a PodGroup that defines a PodGroupResourceClaim with the same
+	// Name and ResourceClaimTemplateName, this PodResourceClaim resolves to the
+	// ResourceClaim generated for the PodGroup. All pods in the group that
+	// define an equivalent PodResourceClaim matching the
+	// PodGroupResourceClaim's Name and ResourceClaimTemplateName share the same
+	// generated ResourceClaim. ResourceClaims generated for a PodGroup are
+	// owned by the PodGroup and their lifecycles are tied to the PodGroup
+	// instead of any individual pod.
+	//
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
@@ -3759,10 +4011,39 @@ type PodResourceClaimStatus struct {
 	Name string
 
 	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod. If this is
-	// unset, then generating a ResourceClaim was not necessary. The
-	// pod.spec.resourceClaims entry can be ignored in this case.
+	// generated for the Pod in the namespace of the Pod.
+	//
+	// When the DRAWorkloadResourceClaims feature is enabled and the
+	// corresponding PodResourceClaim matches a PodGroupResourceClaim
+	// made by the Pod's PodGroup, then this is the name of the
+	// ResourceClaim generated and reserved for the PodGroup.
+	//
+	// If this is unset, then generating a ResourceClaim was not
+	// necessary. The pod.spec.resourceClaims entry can be ignored in
+	// this case.
 	ResourceClaimName *string
+}
+
+// PodExtendedResourceClaimStatus is stored in the PodStatus for the extended
+// resource requests backed by DRA. It stores the generated name for
+// the corresponding special ResourceClaim created by the scheduler.
+type PodExtendedResourceClaimStatus struct {
+	// RequestMapping identifies the mapping of <container, extended resource backed by DRA> to  device request
+	// in the generated ResourceClaim.
+	RequestMappings []ContainerExtendedResourceRequest
+
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod.
+	ResourceClaimName string
+}
+
+type ContainerExtendedResourceRequest struct {
+	// The name of the container requesting resources.
+	ContainerName string
+	// The name of the extended resource in that container which gets backed by DRA.
+	ResourceName string
+	// The name of the request in the special ResourceClaim which corresponds to the extended resource.
+	RequestName string
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -3788,6 +4069,20 @@ type PodSchedulingGate struct {
 	// Name of the scheduling gate.
 	// Each scheduling gate must have a unique name field.
 	Name string
+}
+
+// PodSchedulingGroup identifies the runtime scheduling group instance that a Pod belongs to.
+// The scheduler uses this information to apply workload-aware scheduling semantics.
+// Exactly one field must be specified.
+// +union
+type PodSchedulingGroup struct {
+	// PodGroupName specifies the name of the standalone PodGroup object
+	// that represents the runtime instance of this group.
+	// Must be a DNS subdomain.
+	//
+	// +optional
+	// +oneOf=GroupSelection
+	PodGroupName *string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -4161,7 +4456,8 @@ type EphemeralContainerCommon struct {
 	// +optional
 	Ports []ContainerPort
 	// List of sources to populate environment variables in the container.
-	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
+	// The keys defined within a source may consist of any printable ASCII characters except '='.
+	// All invalid keys
 	// will be reported as an event when the container is starting. When a key exists in multiple
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
@@ -4179,12 +4475,23 @@ type EphemeralContainerCommon struct {
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// Restart policy for the container to manage the restart behavior of each
-	// container within a pod.
-	// This may only be set for init containers. You cannot set this field on
-	// ephemeral containers.
-	// +featureGate=SidecarContainers
+	// container within a pod. Must be specified if restartPolicyRules are used.
+	// You cannot set this field on ephemeral containers.
 	// +optional
 	RestartPolicy *ContainerRestartPolicy
+	// Represents a list of rules to be checked to determine if the
+	// container should be restarted on exit. The rules are evaluated in
+	// order. Once a rule matches a container exit condition, the remaining
+	// rules are ignored. If no rule matches the container exit condition,
+	// the Pod-level restart policy determines the whether the container
+	// is restarted or not. Constraints on the rules:
+	// - At most 20 rules are allowed.
+	// - Rules can have the same action.
+	// - Identical rules are not forbidden in validations.
+	// +featureGate=ContainerRestartRules
+	// +optional
+	// +listType=atomic
+	RestartPolicyRules []ContainerRestartRule
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// +optional
 	VolumeMounts []VolumeMount
@@ -4258,8 +4565,6 @@ type EphemeralContainer struct {
 // state of a system.
 type PodStatus struct {
 	// If set, this represents the .metadata.generation that the pod status was set based upon.
-	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
-	// +featureGate=PodObservedGenerationTracking
 	// +optional
 	ObservedGeneration int64
 	// +optional
@@ -4354,19 +4659,34 @@ type PodStatus struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus
-}
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+	// Status of claim of extended resource backed by DRA.
+	// +featureGate=DRAExtendedResource
+	// +optional
+	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatus
 
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
-type PodStatusResult struct {
-	metav1.TypeMeta
+	// AllocatedResources is the total requests allocated for this pod by the node.
+	// If pod-level requests are not set, this will be the total requests aggregated
+	// across containers in the pod.
+	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
-	metav1.ObjectMeta
-	// Status represents the current information about a pod. This data may not be up
-	// to date.
+	AllocatedResources ResourceList
+
+	// Resources represents the compute resource requests and limits that have been
+	// applied at the pod level
+	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
-	Status PodStatus
+	Resources *ResourceRequirements
+
+	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
+	// that were allocated for this pod through DRA claims. This includes resources currently
+	// reported in v1.Node `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// +featureGate=DRANodeAllocatableResources
+	// +optional
+	// +listType=atomic
+	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4643,27 +4963,25 @@ const (
 
 // These are valid values for the TrafficDistribution field of a Service.
 const (
-	// Indicates a preference for routing traffic to endpoints that are in the same
-	// zone as the client. Users should not set this value unless they have ensured
-	// that clients and endpoints are distributed in such a way that the "same zone"
-	// preference will not result in endpoints getting overloaded.
-	ServiceTrafficDistributionPreferClose = "PreferClose"
-
-	// Indicates a preference for routing traffic to endpoints that are in the same
-	// zone as the client. Users should not set this value unless they have ensured
-	// that clients and endpoints are distributed in such a way that the "same zone"
-	// preference will not result in endpoints getting overloaded.
-	// This is an alias for "PreferClose", but it is an Alpha feature and is only
-	// recognized if the PreferSameTrafficDistribution feature gate is enabled.
+	// ServiceTrafficDistributionPreferSameZone indicates a preference for routing
+	// traffic to endpoints that are in the same zone as the client. Users should only
+	// set this value if they have ensured that clients and endpoints are distributed
+	// in such a way that the "same zone" preference will not result in endpoints
+	// getting overloaded.
 	ServiceTrafficDistributionPreferSameZone = "PreferSameZone"
 
-	// Indicates a preference for routing traffic to endpoints that are on the same
-	// node as the client. Users should not set this value unless they have ensured
-	// that clients and endpoints are distributed in such a way that the "same node"
-	// preference will not result in endpoints getting overloaded.
-	// This is an Alpha feature and is only recognized if the
-	// PreferSameTrafficDistribution feature gate is enabled.
+	// ServiceTrafficDistributionPreferSameNode indicates a preference for routing
+	// traffic to endpoints that are on the same node as the client. Users should only
+	// set this value if they have ensured that clients and endpoints are distributed
+	// in such a way that the "same node" preference will not result in endpoints
+	// getting overloaded.
 	ServiceTrafficDistributionPreferSameNode = "PreferSameNode"
+
+	// ServiceTrafficDistributionPreferClose is the original name of "PreferSameZone".
+	// Despite the generic-sounding name, it has exactly the same meaning as
+	// "PreferSameZone".
+	// Deprecated: use "PreferSameZone" instead.
+	ServiceTrafficDistributionPreferClose = "PreferClose"
 )
 
 // These are the valid conditions of a service.
@@ -4835,6 +5153,8 @@ type ServiceSpec struct {
 
 	// ExternalIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
+	//
+	// Deprecated: ExternalIPs is deprecated and may be removed in a future version.
 	// +optional
 	ExternalIPs []string
 
@@ -5231,11 +5551,9 @@ type NodeDaemonEndpoints struct {
 // NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 type NodeRuntimeHandlerFeatures struct {
 	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
-	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool
 	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *bool
 }
@@ -5380,14 +5698,16 @@ type NodeStatus struct {
 	// +optional
 	Config *NodeConfigStatus
 	// The available runtime handlers.
-	// +featureGate=RecursiveReadOnlyMounts
-	// +featureGate=UserNamespacesSupport
 	// +optional
 	RuntimeHandlers []NodeRuntimeHandler
 	// Features describes the set of features implemented by the CRI implementation.
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	Features *NodeFeatures
+	// DeclaredFeatures represents the declared features of a node.
+	// +featureGate=NodeDeclaredFeatures
+	// +optional
+	DeclaredFeatures []string
 }
 
 // UniqueVolumeName defines the name of attached volume
@@ -6891,4 +7211,18 @@ type ImageVolumeSource struct {
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// +optional
 	PullPolicy PullPolicy
+}
+
+// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
+type NodeAllocatableResourceClaimStatus struct {
+	// ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+	// +required
+	ResourceClaimName string
+	// Containers lists the names of all containers in this pod that reference the claim.
+	// +optional
+	// +listType=set
+	Containers []string
+	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+	// +required
+	Resources map[ResourceName]resource.Quantity
 }

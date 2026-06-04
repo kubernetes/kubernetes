@@ -39,7 +39,7 @@ containerFields: []string{
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "seLinuxOptions",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			p = ensureSELinuxOptions(p)
 			return []*corev1.Pod{
 				// security context with no seLinuxOptions

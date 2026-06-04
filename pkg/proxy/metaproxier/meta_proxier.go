@@ -128,32 +128,10 @@ func (proxier *metaProxier) OnEndpointSlicesSynced() {
 	proxier.ipv6Proxier.OnEndpointSlicesSynced()
 }
 
-// OnNodeAdd is called whenever creation of new node object is observed.
-func (proxier *metaProxier) OnNodeAdd(node *v1.Node) {
-	proxier.ipv4Proxier.OnNodeAdd(node)
-	proxier.ipv6Proxier.OnNodeAdd(node)
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *metaProxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	proxier.ipv4Proxier.OnNodeUpdate(oldNode, node)
-	proxier.ipv6Proxier.OnNodeUpdate(oldNode, node)
-}
-
-// OnNodeDelete is called whenever deletion of an existing node
-// object is observed.
-func (proxier *metaProxier) OnNodeDelete(node *v1.Node) {
-	proxier.ipv4Proxier.OnNodeDelete(node)
-	proxier.ipv6Proxier.OnNodeDelete(node)
-
-}
-
-// OnNodeSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *metaProxier) OnNodeSynced() {
-	proxier.ipv4Proxier.OnNodeSynced()
-	proxier.ipv6Proxier.OnNodeSynced()
+// OnTopologyChange is called whenever change in proxy relevant topology labels is observed.
+func (proxier *metaProxier) OnTopologyChange(topologyLabels map[string]string) {
+	proxier.ipv4Proxier.OnTopologyChange(topologyLabels)
+	proxier.ipv6Proxier.OnTopologyChange(topologyLabels)
 }
 
 // OnServiceCIDRsChanged is called whenever a change is observed

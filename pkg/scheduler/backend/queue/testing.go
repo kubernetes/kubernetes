@@ -23,12 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 // NewTestQueue creates a priority queue with an empty informer factory.
-func NewTestQueue(ctx context.Context, lessFn framework.LessFunc, opts ...Option) *PriorityQueue {
+func NewTestQueue(ctx context.Context, lessFn fwk.LessFunc, opts ...Option) *PriorityQueue {
 	return NewTestQueueWithObjects(ctx, lessFn, nil, opts...)
 }
 
@@ -36,7 +36,7 @@ func NewTestQueue(ctx context.Context, lessFn framework.LessFunc, opts ...Option
 // populated with the provided objects.
 func NewTestQueueWithObjects(
 	ctx context.Context,
-	lessFn framework.LessFunc,
+	lessFn fwk.LessFunc,
 	objs []runtime.Object,
 	opts ...Option,
 ) *PriorityQueue {
@@ -46,13 +46,13 @@ func NewTestQueueWithObjects(
 	// we always set a metric recorder here.
 	recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, ctx.Done())
 	// We set it before the options that users provide, so that users can override it.
-	opts = append([]Option{WithMetricsRecorder(*recorder)}, opts...)
+	opts = append([]Option{WithMetricsRecorder(recorder)}, opts...)
 	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
 }
 
 func NewTestQueueWithInformerFactory(
 	ctx context.Context,
-	lessFn framework.LessFunc,
+	lessFn fwk.LessFunc,
 	informerFactory informers.SharedInformerFactory,
 	opts ...Option,
 ) *PriorityQueue {

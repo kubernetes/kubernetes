@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -43,116 +42,98 @@ import (
 )
 
 func TestWatch(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatch(ctx, t, store)
-}
+	t.Run("Watch", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatch(ctx, t, store)
+	})
+	t.Run("ClusterScopedWatch", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestClusterScopedWatch(ctx, t, store)
+	})
+	t.Run("NamespaceScopedWatch", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
+	})
+	t.Run("DeleteTriggerWatch", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
+	})
+	t.Run("WatchFromZero", func(t *testing.T) {
+		ctx, store, client := testSetup(t)
+		storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(store, client.Client))
+	})
+	t.Run("WatchFromNonZero", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchFromNonZero(ctx, t, store)
+	})
+	t.Run("DelayedWatchDelivery", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
+	})
+	t.Run("WatchError", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchError(ctx, t, &storeWithPrefixTransformer{store})
+	})
+	t.Run("WatchContextCancel", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchContextCancel(ctx, t, store)
+	})
+	t.Run("WatcherTimeout", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatcherTimeout(ctx, t, store)
+	})
+	t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
+	})
+	t.Run("WatchInitializationSignal", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
+	})
+	t.Run("ProgressNotify", func(t *testing.T) {
+		clusterConfig := testserver.NewTestConfig(t)
+		clusterConfig.WatchProgressNotifyInterval = time.Second
+		ctx, store, client := testSetup(t, withClientConfig(clusterConfig))
 
-func TestClusterScopedWatch(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestClusterScopedWatch(ctx, t, store)
-}
+		storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRVFunc(client.Client))
+	})
+	t.Run("WatchWithUnsafeDelete", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
+	})
+	t.Run("WatchDispatchBookmarkEvents", func(t *testing.T) {
+		clusterConfig := testserver.NewTestConfig(t)
+		clusterConfig.WatchProgressNotifyInterval = time.Second
+		ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
-func TestNamespaceScopedWatch(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
-}
-
-func TestDeleteTriggerWatch(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
-}
-
-func TestWatchFromZero(t *testing.T) {
-	ctx, store, client := testSetup(t)
-	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client.Client))
-}
-
-// TestWatchFromNonZero tests that
-// - watch from non-0 should just watch changes after given version
-func TestWatchFromNoneZero(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchFromNonZero(ctx, t, store)
-}
-
-func TestDelayedWatchDelivery(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
-}
-
-func TestWatchError(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchError(ctx, t, &storeWithPrefixTransformer{store})
-}
-
-func TestWatchContextCancel(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchContextCancel(ctx, t, store)
-}
-
-func TestWatcherTimeout(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatcherTimeout(ctx, t, store)
-}
-
-func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
-}
-
-func TestWatchInitializationSignal(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
-}
-
-func TestProgressNotify(t *testing.T) {
-	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
-	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
-
-	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
-}
-
-func TestWatchWithUnsafeDelete(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
-}
-
-// TestWatchDispatchBookmarkEvents makes sure that
-// setting allowWatchBookmarks query param against
-// etcd implementation doesn't have any effect.
-func TestWatchDispatchBookmarkEvents(t *testing.T) {
-	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
-	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
-
-	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, store, false)
-}
-
-func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
-}
-
-func TestEtcdWatchSemantics(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunWatchSemantics(ctx, t, store)
-}
-
-func TestEtcdWatchSemanticsWithConcurrentDecode(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, true)
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunWatchSemantics(ctx, t, store)
-}
-
-func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
-}
-
-func TestWatchListMatchSingle(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunWatchListMatchSingle(ctx, t, store)
+		storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, store, false)
+	})
+	t.Run("SendInitialEventsBackwardCompatibility", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+	})
+	t.Run("WatchSemantics", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunWatchSemantics(ctx, t, store)
+	})
+	t.Run("WatchSemanticsWithConcurrentDecode", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, true)
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunWatchSemantics(ctx, t, store)
+	})
+	t.Run("WatchSemanticInitialEventsExtended", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
+	})
+	t.Run("WatchListMatchSingle", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunWatchListMatchSingle(ctx, t, store)
+	})
+	t.Run("WatchErrorEventIsBlockingFurtherEvent", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		storagetesting.RunWatchErrorIsBlockingFurtherEvents(ctx, t, &storeWithPrefixTransformer{store})
+	})
 }
 
 // =======================================================================
@@ -162,28 +143,6 @@ func TestWatchListMatchSingle(t *testing.T) {
 // As such, they may focus e.g. on non-functional aspects like performance
 // impact.
 // =======================================================================
-
-func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
-	origCtx, store, _ := testSetup(t)
-	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
-	// make resultChan and errChan blocking to ensure ordering.
-	w.resultChan = make(chan watch.Event)
-	w.errChan = make(chan error)
-	// The event flow goes like:
-	// - first we send an error, it should block on resultChan.
-	// - Then we cancel ctx. The blocking on resultChan should be freed up
-	//   and run() goroutine should return.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		w.run(false, true)
-		wg.Done()
-	}()
-	w.errChan <- fmt.Errorf("some error")
-	cancel()
-	wg.Wait()
-}
 
 // TestWatchErrorIncorrectConfiguration checks if an error
 // will be returned when the storage hasn't been properly
@@ -245,7 +204,7 @@ func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
 		t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
 	}
 
-	w, err := store.watcher.Watch(ctx, "/abc", int64(102), requestOpts)
+	w, err := store.watcher.Watch(ctx, "/abc/", int64(102), requestOpts)
 	if err != nil {
 		t.Fatal(err)
 	}

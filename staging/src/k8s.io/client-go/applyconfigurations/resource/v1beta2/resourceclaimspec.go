@@ -20,7 +20,10 @@ package v1beta2
 
 // ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
+//
+// ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.
 type ResourceClaimSpecApplyConfiguration struct {
+	// Devices defines how to request devices.
 	Devices *DeviceClaimApplyConfiguration `json:"devices,omitempty"`
 }
 

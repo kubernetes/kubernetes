@@ -47,6 +47,16 @@ func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (au
 	return authorizer.DecisionAllow, "you're not dave", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (s sarAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(s.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (sarAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
@@ -178,6 +188,12 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 		},
 	})
 	defer tearDownFn()
+	// Switch back to a working authorizer so that tests in tear down work as expected.
+	defer func() {
+		mutex.Lock()
+		defer mutex.Unlock()
+		username = "alice"
+	}()
 
 	tests := []struct {
 		name           string

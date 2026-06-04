@@ -23,54 +23,46 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-// ResourceClaimSubsystem - subsystem name used for ResourceClaim creation
-const ResourceClaimSubsystem = "resourceclaim_controller"
+// subsystem is intentionally generic because similar metrics exist also elsewhere.
+const subsystem = "dynamic_resource_allocation"
+
+type NumResourceClaimLabels struct {
+	Allocated   string
+	AdminAccess string
+	Source      string
+}
 
 var (
-	// ResourceClaimCreateAttempts tracks the number of
-	// ResourceClaims().Create calls (both successful and unsuccessful)
-	ResourceClaimCreateAttempts = metrics.NewCounter(
-		&metrics.CounterOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "create_attempts_total",
-			Help:           "Number of ResourceClaims creation requests",
-			StabilityLevel: metrics.ALPHA,
-		})
-	// ResourceClaimCreateFailures tracks the number of unsuccessful
-	// ResourceClaims().Create calls
-	ResourceClaimCreateFailures = metrics.NewCounter(
-		&metrics.CounterOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "create_failures_total",
-			Help:           "Number of ResourceClaims creation request failures",
-			StabilityLevel: metrics.ALPHA,
-		})
-	// NumResourceClaims tracks the current number of ResourceClaims.
-	NumResourceClaims = metrics.NewGauge(
-		&metrics.GaugeOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "resource_claims",
-			Help:           "Number of ResourceClaims",
-			StabilityLevel: metrics.ALPHA,
-		})
-	// NumAllocatedResourceClaims tracks the current number of allocated ResourceClaims.
-	NumAllocatedResourceClaims = metrics.NewGauge(
-		&metrics.GaugeOpts{
-			Subsystem:      ResourceClaimSubsystem,
-			Name:           "allocated_resource_claims",
-			Help:           "Number of allocated ResourceClaims",
-			StabilityLevel: metrics.ALPHA,
-		})
+	// NumResourceClaimsDesc tracks the number of ResourceClaims,
+	// categorized by their allocation status, admin access, and source.
+	// Source can be 'resource_claim_template' (created from a template),
+	// 'extended_resource' (extended resources), or empty (manually created by a user).
+	NumResourceClaimsDesc = metrics.NewDesc(
+		metrics.BuildFQName("", subsystem, "resource_claims"),
+		"Number of ResourceClaims, categorized by allocation status, admin access, and source. "+
+			"Source can be 'resource_claim_template' (created from a template), "+
+			"'extended_resource' (extended resources), or empty (manually created by a user).",
+		[]string{"allocated", "admin_access", "source"}, nil,
+		metrics.ALPHA, "")
 )
 
 var registerMetrics sync.Once
 
+// testMode indicates whether we're running in test mode
+// In test mode, we don't register the custom collector in the global registry
+var testMode bool
+
+// SetTestMode enables or disables test mode
+func SetTestMode(enabled bool) {
+	testMode = enabled
+}
+
 // RegisterMetrics registers ResourceClaim metrics.
-func RegisterMetrics() {
+func RegisterMetrics(collector metrics.StableCollector) {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(ResourceClaimCreateAttempts)
-		legacyregistry.MustRegister(ResourceClaimCreateFailures)
-		legacyregistry.MustRegister(NumResourceClaims)
-		legacyregistry.MustRegister(NumAllocatedResourceClaims)
+		if !testMode && collector != nil {
+			// Only register custom collector in non-test mode
+			legacyregistry.CustomMustRegister(collector)
+		}
 	})
 }

@@ -237,8 +237,10 @@ status:
   conditions:
   - lastTransitionTime: "2003-01-01T01:01:01Z"
     message: messageValue
+    observedGeneration: 6
     reason: reasonValue
     status: statusValue
     type: typeValue
+  observedGeneration: 4
   storedVersions:
   - storedVersionsValue

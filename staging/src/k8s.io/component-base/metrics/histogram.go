@@ -19,6 +19,7 @@ package metrics
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,7 +29,6 @@ import (
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
 type Histogram struct {
-	ctx context.Context
 	ObserverMetric
 	*HistogramOpts
 	lazyMetric
@@ -37,7 +37,8 @@ type Histogram struct {
 
 // exemplarHistogramMetric holds a context to extract exemplar labels from, and a historgram metric to attach them to. It implements the metricWithExemplar interface.
 type exemplarHistogramMetric struct {
-	*Histogram
+	ctx      context.Context
+	delegate ObserverMetric
 }
 
 type exemplarHistogramVec struct {
@@ -45,18 +46,9 @@ type exemplarHistogramVec struct {
 	observer prometheus.Observer
 }
 
-func (h *Histogram) Observe(v float64) {
-	h.withExemplar(v)
-}
-
-// withExemplar initializes the exemplarMetric object and sets the exemplar value.
-func (h *Histogram) withExemplar(v float64) {
-	(&exemplarHistogramMetric{h}).withExemplar(v)
-}
-
-// withExemplar attaches an exemplar to the metric.
-func (e *exemplarHistogramMetric) withExemplar(v float64) {
-	if m, ok := e.Histogram.ObserverMetric.(prometheus.ExemplarObserver); ok {
+// Observe attaches an exemplar to the metric and then calls the delegate.
+func (e *exemplarHistogramMetric) Observe(v float64) {
+	if m, ok := e.delegate.(prometheus.ExemplarObserver); ok {
 		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
 		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
 			exemplarLabels := prometheus.Labels{
@@ -68,7 +60,7 @@ func (e *exemplarHistogramMetric) withExemplar(v float64) {
 		}
 	}
 
-	e.ObserverMetric.Observe(v)
+	e.delegate.Observe(v)
 }
 
 // NewHistogram returns an object which is Histogram-like. However, nothing
@@ -100,7 +92,7 @@ func (h *Histogram) DeprecatedVersion() *semver.Version {
 // and stores a reference to it
 func (h *Histogram) initializeMetric() {
 	h.HistogramOpts.annotateStabilityLevel()
-	// this actually creates the underlying prometheus gauge.
+	// this actually creates the underlying prometheus histogram.
 	h.setPrometheusHistogram(prometheus.NewHistogram(h.HistogramOpts.toPromHistogramOpts()))
 }
 
@@ -113,8 +105,7 @@ func (h *Histogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
 func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
-	h.ctx = ctx
-	return h.ObserverMetric
+	return &exemplarHistogramMetric{ctx: ctx, delegate: h.ObserverMetric}
 }
 
 // HistogramVec is the internal representation of our wrapping struct around prometheus
@@ -181,17 +172,19 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label values to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
-	} else {
-		v.initializeLabelAllowListsOnce.Do(func() {
-			allowListLock.RLock()
-			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
-				v.LabelValueAllowLists = allowList
-				allowList.ConstrainToAllowedList(v.originalLabels, lvs)
-			}
-			allowListLock.RUnlock()
-		})
 	}
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
@@ -204,19 +197,37 @@ func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label map to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
-	} else {
-		v.initializeLabelAllowListsOnce.Do(func() {
-			allowListLock.RLock()
-			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
-				v.LabelValueAllowLists = allowList
-				allowList.ConstrainLabelMap(labels)
-			}
-			allowListLock.RUnlock()
-		})
 	}
+
 	return v.HistogramVec.With(labels)
+}
+
+// ObserveSince returns a function that observes the duration since the given start time.
+// This is intended to be used with defer to measure the time elapsed since a given point:
+//
+//	start := time.Now()
+//	defer metricVec.ObserveSince(start, "label1", "label2")()
+//
+// The returned function must be called (typically via defer) to record the observation.
+// This pattern avoids the common pitfall where arguments to deferred functions are evaluated
+// immediately, which would result in incorrect timing measurements.
+func (v *HistogramVec) ObserveSince(start time.Time, lvs ...string) func() {
+	return func() {
+		v.WithLabelValues(lvs...).Observe(time.Since(start).Seconds())
+	}
 }
 
 // Delete deletes the metric where the variable labels are the same as those
@@ -296,4 +307,9 @@ func (vc *HistogramVecWithContext) With(labels map[string]string) *exemplarHisto
 		HistogramVecWithContext: vc,
 		observer:                vc.HistogramVec.With(labels),
 	}
+}
+
+// ObserveSince is the wrapper of HistogramVec.ObserveSince.
+func (vc *HistogramVecWithContext) ObserveSince(start time.Time, lvs ...string) func() {
+	return vc.HistogramVec.ObserveSince(start, lvs...)
 }

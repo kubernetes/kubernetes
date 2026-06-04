@@ -82,7 +82,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		e2epv.SkipIfNoDefaultStorageClass(ctx, client)
 		t := testsuites.StorageClassTest{
 			Timeouts:  f.Timeouts,
-			ClaimSize: "1Gi",
+			ClaimSize: "10Gi",
 		}
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			NamePrefix: prefix,

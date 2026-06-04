@@ -424,3 +424,111 @@ func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
 	}
 
 }
+
+func TestTopNodeWithSwap(t *testing.T) {
+	runTopCmd := func(expectedMetrics *metricsv1beta1api.NodeMetricsList, nodes *v1.NodeList) (result string) {
+		cmdtesting.InitTestErrorHandler(t)
+		expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
+
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
+
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+		ns := scheme.Codecs.WithoutConversion()
+
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/api":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				case p == "/apis":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+				case p == expectedNodePath && m == "GET":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
+					return nil, nil
+				}
+			}),
+		}
+		fakemetricsClientset := &metricsfake.Clientset{}
+		fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			return true, expectedMetrics, nil
+		})
+		tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+		streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+
+		cmd := NewCmdTopNode(tf, nil, streams)
+
+		// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+		// TODO then check the particular Run functionality and harvest results from fake clients
+		cmdOptions := &TopNodeOptions{
+			IOStreams: streams,
+			ShowSwap:  true,
+		}
+		if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
+			t.Fatal(err)
+		}
+		cmdOptions.MetricsClient = fakemetricsClientset
+		if err := cmdOptions.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if err := cmdOptions.RunTopNode(); err != nil {
+			t.Fatal(err)
+		}
+
+		return buf.String()
+	}
+
+	for _, tc := range []struct {
+		name                  string
+		isSwapDisabledOnNodes bool
+	}{
+		{
+			name:                  "nodes with swap",
+			isSwapDisabledOnNodes: false,
+		},
+		{
+			name:                  "nodes without swap",
+			isSwapDisabledOnNodes: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			expectedMetrics, nodes := testNodeV1beta1MetricsData()
+			if tc.isSwapDisabledOnNodes {
+				for i := range expectedMetrics.Items {
+					delete(expectedMetrics.Items[i].Usage, "swap")
+				}
+				for i := range nodes.Items {
+					nodes.Items[i].Status.NodeInfo.Swap = nil
+				}
+			}
+
+			result := runTopCmd(expectedMetrics, nodes)
+			fmt.Printf("%s\n", result)
+
+			if !strings.Contains(result, "SWAP(bytes)") {
+				t.Errorf("missing SWAP(bytes) header: \n%s", result)
+			}
+			if !strings.Contains(result, "SWAP(%)") {
+				t.Errorf("missing SWAP(%%) header: \n%s", result)
+			}
+
+			if tc.isSwapDisabledOnNodes {
+				if !strings.Contains(result, "<unknown>") {
+					t.Errorf("expected swap to be <unknown>: \n%s", result)
+				}
+			}
+
+			for _, m := range expectedMetrics.Items {
+				if !strings.Contains(result, m.Name) {
+					t.Errorf("missing metrics for %s: \n%s", m.Name, result)
+				}
+				if _, foundSwapMetric := m.Usage["swap"]; foundSwapMetric != !tc.isSwapDisabledOnNodes {
+					t.Errorf("missing swap metric for %s: \n%s", m.Name, result)
+				}
+			}
+		})
+	}
+}

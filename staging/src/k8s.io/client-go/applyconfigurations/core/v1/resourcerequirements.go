@@ -24,10 +24,25 @@ import (
 
 // ResourceRequirementsApplyConfiguration represents a declarative configuration of the ResourceRequirements type for use
 // with apply.
+//
+// ResourceRequirements describes the compute resource requirements.
 type ResourceRequirementsApplyConfiguration struct {
-	Limits   *corev1.ResourceList              `json:"limits,omitempty"`
-	Requests *corev1.ResourceList              `json:"requests,omitempty"`
-	Claims   []ResourceClaimApplyConfiguration `json:"claims,omitempty"`
+	// Limits describes the maximum amount of compute resources allowed.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	Limits *corev1.ResourceList `json:"limits,omitempty"`
+	// Requests describes the minimum amount of compute resources required.
+	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	Requests *corev1.ResourceList `json:"requests,omitempty"`
+	// Claims lists the names of resources, defined in spec.resourceClaims,
+	// that are used by this container.
+	//
+	// This field depends on the
+	// DynamicResourceAllocation feature gate.
+	//
+	// This field is immutable. It can only be set for containers.
+	Claims []ResourceClaimApplyConfiguration `json:"claims,omitempty"`
 }
 
 // ResourceRequirementsApplyConfiguration constructs a declarative configuration of the ResourceRequirements type for use with

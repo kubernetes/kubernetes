@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -822,7 +823,7 @@ _____________________________________________________________________
 			actual := rt.buf.String()
 			if actual != rt.expected {
 
-				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.StringDiff(actual, rt.expected))
+				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.Diff(actual, rt.expected))
 			}
 		})
 	}

@@ -359,7 +359,7 @@ var _ = SIGDescribe("Watchers", func() {
 
 		ginkgo.By("creating watches starting from each resource version of the events produced and verifying they all receive resource versions in the same order")
 		wcs := []watch.Interface{}
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			wc, err := watchtools.NewRetryWatcher(resourceVersion, listWatcher)
 			framework.ExpectNoError(err, "Failed to watch configmaps in the namespace %s", ns)
 			wcs = append(wcs, wc)
@@ -395,11 +395,6 @@ func watchConfigMaps(ctx context.Context, f *framework.Framework, resourceVersio
 		}),
 	}
 	return c.CoreV1().ConfigMaps(ns).Watch(ctx, opts)
-}
-
-func int64ptr(i int) *int64 {
-	i64 := int64(i)
-	return &i64
 }
 
 func setConfigMapData(cm *v1.ConfigMap, key, value string) {

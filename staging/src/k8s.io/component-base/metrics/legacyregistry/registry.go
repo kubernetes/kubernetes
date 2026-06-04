@@ -90,3 +90,8 @@ func CustomMustRegister(cs ...metrics.StableCollector) {
 		prometheus.MustRegister(c)
 	}
 }
+
+// GetProcessStart return processStart value
+func GetProcessStart() time.Time {
+	return processStart
+}

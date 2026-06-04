@@ -36,4 +36,27 @@ func Test(t *testing.T) {
 		"listTypedefField[0]": {"field Struct.ListTypedefField[*]"},
 		"listTypedefField[1]": {"field Struct.ListTypedefField[*]"},
 	})
+
+	// Test validation ratcheting.
+	st.Value(&Struct{
+		ListField:        []string{"zero", "one"},
+		ListTypedefField: []StringType{StringType("zero"), StringType("one")},
+	}).OldValue(&Struct{
+		// Same data, different order - should still fail.
+		ListField:        []string{"one", "zero"},
+		ListTypedefField: []StringType{StringType("one"), StringType("zero")},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"listField[0]":        {"field Struct.ListField[*]"},
+		"listField[1]":        {"field Struct.ListField[*]"},
+		"listTypedefField[0]": {"field Struct.ListTypedefField[*]"},
+		"listTypedefField[1]": {"field Struct.ListTypedefField[*]"},
+	})
+
+	st.Value(&Struct{
+		ListField:        []string{"zero", "one"},
+		ListTypedefField: []StringType{StringType("zero"), StringType("one")},
+	}).OldValue(&Struct{
+		ListField:        []string{"zero", "one"},
+		ListTypedefField: []StringType{StringType("zero"), StringType("one")},
+	}).ExpectValid()
 }

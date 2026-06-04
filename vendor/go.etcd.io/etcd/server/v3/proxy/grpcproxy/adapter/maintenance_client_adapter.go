@@ -17,9 +17,9 @@ package adapter
 import (
 	"context"
 
-	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-
 	"google.golang.org/grpc"
+
+	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
 
 type mts2mtc struct{ mts pb.MaintenanceServer }
@@ -70,22 +70,24 @@ type ss2scClientStream struct{ chanClientStream }
 type ss2scServerStream struct{ chanServerStream }
 
 func (s *ss2scClientStream) Send(rr *pb.SnapshotRequest) error {
-	return s.SendMsg(rr)
+	return s.SendMsg(rr) //nolint:staticcheck // TODO: remove for a supported version
 }
+
 func (s *ss2scClientStream) Recv() (*pb.SnapshotResponse, error) {
-	var v interface{}
-	if err := s.RecvMsg(&v); err != nil {
+	var v any
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*pb.SnapshotResponse), nil
 }
 
 func (s *ss2scServerStream) Send(rr *pb.SnapshotResponse) error {
-	return s.SendMsg(rr)
+	return s.SendMsg(rr) //nolint:staticcheck // TODO: remove for a supported version
 }
+
 func (s *ss2scServerStream) Recv() (*pb.SnapshotRequest, error) {
-	var v interface{}
-	if err := s.RecvMsg(&v); err != nil {
+	var v any
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*pb.SnapshotRequest), nil

@@ -21,6 +21,8 @@ package heap
 
 import (
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func testHeapObjectKeyFunc(obj testHeapObject) string {
@@ -30,9 +32,20 @@ func testHeapObjectKeyFunc(obj testHeapObject) string {
 type testHeapObject struct {
 	name string
 	val  interface{}
+	size int
+}
+
+func (obj testHeapObject) Size() int {
+	return obj.size
 }
 
 type testMetricRecorder int
+
+func (tmr *testMetricRecorder) Add(val int) {
+	if tmr != nil {
+		*tmr += testMetricRecorder(val)
+	}
+}
 
 func (tmr *testMetricRecorder) Inc() {
 	if tmr != nil {
@@ -52,8 +65,8 @@ func (tmr *testMetricRecorder) Clear() {
 	}
 }
 
-func mkHeapObj(name string, val interface{}) testHeapObject {
-	return testHeapObject{name: name, val: val}
+func mkHeapObj(name string, val interface{}, size int) testHeapObject {
+	return testHeapObject{name: name, val: val, size: size}
 }
 
 func compareInts(val1 testHeapObject, val2 testHeapObject) bool {
@@ -62,74 +75,37 @@ func compareInts(val1 testHeapObject, val2 testHeapObject) bool {
 	return first < second
 }
 
-// TestHeapBasic tests Heap invariant
-func TestHeapBasic(t *testing.T) {
+func expectPopOrder(t *testing.T, h *Heap[testHeapObject], want []int) {
+	t.Helper()
+	var got []int
+	for h.Len() > 0 {
+		item, err := h.Pop()
+		if err != nil {
+			t.Fatalf("unexpected pop error: %v", err)
+		}
+		got = append(got, item.val.(int))
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected pop order (-want, +got):\n%s", diff)
+	}
+}
+
+// TestHeap_Peek tests that Peek returns the minimum element after each insertion.
+func TestHeap_Peek(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
 	const amount = 500
-	var i int
 	var zero testHeapObject
 
-	// empty queue
 	if item, ok := h.Peek(); ok || item != zero {
 		t.Errorf("expected nil object but got %v", item)
 	}
 
-	for i = amount; i > 0; i-- {
-		h.AddOrUpdate(mkHeapObj(string([]rune{'a', rune(i)}), i))
-		// Retrieve head without removing it
+	for i := amount; i > 0; i-- {
+		h.AddOrUpdate(mkHeapObj(string([]rune{'a', rune(i)}), i, 1))
 		head, ok := h.Peek()
 		if e, a := i, head.val; !ok || a != e {
 			t.Errorf("expected %d, got %d", e, a)
 		}
-	}
-
-	// Make sure that the numbers are popped in ascending order.
-	prevNum := 0
-	for i := 0; i < amount; i++ {
-		item, err := h.Pop()
-		num := item.val.(int)
-		// All the items must be sorted.
-		if err != nil || prevNum > num {
-			t.Errorf("got %v out of order, last was %v", item, prevNum)
-		}
-		prevNum = num
-	}
-
-	_, err := h.Pop()
-	if err == nil {
-		t.Errorf("expected Pop() to error on empty heap")
-	}
-}
-
-// TestHeap_AddOrUpdate_Add tests add capabilities of Heap.AddOrUpdate
-// and ensures that heap invariant is preserved after adding items.
-func TestHeap_AddOrUpdate_Add(t *testing.T) {
-	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("baz", 11))
-	h.AddOrUpdate(mkHeapObj("zab", 30))
-	h.AddOrUpdate(mkHeapObj("foo", 13)) // This updates "foo".
-
-	item, err := h.Pop()
-	if e, a := 1, item.val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	item, err = h.Pop()
-	if e, a := 11, item.val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	if err := h.Delete(mkHeapObj("baz", 11)); err == nil { // Nothing is deleted.
-		t.Fatalf("nothing should be deleted from the heap")
-	}
-	h.AddOrUpdate(mkHeapObj("foo", 14)) // foo is updated.
-	item, err = h.Pop()
-	if e, a := 14, item.val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	item, err = h.Pop()
-	if e, a := 30, item.val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
 
@@ -137,32 +113,32 @@ func TestHeap_AddOrUpdate_Add(t *testing.T) {
 // preserved after deleting items.
 func TestHeap_Delete(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("bal", 31))
-	h.AddOrUpdate(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+	h.AddOrUpdate(mkHeapObj("bar", 1, 2))
+	h.AddOrUpdate(mkHeapObj("bal", 31, 3))
+	h.AddOrUpdate(mkHeapObj("baz", 11, 4))
 
 	// Delete head. Delete should work with "key" and doesn't care about the value.
-	if err := h.Delete(mkHeapObj("bar", 200)); err != nil {
+	if obj := h.Delete(mkHeapObj("bar", 200, 2)); obj.name == "" {
 		t.Fatalf("Failed to delete head.")
 	}
 	item, err := h.Pop()
 	if e, a := 10, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
-	h.AddOrUpdate(mkHeapObj("zab", 30))
-	h.AddOrUpdate(mkHeapObj("faz", 30))
+	h.AddOrUpdate(mkHeapObj("zab", 30, 5))
+	h.AddOrUpdate(mkHeapObj("faz", 30, 6))
 	len := h.data.Len()
 	// Delete non-existing item.
-	if err = h.Delete(mkHeapObj("non-existent", 10)); err == nil || len != h.data.Len() {
+	if obj := h.Delete(mkHeapObj("non-existent", 10, 7)); obj.name != "" || len != h.data.Len() {
 		t.Fatalf("Didn't expect any item removal")
 	}
 	// Delete tail.
-	if err = h.Delete(mkHeapObj("bal", 31)); err != nil {
+	if obj := h.Delete(mkHeapObj("bal", 31, 3)); obj.name == "" {
 		t.Fatalf("Failed to delete tail.")
 	}
 	// Delete one of the items with value 30.
-	if err = h.Delete(mkHeapObj("zab", 30)); err != nil {
+	if obj := h.Delete(mkHeapObj("zab", 30, 5)); obj.name == "" {
 		t.Fatalf("Failed to delete item.")
 	}
 	item, err = h.Pop()
@@ -182,14 +158,14 @@ func TestHeap_Delete(t *testing.T) {
 // and ensures that heap invariant is preserved after adding items.
 func TestHeap_AddOrUpdate_Update(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("bal", 31))
-	h.AddOrUpdate(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+	h.AddOrUpdate(mkHeapObj("bar", 1, 2))
+	h.AddOrUpdate(mkHeapObj("bal", 31, 3))
+	h.AddOrUpdate(mkHeapObj("baz", 11, 4))
 
 	// Update an item to a value that should push it to the head.
-	h.AddOrUpdate(mkHeapObj("baz", 0))
-	if h.data.queue[0] != "baz" || h.data.items["baz"].index != 0 {
+	h.AddOrUpdate(mkHeapObj("baz", 0, 5))
+	if h.data.queue[0].key != "baz" || h.data.keyIndex["baz"] != 0 {
 		t.Fatalf("expected baz to be at the head")
 	}
 	item, err := h.Pop()
@@ -197,8 +173,8 @@ func TestHeap_AddOrUpdate_Update(t *testing.T) {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 	// Update bar to push it farther back in the queue.
-	h.AddOrUpdate(mkHeapObj("bar", 100))
-	if h.data.queue[0] != "foo" || h.data.items["foo"].index != 0 {
+	h.AddOrUpdate(mkHeapObj("bar", 100, 6))
+	if h.data.queue[0].key != "foo" || h.data.keyIndex["foo"] != 0 {
 		t.Fatalf("expected foo to be at the head")
 	}
 }
@@ -206,18 +182,18 @@ func TestHeap_AddOrUpdate_Update(t *testing.T) {
 // TestHeap_Get tests Heap.Get.
 func TestHeap_Get(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("bal", 31))
-	h.AddOrUpdate(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+	h.AddOrUpdate(mkHeapObj("bar", 1, 2))
+	h.AddOrUpdate(mkHeapObj("bal", 31, 3))
+	h.AddOrUpdate(mkHeapObj("baz", 11, 4))
 
 	// Get works with the key.
-	item, exists := h.Get(mkHeapObj("baz", 0))
+	item, exists := h.Get(mkHeapObj("baz", 0, 4))
 	if !exists || item.val != 11 {
 		t.Fatalf("unexpected error in getting element")
 	}
 	// Get non-existing object.
-	_, exists = h.Get(mkHeapObj("non-existing", 0))
+	_, exists = h.Get(mkHeapObj("non-existing", 0, 5))
 	if exists {
 		t.Fatalf("didn't expect to get any object")
 	}
@@ -226,10 +202,10 @@ func TestHeap_Get(t *testing.T) {
 // TestHeap_GetByKey tests Heap.GetByKey and is very similar to TestHeap_Get.
 func TestHeap_GetByKey(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("bal", 31))
-	h.AddOrUpdate(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+	h.AddOrUpdate(mkHeapObj("bar", 1, 2))
+	h.AddOrUpdate(mkHeapObj("bal", 31, 3))
+	h.AddOrUpdate(mkHeapObj("baz", 11, 4))
 
 	item, exists := h.GetByKey("baz")
 	if !exists || item.val != 11 {
@@ -258,7 +234,7 @@ func TestHeap_List(t *testing.T) {
 		"faz": 30,
 	}
 	for k, v := range items {
-		h.AddOrUpdate(mkHeapObj(k, v))
+		h.AddOrUpdate(mkHeapObj(k, v, 1))
 	}
 	list = h.List()
 	if len(list) != len(items) {
@@ -272,28 +248,502 @@ func TestHeap_List(t *testing.T) {
 	}
 }
 
+func TestHeapHas(t *testing.T) {
+	t.Run("empty heap", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		if got := h.Has(mkHeapObj("foo", 0, 1)); got != false {
+			t.Errorf("Has(%q) = %v, want %v", "foo", got, false)
+		}
+	})
+
+	t.Run("non-existing item in populated heap", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("bar", 1, 1))
+		if got := h.Has(mkHeapObj("foo", 0, 1)); got != false {
+			t.Errorf("Has(%q) = %v, want %v", "foo", got, false)
+		}
+	})
+
+	t.Run("existing item (single element)", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+		if got := h.Has(mkHeapObj("foo", 0, 1)); got != true {
+			t.Errorf("Has(%q) = %v, want %v", "foo", got, true)
+		}
+	})
+
+	t.Run("existing item (multiple elements)", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("bar", 1, 1))
+		h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+		h.AddOrUpdate(mkHeapObj("baz", 11, 1))
+		if got := h.Has(mkHeapObj("foo", 0, 1)); got != true {
+			t.Errorf("Has(%q) = %v, want %v", "foo", got, true)
+		}
+	})
+
+	t.Run("item missing after deletion", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+		h.Delete(mkHeapObj("foo", 0, 1))
+		if got := h.Has(mkHeapObj("foo", 0, 1)); got != false {
+			t.Errorf("Has(%q) = %v, want %v", "foo", got, false)
+		}
+	})
+}
+
+func TestHeapZeroAndOneElement(t *testing.T) {
+	t.Run("pop single element", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("foo", 42, 1))
+		item, err := h.Pop()
+		if e, a := 42, item.val; err != nil || a != e {
+			t.Fatalf("expected %d, got %d", e, a)
+		}
+		if e, a := 0, h.Len(); a != e {
+			t.Fatalf("expected %d, got %d", e, a)
+		}
+	})
+
+	t.Run("pop empty heap errors", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		_, err := h.Pop()
+		if err == nil {
+			t.Fatalf("expected error popping empty heap")
+		}
+	})
+
+	t.Run("delete single element", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("bar", 7, 1))
+		h.Delete(mkHeapObj("bar", 0, 1))
+		if e, a := 0, h.Len(); a != e {
+			t.Fatalf("expected %d, got %d", e, a)
+		}
+	})
+
+	t.Run("peek single element", func(t *testing.T) {
+		h := New(testHeapObjectKeyFunc, compareInts)
+		h.AddOrUpdate(mkHeapObj("baz", 99, 1))
+		item, ok := h.Peek()
+		if e, a := 99, item.val; !ok || a != e {
+			t.Fatalf("expected %d, got %d", e, a)
+		}
+	})
+}
+
+func TestHeapPopOrder(t *testing.T) {
+	tests := []struct {
+		name     string
+		inserts  []testHeapObject
+		expected []int
+	}{
+		{
+			name: "ascending insertion",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 1, 1),
+				mkHeapObj("bar", 2, 1),
+				mkHeapObj("baz", 3, 1),
+			},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name: "descending insertion",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 30, 1),
+				mkHeapObj("bar", 20, 1),
+				mkHeapObj("baz", 10, 1),
+			},
+			expected: []int{10, 20, 30},
+		},
+		{
+			name: "random insertion",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 15, 1),
+				mkHeapObj("bar", 3, 1),
+				mkHeapObj("baz", 42, 1),
+				mkHeapObj("zab", 1, 1),
+				mkHeapObj("faz", 27, 1),
+			},
+			expected: []int{1, 3, 15, 27, 42},
+		},
+		{
+			name: "duplicate values",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 5, 1),
+				mkHeapObj("bar", 5, 1),
+				mkHeapObj("baz", 5, 1),
+			},
+			expected: []int{5, 5, 5},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(testHeapObjectKeyFunc, compareInts)
+			for _, obj := range tt.inserts {
+				h.AddOrUpdate(obj)
+			}
+
+			expectPopOrder(t, h, tt.expected)
+		})
+	}
+}
+
+func TestHeapDeleteMiddle(t *testing.T) {
+	tests := []struct {
+		name         string
+		inserts      []testHeapObject
+		deletes      []string
+		expectedPops []int
+	}{
+		{
+			name: "delete middle items",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 10, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("bal", 20, 1),
+				mkHeapObj("baz", 15, 1),
+				mkHeapObj("zab", 25, 1),
+				mkHeapObj("faz", 5, 1),
+			},
+			deletes:      []string{"foo", "baz"},
+			expectedPops: []int{1, 5, 20, 25},
+		},
+		{
+			name: "delete head",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 1, 1),
+				mkHeapObj("bar", 10, 1),
+				mkHeapObj("baz", 20, 1),
+			},
+			deletes:      []string{"foo"},
+			expectedPops: []int{10, 20},
+		},
+		{
+			name: "delete all but one",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 10, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("baz", 20, 1),
+			},
+			deletes:      []string{"foo", "baz"},
+			expectedPops: []int{1},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(testHeapObjectKeyFunc, compareInts)
+			for _, obj := range tt.inserts {
+				h.AddOrUpdate(obj)
+			}
+			for _, key := range tt.deletes {
+				h.Delete(mkHeapObj(key, 0, 1))
+			}
+
+			expectPopOrder(t, h, tt.expectedPops)
+		})
+	}
+}
+
+func TestHeapUpdatePriority(t *testing.T) {
+	tests := []struct {
+		name         string
+		inserts      []testHeapObject
+		updates      []testHeapObject
+		expectedPops []int
+	}{
+		{
+			name: "update to same value",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 10, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("baz", 11, 1),
+			},
+			updates:      []testHeapObject{mkHeapObj("foo", 10, 1)},
+			expectedPops: []int{1, 10, 11},
+		},
+		{
+			name: "update to lower value (move to head)",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 10, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("baz", 11, 1),
+			},
+			updates:      []testHeapObject{mkHeapObj("baz", 0, 1)},
+			expectedPops: []int{0, 1, 10},
+		},
+		{
+			name: "update to higher value (move to tail)",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 10, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("baz", 11, 1),
+			},
+			updates:      []testHeapObject{mkHeapObj("bar", 100, 1)},
+			expectedPops: []int{10, 11, 100},
+		},
+		{
+			name: "full order inversion",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 1, 1),
+				mkHeapObj("bar", 2, 1),
+				mkHeapObj("baz", 3, 1),
+				mkHeapObj("zab", 4, 1),
+				mkHeapObj("faz", 5, 1),
+			},
+			updates: []testHeapObject{
+				mkHeapObj("faz", 0, 1),
+				mkHeapObj("foo", 100, 1),
+			},
+			expectedPops: []int{0, 2, 3, 4, 100},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(testHeapObjectKeyFunc, compareInts)
+			for _, obj := range tt.inserts {
+				h.AddOrUpdate(obj)
+			}
+			for _, obj := range tt.updates {
+				h.AddOrUpdate(obj)
+			}
+
+			expectPopOrder(t, h, tt.expectedPops)
+		})
+	}
+}
+
+func TestHeapLen(t *testing.T) {
+	tests := []struct {
+		name        string
+		action      func(h *Heap[testHeapObject])
+		expectedLen int
+	}{
+		{
+			name:        "empty heap",
+			action:      func(h *Heap[testHeapObject]) {},
+			expectedLen: 0,
+		},
+		{
+			name: "after one add",
+			action: func(h *Heap[testHeapObject]) {
+				h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+			},
+			expectedLen: 1,
+		},
+		{
+			name: "after three adds",
+			action: func(h *Heap[testHeapObject]) {
+				h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+				h.AddOrUpdate(mkHeapObj("bar", 1, 1))
+				h.AddOrUpdate(mkHeapObj("baz", 11, 1))
+			},
+			expectedLen: 3,
+		},
+		{
+			name: "update does not change len",
+			action: func(h *Heap[testHeapObject]) {
+				h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+				h.AddOrUpdate(mkHeapObj("bar", 1, 1))
+				h.AddOrUpdate(mkHeapObj("foo", 20, 1))
+			},
+			expectedLen: 2,
+		},
+		{
+			name: "after add and delete",
+			action: func(h *Heap[testHeapObject]) {
+				h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+				h.AddOrUpdate(mkHeapObj("bar", 1, 1))
+				h.Delete(mkHeapObj("bar", 0, 1))
+			},
+			expectedLen: 1,
+		},
+		{
+			name: "after add and pop",
+			action: func(h *Heap[testHeapObject]) {
+				h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+				h.AddOrUpdate(mkHeapObj("bar", 1, 1))
+				_, _ = h.Pop()
+			},
+			expectedLen: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(testHeapObjectKeyFunc, compareInts)
+			tt.action(h)
+			if e, a := tt.expectedLen, h.Len(); a != e {
+				t.Fatalf("expected %d, got %d", e, a)
+			}
+		})
+	}
+}
+
+func TestHeapPopAllAndReuse(t *testing.T) {
+	tests := []struct {
+		name         string
+		firstRound   []testHeapObject
+		secondRound  []testHeapObject
+		expectedPops []int
+	}{
+		{
+			name: "reuse with different keys",
+			firstRound: []testHeapObject{
+				mkHeapObj("foo", 3, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("baz", 2, 1),
+			},
+			secondRound: []testHeapObject{
+				mkHeapObj("x", 20, 1),
+				mkHeapObj("y", 10, 1),
+				mkHeapObj("z", 15, 1),
+			},
+			expectedPops: []int{10, 15, 20},
+		},
+		{
+			name: "reuse with same keys",
+			firstRound: []testHeapObject{
+				mkHeapObj("foo", 100, 1),
+				mkHeapObj("bar", 200, 1),
+			},
+			secondRound: []testHeapObject{
+				mkHeapObj("foo", 5, 1),
+				mkHeapObj("bar", 3, 1),
+			},
+			expectedPops: []int{3, 5},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(testHeapObjectKeyFunc, compareInts)
+			for _, obj := range tt.firstRound {
+				h.AddOrUpdate(obj)
+			}
+			for h.Len() > 0 {
+				_, _ = h.Pop()
+			}
+			for _, obj := range tt.secondRound {
+				h.AddOrUpdate(obj)
+			}
+			expectPopOrder(t, h, tt.expectedPops)
+		})
+	}
+}
+
+func TestHeapDeleteAll(t *testing.T) {
+	tests := []struct {
+		name        string
+		inserts     []testHeapObject
+		deleteOrder []string
+	}{
+		{
+			name: "delete in random order",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 10, 1),
+				mkHeapObj("bar", 1, 1),
+				mkHeapObj("bal", 31, 1),
+				mkHeapObj("baz", 11, 1),
+				mkHeapObj("zab", 30, 1),
+			},
+			deleteOrder: []string{"baz", "foo", "zab", "bar", "bal"},
+		},
+		{
+			name: "delete head first",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 1, 1),
+				mkHeapObj("bar", 10, 1),
+				mkHeapObj("baz", 20, 1),
+			},
+			deleteOrder: []string{"foo", "bar", "baz"},
+		},
+		{
+			name: "delete tail first",
+			inserts: []testHeapObject{
+				mkHeapObj("foo", 1, 1),
+				mkHeapObj("bar", 10, 1),
+				mkHeapObj("baz", 20, 1),
+			},
+			deleteOrder: []string{"baz", "bar", "foo"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(testHeapObjectKeyFunc, compareInts)
+			for _, obj := range tt.inserts {
+				h.AddOrUpdate(obj)
+			}
+			for _, key := range tt.deleteOrder {
+				h.Delete(mkHeapObj(key, 0, 1))
+			}
+			if e, a := 0, h.Len(); a != e {
+				t.Fatalf("expected %d, got %d", e, a)
+			}
+			// Heap should still be usable.
+			h.AddOrUpdate(mkHeapObj("new", 5, 1))
+			item, err := h.Pop()
+			if e, a := 5, item.val; err != nil || a != e {
+				t.Fatalf("expected %d, got %d", e, a)
+			}
+		})
+	}
+}
+
+func TestHeapLargeScale(t *testing.T) {
+	h := New(testHeapObjectKeyFunc, compareInts)
+	const amount = 1000
+
+	// Insert items in descending order.
+	for i := amount; i > 0; i-- {
+		h.AddOrUpdate(mkHeapObj(string([]rune{'a', rune(i)}), i, 1))
+	}
+
+	// Update a subset to new priorities.
+	for i := 1; i <= amount; i += 10 {
+		h.AddOrUpdate(mkHeapObj(string([]rune{'a', rune(i)}), amount+i, 1))
+	}
+
+	// Delete a subset.
+	for i := 5; i <= amount; i += 10 {
+		h.Delete(mkHeapObj(string([]rune{'a', rune(i)}), 0, 1))
+	}
+
+	// Pop all remaining and verify sorted order.
+	prevNum := 0
+	for h.Len() > 0 {
+		item, err := h.Pop()
+		if err != nil {
+			t.Fatalf("unexpected pop error: %v", err)
+		}
+		num := item.val.(int)
+		if prevNum > num {
+			t.Fatalf("got %d out of order, last was %d", num, prevNum)
+		}
+		prevNum = num
+	}
+}
+
 func TestHeapWithRecorder(t *testing.T) {
 	metricRecorder := new(testMetricRecorder)
 	h := NewWithRecorder(testHeapObjectKeyFunc, compareInts, metricRecorder)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("baz", 100))
-	h.AddOrUpdate(mkHeapObj("qux", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10, 1))
+	h.AddOrUpdate(mkHeapObj("bar", 1, 2))
+	h.AddOrUpdate(mkHeapObj("baz", 100, 3))
+	h.AddOrUpdate(mkHeapObj("qux", 11, 4))
 
-	if *metricRecorder != 4 {
-		t.Errorf("expected count to be 4 but got %d", *metricRecorder)
+	if *metricRecorder != 10 {
+		t.Errorf("expected count to be 10 (1+2+3+4) but got %d", *metricRecorder)
 	}
-	if err := h.Delete(mkHeapObj("bar", 1)); err != nil {
-		t.Fatal(err)
+	if obj := h.Delete(mkHeapObj("bar", 1, 2)); obj.name == "" {
+		t.Fatalf("Failed to delete item")
 	}
-	if *metricRecorder != 3 {
-		t.Errorf("expected count to be 3 but got %d", *metricRecorder)
+	if *metricRecorder != 8 {
+		t.Errorf("expected count to be 8 (1+3+4) but got %d", *metricRecorder)
 	}
 	if _, err := h.Pop(); err != nil {
 		t.Fatal(err)
 	}
-	if *metricRecorder != 2 {
-		t.Errorf("expected count to be 2 but got %d", *metricRecorder)
+	if *metricRecorder != 7 {
+		t.Errorf("expected count to be 7 (3+4) but got %d", *metricRecorder)
 	}
 
 	h.metricRecorder.Clear()

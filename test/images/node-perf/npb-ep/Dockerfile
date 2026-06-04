@@ -13,21 +13,25 @@
 # limitations under the License.
 
 ARG BASEIMAGE
-FROM $BASEIMAGE as build_node_perf_npb_ep
+FROM $BASEIMAGE AS build_node_perf_npb_ep
 
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+RUN apt-get update && apt-get install -y libc6-dev g++ bzip2 dpkg-dev build-essential gfortran
 
-RUN apt-get update && apt-get install -y build-essential gfortran
+ADD http://www.nas.nasa.gov/assets/npb/NPB3.4.3.tar.gz .
+# Fix permissions for cross-build with QEMU emulation
+RUN tar xzf NPB3.4.3.tar.gz && chmod -R a+rX NPB3.4.3
 
-ADD http://www.nas.nasa.gov/assets/npb/NPB3.3.1.tar.gz .
-RUN tar xzf NPB3.3.1.tar.gz
+WORKDIR ./NPB3.4.3/NPB3.4-OMP
 
-WORKDIR ./NPB3.3.1/NPB3.3-OMP
+# Add missing shebangs to shell scripts - required for cross-build with QEMU emulation
+# Without shebangs, dash (default /bin/sh on Debian) fails to execute these scripts via make
+RUN sed -i '1i#!/bin/sh' sys/print_header sys/print_instructions
+
 RUN if [ $(arch) != "x86_64" ]; then \
-    sed s/-mcmodel=medium//g config/NAS.samples/make.def.gcc_x86 > config/make.def; \
-else \
-    cp config/NAS.samples/make.def.gcc_x86 config/make.def; \
-fi
+    sed s/-mcmodel=medium//g config/NAS.samples/make.def_gcc > config/make.def; \
+    else \
+    cp config/NAS.samples/make.def_gcc config/make.def; \
+    fi
 RUN make EP CLASS=D
 
 # Copying the required libraries (shared object files) to a convenient location so that it can be copied into the
@@ -36,7 +40,7 @@ RUN mkdir -p /lib-copy && find /usr/lib -name "*.so.*" -exec cp {} /lib-copy \;
 
 FROM $BASEIMAGE
 
-COPY --from=build_node_perf_npb_ep /NPB3.3.1/NPB3.3-OMP/bin/ep.D.x /
+COPY --from=build_node_perf_npb_ep /NPB3.4.3/NPB3.4-OMP/bin/ep.D.x /
 COPY --from=build_node_perf_npb_ep /lib-copy /lib-copy
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/lib-copy"
 

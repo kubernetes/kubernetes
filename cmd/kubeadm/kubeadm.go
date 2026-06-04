@@ -18,9 +18,9 @@ package main
 
 import (
 	"k8s.io/kubernetes/cmd/kubeadm/app"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	utilerrors "k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func main() {
-	kubeadmutil.CheckErr(app.Run())
+	utilerrors.HandleError(app.Run())
 }

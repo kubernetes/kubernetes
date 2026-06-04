@@ -401,6 +401,7 @@ func autoConvert_api_ExecConfig_To_v1_ExecConfig(in *api.ExecConfig, out *ExecCo
 	out.InteractiveMode = ExecInteractiveMode(in.InteractiveMode)
 	// INFO: in.StdinUnavailable opted out of conversion generation
 	// INFO: in.StdinUnavailableMessage opted out of conversion generation
+	// INFO: in.PluginPolicy opted out of conversion generation
 	return nil
 }
 

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	netutils "k8s.io/utils/net"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -40,8 +40,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -58,13 +58,13 @@ import (
 
 // podStrategy implements behavior for Pods
 type podStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = podStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -96,6 +96,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
+	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
 }
 
@@ -132,7 +133,7 @@ func (podStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for pods.
-func (podStrategy) AllowCreateOnUpdate() bool {
+func (podStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -154,7 +155,7 @@ func (podStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
-func (podStrategy) AllowUnconditionalUpdate() bool {
+func (podStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -354,7 +355,10 @@ var ResizeStrategy = podResizeStrategy{
 	),
 }
 
-// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources, pod.Spec.InitContainers[*].Resources, ResizePolicy and certain metadata
+// dropNonResizeUpdates discards all changes except for
+// pod.Spec.Containers[*].Resources, pod.Spec.InitContainers[*].Resources,
+// ResizePolicy and certain metadata. If InPlacePodLevelResourcesVerticalScaling
+// feature is enabled, pod-level resources are also preserved.
 func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// Containers are not allowed to be added, removed, re-ordered, or renamed.
 	// If we detect any of these changes, we will return new podspec as-is and
@@ -363,17 +367,24 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 		return newPod
 	}
 
+	// Preserve the incoming pod-level resource from the new pod object.
+	newPodResources := newPod.Spec.Resources
+
 	containers := dropNonResizeUpdatesForContainers(newPod.Spec.Containers, oldPod.Spec.Containers)
 	initContainers := dropNonResizeUpdatesForContainers(newPod.Spec.InitContainers, oldPod.Spec.InitContainers)
 
 	newPod.Spec = oldPod.Spec
+	// If PodLevelResources and InPlacePodLevelResourcesVerticalScaling feature gates is enabled,
+	// restore the saved pod-level resource requests to the new pod's spec.
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		newPod.Spec.Resources = newPodResources
+	}
+
 	newPod.Status = oldPod.Status
 	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
 
 	newPod.Spec.Containers = containers
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		newPod.Spec.InitContainers = initContainers
-	}
+	newPod.Spec.InitContainers = initContainers
 
 	return newPod
 }
@@ -440,15 +451,11 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	var indexFields = []string{"spec.nodeName"}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
-		indexFields = append(indexFields, "metadata.namespace")
-	}
 	return storage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: indexFields,
+		IndexFields: []string{"spec.nodeName"},
 	}
 }
 
@@ -466,24 +473,11 @@ func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
-// NamespaceIndexFunc return value name of given object.
-func NamespaceIndexFunc(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return nil, fmt.Errorf("not a pod")
-	}
-	return []string{pod.Namespace}, nil
-}
-
 // Indexers returns the indexers for pod storage.
 func Indexers() *cache.Indexers {
-	var indexers = cache.Indexers{
+	return &cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
-		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
-	}
-	return &indexers
 }
 
 // ToSelectableFields returns a field set that represents the object
@@ -722,7 +716,7 @@ func AttachLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodAttachOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "attach")
 }
 
@@ -734,7 +728,7 @@ func ExecLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodExecOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "exec")
 }
 
@@ -746,7 +740,7 @@ func streamLocation(
 	opts runtime.Object,
 	container,
 	path string,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -778,7 +772,7 @@ func streamLocation(
 		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo.Transport, nil
+	return loc, nodeInfo, nil
 }
 
 // PortForwardLocation returns the port-forward URL for a pod.
@@ -788,7 +782,7 @@ func PortForwardLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodPortForwardOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -813,7 +807,7 @@ func PortForwardLocation(
 		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo.Transport, nil
+	return loc, nodeInfo, nil
 }
 
 // validateContainer validate container is valid for pod, return valid container
@@ -892,6 +886,25 @@ func mutatePodAffinity(pod *api.Pod) {
 	}
 }
 
+func applyMatchLabelKeys(constraint *api.TopologySpreadConstraint, labels map[string]string) {
+	if len(constraint.MatchLabelKeys) == 0 || constraint.LabelSelector == nil {
+		// If LabelSelector is nil, we don't need to apply label keys to it because nil-LabelSelector is match none.
+		return
+	}
+
+	applyLabelKeysToLabelSelector(constraint.LabelSelector, constraint.MatchLabelKeys, metav1.LabelSelectorOpIn, labels)
+}
+
+func mutateTopologySpreadConstraints(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) || !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge) || pod.Spec.TopologySpreadConstraints == nil {
+		return
+	}
+	topologySpreadConstraints := pod.Spec.TopologySpreadConstraints
+	for i := range topologySpreadConstraints {
+		applyMatchLabelKeys(&topologySpreadConstraints[i], pod.Labels)
+	}
+}
+
 // applySchedulingGatedCondition adds a {type:PodScheduled, reason:SchedulingGated} condition
 // to a new-created Pod if necessary.
 func applySchedulingGatedCondition(pod *api.Pod) {
@@ -938,23 +951,9 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 				containerProfile = ctr.SecurityContext.AppArmorProfile
 			}
 
-			// sync field and annotation
-			if !hasAnnotation {
-				newAnnotation := ""
-				if containerProfile != nil {
-					newAnnotation = appArmorAnnotationForField(containerProfile)
-				} else if podProfile != nil {
-					newAnnotation = appArmorAnnotationForField(podProfile)
-				}
-
-				if newAnnotation != "" {
-					if pod.Annotations == nil {
-						pod.Annotations = map[string]string{}
-					}
-					pod.Annotations[key] = newAnnotation
-				}
-			} else if containerProfile == nil {
-				newField := apparmorFieldForAnnotation(annotation)
+			// Sync deprecated AppArmor annotations to fields
+			if hasAnnotation && containerProfile == nil {
+				newField := podutil.ApparmorFieldForAnnotation(annotation)
 				if errs := corevalidation.ValidateAppArmorProfileField(newField, &field.Path{}); len(errs) > 0 {
 					// Skip copying invalid value.
 					newField = nil
@@ -984,57 +983,6 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 
 			return true
 		})
-}
-
-// appArmorFieldForAnnotation takes a pod apparmor profile field and returns the
-// converted annotation value
-func appArmorAnnotationForField(field *api.AppArmorProfile) string {
-	// If only apparmor fields are specified, add the corresponding annotations.
-	// This ensures that the fields are enforced even if the node version
-	// trails the API version
-	switch field.Type {
-	case api.AppArmorProfileTypeUnconfined:
-		return api.DeprecatedAppArmorAnnotationValueUnconfined
-
-	case api.AppArmorProfileTypeRuntimeDefault:
-		return api.DeprecatedAppArmorAnnotationValueRuntimeDefault
-
-	case api.AppArmorProfileTypeLocalhost:
-		if field.LocalhostProfile != nil {
-			return api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + *field.LocalhostProfile
-		}
-	}
-
-	// we can only reach this code path if the LocalhostProfile is nil but the
-	// provided field type is AppArmorProfileTypeLocalhost or if an unrecognized
-	// type is specified
-	return ""
-}
-
-// apparmorFieldForAnnotation takes a pod annotation and returns the converted
-// apparmor profile field.
-func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
-	if annotation == api.DeprecatedAppArmorAnnotationValueUnconfined {
-		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
-	}
-
-	if annotation == api.DeprecatedAppArmorAnnotationValueRuntimeDefault {
-		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
-	}
-
-	if strings.HasPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix)
-		if localhostProfile != "" {
-			return &api.AppArmorProfile{
-				Type:             api.AppArmorProfileTypeLocalhost,
-				LocalhostProfile: &localhostProfile,
-			}
-		}
-	}
-
-	// we can only reach this code path if the localhostProfile name has a zero
-	// length or if the annotation has an unrecognized value
-	return nil
 }
 
 // updatePodGeneration bumps metadata.generation if needed for any updates

@@ -34,14 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -62,21 +63,20 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
-	"k8s.io/component-base/zpages/statusz"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	configv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
+	v1alpha1conversion "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	netutils "k8s.io/utils/net"
 )
@@ -173,7 +173,8 @@ type ProxyServer struct {
 	NodeIPs         map[v1.IPFamily]net.IP
 	flagz           flagz.Reader
 
-	podCIDRs []string // only used for LocalModeNodeCIDR
+	podCIDRs    []string // only used for LocalModeNodeCIDR
+	NodeManager *proxy.NodeManager
 
 	Proxier proxy.Provider
 }
@@ -187,11 +188,19 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		flagz:  flagzReader,
 	}
 
+	externalConfig := &configv1alpha1.KubeProxyConfiguration{}
+	if err := v1alpha1conversion.Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(config, externalConfig, nil); err != nil {
+		return nil, fmt.Errorf("unable to convert configz: %w", err)
+	}
+	externalConfig.SetGroupVersionKind(configv1alpha1.SchemeGroupVersion.WithKind("KubeProxyConfiguration"))
+
 	cz, err := configz.New(kubeproxyconfig.GroupName)
 	if err != nil {
-		return nil, fmt.Errorf("unable to register configz: %s", err)
+		return nil, fmt.Errorf("unable to register configz: %w", err)
 	}
-	cz.Set(config)
+	if err := cz.Set(externalConfig); err != nil {
+		return nil, fmt.Errorf("unable to set configz: %w", err)
+	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
@@ -207,8 +216,18 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		return nil, err
 	}
 
-	rawNodeIPs := getNodeIPs(ctx, s.Client, s.NodeName)
+	// NodeManager makes an informer that selects for the node where this kube-proxy is running
+	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.NodeName, s.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	rawNodeIPs := s.NodeManager.NodeIPs()
+	if len(rawNodeIPs) > 0 {
+		logger.Info("Successfully retrieved NodeIPs", "NodeIPs", rawNodeIPs)
+	}
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
+	s.podCIDRs = s.NodeManager.PodCIDRs()
 
 	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
 		var nodePortAddresses []string
@@ -225,14 +244,14 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
 
 	s.NodeRef = &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      s.NodeName,
-		UID:       types.UID(s.NodeName),
-		Namespace: "",
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       s.NodeName,
+		Namespace:  "",
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
+		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration, s.NodeManager)
 	}
 
 	err = s.platformSetup(ctx)
@@ -429,7 +448,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 		return
 	}
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		err := hz.Run(ctx)
 		if err != nil {
 			logger.Error(err, "Healthz server failed")
@@ -443,7 +462,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh 
 			logger.Error(nil, "Healthz server returned without error")
 		}
 	}
-	go wait.Until(fn, 5*time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
 func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, flagzReader flagz.Reader, errCh chan error) {
@@ -475,15 +494,18 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		reg := statusz.NewRegistry(
+			compatibility.DefaultBuildEffectiveVersion(),
+			statusz.WithListedPaths(proxyMux.ListedPaths()),
+		)
+		statusz.Install(proxyMux, kubeProxy, reg)
 	}
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		var err error
 		defer func() {
 			if err != nil {
-				err = fmt.Errorf("starting metrics server failed: %w", err)
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "starting metrics server failed")
 				if errCh != nil {
 					errCh <- err
 					// if in hardfail mode, never retry again
@@ -505,7 +527,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		}
 
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
@@ -557,13 +579,16 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 		return err
 	}
 
-	labelSelector := labels.NewSelector()
-	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+	labelSelectorNoProxyName := labels.NewSelector().Add(*noProxyName)
+	labelSelectorNoHeadlessEndpoints := labels.NewSelector().Add(*noHeadlessEndpoints)
 
-	// Make informers that filter out objects that want a non-default service proxy.
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+	// Make informer that contains no filters
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration)
+
+	// Make informers that filter out objects that do not contain a service.kubernetes.io/headless label
+	endpointSliceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = labelSelector.String()
+			options.LabelSelector = labelSelectorNoHeadlessEndpoints.String()
 		}))
 
 	// Create configs (i.e. Watches for Services, EndpointSlices and ServiceCIDRs)
@@ -573,14 +598,14 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// don't watch headless services for kube-proxy, they are proxied by DNS.
 	serviceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = labelSelector.String()
+			options.LabelSelector = labelSelectorNoProxyName.String()
 			options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", v1.ClusterIPNone).String()
 		}))
 	serviceConfig := config.NewServiceConfig(ctx, serviceInformerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(ctx.Done())
 
-	endpointSliceConfig := config.NewEndpointSliceConfig(ctx, informerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
+	endpointSliceConfig := config.NewEndpointSliceConfig(ctx, endpointSliceInformerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
 	endpointSliceConfig.RegisterEventHandler(s.Proxier)
 	go endpointSliceConfig.Run(ctx.Done())
 
@@ -592,28 +617,18 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
+	endpointSliceInformerFactory.Start(wait.NeverStop)
 	serviceInformerFactory.Start(wait.NeverStop)
 
-	// Make an informer that selects for our nodename.
-	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
-		}))
-	nodeConfig := config.NewNodeConfig(ctx, currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
-	// https://issues.k8s.io/111321
-	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
+	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
+	if s.NodeManager != nil {
+		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
+		nodeConfig.RegisterEventHandler(s.NodeManager)
+		nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
+		nodeTopologyConfig.RegisterEventHandler(s.Proxier)
+
+		go nodeConfig.Run(wait.NeverStop)
 	}
-	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
-		HealthServer: s.HealthzServer,
-	})
-	nodeConfig.RegisterEventHandler(s.Proxier)
-
-	go nodeConfig.Run(wait.NeverStop)
-
-	// This has to start after the calls to NewNodeConfig because that must
-	// configure the shared informer event handler first.
-	currentNodeInformerFactory.Start(wait.NeverStop)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
@@ -684,35 +699,4 @@ func detectNodeIPs(ctx context.Context, rawNodeIPs []net.IP, bindAddress string)
 		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
 	}
 	return primaryFamily, nodeIPs
-}
-
-// getNodeIP returns IPs for the node with the provided name.  If
-// required, it will wait for the node to be created.
-func getNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
-	logger := klog.FromContext(ctx)
-	var nodeIPs []net.IP
-	backoff := wait.Backoff{
-		Steps:    6,
-		Duration: 1 * time.Second,
-		Factor:   2.0,
-		Jitter:   0.2,
-	}
-
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node info")
-			return false, nil
-		}
-		nodeIPs, err = utilnode.GetNodeHostIPs(node)
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node IPs")
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == nil {
-		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
-	}
-	return nodeIPs
 }

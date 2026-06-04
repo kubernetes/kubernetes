@@ -17,9 +17,12 @@ package types
 import (
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/google/cel-go/common/types/pb"
 	"github.com/google/cel-go/common/types/ref"
@@ -68,7 +71,7 @@ func (o *protoObj) ConvertToNative(typeDesc reflect.Type) (any, error) {
 			return srcPB, nil
 		}
 		return anypb.New(srcPB)
-	case jsonValueType:
+	case JSONValueType:
 		// Marshal the proto to JSON first, and then rehydrate as protobuf.Value as there is no
 		// support for direct conversion from proto.Message to protobuf.Value.
 		bytes, err := protojson.Marshal(srcPB)
@@ -162,4 +165,30 @@ func (o *protoObj) Type() ref.Type {
 
 func (o *protoObj) Value() any {
 	return o.value
+}
+
+type protoObjField struct {
+	fd protoreflect.FieldDescriptor
+	v  protoreflect.Value
+}
+
+func (o *protoObj) format(sb *strings.Builder) {
+	var fields []protoreflect.FieldDescriptor
+	o.value.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		fields = append(fields, fd)
+		return true
+	})
+	sort.SliceStable(fields, func(i, j int) bool {
+		return fields[i].Number() < fields[j].Number()
+	})
+	sb.WriteString(o.Type().TypeName())
+	sb.WriteString("{")
+	for i, field := range fields {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(fmt.Sprintf("%s: ", field.Name()))
+		formatTo(sb, o.Get(String(field.Name())))
+	}
+	sb.WriteString("}")
 }

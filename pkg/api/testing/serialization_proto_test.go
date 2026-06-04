@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
@@ -89,7 +88,8 @@ func fieldsHaveProtobufTags(obj reflect.Type) error {
 				// TypeMeta is not included in external protobuf because we use an envelope type with TypeMeta
 				continue
 			}
-			if len(f.Tag.Get("json")) > 0 && len(f.Tag.Get("protobuf")) == 0 {
+			_, jsonTagExists := f.Tag.Lookup("json")
+			if jsonTagExists && len(f.Tag.Get("protobuf")) == 0 {
 				return fmt.Errorf("field %s in %s has a 'json' tag but no protobuf tag", f.Name, obj)
 			}
 		}
@@ -225,7 +225,7 @@ func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
+// BenchmarkDecodeIntoProtobuf provides a baseline for regular protobuf decode performance
 func BenchmarkDecodeIntoProtobuf(b *testing.B) {
 	items := benchmarkItems(b)
 	width := len(items)
@@ -237,14 +237,16 @@ func BenchmarkDecodeIntoProtobuf(b *testing.B) {
 		}
 		encoded[i] = data
 		validate := &v1.Pod{}
-		if err := proto.Unmarshal(data, validate); err != nil {
+		validate.Reset() // decode normally resets internally
+		if err := validate.Unmarshal(data); err != nil {
 			b.Fatalf("Failed to unmarshal %d: %v\n%#v", i, err, items[i])
 		}
 	}
 
 	for i := 0; i < b.N; i++ {
-		obj := v1.Pod{}
-		if err := proto.Unmarshal(encoded[i%width], &obj); err != nil {
+		obj := &v1.Pod{}
+		obj.Reset() // decode normally resets internally
+		if err := obj.Unmarshal(encoded[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}

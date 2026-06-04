@@ -20,10 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
-
-	"github.com/onsi/gomega"
-	"k8s.io/klog/v2"
 )
 
 // WithError creates a context where test failures are collected and stored in
@@ -41,12 +37,12 @@ import (
 // them with errors.Join.
 //
 // Test failures are not propagated to the parent context.
-func WithError(tCtx TContext, err *error) (TContext, func()) {
-	eCtx := &errorContext{
-		TContext: tCtx,
-	}
+// WithRESTConfig initializes all client-go clients with new clients
+// created for the config. The current test name gets included in the UserAgent.
+func (tCtx TContext) WithError(err *error) (TContext, func()) {
+	tCtx.capture = &capture{}
 
-	return eCtx, func() {
+	return tCtx, func() {
 		// Recover has to be called in the deferred function. When called inside
 		// a function called by a deferred function (like finalize below), it
 		// returns nil.
@@ -57,104 +53,185 @@ func WithError(tCtx TContext, err *error) (TContext, func()) {
 			}
 		}
 
-		eCtx.finalize(err)
+		tCtx.finalize(err)
 	}
 }
 
-type errorContext struct {
-	TContext
+func (tCtx TContext) finalize(err *error) {
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
-	mutex  sync.Mutex
-	errors []error
-	failed bool
+	errs := tCtx.capture.errors
+	if tCtx.capture.failed && len(errs) == 0 {
+		errs = []error{errFailedWithNoExplanation}
+	}
+	if len(errs) == 0 {
+		return
+	}
+	*err = failures{errors.Join(errs...)}
 }
 
-func (eCtx *errorContext) finalize(err *error) {
-	eCtx.mutex.Lock()
-	defer eCtx.mutex.Unlock()
+type failures struct {
+	error
+}
 
-	if !eCtx.failed {
+func (e failures) GomegaString() string {
+	// We don't need to repeat the string. Errors already get formatted once by Gomega itself,
+	// then it calls GomegaString for a summary that isn't necessary anymore.
+	return ""
+}
+
+// buildHeader handles:
+// - "ERROR:<non-empty prefix><optional header><suffix>" -> use both prefix and suffix when we have a header, otherwise just the suffix
+// - "<empty prefix><optional header><suffix>" -> use suffix only if we have a header
+func (tCtx TContext) buildHeader(prefix, suffix string) string {
+	if tCtx.perTestHeader != nil {
+		return prefix + tCtx.perTestHeader() + suffix
+	}
+	if prefix != "" {
+		return suffix
+	}
+	return ""
+}
+
+// indent either indents all follow-up lines or all lines including the first one.
+func indent(msg string, all bool) string {
+	header := ""
+	if all {
+		header = "\t"
+	}
+	return header + strings.ReplaceAll(msg, "\n", "\n\t")
+}
+
+func (tCtx TContext) Skip(args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintln.
+	msg := strings.TrimSpace(fmt.Sprintln(args...))
+	tCtx.TB().Skip("SKIP:", tCtx.buildHeader(" ", " ")+tCtx.steps+indent(msg, false))
+}
+
+func (tCtx TContext) Skipf(format string, args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintf.
+	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+	tCtx.TB().Skip("SKIP:", tCtx.buildHeader(" ", " ")+tCtx.steps+indent(msg, false))
+}
+
+func (tCtx TContext) Log(args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintln.
+	msg := strings.TrimSpace(fmt.Sprintln(args...))
+	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
+}
+
+func (tCtx TContext) Logf(format string, args ...any) {
+	tCtx.Helper()
+	// Enable `go vet printf` by directly calling fmt.Sprintf.
+	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
+}
+
+func (tCtx TContext) Error(args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		msg := strings.TrimSpace(fmt.Sprintln(args...))
+		// ERROR *before* header to make it stand out as failure.
+		tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
 		return
 	}
 
-	errs := eCtx.errors
-	if len(errs) == 0 {
-		errs = []error{errFailedWithNoExplanation}
-	}
-	*err = errors.Join(errs...)
-}
-
-func (eCtx *errorContext) Error(args ...any) {
-	eCtx.mutex.Lock()
-	defer eCtx.mutex.Unlock()
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
 	// Gomega adds a leading newline in https://github.com/onsi/gomega/blob/f804ac6ada8d36164ecae0513295de8affce1245/internal/gomega.go#L37
 	// Let's strip that at start and end because ktesting will make errors
 	// stand out more with the "ERROR" prefix, so there's no need for additional
-	// line breaks.
-	eCtx.errors = append(eCtx.errors, errors.New(strings.TrimSpace(fmt.Sprintln(args...))))
-	eCtx.failed = true
+	// line breaks. Besides, Sprintln (required for `go vet printf`) also
+	// adds a trailing newline that we don't want.
+	msg := strings.TrimSpace(fmt.Sprintln(args...))
+	tCtx.capture.errors = append(tCtx.capture.errors, errors.New(tCtx.steps+msg))
+	tCtx.capture.failed = true
 }
 
-func (eCtx *errorContext) Errorf(format string, args ...any) {
-	eCtx.mutex.Lock()
-	defer eCtx.mutex.Unlock()
+func (tCtx TContext) Errorf(format string, args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		// Enable `go vet printf` by directly calling fmt.Sprintln.
+		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+		// ERROR *before* header to make it stand out as failure.
+		tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		return
+	}
 
-	eCtx.errors = append(eCtx.errors, errors.New(strings.TrimSpace(fmt.Sprintf(format, args...))))
-	eCtx.failed = true
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+	tCtx.capture.errors = append(tCtx.capture.errors, errors.New(tCtx.steps+msg))
+	tCtx.capture.failed = true
 }
 
-func (eCtx *errorContext) Fail() {
-	eCtx.mutex.Lock()
-	defer eCtx.mutex.Unlock()
+func (tCtx TContext) Fail() {
+	if tCtx.capture == nil {
+		tCtx.TB().Fail()
+		return
+	}
 
-	eCtx.failed = true
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	tCtx.capture.failed = true
 }
 
-func (eCtx *errorContext) FailNow() {
-	eCtx.Helper()
-	eCtx.Fail()
+func (tCtx TContext) FailNow() {
+	if tCtx.capture == nil {
+		tCtx.TB().FailNow()
+		return
+	}
+
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	tCtx.capture.failed = true
 	panic(failed)
 }
 
-func (eCtx *errorContext) Failed() bool {
-	eCtx.mutex.Lock()
-	defer eCtx.mutex.Unlock()
+func (tCtx TContext) Failed() bool {
+	if tCtx.capture == nil {
+		return tCtx.TB().Failed()
+	}
 
-	return eCtx.failed
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
+
+	return tCtx.capture.failed
 }
 
-func (eCtx *errorContext) Fatal(args ...any) {
-	eCtx.Error(args...)
-	eCtx.FailNow()
+func (tCtx TContext) Fatal(args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		// Enable `go vet printf` by directly calling fmt.Sprintln.
+		msg := strings.TrimSpace(fmt.Sprintln(args...))
+		// FATAL ERROR *before* header to make it stand out as failure.
+		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+	}
+
+	tCtx.Error(args...)
+	tCtx.FailNow()
 }
 
-func (eCtx *errorContext) Fatalf(format string, args ...any) {
-	eCtx.Errorf(format, args...)
-	eCtx.FailNow()
-}
+func (tCtx TContext) Fatalf(format string, args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
+		// Enable `go vet printf` by directly calling fmt.Sprintf.
+		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
+		// FATAL ERROR *before* header to make it stand out as failure.
+		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		return
+	}
 
-func (eCtx *errorContext) CleanupCtx(cb func(TContext)) {
-	eCtx.Helper()
-	cleanupCtx(eCtx, cb)
-}
-
-func (eCtx *errorContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
-	eCtx.Helper()
-	return expect(eCtx, actual, extra...)
-}
-
-func (eCtx *errorContext) ExpectNoError(err error, explain ...interface{}) {
-	eCtx.Helper()
-	expectNoError(eCtx, err, explain...)
-}
-
-func (cCtx *errorContext) Run(name string, cb func(tCtx TContext)) bool {
-	return run(cCtx, name, cb)
-}
-
-func (eCtx *errorContext) Logger() klog.Logger {
-	return klog.FromContext(eCtx)
+	tCtx.Errorf(format, args...)
+	tCtx.FailNow()
 }
 
 // fatalWithError is the internal type that should never get propagated up. The

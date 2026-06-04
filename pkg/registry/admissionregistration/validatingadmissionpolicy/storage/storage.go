@@ -31,7 +31,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // REST implements a RESTStorage for validatingAdmissionPolicy against etcd
@@ -48,7 +48,7 @@ type StatusREST struct {
 var groupResource = admissionregistration.Resource("validatingadmissionpolicies")
 
 // NewREST returns two RESTStorage objects that will work against validatingAdmissionPolicy and its status.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) (*REST, *StatusREST, error) {
 	r := &REST{}
 	strategy := validatingadmissionpolicy.NewStrategy(authorizer, resourceResolver)
 	store := &genericregistry.Store{

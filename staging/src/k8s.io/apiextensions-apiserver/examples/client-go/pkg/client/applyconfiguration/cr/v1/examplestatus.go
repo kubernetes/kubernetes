@@ -24,6 +24,8 @@ import (
 
 // ExampleStatusApplyConfiguration represents a declarative configuration of the ExampleStatus type for use
 // with apply.
+//
+// ExampleStatus is the status for an Example resource
 type ExampleStatusApplyConfiguration struct {
 	State   *crv1.ExampleState `json:"state,omitempty"`
 	Message *string            `json:"message,omitempty"`

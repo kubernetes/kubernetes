@@ -176,7 +176,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -371,10 +371,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 		return e
 	}
 
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields, event.Object)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields)
+		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObject)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.
@@ -434,7 +434,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 }
 
 func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
 
@@ -503,7 +503,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	}
 
 	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.String()).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {

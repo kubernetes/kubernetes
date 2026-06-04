@@ -314,8 +314,10 @@ _setup_bootstrap() {
 # _compile "dir"
 _compile() {
 	(
-		if grep -q GOROOT_BOOTSTRAP "${1}/src/make.bash" &>/dev/null; then
-			_setup_bootstrap || return 1
+	  if [[ -z "${GOROOT_BOOTSTRAP}" ]]; then
+		  if grep -q GOROOT_BOOTSTRAP "${1}/src/make.bash" &>/dev/null; then
+			  _setup_bootstrap || return 1
+		  fi
 		fi
 		cd "${1}"
 		if [[ -d .git ]]; then

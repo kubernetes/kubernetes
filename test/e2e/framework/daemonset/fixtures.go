@@ -19,6 +19,7 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +28,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting/format"
 )
 
 func NewDaemonSet(dsName, image string, labels map[string]string, volumes []v1.Volume, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) *appsv1.DaemonSet {
@@ -81,11 +82,12 @@ func CheckPresentOnNodes(ctx context.Context, c clientset.Interface, ds *appsv1.
 }
 
 func SchedulableNodes(ctx context.Context, c clientset.Interface, ds *appsv1.DaemonSet) []string {
+	logger := klog.FromContext(ctx)
 	nodeList, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
-		shouldRun, _ := daemon.NodeShouldRunDaemonPod(&node, ds)
+		shouldRun, _ := daemon.NodeShouldRunDaemonPod(logger, &node, ds)
 		if !shouldRun {
 			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
 			continue

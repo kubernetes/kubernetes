@@ -20,11 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
+	"slices"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -124,24 +127,30 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	c.eventBroadcaster.StartStructuredLogging(3)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-
 	logger.Info("Starting", "controller", controllerName)
-	defer logger.Info("Shutting down", "controller", controllerName)
 
-	if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), c.serviceCIDRsSynced, c.ipAddressSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down", "controller", controllerName)
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.serviceCIDRsSynced, c.ipAddressSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.worker, c.workerLoopPeriod)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.worker, c.workerLoopPeriod)
+		})
 	}
 	<-ctx.Done()
 }
@@ -269,7 +278,7 @@ func (c *Controller) processNext(ctx context.Context) bool {
 	} else {
 		logger.Info("Dropping ServiceCIDR out of the queue", "ServiceCIDR", key, "err", err)
 		c.queue.Forget(key)
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "ServiceCIDR sync failed after max retries")
 	}
 	return true
 }
@@ -302,16 +311,14 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 			// update the status to indicate why the ServiceCIDR can not be deleted,
 			// it will be reevaludated by an event on any ServiceCIDR or IPAddress related object
 			// that may remove this condition.
-			svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
-				metav1apply.Condition().
-					WithType(networkingapiv1.ServiceCIDRConditionReady).
-					WithStatus(metav1.ConditionFalse).
-					WithReason(networkingapiv1.ServiceCIDRReasonTerminating).
-					WithMessage("There are still IPAddresses referencing the ServiceCIDR, please remove them or create a new ServiceCIDR").
-					WithLastTransitionTime(metav1.Now()))
-			svcApply := networkingapiv1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
-			_, err = c.client.NetworkingV1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true})
-			return err
+			condition := metav1.Condition{
+				Type:               networkingapiv1.ServiceCIDRConditionReady,
+				Status:             metav1.ConditionFalse,
+				Reason:             networkingapiv1.ServiceCIDRReasonTerminating,
+				Message:            "There are still IPAddresses referencing the ServiceCIDR, please remove them or create a new ServiceCIDR",
+				LastTransitionTime: metav1.Now(),
+			}
+			return c.updateConditionIfNeeded(ctx, cidr, condition)
 		}
 		// If there are no IPAddress depending on this ServiceCIDR is safe to remove it,
 		// however, there can be a race when the allocators still consider the ServiceCIDR
@@ -332,15 +339,13 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 		return err
 	}
 
-	// Set Ready condition to True.
-	svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
-		metav1apply.Condition().
-			WithType(networkingapiv1.ServiceCIDRConditionReady).
-			WithStatus(metav1.ConditionTrue).
-			WithMessage("Kubernetes Service CIDR is ready").
-			WithLastTransitionTime(metav1.Now()))
-	svcApply := networkingapiv1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
-	if _, err := c.client.NetworkingV1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true}); err != nil {
+	condition := metav1.Condition{
+		Type:               networkingapiv1.ServiceCIDRConditionReady,
+		Status:             metav1.ConditionTrue,
+		Message:            "Kubernetes Service CIDR is ready",
+		LastTransitionTime: metav1.Now(),
+	}
+	if err := c.updateConditionIfNeeded(ctx, cidr, condition); err != nil {
 		logger.Info("error updating default ServiceCIDR status", "error", err)
 		c.eventRecorder.Eventf(cidr, v1.EventTypeWarning, "KubernetesServiceCIDRError", "The ServiceCIDR Status can not be set to Ready=True")
 		return err
@@ -412,10 +417,8 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 }
 
 func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
-	for _, f := range cidr.GetFinalizers() {
-		if f == ServiceCIDRProtectionFinalizer {
-			return nil
-		}
+	if slices.Contains(cidr.GetFinalizers(), ServiceCIDRProtectionFinalizer) {
+		return nil
 	}
 
 	patch := map[string]interface{}{
@@ -437,14 +440,7 @@ func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *
 }
 
 func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
-	found := false
-	for _, f := range cidr.GetFinalizers() {
-		if f == ServiceCIDRProtectionFinalizer {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(cidr.GetFinalizers(), ServiceCIDRProtectionFinalizer) {
 		return nil
 	}
 	patch := map[string]interface{}{
@@ -462,6 +458,34 @@ func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cid
 	}
 	klog.FromContext(ctx).V(4).Info("Removed protection finalizer from ServiceCIDRs", "ServiceCIDR", cidr.Name)
 	return nil
+}
+
+// updateConditionIfNeeded updates the status condition of the ServiceCIDR if needed.
+func (c *Controller) updateConditionIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR, newCondition metav1.Condition) error {
+	logger := klog.FromContext(ctx)
+	currentCondition := apimeta.FindStatusCondition(cidr.Status.Conditions, newCondition.Type)
+	// Condition exists and is the same, no need to update.
+	if currentCondition != nil &&
+		currentCondition.Status == newCondition.Status &&
+		currentCondition.Reason == newCondition.Reason &&
+		currentCondition.Message == newCondition.Message {
+		logger.V(4).Info("ServiceCIDR condition already up to date", "ServiceCIDR", cidr.Name, "conditionType", newCondition.Type)
+		return nil
+	}
+
+	logger.V(2).Info("Updating ServiceCIDR condition", "ServiceCIDR", cidr.Name, "conditionType", newCondition.Type, "newStatus", newCondition.Status, "newReason", newCondition.Reason)
+
+	svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
+		metav1apply.Condition().
+			WithType(newCondition.Type).
+			WithStatus(newCondition.Status).
+			WithReason(newCondition.Reason).
+			WithMessage(newCondition.Message).
+			WithLastTransitionTime(newCondition.LastTransitionTime)) // Use the timestamp from the new condition
+
+	svcApply := networkingapiv1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
+	_, err := c.client.NetworkingV1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true})
+	return err
 }
 
 // Convert netutils.IPFamily to v1.IPFamily

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -27,6 +26,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"os"
 	"os/exec"
@@ -49,6 +50,9 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
+	"k8s.io/kubernetes/test/e2e_node/mounter"
+	gcpcredentialprovider "k8s.io/kubernetes/test/e2e_node/plugins/gcp-credential-provider/pkg"
+	"k8s.io/kubernetes/test/e2e_node/runner/node"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
@@ -60,7 +64,8 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -120,6 +125,37 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	// e2e_node.test can behave like several other commands which are required
+	// when doing node testing on a remote virtual machine.
+	//
+	// e2e_node.test owns pflag.CommandLine and flag.CommandLine.
+	// Other commands must use separate FlagSets.
+	pflag.Usage = func() {
+		fmt.Fprint(pflag.CommandLine.Output(), `Usage when invoked under a different name:
+    gcp-credential-provider (no flags) - emulate test/e2e_node/plugins/gcp-credential-provider
+    mounter (no flags) - emulate cluster/gce/gci/mounter
+
+Usage as e2e_node.test:
+    e2e_node.test remote <remote flags> - run remote testing, replacing "testgrid2 noop -test=node", see "remote -help" for flags
+    e2e_node.test <test flags> - execute Ginkgo test suite, see following flags
+
+`)
+		pflag.CommandLine.PrintDefaults()
+	}
+	cmdName := filepath.Base(os.Args[0])
+	switch {
+	case strings.HasPrefix(cmdName, "gcp-credential-provider"):
+		gcpcredentialprovider.Main()
+	case strings.HasPrefix(cmdName, "mounter"):
+		mounter.Main()
+	case len(os.Args) > 1 && os.Args[1] == "remote":
+		node.Main(os.Args[2:])
+	default:
+		testMain(m)
+	}
+}
+
+func testMain(m *testing.M) {
 	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
@@ -158,6 +194,7 @@ func TestMain(m *testing.M) {
 const rootfs = "/rootfs"
 
 func TestE2eNode(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Make sure we are not limited by sshd when it comes to open files
 	if err := rlimit.SetNumFiles(1000000); err != nil {
 		klog.Infof("failed to set rlimit on max file handles: %v", err)
@@ -170,7 +207,7 @@ func TestE2eNode(t *testing.T) {
 	}
 	if *runKubeletMode {
 		// If run-kubelet-mode is specified, only start kubelet.
-		services.RunKubelet(featureGates)
+		services.RunKubelet(tCtx, featureGates)
 		return
 	}
 	if *systemValidateMode {
@@ -250,7 +287,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 
 	if framework.TestContext.CriProxyEnabled {
 		framework.Logf("Start cri proxy")
-		rs, is, err := getCRIClient()
+		rs, is, err := getCRIClient(ctx)
 		framework.ExpectNoError(err)
 
 		e2eCriProxy = criproxy.NewRemoteRuntimeProxy(rs, is)
@@ -268,7 +305,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 		// If the services are expected to stop after test, they should monitor the test process.
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
-		gomega.Expect(e2es.Start(featureGates)).To(gomega.Succeed(), "should be able to start node services.")
+		gomega.Expect(e2es.Start(ctx, featureGates)).To(gomega.Succeed(), "should be able to start node services.")
 	} else {
 		klog.Infof("Running tests without starting services.")
 	}
@@ -371,6 +408,13 @@ func updateTestContext(ctx context.Context) error {
 	setExtraEnvs()
 	updateImageAllowList(ctx)
 
+	// Set KubeletRootDir to match the kubelet configuration used in node e2e tests.
+	// This ensures tests that use framework.TestContext.KubeletRootDir (e.g., for HostPath volumes)
+	// use the correct path.
+	if framework.TestContext.KubeletRootDir == "" {
+		framework.TestContext.KubeletRootDir = services.KubeletRootDirectory
+	}
+
 	client, err := getAPIServerClient()
 	if err != nil {
 		return fmt.Errorf("failed to get apiserver client: %w", err)
@@ -433,16 +477,6 @@ func loadSystemSpecFromFile(filename string) (*system.SysSpec, error) {
 		return nil, err
 	}
 	return spec, nil
-}
-
-// isNodeReady returns true if a node is ready; false otherwise.
-func isNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
-	return false
 }
 
 func setExtraEnvs() {

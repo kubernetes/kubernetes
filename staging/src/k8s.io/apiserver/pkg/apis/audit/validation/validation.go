@@ -98,7 +98,7 @@ func validateResources(groupResources []audit.GroupResources, fldPath *field.Pat
 	var allErrs field.ErrorList
 	for _, groupResource := range groupResources {
 		// The empty string represents the core API group.
-		if len(groupResource.Group) != 0 {
+		if len(groupResource.Group) != 0 && groupResource.Group != "*" {
 			// Group names must be lower case and be valid DNS subdomains.
 			// reference: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
 			// an error is returned for group name like rbac.authorization.k8s.io/v1beta1

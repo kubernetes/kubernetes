@@ -31,17 +31,17 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
 type statefulSetStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
-var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = statefulSetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -118,20 +118,9 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 //	    newSvc.Spec.MyFeature = nil
 //	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
-			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
-		}
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
 		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
-		}
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		if oldSS == nil || oldSS.Spec.Ordinals == nil {
-			// Reset Spec.Ordinals to the default value (nil).
-			newSS.Spec.Ordinals = nil
 		}
 	}
 }
@@ -162,7 +151,7 @@ func (statefulSetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for StatefulSet; this means POST is needed to create one.
-func (statefulSetStrategy) AllowCreateOnUpdate() bool {
+func (statefulSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -194,7 +183,7 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 }
 
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
-func (statefulSetStrategy) AllowUnconditionalUpdate() bool {
+func (statefulSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

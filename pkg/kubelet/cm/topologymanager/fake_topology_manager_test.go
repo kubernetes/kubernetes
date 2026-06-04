@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewFakeManager(t *testing.T) {
@@ -57,6 +58,7 @@ func TestFakeGetAffinity(t *testing.T) {
 }
 
 func TestFakeRemoveContainer(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name        string
 		containerID string
@@ -75,7 +77,7 @@ func TestFakeRemoveContainer(t *testing.T) {
 	}
 	fm := fakeManager{}
 	for _, tc := range testCases {
-		err := fm.RemoveContainer(tc.containerID)
+		err := fm.RemoveContainer(logger, tc.containerID)
 		if err != nil {
 			t.Errorf("Expected error to be nil but got: %v", err)
 		}
@@ -85,6 +87,7 @@ func TestFakeRemoveContainer(t *testing.T) {
 }
 
 func TestFakeAdmit(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tcases := []struct {
 		name     string
 		result   lifecycle.PodAdmitResult
@@ -116,7 +119,7 @@ func TestFakeAdmit(t *testing.T) {
 		pod := v1.Pod{}
 		pod.Status.QOSClass = tc.qosClass
 		podAttr.Pod = &pod
-		actual := fm.Admit(&podAttr)
+		actual := fm.Admit(tCtx, &podAttr)
 		if reflect.DeepEqual(actual, tc.result) {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.result, actual.Admit)
 		}

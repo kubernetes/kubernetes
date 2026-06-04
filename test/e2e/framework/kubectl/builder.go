@@ -37,8 +37,13 @@ import (
 // KubectlBuilder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
 type KubectlBuilder struct {
-	cmd     *exec.Cmd
-	timeout <-chan time.Time
+	cmd *exec.Cmd
+	// appendEnv contains only AppendEnv(...) values and NOT os.Environ()
+	// logging os.Environ is ~redundant and noisy
+	// logging the env we modified is important to understand what we're running
+	// versus the defaults
+	appendedEnv []string
+	timeout     <-chan time.Time
 }
 
 // NewKubectlCommand returns a KubectlBuilder for running kubectl.
@@ -55,6 +60,7 @@ func (b *KubectlBuilder) AppendEnv(env []string) *KubectlBuilder {
 		b.cmd.Env = os.Environ()
 	}
 	b.cmd.Env = append(b.cmd.Env, env...)
+	b.appendedEnv = append(b.appendedEnv, env...)
 	return b
 }
 
@@ -118,7 +124,11 @@ func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	framework.Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
+	if len(b.appendedEnv) > 0 {
+		framework.Logf("Running '%s %s %s'", strings.Join(b.appendedEnv, " "), cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
+	} else {
+		framework.Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
+	}
 	if err := cmd.Start(); err != nil {
 		return "", "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
 	}

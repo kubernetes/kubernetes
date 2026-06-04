@@ -20,6 +20,7 @@ import (
 	"time"
 
 	resourceapi "k8s.io/api/resource/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -35,6 +36,10 @@ func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
 	if obj.DeviceClassName == "" {
 		return
 	}
+	// Declarative defaulting (+default) is not used for AllocationMode here because
+	// v1beta1 uses a bespoke union structure. Applying an unconditional default
+	// would make valid "FirstAvailable" requests (where this field must be empty) invalid.
+	// Therefore, we rely on this manual defaulting logic.
 	if obj.AllocationMode == "" {
 		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
 	}
@@ -57,5 +62,16 @@ func SetDefaults_DeviceSubRequest(obj *resourceapi.DeviceSubRequest) {
 func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
 	if obj.TimeAdded == nil {
 		obj.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
+	}
+}
+
+func SetDefaults_BasicDevice(obj *resourceapi.BasicDevice) {
+	// TODO: fix defaulter-gen not finding SetDefaults func on map value
+	for k, m := range obj.NodeAllocatableResourceMappings {
+		if m.AllocationMultiplier == nil {
+			q := resource.MustParse("1")
+			m.AllocationMultiplier = &q
+			obj.NodeAllocatableResourceMappings[k] = m
+		}
 	}
 }

@@ -3,11 +3,14 @@
 // license that can be found in the LICENSE file.
 
 // Package curve25519 provides an implementation of the X25519 function, which
-// performs scalar multiplication on the elliptic curve known as Curve25519.
-// See RFC 7748.
+// performs scalar multiplication on the elliptic curve known as Curve25519
+// according to [RFC 7748].
 //
-// This package is a wrapper for the X25519 implementation
-// in the crypto/ecdh package.
+// The curve25519 package is a wrapper for the X25519 implementation in the
+// crypto/ecdh package. It is [frozen] and is not accepting new features.
+//
+// [RFC 7748]: https://datatracker.ietf.org/doc/html/rfc7748
+// [frozen]: https://go.dev/wiki/Frozen
 package curve25519
 
 import "crypto/ecdh"
@@ -36,7 +39,7 @@ func ScalarBaseMult(dst, scalar *[32]byte) {
 	curve := ecdh.X25519()
 	priv, err := curve.NewPrivateKey(scalar[:])
 	if err != nil {
-		panic("curve25519: internal error: scalarBaseMult was not 32 bytes")
+		panic("curve25519: " + err.Error())
 	}
 	copy(dst[:], priv.PublicKey().Bytes())
 }

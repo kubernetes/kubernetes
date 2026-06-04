@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // +k8s:deepcopy-gen=false
@@ -37,28 +38,34 @@ type PolicyRuleBuilder struct {
 
 func NewRule(verbs ...string) *PolicyRuleBuilder {
 	return &PolicyRuleBuilder{
-		PolicyRule: rbacv1.PolicyRule{Verbs: verbs},
+		PolicyRule: rbacv1.PolicyRule{Verbs: sets.NewString(verbs...).List()},
 	}
 }
 
 func (r *PolicyRuleBuilder) Groups(groups ...string) *PolicyRuleBuilder {
-	r.PolicyRule.APIGroups = append(r.PolicyRule.APIGroups, groups...)
+	r.PolicyRule.APIGroups = combine(r.PolicyRule.APIGroups, groups)
 	return r
 }
 
 func (r *PolicyRuleBuilder) Resources(resources ...string) *PolicyRuleBuilder {
-	r.PolicyRule.Resources = append(r.PolicyRule.Resources, resources...)
+	r.PolicyRule.Resources = combine(r.PolicyRule.Resources, resources)
 	return r
 }
 
 func (r *PolicyRuleBuilder) Names(names ...string) *PolicyRuleBuilder {
-	r.PolicyRule.ResourceNames = append(r.PolicyRule.ResourceNames, names...)
+	r.PolicyRule.ResourceNames = combine(r.PolicyRule.ResourceNames, names)
 	return r
 }
 
 func (r *PolicyRuleBuilder) URLs(urls ...string) *PolicyRuleBuilder {
-	r.PolicyRule.NonResourceURLs = append(r.PolicyRule.NonResourceURLs, urls...)
+	r.PolicyRule.NonResourceURLs = combine(r.PolicyRule.NonResourceURLs, urls)
 	return r
+}
+
+func combine(s1, s2 []string) []string {
+	s := sets.NewString(s1...)
+	s.Insert(s2...)
+	return s.List()
 }
 
 func (r *PolicyRuleBuilder) RuleOrDie() rbacv1.PolicyRule {

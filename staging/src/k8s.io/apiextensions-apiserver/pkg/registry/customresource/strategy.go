@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -261,12 +261,12 @@ func (customResourceStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for CustomResources; this means a POST is
 // needed to create one.
-func (customResourceStrategy) AllowCreateOnUpdate() bool {
+func (customResourceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // AllowUnconditionalUpdate is the default update policy for CustomResource objects.
-func (customResourceStrategy) AllowUnconditionalUpdate() bool {
+func (customResourceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

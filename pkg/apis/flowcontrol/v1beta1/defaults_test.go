@@ -24,7 +24,7 @@ import (
 
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
@@ -45,8 +45,8 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrolv1beta1.PriorityLevelConfigurationSpec{
 					Type: flowcontrolv1beta1.PriorityLevelEnablementExempt,
 					Exempt: &flowcontrolv1beta1.ExemptPriorityLevelConfiguration{
-						NominalConcurrencyShares: pointer.Int32(0),
-						LendablePercent:          pointer.Int32(0),
+						NominalConcurrencyShares: ptr.To[int32](0),
+						LendablePercent:          ptr.To[int32](0),
 					},
 				},
 			},
@@ -69,7 +69,7 @@ func TestDefaultWithPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrolv1beta1.PriorityLevelEnablementLimited,
 					Limited: &flowcontrolv1beta1.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 5,
-						LendablePercent:          pointer.Int32(0),
+						LendablePercent:          ptr.To[int32](0),
 						LimitResponse: flowcontrolv1beta1.LimitResponse{
 							Type: flowcontrolv1beta1.LimitResponseTypeReject,
 						},

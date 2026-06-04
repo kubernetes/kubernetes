@@ -117,15 +117,19 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
+	// +optional
 	DisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
 
 	// current number of healthy pods
+	// +optional
 	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,4,opt,name=currentHealthy"`
 
 	// minimum desired number of healthy pods
+	// +optional
 	DesiredHealthy int32 `json:"desiredHealthy" protobuf:"varint,5,opt,name=desiredHealthy"`
 
 	// total number of pods counted by this disruption budget
+	// +optional
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,6,opt,name=expectedPods"`
 
 	// Conditions contain conditions for PDB. The disruption controller sets the
@@ -170,8 +174,9 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
+// +k8s:supportsSubresource="/status"
 type PodDisruptionBudget struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -190,7 +195,7 @@ type PodDisruptionBudget struct {
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -208,7 +213,7 @@ type PodDisruptionBudgetList struct {
 // This is a subresource of Pod.  A request to cause such an eviction is
 // created by POSTing to .../pods/<pod name>/evictions.
 type Eviction struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// ObjectMeta describes the pod that is being evicted.
 	// +optional

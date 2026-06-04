@@ -14,9 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Below is the implementation of the a heap. The logic is pretty much the same
-// as cache.heap, however, this heap does not perform synchronization. It leaves
-// synchronization to the SchedulingQueue.
+// Below is the implementation of a generic heap. It does not perform
+// synchronization. It leaves synchronization to the SchedulingQueue.
 
 package heap
 
@@ -27,29 +26,29 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
-// KeyFunc is a function type to get the key from an object.
-type KeyFunc[T any] func(obj T) string
-
-type heapItem[T any] struct {
-	obj   T   // The object which is stored in the heap.
-	index int // The index of the object's key in the Heap.queue.
+// Item is an interface that should be implemented by all items in the heap.
+type Item interface {
+	// Size returns the size of the item, used for metrics.
+	Size() int
 }
 
-type itemKeyValue[T any] struct {
-	key string
+// KeyFunc is a function type to get the key from an object.
+type KeyFunc[T Item] func(obj T) string
+
+type heapItem[T Item] struct {
+	// obj is the object which is stored in the heap.
 	obj T
+	// key is the key of the object for identity/lookup.
+	key string
 }
 
 // data is an internal struct that implements the standard heap interface
 // and keeps the data stored in the heap.
-type data[T any] struct {
-	// items is a map from key of the objects to the objects and their index.
-	// We depend on the property that items in the map are in the queue and vice versa.
-	items map[string]*heapItem[T]
-	// queue implements a heap data structure and keeps the order of elements
-	// according to the heap invariant. The queue keeps the keys of objects stored
-	// in "items".
-	queue []string
+type data[T Item] struct {
+	// queue is a heap-ordered slice of item pointers.
+	queue []*heapItem[T]
+	// keyIndex maps object keys to their index in queue for O(1) lookups.
+	keyIndex map[string]int
 
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
@@ -59,24 +58,13 @@ type data[T any] struct {
 }
 
 var (
-	_ = heap.Interface(&data[any]{}) // heapData is a standard heap
+	_ = heap.Interface(&data[Item]{}) // heapData is a standard heap
 )
 
 // Less compares two objects and returns true if the first one should go
 // in front of the second one in the heap.
 func (h *data[T]) Less(i, j int) bool {
-	if i > len(h.queue) || j > len(h.queue) {
-		return false
-	}
-	itemi, ok := h.items[h.queue[i]]
-	if !ok {
-		return false
-	}
-	itemj, ok := h.items[h.queue[j]]
-	if !ok {
-		return false
-	}
-	return h.lessFunc(itemi.obj, itemj.obj)
+	return h.lessFunc(h.queue[i].obj, h.queue[j].obj)
 }
 
 // Len returns the number of items in the Heap.
@@ -85,52 +73,42 @@ func (h *data[T]) Len() int { return len(h.queue) }
 // Swap implements swapping of two elements in the heap. This is a part of standard
 // heap interface and should never be called directly.
 func (h *data[T]) Swap(i, j int) {
-	if i < 0 || j < 0 {
-		return
-	}
 	h.queue[i], h.queue[j] = h.queue[j], h.queue[i]
-	item := h.items[h.queue[i]]
-	item.index = i
-	item = h.items[h.queue[j]]
-	item.index = j
+	h.keyIndex[h.queue[i].key] = i
+	h.keyIndex[h.queue[j].key] = j
 }
 
 // Push is supposed to be called by container/heap.Push only.
-func (h *data[T]) Push(kv interface{}) {
-	keyValue := kv.(*itemKeyValue[T])
-	n := len(h.queue)
-	h.items[keyValue.key] = &heapItem[T]{keyValue.obj, n}
-	h.queue = append(h.queue, keyValue.key)
+func (h *data[T]) Push(x interface{}) {
+	item := x.(*heapItem[T])
+	h.keyIndex[item.key] = len(h.queue)
+	h.queue = append(h.queue, item)
 }
 
 // Pop is supposed to be called by container/heap.Pop only.
 func (h *data[T]) Pop() interface{} {
-	if len(h.queue) == 0 {
+	n := len(h.queue)
+	if n == 0 {
 		return nil
 	}
-	key := h.queue[len(h.queue)-1]
-	h.queue = h.queue[0 : len(h.queue)-1]
-	item, ok := h.items[key]
-	if !ok {
-		// This is an error
-		return nil
-	}
-	delete(h.items, key)
+	item := h.queue[n-1]
+	h.queue[n-1] = nil // avoid memory leak
+	h.queue = h.queue[:n-1]
+	delete(h.keyIndex, item.key)
 	return item.obj
 }
 
 // Peek returns the head of the heap without removing it.
 func (h *data[T]) Peek() (T, bool) {
 	if len(h.queue) > 0 {
-		return h.items[h.queue[0]].obj, true
+		return h.queue[0].obj, true
 	}
-	var zero T
-	return zero, false
+	return *new(T), false
 }
 
 // Heap is a producer/consumer queue that implements a heap data structure.
 // It can be used to implement priority queues and similar data structures.
-type Heap[T any] struct {
+type Heap[T Item] struct {
 	// data stores objects and has a queue that keeps their ordering according
 	// to the heap invariant.
 	data *data[T]
@@ -143,28 +121,29 @@ type Heap[T any] struct {
 // already exists.
 func (h *Heap[T]) AddOrUpdate(obj T) {
 	key := h.data.keyFunc(obj)
-	if _, exists := h.data.items[key]; exists {
-		h.data.items[key].obj = obj
-		heap.Fix(h.data, h.data.items[key].index)
+	if idx, exists := h.data.keyIndex[key]; exists {
+		h.data.queue[idx].obj = obj
+		heap.Fix(h.data, idx)
 	} else {
-		heap.Push(h.data, &itemKeyValue[T]{key, obj})
+		heap.Push(h.data, &heapItem[T]{obj: obj, key: key})
 		if h.metricRecorder != nil {
-			h.metricRecorder.Inc()
+			h.metricRecorder.Add(obj.Size())
 		}
 	}
 }
 
-// Delete removes an item.
-func (h *Heap[T]) Delete(obj T) error {
+// Delete removes an item and returns the deleted obj.
+func (h *Heap[T]) Delete(obj T) T {
 	key := h.data.keyFunc(obj)
-	if item, ok := h.data.items[key]; ok {
-		heap.Remove(h.data, item.index)
+	if idx, ok := h.data.keyIndex[key]; ok {
+		removed := heap.Remove(h.data, idx).(T)
 		if h.metricRecorder != nil {
-			h.metricRecorder.Dec()
+			h.metricRecorder.Add(-obj.Size())
 		}
-		return nil
+		return removed
 	}
-	return fmt.Errorf("object not found")
+	var zero T
+	return zero
 }
 
 // Peek returns the head of the heap without removing it.
@@ -174,15 +153,15 @@ func (h *Heap[T]) Peek() (T, bool) {
 
 // Pop returns the head of the heap and removes it.
 func (h *Heap[T]) Pop() (T, error) {
-	obj := heap.Pop(h.data)
-	if obj != nil {
-		if h.metricRecorder != nil {
-			h.metricRecorder.Dec()
-		}
-		return obj.(T), nil
+	if h.data.Len() == 0 {
+		return *new(T), fmt.Errorf("heap is empty")
 	}
-	var zero T
-	return zero, fmt.Errorf("heap is empty")
+	obj := heap.Pop(h.data)
+	typedObj := obj.(T)
+	if h.metricRecorder != nil {
+		h.metricRecorder.Add(-typedObj.Size())
+	}
+	return typedObj, nil
 }
 
 // Get returns the requested item, or sets exists=false.
@@ -193,24 +172,23 @@ func (h *Heap[T]) Get(obj T) (T, bool) {
 
 // GetByKey returns the requested item, or sets exists=false.
 func (h *Heap[T]) GetByKey(key string) (T, bool) {
-	item, exists := h.data.items[key]
+	idx, exists := h.data.keyIndex[key]
 	if !exists {
-		var zero T
-		return zero, false
+		return *new(T), false
 	}
-	return item.obj, true
+	return h.data.queue[idx].obj, true
 }
 
 func (h *Heap[T]) Has(obj T) bool {
 	key := h.data.keyFunc(obj)
-	_, ok := h.GetByKey(key)
+	_, ok := h.data.keyIndex[key]
 	return ok
 }
 
 // List returns a list of all the items.
 func (h *Heap[T]) List() []T {
-	list := make([]T, 0, len(h.data.items))
-	for _, item := range h.data.items {
+	list := make([]T, 0, len(h.data.queue))
+	for _, item := range h.data.queue {
 		list = append(list, item.obj)
 	}
 	return list
@@ -222,16 +200,16 @@ func (h *Heap[T]) Len() int {
 }
 
 // New returns a Heap which can be used to queue up items to process.
-func New[T any](keyFn KeyFunc[T], lessFn LessFunc[T]) *Heap[T] {
+func New[T Item](keyFn KeyFunc[T], lessFn LessFunc[T]) *Heap[T] {
 	return NewWithRecorder(keyFn, lessFn, nil)
 }
 
 // NewWithRecorder wraps an optional metricRecorder to compose a Heap object.
-func NewWithRecorder[T any](keyFn KeyFunc[T], lessFn LessFunc[T], metricRecorder metrics.MetricRecorder) *Heap[T] {
+func NewWithRecorder[T Item](keyFn KeyFunc[T], lessFn LessFunc[T], metricRecorder metrics.MetricRecorder) *Heap[T] {
 	return &Heap[T]{
 		data: &data[T]{
-			items:    map[string]*heapItem[T]{},
-			queue:    []string{},
+			queue:    []*heapItem[T]{},
+			keyIndex: map[string]int{},
 			keyFunc:  keyFn,
 			lessFunc: lessFn,
 		},
@@ -241,4 +219,4 @@ func NewWithRecorder[T any](keyFn KeyFunc[T], lessFn LessFunc[T], metricRecorder
 
 // LessFunc is a function that receives two items and returns true if the first
 // item should be placed before the second one when the list is sorted.
-type LessFunc[T any] func(item1, item2 T) bool
+type LessFunc[T Item] func(item1, item2 T) bool

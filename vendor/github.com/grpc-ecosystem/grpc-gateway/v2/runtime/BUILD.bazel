@@ -27,6 +27,7 @@ go_library(
         "//internal/httprule",
         "//utilities",
         "@org_golang_google_genproto_googleapis_api//httpbody",
+        "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//grpclog",
         "@org_golang_google_grpc//health/grpc_health_v1",

@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -47,39 +46,39 @@ import (
 // to also be used as a scheme builder.
 // Must only be used with tests that perform all registration before calls to validate.
 type Scheme struct {
-	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList
+	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList
 	registrationErrors field.ErrorList
 }
 
 // New creates a new Scheme.
 func New() *Scheme {
-	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
+	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}) field.ErrorList{}}
 }
 
 // AddValidationFunc registers a validation function.
 // Last writer wins.
-func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList) {
+func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList) {
 	s.validationFuncs[reflect.TypeOf(srcType)] = fn
 }
 
 // Validate validates an object using the registered validation function.
-func (s *Scheme) Validate(ctx context.Context, opts sets.Set[string], object any, subresources ...string) field.ErrorList {
+func (s *Scheme) Validate(ctx context.Context, options []string, object any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Create, Options: opts}, object, nil, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: options}, object, nil)
 	}
 	return nil
 }
 
 // ValidateUpdate validates an update to an object using the registered validation function.
-func (s *Scheme) ValidateUpdate(ctx context.Context, opts sets.Set[string], object, oldObject any, subresources ...string) field.ErrorList {
+func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, oldObject any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Update}, object, oldObject, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: options}, object, oldObject)
 	}
 	return nil
 }
@@ -140,7 +139,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 		}
 		s.ValueFuzzed(v)
 		vt := &ValidationTester{ValidationTestBuilder: s, value: v}
-		byPath := vt.ValidateFalseArgsByPath()
+		byPath := vt.validateFalseArgsByPath()
 		got[t.String()] = byPath
 	}
 
@@ -223,7 +222,8 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 
 func randfiller() *randfill.Filler {
 	// Ensure that lists and maps are not empty and use a deterministic seed.
-	return randfill.New().NilChance(0.0).NumElements(2, 2).RandSource(rand.NewSource(0))
+	// But also, don't recurse infinitely.
+	return randfill.New().NilChance(0.0).NumElements(2, 2).MaxDepth(8).RandSource(rand.NewSource(0))
 }
 
 // ValueFuzzed automatically populates the given value using a deterministic filler.
@@ -243,17 +243,20 @@ func (s *ValidationTestBuilder) Value(value any) *ValidationTester {
 // tests for a validatable value.
 type ValidationTester struct {
 	*ValidationTestBuilder
-	value    any
-	oldValue any
-	opts     sets.Set[string]
+	value        any
+	oldValue     any
+	isUpdate     bool
+	options      []string
+	subresources []string
 }
 
-// OldValue sets the oldValue for this ValidationTester. When oldValue is set to
-// a non-nil value, update validation will be used to test validation.
+// OldValue sets the oldValue for this ValidationTester. When oldValue is set,
+// update validation will be used to test validation.
 // oldValue must be the same type as value.
 // Returns ValidationTester to support call chaining.
 func (v *ValidationTester) OldValue(oldValue any) *ValidationTester {
 	v.oldValue = oldValue
+	v.isUpdate = true
 	return v
 }
 
@@ -262,12 +265,19 @@ func (v *ValidationTester) OldValue(oldValue any) *ValidationTester {
 func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 	randfiller().Fill(oldValue)
 	v.oldValue = oldValue
+	v.isUpdate = true
 	return v
 }
 
 // Opts sets the ValidationOpts to use.
-func (v *ValidationTester) Opts(opts sets.Set[string]) *ValidationTester {
-	v.opts = opts
+func (v *ValidationTester) Opts(options []string) *ValidationTester {
+	v.options = options
+	return v
+}
+
+// Subresource sets the ValidationOpts to use.
+func (v *ValidationTester) Subresources(subresources []string) *ValidationTester {
+	v.subresources = subresources
 	return v
 }
 
@@ -303,69 +313,31 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 	return v
 }
 
-// ExpectValidAt validates the value and calls t.Errorf for any validation errors at the given path.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectValidAt(fldPath *field.Path) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T.%v", v.value, fldPath), func(t *testing.T) {
-		t.Helper()
-
-		var got field.ErrorList
-		for _, e := range v.validate() {
-			if e.Field == fldPath.String() {
-				got = append(got, e)
-			}
-		}
-		if len(got) > 0 {
-			t.Errorf("want no errors at %v, got: %v", fldPath, got)
-		}
-	})
-	return v
-}
-
-// ExpectInvalid validates the value and calls t.Errorf if want does not match the actual errors.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectInvalid(want ...*field.Error) *ValidationTester {
-	v.T.Helper()
-
-	return v.expectInvalid(byFullError, want...)
-}
-
-// ExpectValidateFalse validates the value and calls t.Errorf if the actual errors do not
-// match the given validateFalseArgs.  For example, if the value to validate has a
-// single `+validateFalse="type T1"` tag, ExpectValidateFalse("type T1") will pass.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectValidateFalse(validateFalseArgs ...string) *ValidationTester {
-	v.T.Helper()
-
-	var want []*field.Error
-	for _, s := range validateFalseArgs {
-		want = append(want, field.Invalid(nil, "", fmt.Sprintf("forced failure: %s", s)))
-	}
-	return v.expectInvalid(byDetail, want...)
-}
-
-func (v *ValidationTester) ExpectValidateFalseByPath(validateFalseArgsByPath map[string][]string) *ValidationTester {
+// ExpectValidateFalseByPath validates the value and looks for the errors
+// specifically produced by `+k8s:validateFalse` tags. Each field (the map key)
+// can have multiple error strings (the map value). Test which are trying
+// to prove that the validation logic itself (e.g. validation-gen) produces the
+// expected errors should use this method.
+func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
 	v.T.Helper()
 
 	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
-		byPath := v.ValidateFalseArgsByPath()
+		actualByPath := v.validateFalseArgsByPath()
 		// ensure args are sorted
-		for _, args := range validateFalseArgsByPath {
+		for _, args := range expectedByPath {
 			sort.Strings(args)
 		}
-		if !cmp.Equal(validateFalseArgsByPath, byPath) {
-			t.Errorf("validateFalse args, grouped by field path, differed from expected:\n%s\n", cmp.Diff(validateFalseArgsByPath, byPath, cmpopts.SortMaps(stdcmp.Less[string])))
+		if !cmp.Equal(expectedByPath, actualByPath) {
+			t.Errorf("validateFalse args, grouped by field path, differed from expected:\n%s\n", cmp.Diff(expectedByPath, actualByPath, cmpopts.SortMaps(stdcmp.Less[string])))
 		}
 
 	})
 	return v
 }
 
-func (v *ValidationTester) ValidateFalseArgsByPath() map[string][]string {
+func (v *ValidationTester) validateFalseArgsByPath() map[string][]string {
 	byPath := map[string][]string{}
 	errs := v.validate()
 	for _, e := range errs {
@@ -385,153 +357,24 @@ func (v *ValidationTester) ValidateFalseArgsByPath() map[string][]string {
 	return byPath
 }
 
-func (v *ValidationTester) ExpectRegexpsByPath(regexpStringsByPath map[string][]string) *ValidationTester {
-	v.T.Helper()
+// ExpectMatches compares the expected errors with the actual errors returned
+// by the validation, using the provided ErrorMatcher. Tests which are trying
+// to prove that a use-case of validation (e.g. testing pod validation)
+// produces the expected errors should use this method.
+func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected field.ErrorList) *ValidationTester {
+	v.Helper()
 
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
-
-		errorsByPath := v.getErrorsByPath()
-
-		// sanity check
-		if want, got := len(regexpStringsByPath), len(errorsByPath); got != want {
-			t.Fatalf("wrong number of error-fields: expected %d, got %d:\nwanted:\n%sgot:\n%s",
-				want, got, renderByPath(regexpStringsByPath), renderByPath(errorsByPath))
-		}
-
-		// compile regexps
-		regexpsByPath := map[string][]*regexp.Regexp{}
-		for field, strs := range regexpStringsByPath {
-			regexps := make([]*regexp.Regexp, 0, len(strs))
-			for _, str := range strs {
-				regexps = append(regexps, regexp.MustCompile(str))
-			}
-			regexpsByPath[field] = regexps
-		}
-
-		for field := range errorsByPath {
-			errors := errorsByPath[field]
-			regexps := regexpsByPath[field]
-
-			// sanity check
-			if want, got := len(regexps), len(errors); got != want {
-				t.Fatalf("field %q: wrong number of errors: expected %d, got %d:\nwanted:\n%sgot:\n%s",
-					field, want, got, renderList(regexpStringsByPath[field]), renderList(errors))
-			}
-
-			// build a set of errors and expectations, so we can track them,
-			expSet := sets.New(regexps...)
-
-			for _, err := range errors {
-				var found *regexp.Regexp
-				for _, re := range regexps {
-					if re.MatchString(err) {
-						found = re
-						break // done with regexps
-					}
-				}
-				if found != nil {
-					expSet.Delete(found)
-					continue // next error
-				}
-				t.Errorf("field %q, error %q did not match any expectation", field, err)
-			}
-			if len(expSet) != 0 {
-				t.Errorf("field %q had unsatisfied expectations: %q", field, expSet.UnsortedList())
-			}
-		}
+		actual := v.validate()
+		matcher.Test(t, expected, actual)
 	})
 	return v
-}
-
-func (v *ValidationTester) getErrorsByPath() map[string][]string {
-	byPath := map[string][]string{}
-	errs := v.validate()
-	for _, e := range errs {
-		f := e.Field
-		if f == "<nil>" {
-			f = ""
-		}
-		byPath[f] = append(byPath[f], e.ErrorBody())
-	}
-	// ensure args are sorted
-	for _, args := range byPath {
-		sort.Strings(args)
-	}
-	return byPath
-}
-
-func renderByPath(byPath map[string][]string) string {
-	keys := []string{}
-	for key := range byPath {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, vals := range byPath {
-		sort.Strings(vals)
-	}
-
-	buf := strings.Builder{}
-	for _, key := range keys {
-		vals := byPath[key]
-		for _, val := range vals {
-			buf.WriteString(fmt.Sprintf("\t%s: %q\n", key, val))
-		}
-	}
-	return buf.String()
-}
-
-func renderList(list []string) string {
-	buf := strings.Builder{}
-	for _, item := range list {
-		buf.WriteString(fmt.Sprintf("\t%q\n", item))
-	}
-	return buf.String()
-}
-
-func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
-		t.Helper()
-
-		want := sets.New[string]()
-		for _, e := range errs {
-			want.Insert(matcher(e))
-		}
-
-		got := sets.New[string]()
-		for _, e := range v.validate() {
-			got.Insert(matcher(e))
-		}
-		if !got.Equal(want) {
-			t.Errorf("validation errors differed from expected:\n%v\n", cmp.Diff(want, got, cmpopts.SortMaps(stdcmp.Less[string])))
-
-			for x := range got.Difference(want) {
-				fmt.Printf("%q,\n", strings.TrimPrefix(x, "forced failure: "))
-			}
-		}
-	})
-	return v
-}
-
-type matcher func(err *field.Error) string
-
-func byDetail(err *field.Error) string {
-	return err.Detail
-}
-
-func byFullError(err *field.Error) string {
-	return err.Error()
 }
 
 func (v *ValidationTester) validate() field.ErrorList {
-	var errs field.ErrorList
-	if v.oldValue == nil {
-		errs = v.s.Validate(context.Background(), v.opts, v.value)
-	} else {
-		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue)
+	if v.isUpdate {
+		return v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
 	}
-	return errs
+	return v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
 }

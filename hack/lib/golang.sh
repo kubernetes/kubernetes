@@ -89,7 +89,11 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 # The set of server targets we build docker images for
 kube::golang::server_image_targets() {
   # NOTE: this contains cmd targets for kube::build::get_docker_wrapped_binaries
+  # NOTE: kube-log-runner should NOT be in kube::build::get_docker_wrapped_binaries
+  # This binary is used across all images
+  # kube-log-runner should be the first target so it can be skipped
   local targets=(
+    staging/src/k8s.io/component-base/logs/kube-log-runner
     cmd/kube-apiserver
     cmd/kube-controller-manager
     cmd/kube-scheduler
@@ -524,6 +528,23 @@ kube::golang::internal::verify_go_version() {
   if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
     # no-op, just respect GOTOOLCHAIN
     :
+  elif [ "${GO_VERSION:-}" == 'devel' ]; then
+    # get the latest master version of Go, build and use that version
+    export GOTOOLCHAIN='local'
+    if [[ ! -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" && ! -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
+      # gimme tries to write to $HOME directory, in CI environments this may not be writable.
+      if [ ! -w "${HOME:?Variable HOME is not set}" ]; then
+        tmp_home="$(mktemp -d)"
+        export HOME="${tmp_home}"
+      fi
+      GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master" >/dev/null 2>&1
+    fi
+
+    if [[ -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" ]]; then
+      source "${KUBE_ROOT}/.gimme/envs/gomaster.env"
+    elif [[ -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
+      source "${HOME}/.gimme/envs/gomaster.env"
+    fi
   elif [ -n "${FORCE_HOST_GO:-}" ]; then
     # ensure existing host version is used, like before GOTOOLCHAIN existed
     export GOTOOLCHAIN='local'
@@ -551,7 +572,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.24
+  minimum_go_version=go1.26
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -621,21 +642,6 @@ kube::golang::hack_tools_gotoolchain() {
   echo -n "${hack_tools_gotoolchain}"
 }
 
-kube::golang::setup_gomaxprocs() {
-  # GOMAXPROCS by default does not reflect the number of cpu(s) available
-  # when running in a container, please see https://github.com/golang/go/issues/33803
-  if [[ -z "${GOMAXPROCS:-}" ]]; then
-    if ! command -v ncpu >/dev/null 2>&1; then
-      GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
-    fi
-    if command -v ncpu >/dev/null 2>&1; then
-      GOMAXPROCS=$(ncpu)
-      export GOMAXPROCS
-      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS}"
-    fi
-  fi
-}
-
 # This will take binaries from $GOPATH/bin and copy them to the appropriate
 # place in ${KUBE_OUTPUT_BIN}
 #
@@ -657,9 +663,15 @@ kube::golang::place_bins() {
     local platform_src="/${platform//\//_}"
     if [[ "${platform}" == "${host_platform}" ]]; then
       platform_src=""
-      rm -f "${THIS_PLATFORM_BIN}"
-      mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
-      ln -s "${KUBE_OUTPUT_BIN}/${platform}" "${THIS_PLATFORM_BIN}"
+      # For compatibility with the old rsync behavior, only setup the symlink
+      # when we're doing a "local" build, not a "dockerized" build
+      # if KUBE_OUTPUT_SUBPATH is set then we're not writing to the default local path
+      if [[ -z "${KUBE_OUTPUT_SUBPATH+x}" ]]; then
+        V=4 kube::log::status "Creating ${THIS_PLATFORM_BIN} symlink for non-dockerized build"
+        rm -f "${THIS_PLATFORM_BIN}"
+        mkdir -p "$(dirname "${THIS_PLATFORM_BIN}")"
+        ln -s "../${_KUBE_OUTPUT_SUBPATH:?}/${_KUBE_OUTPUT_BIN_SUBPATH:?}/${platform}" "${THIS_PLATFORM_BIN}"
+      fi
     fi
 
     V=3 kube::log::status "Placing binaries for ${platform} in ${KUBE_OUTPUT_BIN}/${platform}"
@@ -667,7 +679,7 @@ kube::golang::place_bins() {
     if [[ -d "${full_binpath_src}" ]]; then
       mkdir -p "${KUBE_OUTPUT_BIN}/${platform}"
       find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync -pc {} "${KUBE_OUTPUT_BIN}/${platform}" \;
+        cp -p {} "${KUBE_OUTPUT_BIN}/${platform}" \;
     fi
   done
 }
@@ -813,18 +825,18 @@ kube::golang::build_binaries_for_platform() {
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
-      kube::log::info "    ${binary} (test)"
+      kube::log::info "    ${binary} (test${KUBE_RACE:+, race detection})"
     elif kube::golang::is_statically_linked "${binary}"; then
       statics+=("${binary}")
       kube::log::info "    ${binary} (static)"
     else
       nonstatics+=("${binary}")
-      kube::log::info "    ${binary} (non-static)"
+      kube::log::info "    ${binary} (non-static${KUBE_RACE:+, race detection})"
     fi
    done
 
   V=2 kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags}"
+  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags} and -tags=${gotags:-}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
@@ -845,6 +857,9 @@ kube::golang::build_binaries_for_platform() {
       -ldflags="${goldflags}"
       -tags="${gotags:-}"
     )
+    if [[ -n "${KUBE_RACE:-}" ]]; then
+      build_args+=("${KUBE_RACE}")
+    fi
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 
@@ -854,13 +869,18 @@ kube::golang::build_binaries_for_platform() {
     testpkg=$(dirname "${test}")
 
     mkdir -p "$(dirname "${outfile}")"
-    go test -c \
-      ${goflags:+"${goflags[@]}"} \
-      -gcflags="${gogcflags}" \
-      -ldflags="${goldflags}" \
-      -tags="${gotags:-}" \
-      -o "${outfile}" \
-      "${testpkg}"
+    build_args=(
+      -c
+      ${goflags:+"${goflags[@]}"}
+      -gcflags="${gogcflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
+      -o "${outfile}"
+    )
+    if [[ -n "${KUBE_RACE:-}" ]]; then
+      build_args+=("${KUBE_RACE}")
+    fi
+    go test "${build_args[@]}" "${testpkg}"
   done
 }
 
@@ -915,6 +935,9 @@ kube::golang::build_binaries() {
   gogcflags="${GOGCFLAGS:-}"
   goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
+  local grpcnotrace
+  grpcnotrace=""
+
   if [[ "${DBG:-}" == 1 ]]; then
       # Debugging - disable optimizations and inlining and trimPath
       gogcflags="${gogcflags} all=-N -l"
@@ -922,10 +945,12 @@ kube::golang::build_binaries() {
       # Not debugging - disable symbols and DWARF, trim embedded paths
       goldflags="${goldflags} -s -w"
       goflags+=("-trimpath")
+      # build non-debug binaries with "grpcnotrace" tag to avoid x/net trace usage and enable dead code elimination
+      grpcnotrace=",grpcnotrace"
   fi
 
   # Extract tags if any specified in GOFLAGS
-  gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  gotags="selinux,notest${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
   local -a targets=()
   local arg

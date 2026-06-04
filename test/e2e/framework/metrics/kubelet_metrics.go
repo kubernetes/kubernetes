@@ -33,7 +33,6 @@ import (
 )
 
 const (
-	proxyTimeout = 2 * time.Minute
 	// dockerOperationsLatencyKey is the key for the operation latency metrics.
 	// Taken from k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
 	dockerOperationsLatencyKey = "docker_operations_duration_seconds"

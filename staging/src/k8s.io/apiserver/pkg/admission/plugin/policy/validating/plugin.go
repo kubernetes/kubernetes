@@ -26,13 +26,14 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/config"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/manifest/source"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -45,38 +46,20 @@ const (
 
 var (
 	lazyCompositionEnvTemplateWithStrictCostInit sync.Once
-	lazyCompositionEnvTemplateWithStrictCost     *cel.CompositionEnv
-
-	lazyCompositionEnvTemplateWithoutStrictCostInit sync.Once
-	lazyCompositionEnvTemplateWithoutStrictCost     *cel.CompositionEnv
+	lazyCompositionEnvTemplateWithStrictCost     *environment.EnvSet
 )
 
-func getCompositionEnvTemplateWithStrictCost() *cel.CompositionEnv {
+func getCompositionEnvTemplateWithStrictCost() *environment.EnvSet {
 	lazyCompositionEnvTemplateWithStrictCostInit.Do(func() {
-		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-		if err != nil {
-			panic(err)
-		}
-		lazyCompositionEnvTemplateWithStrictCost = env
+		lazyCompositionEnvTemplateWithStrictCost = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	})
 	return lazyCompositionEnvTemplateWithStrictCost
-}
-
-func getCompositionEnvTemplateWithoutStrictCost() *cel.CompositionEnv {
-	lazyCompositionEnvTemplateWithoutStrictCostInit.Do(func() {
-		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
-		if err != nil {
-			panic(err)
-		}
-		lazyCompositionEnvTemplateWithoutStrictCost = env
-	})
-	return lazyCompositionEnvTemplateWithoutStrictCost
 }
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
-		return NewPlugin(configFile), nil
+		return NewPlugin(configFile)
 	})
 }
 
@@ -93,8 +76,42 @@ type Plugin struct {
 var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
 var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
+var _ initializer.WantsManifestLoaders = &Plugin{}
 
-func NewPlugin(_ io.Reader) *Plugin {
+// SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
+func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
+	if loaders == nil || loaders.LoadValidatingPolicyManifests == nil {
+		return
+	}
+	loadFunc := loaders.LoadValidatingPolicyManifests
+	a.SetStaticSourceFactory(func(manifestsDir string) (generic.ReloadableSource[PolicyHook], error) {
+		staticSource := source.NewStaticPolicySource(manifestsDir, a.GetAPIServerID(),
+			func(p *v1.ValidatingAdmissionPolicy) (Validator, error) {
+				v := compilePolicy(p)
+				if err := v.CompileError(); err != nil {
+					return nil, err
+				}
+				return v, nil
+			},
+			func(dir string) ([]*v1.ValidatingAdmissionPolicy, []*v1.ValidatingAdmissionPolicyBinding, string, error) {
+				return loadFunc(dir)
+			},
+			func(b *v1.ValidatingAdmissionPolicyBinding) string { return b.Spec.PolicyName },
+			metrics.VAPManifestType,
+		)
+		if err := staticSource.LoadInitial(); err != nil {
+			return nil, err
+		}
+		return staticSource, nil
+	})
+}
+
+func NewPlugin(configFile io.Reader) (*Plugin, error) {
+	cfg, err := config.LoadValidatingConfig(configFile)
+	if err != nil {
+		return nil, err
+	}
+
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 
 	p := &Plugin{
@@ -112,13 +129,14 @@ func NewPlugin(_ io.Reader) *Plugin {
 					restMapper,
 				)
 			},
-			func(a authorizer.Authorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
+			func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
 				return NewDispatcher(a, generic.NewPolicyMatcher(m))
 			},
 		),
 	}
 	p.SetEnabled(true)
-	return p
+	p.SetStaticManifestsDir(cfg.StaticManifestsDir)
+	return p, nil
 }
 
 // Validate makes an admission decision based on the request attributes.
@@ -131,19 +149,16 @@ func compilePolicy(policy *Policy) Validator {
 	if policy.Spec.ParamKind != nil {
 		hasParam = true
 	}
-	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
-	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true, StrictCost: strictCost}
-	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false, StrictCost: strictCost}
+	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
+	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
 	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
-	var compositionEnvTemplate *cel.CompositionEnv
-	if strictCost {
-		compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
-	} else {
-		compositionEnvTemplate = getCompositionEnvTemplateWithoutStrictCost()
+	compositionEnvTemplate := getCompositionEnvTemplateWithStrictCost()
+	filterCompiler, err := cel.NewCompositedCompiler(compositionEnvTemplate)
+	if err != nil {
+		return NewValidator(nil, nil, nil, nil, failurePolicy, err)
 	}
-	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
 	if len(matchConditions) > 0 {
@@ -159,6 +174,7 @@ func compilePolicy(policy *Policy) Validator {
 		filterCompiler.CompileCondition(convertv1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
 		filterCompiler.CompileCondition(convertv1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 		failurePolicy,
+		nil,
 	)
 
 	return res

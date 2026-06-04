@@ -44,8 +44,13 @@ type Matcher struct {
 	Client          clientset.Interface
 }
 
-func (m *Matcher) GetNamespace(name string) (*v1.Namespace, error) {
-	return m.NamespaceLister.Get(name)
+func (m *Matcher) GetNamespace(ctx context.Context, name string) (*v1.Namespace, error) {
+	ns, err := m.NamespaceLister.Get(name)
+	if apierrors.IsNotFound(err) && len(name) > 0 {
+		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
+		ns, err = m.Client.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+	}
+	return ns, err
 }
 
 // Validate checks if the Matcher has a NamespaceLister and Client.
@@ -95,8 +100,8 @@ func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]stri
 	return namespace.Labels, nil
 }
 
-// MatchNamespaceSelector decideds whether the request matches the
-// namespaceSelctor of the webhook. Only when they match, the webhook is called.
+// MatchNamespaceSelector decides whether the request matches the
+// namespaceSelector of the webhook. Only when they match, the webhook is called.
 func (m *Matcher) MatchNamespaceSelector(p NamespaceSelectorProvider, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	namespaceName := attr.GetNamespace()
 	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {

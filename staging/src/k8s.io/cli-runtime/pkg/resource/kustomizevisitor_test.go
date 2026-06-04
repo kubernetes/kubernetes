@@ -19,7 +19,7 @@ package resource
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/dump"
+	"k8s.io/utils/dump"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )

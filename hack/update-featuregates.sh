@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script updates test/compatibility_lifecycle/reference/versioned_feature_list.yaml 
-# with all the feature gate features.
+# This script updates test/compatibility_lifecycle/reference/versioned_feature_list.yaml
+# and test/compatibility_lifecycle/reference/feature_list.md with all the feature gate features.
 # Usage: `hack/update-featuregates.sh`.
 
 set -o errexit
@@ -28,3 +28,4 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 go run test/compatibility_lifecycle/main.go feature-gates update
+go run cmd/genfeaturegates/genfeaturegates.go -output=test/compatibility_lifecycle/reference/feature_list.md

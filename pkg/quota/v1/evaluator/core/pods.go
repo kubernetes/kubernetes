@@ -22,6 +22,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,10 +40,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // the name used for object count quota
 var podObjectCountName = generic.ObjectCountQuotaResourceNameFor(corev1.SchemeGroupVersion.WithResource("pods").GroupResource())
+var resourceRequestsDeviceClassPrefix = corev1.DefaultResourceRequestsPrefix + resourceapi.ResourceDeviceClassPrefix
 
 // podResources are the set of resources managed by quota associated with pods.
 var podResources = []corev1.ResourceName{
@@ -82,8 +85,15 @@ func maskResourceWithPrefix(resource corev1.ResourceName, prefix string) corev1.
 // has the quota related resource prefix.
 func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// As overcommit is not supported by extended resources for now,
-	// only quota objects in format of "requests.resourceName" is allowed.
-	return !helper.IsNativeResource(name) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+	// quota objects in format of "requests.resourceName" is allowed
+	nonNative := !helper.IsNativeResource(name)
+	// allow the implicit extended resource name in the format of
+	// requests.deviceclass.resource.kubernetes.io/device-class-name
+	implicitExtendedResource := strings.HasPrefix(string(name), resourceRequestsDeviceClassPrefix)
+	// name starts with 'requests.'
+	isQuotaRequest := strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+
+	return (nonNative || implicitExtendedResource) && isQuotaRequest
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
@@ -312,7 +322,7 @@ func podComputeUsageHelper(requests corev1.ResourceList, limits corev1.ResourceL
 			result[maskResourceWithPrefix(resource, corev1.DefaultResourceRequestsPrefix)] = request
 		}
 		// for extended resources
-		if helper.IsExtendedResourceName(resource) {
+		if schedutil.IsDRAExtendedResourceName(resource) {
 			// only quota objects in format of "requests.resourceName" is allowed for extended resource.
 			result[maskResourceWithPrefix(resource, corev1.DefaultResourceRequestsPrefix)] = request
 		}

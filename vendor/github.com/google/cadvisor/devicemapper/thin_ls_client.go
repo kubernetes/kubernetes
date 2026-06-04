@@ -58,7 +58,7 @@ func (c *defaultThinLsClient) ThinLs(deviceName string) (map[string]uint64, erro
 
 	output, err := exec.Command(c.thinLsPath, args...).Output()
 	if err != nil {
-		return nil, fmt.Errorf("Error running command `thin_ls %v`: %v\noutput:\n\n%v", strings.Join(args, " "), err, string(output))
+		return nil, fmt.Errorf("error running command `thin_ls %v`: %v\noutput:\n\n%v", strings.Join(args, " "), err, string(output))
 	}
 
 	return parseThinLsOutput(output), nil

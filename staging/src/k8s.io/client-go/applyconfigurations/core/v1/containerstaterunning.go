@@ -24,7 +24,10 @@ import (
 
 // ContainerStateRunningApplyConfiguration represents a declarative configuration of the ContainerStateRunning type for use
 // with apply.
+//
+// ContainerStateRunning is a running state of a container.
 type ContainerStateRunningApplyConfiguration struct {
+	// Time at which the container was last (re-)started
 	StartedAt *metav1.Time `json:"startedAt,omitempty"`
 }
 

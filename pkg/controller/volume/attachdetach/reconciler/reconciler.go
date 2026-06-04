@@ -215,20 +215,24 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 
 			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
 			if err != nil {
-				logger.Error(err, "Failed to get health of node", "node", klog.KRef("", string(attachedVolume.NodeName)))
+				logger.V(5).Info("Failed to get health of node",
+					"node", klog.KRef("", string(attachedVolume.NodeName)),
+					"err", err)
 			}
 
 			// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration if force detach is enabled
 			// Ensure that the timeout condition checks this correctly so that the correct metric is updated below
-			forceDetatchTimeoutExpired := maxWaitForUnmountDurationExpired && !rc.disableForceDetachOnTimeout
+			forceDetachTimeoutExpired := maxWaitForUnmountDurationExpired && !rc.disableForceDetachOnTimeout
 			if maxWaitForUnmountDurationExpired && rc.disableForceDetachOnTimeout {
 				logger.V(5).Info("Drain timeout expired for volume but disableForceDetachOnTimeout was set", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 			}
-			forceDetach := !isHealthy && forceDetatchTimeoutExpired
+			forceDetach := !isHealthy && forceDetachTimeoutExpired
 
 			hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
 			if err != nil {
-				logger.Error(err, "Failed to get taint specs for node", "node", klog.KRef("", string(attachedVolume.NodeName)))
+				logger.V(5).Info("Failed to get taint specs for node",
+					"node", klog.KRef("", string(attachedVolume.NodeName)),
+					"err", err)
 			}
 
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless we have
@@ -262,19 +266,19 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 			}
 
 			// Trigger detach volume which requires verifying safe to detach step
-			// If forceDetatchTimeoutExpired is true, skip verifySafeToDetach check
+			// If forceDetachTimeoutExpired is true, skip verifySafeToDetach check
 			// If the node has node.kubernetes.io/out-of-service taint with NoExecute effect, skip verifySafeToDetach check
 			logger.V(5).Info("Starting attacherDetacher.DetachVolume", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 			if hasOutOfServiceTaint {
 				logger.V(4).Info("node has out-of-service taint", "node", klog.KRef("", string(attachedVolume.NodeName)))
 			}
-			verifySafeToDetach := !(forceDetatchTimeoutExpired || hasOutOfServiceTaint)
+			verifySafeToDetach := !forceDetachTimeoutExpired && !hasOutOfServiceTaint
 			err = rc.attacherDetacher.DetachVolume(logger, attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if verifySafeToDetach { // normal detach
 					logger.Info("attacherDetacher.DetachVolume started", "node", klog.KRef("", string(attachedVolume.NodeName)), "volumeName", attachedVolume.VolumeName)
 				} else { // force detach
-					if forceDetatchTimeoutExpired {
+					if forceDetachTimeoutExpired {
 						metrics.RecordForcedDetachMetric(metrics.ForceDetachReasonTimeout)
 						logger.Info("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching",
 							"duration", rc.maxWaitForUnmountDuration,
@@ -389,12 +393,12 @@ func (rc *reconciler) reportMultiAttachError(logger klog.Logger, volumeToAttach 
 	pods := rc.desiredStateOfWorld.GetVolumePodsOnNodes(otherNodes, volumeToAttach.VolumeName)
 	if len(pods) == 0 {
 		// We did not find any pods that requests the volume. The pod must have been deleted already.
-		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
+		simpleMsg, _ := volumeToAttach.GenerateMsg("Waiting for detach", "Volume is already exclusively attached to one node, waiting on detach before it can be attached to another node")
 		for _, pod := range volumeToAttach.ScheduledPods {
-			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, "%s", simpleMsg)
 		}
 		// Log detailed message to system admin
-		logger.Info("Multi-Attach error: volume is already exclusively attached and can't be attached to another node", "attachedTo", otherNodesStr, "volume", volumeToAttach)
+		logger.Info("Waiting for detach: volume is already exclusively attached, waiting on detach before it can be attached to another node", "attachedTo", otherNodesStr, "volume", volumeToAttach)
 		return
 	}
 
@@ -425,10 +429,10 @@ func (rc *reconciler) reportMultiAttachError(logger klog.Logger, volumeToAttach 
 			// No local pods, there are pods only in different namespaces.
 			msg = fmt.Sprintf("Volume is already used by %d pod(s) in different namespaces", otherPods)
 		}
-		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", msg)
-		rc.recorder.Eventf(scheduledPod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+		simpleMsg, _ := volumeToAttach.GenerateMsg("Waiting for detach", msg)
+		rc.recorder.Eventf(scheduledPod, v1.EventTypeWarning, kevents.FailedAttachVolume, "%s", simpleMsg)
 	}
 
 	// Log all pods for system admin
-	logger.Info("Multi-Attach error: volume is already used by pods", "pods", klog.KObjSlice(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
+	logger.Info("Waiting for detach: volume is in use by pods", "pods", klog.KObjSlice(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
 }

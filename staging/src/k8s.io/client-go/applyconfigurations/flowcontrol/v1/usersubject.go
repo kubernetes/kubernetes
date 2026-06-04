@@ -20,7 +20,11 @@ package v1
 
 // UserSubjectApplyConfiguration represents a declarative configuration of the UserSubject type for use
 // with apply.
+//
+// UserSubject holds detailed information for user-kind subject.
 type UserSubjectApplyConfiguration struct {
+	// `name` is the username that matches, or "*" to match all usernames.
+	// Required.
 	Name *string `json:"name,omitempty"`
 }
 

@@ -20,14 +20,13 @@ import (
 	"crypto/x509"
 	"sort"
 
-	"github.com/pkg/errors"
-
 	certutil "k8s.io/client-go/util/cert"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -248,7 +247,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 
 	cfg := &pkiutil.CertConfig{
 		Config:              certConfig,
-		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithm,
 	}
 
 	startTime := kubeadmutil.StartTimeUTC()
@@ -308,7 +307,7 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 	cfg := &pkiutil.CertConfig{
 		Config:              certConfig,
-		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithm,
 	}
 
 	// generates the CSR request and save it

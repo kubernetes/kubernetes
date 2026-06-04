@@ -17,7 +17,6 @@ limitations under the License.
 package certificate
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (
@@ -146,6 +146,8 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	// This test fails if you comment out the t.closeAllConns() call in
 	// transport.go and don't close connections on a rotate.
 
+	logger, tCtx := ktesting.NewTestContext(t)
+
 	stop := make(chan struct{})
 	defer close(stop)
 
@@ -191,7 +193,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	}
 
 	// Check for a new cert every 10 milliseconds
-	if _, err := updateTransport(stop, 10*time.Millisecond, c, m, 0); err != nil {
+	if _, err := updateTransport(logger, stop, 10*time.Millisecond, c, m, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -200,7 +202,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := client.Get().Do(context.TODO()).Error(); err != nil {
+	if err := client.Get().Do(tCtx).Error(); err != nil {
 		t.Fatal(err)
 	}
 	firstCertSerial := lastSerialNumber()
@@ -210,7 +212,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	m.setCurrent(client2CertData.certificate)
 
 	err = wait.PollImmediate(time.Millisecond*50, wait.ForeverTestTimeout, func() (done bool, err error) {
-		client.Get().Do(context.TODO())
+		client.Get().Do(tCtx)
 		if firstCertSerial.Cmp(lastSerialNumber()) != 0 {
 			// The certificate changed!
 			return true, nil

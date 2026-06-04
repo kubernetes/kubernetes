@@ -17,11 +17,11 @@ limitations under the License.
 package strict
 
 import (
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // VerifyUnmarshalStrict takes a slice of schemes, a JSON/YAML byte slice and a GroupVersionKind

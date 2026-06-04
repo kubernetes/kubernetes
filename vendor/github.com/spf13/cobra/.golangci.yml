@@ -12,14 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+version: "2"
+
 run:
-  deadline: 5m
+  timeout: 5m
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 linters:
-  disable-all: true
+  default: none
   enable:
     #- bodyclose
-    # - deadcode ! deprecated since v1.49.0; replaced by 'unused'
     #- depguard
     #- dogsled
     #- dupl
@@ -30,28 +36,31 @@ linters:
     - goconst
     - gocritic
     #- gocyclo
-    - gofmt
-    - goimports
-    #- gomnd
     #- goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     #- lll
     - misspell
+    #- mnd
     #- nakedret
     #- noctx
     - nolintlint
     #- rowserrcheck
-    #- scopelint
     - staticcheck
-    #- structcheck ! deprecated since v1.49.0; replaced by 'unused'
-    - stylecheck
-    #- typecheck
     - unconvert
     #- unparam
     - unused
-    # - varcheck ! deprecated since v1.49.0; replaced by 'unused'
     #- whitespace
-  fast: false
+  exclusions:
+    presets:
+      - common-false-positives
+      - legacy
+      - std-error-handling
+  settings:
+    govet:
+      # Disable buildtag check to allow dual build tag syntax (both //go:build and // +build).
+      # This is necessary for Go 1.15 compatibility since //go:build was introduced in Go 1.17.
+      # This can be removed once Cobra requires Go 1.17 or higher.
+      disable:
+        - buildtag

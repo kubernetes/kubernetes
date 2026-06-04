@@ -20,11 +20,14 @@ import (
 	"sort"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/parser"
 )
 
@@ -44,7 +47,7 @@ var comparableTypes = []*cel.Type{
 //
 // # Distinct
 //
-// Introduced in version: 2
+// Introduced in version: 2 (cost support in version 3)
 //
 // Returns the distinct elements of a list.
 //
@@ -58,7 +61,7 @@ var comparableTypes = []*cel.Type{
 //
 // # Range
 //
-// Introduced in version: 2
+// Introduced in version: 2 (cost support in version 3)
 //
 // Returns a list of integers from 0 to n-1.
 //
@@ -70,7 +73,7 @@ var comparableTypes = []*cel.Type{
 //
 // # Reverse
 //
-// Introduced in version: 2
+// Introduced in version: 2 (cost support in version 3)
 //
 // Returns the elements of a list in reverse order.
 //
@@ -81,6 +84,8 @@ var comparableTypes = []*cel.Type{
 //	[5, 3, 1, 2].reverse() // return [2, 1, 3, 5]
 //
 // # Slice
+//
+// Introduced in version: 0 (cost support in version 3)
 //
 // Returns a new sub-list using the indexes provided.
 //
@@ -93,12 +98,14 @@ var comparableTypes = []*cel.Type{
 //
 // # Flatten
 //
+// Introduced in version: 1 (cost support in version 3)
+//
 // Flattens a list recursively.
-// If an optional depth is provided, the list is flattened to a the specificied level.
+// If an optional depth is provided, the list is flattened to a the specified level.
 // A negative depth value will result in an error.
 //
-//	<list>.flatten(<list>) -> <list>
-//	<list>.flatten(<list>, <int>) -> <list>
+//	<list>.flatten() -> <list>
+//	<list>.flatten(<int>) -> <list>
 //
 // Examples:
 //
@@ -110,7 +117,7 @@ var comparableTypes = []*cel.Type{
 //
 // # Sort
 //
-// Introduced in version: 2
+// Introduced in version: 2 (cost support in version 3)
 //
 // Sorts a list with comparable elements. If the element type is not comparable
 // or the element types are not the same, the function will produce an error.
@@ -127,6 +134,8 @@ var comparableTypes = []*cel.Type{
 //
 // # SortBy
 //
+// Introduced in version: 2 (cost support in version 3)
+//
 // Sorts a list by a key value, i.e., the order is determined by the result of
 // an expression applied to each element of the list.
 // The output of the key expression must be a comparable type, otherwise the
@@ -134,7 +143,7 @@ var comparableTypes = []*cel.Type{
 //
 //	<list(T)>.sortBy(<bindingName>, <keyExpr>) -> <list(T)>
 //	keyExpr returns a value in {int, uint, double, bool, duration, timestamp, string, bytes}
-
+//
 // Examples:
 //
 //	[
@@ -143,7 +152,6 @@ var comparableTypes = []*cel.Type{
 //	  Player { name: "baz", score: 1000 },
 //	].sortBy(e, e.score).map(e, e.name)
 //	== ["bar", "foo", "baz"]
-
 func Lists(options ...ListsOption) cel.EnvOption {
 	l := &listsLib{version: math.MaxUint32}
 	for _, o := range options {
@@ -304,9 +312,8 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 		opts = append(opts, cel.Function("lists.range",
 			cel.Overload("lists_range",
 				[]*cel.Type{cel.IntType}, cel.ListType(cel.IntType),
-				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
-					n := args[0].(types.Int)
-					result, err := genRange(n)
+				cel.UnaryBinding(func(n ref.Val) ref.Val {
+					result, err := genRange(n.(types.Int))
 					if err != nil {
 						return types.WrapErr(err)
 					}
@@ -317,9 +324,8 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 		opts = append(opts, cel.Function("reverse",
 			cel.MemberOverload("list_reverse",
 				[]*cel.Type{listType}, listType,
-				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
-					list := args[0].(traits.Lister)
-					result, err := reverseList(list)
+				cel.UnaryBinding(func(list ref.Val) ref.Val {
+					result, err := reverseList(list.(traits.Lister))
 					if err != nil {
 						return types.WrapErr(err)
 					}
@@ -340,13 +346,61 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 			),
 		))
 	}
+	if lib.version >= 3 {
+		estimators := []checker.CostOption{
+			checker.OverloadCostEstimate("list_slice", estimateListSlice),
+			checker.OverloadCostEstimate("list_flatten", estimateListFlatten),
+			checker.OverloadCostEstimate("list_flatten_int", estimateListFlatten),
+			checker.OverloadCostEstimate("lists_range", estimateListsRange),
+			checker.OverloadCostEstimate("list_reverse", estimateListReverse),
+			checker.OverloadCostEstimate("list_distinct", estimateListDistinct),
+		}
+		for _, t := range comparableTypes {
+			estimators = append(estimators,
+				checker.OverloadCostEstimate(
+					fmt.Sprintf("list_%s_sort", t.TypeName()),
+					estimateListSort(t),
+				),
+				checker.OverloadCostEstimate(
+					fmt.Sprintf("list_%s_sortByAssociatedKeys", t.TypeName()),
+					estimateListSortBy(t),
+				),
+			)
+		}
+		opts = append(opts, cel.CostEstimatorOptions(estimators...))
+	}
 
 	return opts
 }
 
 // ProgramOptions implements the Library interface method.
-func (listsLib) ProgramOptions() []cel.ProgramOption {
-	return []cel.ProgramOption{}
+func (lib *listsLib) ProgramOptions() []cel.ProgramOption {
+	var opts []cel.ProgramOption
+	if lib.version >= 3 {
+		// TODO: Add cost trackers for list operations
+		trackers := []interpreter.CostTrackerOption{
+			interpreter.OverloadCostTracker("list_slice", trackListOutputSize),
+			interpreter.OverloadCostTracker("list_flatten", trackListFlatten),
+			interpreter.OverloadCostTracker("list_flatten_int", trackListFlatten),
+			interpreter.OverloadCostTracker("lists_range", trackListOutputSize),
+			interpreter.OverloadCostTracker("list_reverse", trackListOutputSize),
+			interpreter.OverloadCostTracker("list_distinct", trackListDistinct),
+		}
+		for _, t := range comparableTypes {
+			trackers = append(trackers,
+				interpreter.OverloadCostTracker(
+					fmt.Sprintf("list_%s_sort", t.TypeName()),
+					trackListSort,
+				),
+				interpreter.OverloadCostTracker(
+					fmt.Sprintf("list_%s_sortByAssociatedKeys", t.TypeName()),
+					trackListSortBy,
+				),
+			)
+		}
+		opts = append(opts, cel.CostTrackerOptions(trackers...))
+	}
+	return opts
 }
 
 func genRange(n types.Int) (ref.Val, error) {
@@ -451,20 +505,24 @@ func sortListByAssociatedKeys(list, keys traits.Lister) (ref.Val, error) {
 
 	sortedIndices := make([]ref.Val, 0, listLength)
 	for i := types.IntZero; i < listLength; i++ {
-		if keys.Get(i).Type() != elem.Type() {
-			return nil, fmt.Errorf("list elements must have the same type")
-		}
 		sortedIndices = append(sortedIndices, i)
 	}
 
+	var err error
 	sort.Slice(sortedIndices, func(i, j int) bool {
 		iKey := keys.Get(sortedIndices[i])
 		jKey := keys.Get(sortedIndices[j])
+		if iKey.Type() != elem.Type() || jKey.Type() != elem.Type() {
+			err = fmt.Errorf("list elements must have the same type")
+			return false
+		}
 		return iKey.(traits.Comparer).Compare(jKey) == types.IntNegOne
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	sorted := make([]ref.Val, 0, listLength)
-
 	for _, sortedIdx := range sortedIndices {
 		sorted = append(sorted, list.Get(sortedIdx))
 	}
@@ -550,4 +608,172 @@ func templatedOverloads(types []*cel.Type, template func(t *cel.Type) cel.Functi
 		overloads[i] = template(t)
 	}
 	return overloads
+}
+
+// estimateListSlice computes an O(n) slice operation with a cost factor of 1.
+func estimateListSlice(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) != 2 {
+		return nil
+	}
+	sz := estimateSize(estimator, *target)
+	start := nodeAsIntValue(args[0], 0)
+	end := nodeAsIntValue(args[1], sz.Max)
+	return estimateAllocatingListCall(1, checker.FixedSizeEstimate(end-start))
+}
+
+// estimateListsRange computes an O(n) range operation with a cost factor of 1.
+func estimateListsRange(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target != nil || len(args) != 1 {
+		return nil
+	}
+	return estimateAllocatingListCall(1, checker.FixedSizeEstimate(nodeAsIntValue(args[0], math.MaxUint)))
+}
+
+// estimateListReverse computes an O(n) reverse operation with a cost factor of 1.
+func estimateListReverse(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) != 0 {
+		return nil
+	}
+	return estimateAllocatingListCall(1, estimateSize(estimator, *target))
+}
+
+// estimateListFlatten computes an O(n) flatten operation with a cost factor proportional to the flatten depth.
+func estimateListFlatten(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) > 1 {
+		return nil
+	}
+	depth := uint64(1)
+	if len(args) == 1 {
+		depth = nodeAsIntValue(args[0], math.MaxUint)
+	}
+	return estimateAllocatingListCall(float64(depth), estimateSize(estimator, *target))
+}
+
+// Compute an O(n^2) with a cost factor of 2, equivalent to sets.contains with a result list
+// which can vary in size from 1 element to the original list size.
+func estimateListDistinct(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) != 0 {
+		return nil
+	}
+	sz := estimateSize(estimator, *target)
+	costFactor := 2.0
+	return estimateAllocatingListCall(costFactor, sz.Multiply(sz))
+}
+
+// estimateListSort computes an O(n^2) sort operation with a cost factor of 2 for the equality
+// operations against the elements in the list against themselves which occur during the sort computation.
+func estimateListSort(t *types.Type) checker.FunctionEstimator {
+	return func(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+		if target == nil || len(args) != 0 {
+			return nil
+		}
+		return estimateListSortCost(estimator, *target, t)
+	}
+}
+
+// estimateListSortBy computes an O(n^2) sort operation with a cost factor of 2 for the equality
+// operations against the sort index list which occur during the sort computation.
+func estimateListSortBy(u *types.Type) checker.FunctionEstimator {
+	return func(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+		if target == nil || len(args) != 1 {
+			return nil
+		}
+		// Estimate the size of the list used as the sort index
+		return estimateListSortCost(estimator, args[0], u)
+	}
+}
+
+// estimateListSortCost estimates an O(n^2) sort operation with a cost factor of 2 for the equality
+// operations which occur during the sort computation.
+func estimateListSortCost(estimator checker.CostEstimator, node checker.AstNode, elemType *types.Type) *checker.CallEstimate {
+	sz := estimateSize(estimator, node)
+	costFactor := 2.0
+	switch elemType {
+	case types.StringType, types.BytesType:
+		costFactor += common.StringTraversalCostFactor
+	}
+	return estimateAllocatingListCall(costFactor, sz.Multiply(sz))
+}
+
+// estimateAllocatingListCall computes cost as a function of the size of the result list with a
+// baseline cost for the call dispatch and the associated list allocation.
+func estimateAllocatingListCall(costFactor float64, listSize checker.SizeEstimate) *checker.CallEstimate {
+	return estimateListCall(costFactor, listSize, true)
+}
+
+// estimateListCall computes cost as a function of the size of the target list and whether the
+// call allocates memory.
+func estimateListCall(costFactor float64, listSize checker.SizeEstimate, allocates bool) *checker.CallEstimate {
+	cost := listSize.MultiplyByCostFactor(costFactor).Add(callCostEstimate)
+	if allocates {
+		cost = cost.Add(checker.FixedCostEstimate(common.ListCreateBaseCost))
+	}
+	return &checker.CallEstimate{CostEstimate: cost, ResultSize: &listSize}
+}
+
+// trackListOutputSize computes cost as a function of the size of the result list.
+func trackListOutputSize(_ []ref.Val, result ref.Val) *uint64 {
+	return trackAllocatingListCall(1, actualSize(result))
+}
+
+// trackListFlatten computes cost as a function of the size of the result list and the depth of
+// the flatten operation.
+func trackListFlatten(args []ref.Val, _ ref.Val) *uint64 {
+	depth := 1.0
+	if len(args) == 2 {
+		depth = float64(args[1].(types.Int))
+	}
+	inputSize := actualSize(args[0])
+	return trackAllocatingListCall(depth, inputSize)
+}
+
+// trackListDistinct computes costs as a worst-case O(n^2) operation over the input list.
+func trackListDistinct(args []ref.Val, _ ref.Val) *uint64 {
+	return trackListSelfCompare(args[0].(traits.Lister))
+}
+
+// trackListSort computes costs as a worst-case O(n^2) operation over the input list.
+func trackListSort(args []ref.Val, result ref.Val) *uint64 {
+	return trackListSelfCompare(args[0].(traits.Lister))
+}
+
+// trackListSortBy computes costs as a worst-case O(n^2) operation over the sort index list.
+func trackListSortBy(args []ref.Val, result ref.Val) *uint64 {
+	return trackListSelfCompare(args[1].(traits.Lister))
+}
+
+// trackListSelfCompare computes costs as a worst-case O(n^2) operation over the input list.
+func trackListSelfCompare(l traits.Lister) *uint64 {
+	sz := actualSize(l)
+	costFactor := 2.0
+	if sz == 0 {
+		return trackAllocatingListCall(costFactor, 0)
+	}
+	elem := l.Get(types.IntZero)
+	if elem.Type() == types.StringType || elem.Type() == types.BytesType {
+		costFactor += common.StringTraversalCostFactor
+	}
+	return trackAllocatingListCall(costFactor, sz*sz)
+}
+
+// trackAllocatingListCall computes costs as a function of the size of the result list with a baseline cost
+// for the call dispatch and the associated list allocation.
+func trackAllocatingListCall(costFactor float64, size uint64) *uint64 {
+	cost := uint64(float64(size)*costFactor) + callCost + common.ListCreateBaseCost
+	return &cost
+}
+
+func nodeAsIntValue(node checker.AstNode, defaultVal uint64) uint64 {
+	if node.Expr().Kind() != ast.LiteralKind {
+		return defaultVal
+	}
+	lit := node.Expr().AsLiteral()
+	if lit.Type() != types.IntType {
+		return defaultVal
+	}
+	val := lit.(types.Int)
+	if val < types.IntZero {
+		return 0
+	}
+	return uint64(lit.(types.Int))
 }

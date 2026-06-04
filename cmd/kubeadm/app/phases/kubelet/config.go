@@ -22,8 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +33,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
@@ -68,13 +66,12 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 		}
 	}
 
-	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
-		file := filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
-		kubeletBytes, err = applyKubeletConfigPatchFromFile(kubeletBytes, file, output)
-		if err != nil {
-			return errors.Wrapf(err, "could not apply kubelet instance configuration as a patch from %q", file)
-		}
+	file := filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+	kubeletBytes, err = applyKubeletConfigPatchFromFile(kubeletBytes, file, output)
+	if err != nil {
+		return errors.Wrapf(err, "could not apply kubelet instance configuration as a patch from %q", file)
 	}
+
 	return writeConfigBytesToDisk(kubeletBytes, kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
 }
 

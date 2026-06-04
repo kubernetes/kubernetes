@@ -19,6 +19,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/cel-go/common/types/ref"
@@ -119,7 +120,7 @@ func (i Int) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case int64WrapperType:
 			// Convert the value to a wrapperspb.Int64Value.
 			return wrapperspb.Int64(int64(i)), nil
-		case jsonValueType:
+		case JSONValueType:
 			// The proto-to-JSON conversion rules would convert all 64-bit integer values to JSON
 			// decimal strings. Because CEL ints might come from the automatic widening of 32-bit
 			// values in protos, the JSON type is chosen dynamically based on the value.
@@ -288,6 +289,10 @@ func (i Int) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (i Int) Value() any {
 	return int64(i)
+}
+
+func (i Int) format(sb *strings.Builder) {
+	sb.WriteString(strconv.FormatInt(int64(i), 10))
 }
 
 // isJSONSafe indicates whether the int is safely representable as a floating point value in JSON.

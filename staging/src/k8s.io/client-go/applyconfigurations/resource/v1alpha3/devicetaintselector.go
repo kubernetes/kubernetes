@@ -20,26 +20,35 @@ package v1alpha3
 
 // DeviceTaintSelectorApplyConfiguration represents a declarative configuration of the DeviceTaintSelector type for use
 // with apply.
+//
+// DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.
+// The empty selector matches all devices. Without a selector, no devices
+// are matched.
 type DeviceTaintSelectorApplyConfiguration struct {
-	DeviceClassName *string                            `json:"deviceClassName,omitempty"`
-	Driver          *string                            `json:"driver,omitempty"`
-	Pool            *string                            `json:"pool,omitempty"`
-	Device          *string                            `json:"device,omitempty"`
-	Selectors       []DeviceSelectorApplyConfiguration `json:"selectors,omitempty"`
+	// If driver is set, only devices from that driver are selected.
+	// This fields corresponds to slice.spec.driver.
+	Driver *string `json:"driver,omitempty"`
+	// If pool is set, only devices in that pool are selected.
+	//
+	// Also setting the driver name may be useful to avoid
+	// ambiguity when different drivers use the same pool name,
+	// but this is not required because selecting pools from
+	// different drivers may also be useful, for example when
+	// drivers with node-local devices use the node name as
+	// their pool name.
+	Pool *string `json:"pool,omitempty"`
+	// If device is set, only devices with that name are selected.
+	// This field corresponds to slice.spec.devices[].name.
+	//
+	// Setting also driver and pool may be required to avoid ambiguity,
+	// but is not required.
+	Device *string `json:"device,omitempty"`
 }
 
 // DeviceTaintSelectorApplyConfiguration constructs a declarative configuration of the DeviceTaintSelector type for use with
 // apply.
 func DeviceTaintSelector() *DeviceTaintSelectorApplyConfiguration {
 	return &DeviceTaintSelectorApplyConfiguration{}
-}
-
-// WithDeviceClassName sets the DeviceClassName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DeviceClassName field is set to the value of the last call.
-func (b *DeviceTaintSelectorApplyConfiguration) WithDeviceClassName(value string) *DeviceTaintSelectorApplyConfiguration {
-	b.DeviceClassName = &value
-	return b
 }
 
 // WithDriver sets the Driver field in the declarative configuration to the given value
@@ -63,18 +72,5 @@ func (b *DeviceTaintSelectorApplyConfiguration) WithPool(value string) *DeviceTa
 // If called multiple times, the Device field is set to the value of the last call.
 func (b *DeviceTaintSelectorApplyConfiguration) WithDevice(value string) *DeviceTaintSelectorApplyConfiguration {
 	b.Device = &value
-	return b
-}
-
-// WithSelectors adds the given value to the Selectors field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Selectors field.
-func (b *DeviceTaintSelectorApplyConfiguration) WithSelectors(values ...*DeviceSelectorApplyConfiguration) *DeviceTaintSelectorApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithSelectors")
-		}
-		b.Selectors = append(b.Selectors, *values[i])
-	}
 	return b
 }

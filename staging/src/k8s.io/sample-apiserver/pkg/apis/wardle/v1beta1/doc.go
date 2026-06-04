@@ -19,6 +19,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/sample-apiserver/pkg/apis/wardle
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=wardle.example.com
+// +k8s:openapi-model-package=io.k8s.sample-apiserver.pkg.apis.wardle.v1beta1
 
 // Package v1beta1 is the v1beta1 version of the API.
 package v1beta1

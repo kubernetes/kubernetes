@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -84,7 +85,7 @@ func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
 }
 
 // NewHTTPExtender creates an HTTPExtender object.
-func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) {
+func NewHTTPExtender(config *schedulerapi.Extender) (fwk.Extender, error) {
 	if config.HTTPTimeout.Duration.Nanoseconds() == 0 {
 		config.HTTPTimeout.Duration = time.Duration(DefaultExtenderTimeout)
 	}
@@ -136,7 +137,7 @@ func (h *HTTPExtender) SupportsPreemption() bool {
 func (h *HTTPExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeNameToVictims map[string]*extenderv1.Victims,
-	nodeInfos framework.NodeInfoLister,
+	nodeInfos fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	var (
 		result extenderv1.ExtenderPreemptionResult
@@ -179,7 +180,7 @@ func (h *HTTPExtender) ProcessPreemption(
 // such as UIDs and names, to object pointers.
 func (h *HTTPExtender) convertToVictims(
 	nodeNameToMetaVictims map[string]*extenderv1.MetaVictims,
-	nodeInfos framework.NodeInfoLister,
+	nodeInfos fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	nodeNameToVictims := map[string]*extenderv1.Victims{}
 	for nodeName, metaVictims := range nodeNameToMetaVictims {
@@ -209,10 +210,10 @@ func (h *HTTPExtender) convertToVictims(
 // and extender, i.e. when the pod is not found in nodeInfo.Pods.
 func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *extenderv1.MetaPod,
-	nodeInfo *framework.NodeInfo) (*v1.Pod, error) {
-	for _, p := range nodeInfo.Pods {
-		if string(p.Pod.UID) == metaPod.UID {
-			return p.Pod, nil
+	nodeInfo fwk.NodeInfo) (*v1.Pod, error) {
+	for _, p := range nodeInfo.GetPods() {
+		if string(p.GetPod().UID) == metaPod.UID {
+			return p.GetPod(), nil
 		}
 	}
 	return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",
@@ -247,16 +248,16 @@ func convertToMetaVictims(
 // unresolvable.
 func (h *HTTPExtender) Filter(
 	pod *v1.Pod,
-	nodes []*framework.NodeInfo,
-) (filteredList []*framework.NodeInfo, failedNodes, failedAndUnresolvableNodes extenderv1.FailedNodesMap, err error) {
+	nodes []fwk.NodeInfo,
+) (filteredList []fwk.NodeInfo, failedNodes, failedAndUnresolvableNodes extenderv1.FailedNodesMap, err error) {
 	var (
 		result     extenderv1.ExtenderFilterResult
 		nodeList   *v1.NodeList
 		nodeNames  *[]string
-		nodeResult []*framework.NodeInfo
+		nodeResult []fwk.NodeInfo
 		args       *extenderv1.ExtenderArgs
 	)
-	fromNodeName := make(map[string]*framework.NodeInfo)
+	fromNodeName := make(map[string]fwk.NodeInfo)
 	for _, n := range nodes {
 		fromNodeName[n.Node().Name] = n
 	}
@@ -292,7 +293,7 @@ func (h *HTTPExtender) Filter(
 	}
 
 	if h.nodeCacheCapable && result.NodeNames != nil {
-		nodeResult = make([]*framework.NodeInfo, len(*result.NodeNames))
+		nodeResult = make([]fwk.NodeInfo, len(*result.NodeNames))
 		for i, nodeName := range *result.NodeNames {
 			if n, ok := fromNodeName[nodeName]; ok {
 				nodeResult[i] = n
@@ -303,7 +304,7 @@ func (h *HTTPExtender) Filter(
 			}
 		}
 	} else if result.Nodes != nil {
-		nodeResult = make([]*framework.NodeInfo, len(result.Nodes.Items))
+		nodeResult = make([]fwk.NodeInfo, len(result.Nodes.Items))
 		for i := range result.Nodes.Items {
 			nodeResult[i] = framework.NewNodeInfo()
 			nodeResult[i].SetNode(&result.Nodes.Items[i])
@@ -316,7 +317,7 @@ func (h *HTTPExtender) Filter(
 // Prioritize based on extender implemented priority functions. Weight*priority is added
 // up for each such priority function. The returned score is added to the score computed
 // by Kubernetes scheduler. The total score is used to do the host selection.
-func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*framework.NodeInfo) (*extenderv1.HostPriorityList, int64, error) {
+func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []fwk.NodeInfo) (*extenderv1.HostPriorityList, int64, error) {
 	var (
 		result    extenderv1.HostPriorityList
 		nodeList  *v1.NodeList

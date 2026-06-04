@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 
@@ -29,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+
+	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -371,7 +374,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
+	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -424,5 +427,48 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	// The interval's buffer should now be empty.
 	if !wci.buffer.isEmpty() {
 		t.Error("expected cache interval's buffer to be empty")
+	}
+}
+
+// TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
+// events sorted by Key for both indexer backends.
+func TestCacheIntervalFromStoreSorted(t *testing.T) {
+	cases := []struct {
+		name    string
+		indexer store.OrderedIndexer
+	}{
+		{"btree", store.NewIndexer(nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const n = 50
+			// Insert in reverse-key order so any code path that returns
+			// items in insertion order trivially fails the sorted check below.
+			for i := n - 1; i >= 0; i-- {
+				key := fmt.Sprintf("pod-%08d", i)
+				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
+				err := tc.indexer.Add(elem)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := make([]string, 0, n)
+			for range n {
+				ev, err := wci.Next()
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, ev.Key)
+			}
+			if !sort.StringsAreSorted(got) {
+				t.Errorf("events not sorted by key: %v", got)
+			}
+		})
 	}
 }

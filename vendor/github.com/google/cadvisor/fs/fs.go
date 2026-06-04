@@ -13,30 +13,25 @@
 // limitations under the License.
 
 //go:build linux
-// +build linux
 
 // Provides Filesystem Stats
 package fs
 
 import (
 	"bufio"
-	"context"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
-	zfs "github.com/mistifyio/go-zfs"
 	mount "github.com/moby/sys/mountinfo"
 
 	"github.com/google/cadvisor/devicemapper"
-	"github.com/google/cadvisor/utils"
 
 	"k8s.io/klog/v2"
 )
@@ -173,28 +168,21 @@ func getFsUUIDToDeviceNameMap() (map[string]string, error) {
 func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) map[string]partition {
 	partitions := make(map[string]partition)
 
-	supportedFsType := map[string]bool{
-		// all ext and nfs systems are checked through prefix
-		// because there are a number of families (e.g., ext3, ext4, nfs3, nfs4...)
-		"btrfs":   true,
-		"overlay": true,
-		"tmpfs":   true,
-		"xfs":     true,
-		"zfs":     true,
-	}
-
 	for _, mnt := range mounts {
-		if !strings.HasPrefix(mnt.FSType, "ext") && !strings.HasPrefix(mnt.FSType, "nfs") &&
-			!supportedFsType[mnt.FSType] {
+		// Use plugin system to determine if filesystem is supported
+		plugin := GetPluginForFsType(mnt.FSType)
+		if plugin == nil {
 			continue
 		}
-		// Avoid bind mounts, exclude tmpfs.
+
+		// Avoid bind mounts, but allow tmpfs duplicates (handled by plugin's ProcessMount)
 		if _, ok := partitions[mnt.Source]; ok {
 			if mnt.FSType != "tmpfs" {
 				continue
 			}
 		}
 
+		// Check for excluded mountpoint prefixes
 		hasPrefix := false
 		for _, prefix := range excludedMountpointPrefixes {
 			if strings.HasPrefix(mnt.Mountpoint, prefix) {
@@ -206,32 +194,21 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 			continue
 		}
 
-		// using mountpoint to replace device once fstype it tmpfs
-		if mnt.FSType == "tmpfs" {
-			mnt.Source = mnt.Mountpoint
+		// Let plugin process the mount (handles filesystem-specific modifications)
+		include, processedMnt, err := plugin.ProcessMount(mnt)
+		if err != nil {
+			klog.Warningf("error processing mount for %s: %v", mnt.FSType, err)
+			continue
 		}
-		// btrfs fix: following workaround fixes wrong btrfs Major and Minor Ids reported in /proc/self/mountinfo.
-		// instead of using values from /proc/self/mountinfo we use stat to get Ids from btrfs mount point
-		if mnt.FSType == "btrfs" && mnt.Major == 0 && strings.HasPrefix(mnt.Source, "/dev/") {
-			major, minor, err := getBtrfsMajorMinorIds(mnt)
-			if err != nil {
-				klog.Warningf("%s", err)
-			} else {
-				mnt.Major = major
-				mnt.Minor = minor
-			}
+		if !include {
+			continue
 		}
 
-		// overlay fix: Making mount source unique for all overlay mounts, using the mount's major and minor ids.
-		if mnt.FSType == "overlay" {
-			mnt.Source = fmt.Sprintf("%s_%d-%d", mnt.Source, mnt.Major, mnt.Minor)
-		}
-
-		partitions[mnt.Source] = partition{
-			fsType:     mnt.FSType,
-			mountpoint: mnt.Mountpoint,
-			major:      uint(mnt.Major),
-			minor:      uint(mnt.Minor),
+		partitions[processedMnt.Source] = partition{
+			fsType:     processedMnt.FSType,
+			mountpoint: processedMnt.Mountpoint,
+			major:      uint(processedMnt.Major),
+			minor:      uint(processedMnt.Minor),
 		}
 	}
 
@@ -412,81 +389,112 @@ func (i *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, error
 	if err != nil {
 		return nil, err
 	}
-	nfsInfo := make(map[string]Fs, 0)
+	// statsCache stores cached filesystem stats by cache key for plugins that implement FsCachingPlugin
+	statsCache := make(map[string]Fs)
 	for device, partition := range i.partitions {
 		_, hasMount := mountSet[partition.mountpoint]
 		_, hasDevice := deviceSet[device]
 		if mountSet == nil || (hasMount && !hasDevice) {
 			var (
-				err error
-				fs  Fs
+				statsErr error
+				fs       Fs
 			)
-			fsType := partition.fsType
-			if strings.HasPrefix(partition.fsType, "nfs") {
-				fsType = "nfs"
-			}
-			switch fsType {
-			case DeviceMapper.String():
-				fs.Capacity, fs.Free, fs.Available, err = getDMStats(device, partition.blockSize)
-				klog.V(5).Infof("got devicemapper fs capacity stats: capacity: %v free: %v available: %v:", fs.Capacity, fs.Free, fs.Available)
-				fs.Type = DeviceMapper
-			case ZFS.String():
-				if _, devzfs := os.Stat("/dev/zfs"); os.IsExist(devzfs) {
-					fs.Capacity, fs.Free, fs.Available, err = getZfstats(device)
-					fs.Type = ZFS
-					break
-				}
-				// if /dev/zfs is not present default to VFS
-				fallthrough
-			case NFS.String():
-				devId := fmt.Sprintf("%d:%d", partition.major, partition.minor)
-				if v, ok := nfsInfo[devId]; ok {
-					fs = v
-					break
-				}
-				var inodes, inodesFree uint64
-				fs.Capacity, fs.Free, fs.Available, inodes, inodesFree, err = getVfsStats(partition.mountpoint)
-				if err != nil {
-					klog.V(4).Infof("the file system type is %s, partition mountpoint does not exist: %v, error: %v", partition.fsType, partition.mountpoint, err)
-					break
-				}
-				fs.Inodes = &inodes
-				fs.InodesFree = &inodesFree
-				fs.Type = VFS
-				nfsInfo[devId] = fs
-			default:
-				var inodes, inodesFree uint64
-				if utils.FileExists(partition.mountpoint) {
-					fs.Capacity, fs.Free, fs.Available, inodes, inodesFree, err = getVfsStats(partition.mountpoint)
-					fs.Inodes = &inodes
-					fs.InodesFree = &inodesFree
-					fs.Type = VFS
-				} else {
-					klog.V(4).Infof("unable to determine file system type, partition mountpoint does not exist: %v", partition.mountpoint)
-				}
-			}
-			if err != nil {
-				klog.V(4).Infof("Stat fs failed. Error: %v", err)
-			} else {
-				deviceSet[device] = struct{}{}
-				fs.DeviceInfo = DeviceInfo{
-					Device: device,
-					Major:  uint(partition.major),
-					Minor:  uint(partition.minor),
-				}
 
-				if val, ok := diskStatsMap[device]; ok {
-					fs.DiskStats = val
-				} else {
-					for k, v := range diskStatsMap {
-						if v.MajorNum == uint64(partition.major) && v.MinorNum == uint64(partition.minor) {
-							fs.DiskStats = diskStatsMap[k]
-							break
+			// Use plugin system to get filesystem stats
+			plugin := GetPluginForFsType(partition.fsType)
+			if plugin == nil {
+				klog.V(4).Infof("no plugin found for filesystem type: %v", partition.fsType)
+				continue
+			}
+
+			partInfo := PartitionInfo{
+				Mountpoint: partition.mountpoint,
+				Major:      partition.major,
+				Minor:      partition.minor,
+				FsType:     partition.fsType,
+				BlockSize:  partition.blockSize,
+			}
+
+			// Check if plugin supports caching and if we have a cached value
+			var cacheKey string
+			if cachingPlugin, ok := plugin.(FsCachingPlugin); ok {
+				cacheKey = cachingPlugin.CacheKey(partInfo)
+				if cacheKey != "" {
+					if cachedFs, found := statsCache[cacheKey]; found {
+						fs = cachedFs
+						// Skip stats fetching, use cached value
+						deviceSet[device] = struct{}{}
+						fs.DeviceInfo = DeviceInfo{
+							Device: device,
+							Major:  uint(partition.major),
+							Minor:  uint(partition.minor),
 						}
+						if val, ok := diskStatsMap[device]; ok {
+							fs.DiskStats = val
+						} else {
+							for k, v := range diskStatsMap {
+								if v.MajorNum == uint64(partition.major) && v.MinorNum == uint64(partition.minor) {
+									fs.DiskStats = diskStatsMap[k]
+									break
+								}
+							}
+						}
+						filesystems = append(filesystems, fs)
+						continue
 					}
 				}
-				filesystems = append(filesystems, fs)
 			}
+
+			stats, statsErr := plugin.GetStats(device, partInfo)
+			if statsErr != nil {
+				// Handle fallback to VFS for plugins that request it
+				if errors.Is(statsErr, ErrFallbackToVFS) {
+					vfsPlugin := GetPluginForFsType("ext4") // VFS handles ext*
+					if vfsPlugin != nil {
+						stats, statsErr = vfsPlugin.GetStats(device, partInfo)
+					}
+				}
+				if statsErr != nil {
+					klog.V(4).Infof("Stat fs failed for %s. Error: %v", partition.fsType, statsErr)
+					continue
+				}
+			}
+
+			if stats == nil {
+				klog.V(4).Infof("no stats returned for %s at %s", partition.fsType, partition.mountpoint)
+				continue
+			}
+
+			fs.Capacity = stats.Capacity
+			fs.Free = stats.Free
+			fs.Available = stats.Available
+			fs.Inodes = stats.Inodes
+			fs.InodesFree = stats.InodesFree
+			fs.Type = stats.Type
+
+			// Store in cache if plugin supports caching
+			if cacheKey != "" {
+				statsCache[cacheKey] = fs
+			}
+
+			deviceSet[device] = struct{}{}
+			fs.DeviceInfo = DeviceInfo{
+				Device: device,
+				Major:  uint(partition.major),
+				Minor:  uint(partition.minor),
+			}
+
+			if val, ok := diskStatsMap[device]; ok {
+				fs.DiskStats = val
+			} else {
+				for k, v := range diskStatsMap {
+					if v.MajorNum == uint64(partition.major) && v.MinorNum == uint64(partition.minor) {
+						fs.DiskStats = diskStatsMap[k]
+						break
+					}
+				}
+			}
+			filesystems = append(filesystems, fs)
 		}
 	}
 	return filesystems, nil
@@ -717,50 +725,12 @@ func (i *RealFsInfo) GetDirUsage(dir string) (UsageInfo, error) {
 	return GetDirUsage(dir)
 }
 
-func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes uint64, inodesFree uint64, err error) {
-	// timeout the context with, default is 2sec
-	timeout := 2
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancel()
-
-	type result struct {
-		total      uint64
-		free       uint64
-		avail      uint64
-		inodes     uint64
-		inodesFree uint64
-		err        error
-	}
-
-	resultChan := make(chan result, 1)
-
-	go func() {
-		var s syscall.Statfs_t
-		if err = syscall.Statfs(path, &s); err != nil {
-			total, free, avail, inodes, inodesFree = 0, 0, 0, 0, 0
-		}
-		total = uint64(s.Frsize) * s.Blocks
-		free = uint64(s.Frsize) * s.Bfree
-		avail = uint64(s.Frsize) * s.Bavail
-		inodes = uint64(s.Files)
-		inodesFree = uint64(s.Ffree)
-		resultChan <- result{total: total, free: free, avail: avail, inodes: inodes, inodesFree: inodesFree, err: err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return 0, 0, 0, 0, 0, ctx.Err()
-	case res := <-resultChan:
-		return res.total, res.free, res.avail, res.inodes, res.inodesFree, res.err
-	}
-}
-
 // Devicemapper thin provisioning is detailed at
 // https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt
 func dockerDMDevice(driverStatus map[string]string, dmsetup devicemapper.DmsetupClient) (string, uint, uint, uint, error) {
 	poolName, ok := driverStatus[DriverStatusPoolName]
 	if !ok || len(poolName) == 0 {
-		return "", 0, 0, 0, fmt.Errorf("Could not get dm pool name")
+		return "", 0, 0, 0, fmt.Errorf("could not get dm pool name")
 	}
 
 	out, err := dmsetup.Table(poolName)
@@ -783,7 +753,7 @@ func parseDMTable(dmTable string) (uint, uint, uint, error) {
 	dmFields := strings.Fields(dmTable)
 
 	if len(dmFields) < 8 {
-		return 0, 0, 0, fmt.Errorf("Invalid dmsetup status output: %s", dmTable)
+		return 0, 0, 0, fmt.Errorf("invalid dmsetup status output: %s", dmTable)
 	}
 
 	major, err := strconv.ParseUint(dmFields[5], 10, 32)
@@ -800,56 +770,6 @@ func parseDMTable(dmTable string) (uint, uint, uint, error) {
 	}
 
 	return uint(major), uint(minor), uint(dataBlkSize), nil
-}
-
-func getDMStats(poolName string, dataBlkSize uint) (uint64, uint64, uint64, error) {
-	out, err := exec.Command("dmsetup", "status", poolName).Output()
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	used, total, err := parseDMStatus(string(out))
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	used *= 512 * uint64(dataBlkSize)
-	total *= 512 * uint64(dataBlkSize)
-	free := total - used
-
-	return total, free, free, nil
-}
-
-func parseDMStatus(dmStatus string) (uint64, uint64, error) {
-	dmStatus = strings.Replace(dmStatus, "/", " ", -1)
-	dmFields := strings.Fields(dmStatus)
-
-	if len(dmFields) < 8 {
-		return 0, 0, fmt.Errorf("Invalid dmsetup status output: %s", dmStatus)
-	}
-
-	used, err := strconv.ParseUint(dmFields[6], 10, 64)
-	if err != nil {
-		return 0, 0, err
-	}
-	total, err := strconv.ParseUint(dmFields[7], 10, 64)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return used, total, nil
-}
-
-// getZfstats returns ZFS mount stats using zfsutils
-func getZfstats(poolName string) (uint64, uint64, uint64, error) {
-	dataset, err := zfs.GetDataset(poolName)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	total := dataset.Used + dataset.Avail + dataset.Usedbydataset
-
-	return total, dataset.Avail, dataset.Avail, nil
 }
 
 // Get major and minor Ids for a mount point using btrfs as filesystem.

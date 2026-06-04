@@ -192,6 +192,16 @@ func WithTimeout(duration time.Duration) Option {
 	return wrappedOption{otlpconfig.WithTimeout(duration)}
 }
 
+// WithMaxRequestSize sets the maximum size, in bytes, of a serialized export
+// request, before compression, that the exporter will send.
+//
+// If size is less than or equal to zero, no request-size limit is applied.
+// Disabling the limit is not recommended because it can lead to excessive
+// resource consumption or abuse.
+func WithMaxRequestSize(size int) Option {
+	return wrappedOption{otlpconfig.WithMaxRequestSize(size)}
+}
+
 // WithRetry sets the retry policy for transient retryable errors that may be
 // returned by the target endpoint when exporting a batch of spans.
 //
@@ -199,8 +209,9 @@ func WithTimeout(duration time.Duration) Option {
 // explicitly returns a backoff time in the response. That time will take
 // precedence over these settings.
 //
-// These settings do not define any network retry strategy. That is entirely
-// handled by the gRPC ClientConn.
+// These settings define the retry strategy implemented by the exporter.
+// These settings do not define any network retry strategy.
+// That is handled by the gRPC ClientConn.
 //
 // If unset, the default retry policy will be used. It will retry the export
 // 5 seconds after receiving a retryable error and increase exponentially

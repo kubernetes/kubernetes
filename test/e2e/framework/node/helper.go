@@ -18,8 +18,10 @@ package node
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -188,10 +190,15 @@ func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nod
 	extendedResourceList := v1.ResourceList{
 		extendedResource: extendedResourceQuantity,
 	}
-	patchPayload, err := json.Marshal(v1.Node{
-		Status: v1.NodeStatus{
-			Capacity:    extendedResourceList,
-			Allocatable: extendedResourceList,
+
+	// This is a workaround for the fact that we shouldn't marshal a Node struct to JSON
+	// because it wipes out some fields from node status like the daemonEndpoints and
+	// nodeInfo which should not be changed at this time. We need to use a map instead.
+	// See https://github.com/kubernetes/kubernetes/issues/131229
+	patchPayload, err := json.Marshal(map[string]any{
+		"status": map[string]any{
+			"capacity":    extendedResourceList,
+			"allocatable": extendedResourceList,
 		},
 	})
 	framework.ExpectNoError(err, "Failed to marshal node JSON")
@@ -216,4 +223,25 @@ func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, 
 		return err
 	})
 	framework.ExpectNoError(err)
+}
+
+func HealthCheck(url string) bool {
+	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	insecureHTTPClient := &http.Client{
+		Transport: insecureTransport,
+	}
+
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+	resp, err := insecureHTTPClient.Do(req)
+	if err != nil {
+		framework.Logf("Health check on %q failed, error=%v", url, err)
+	} else if resp.StatusCode != http.StatusOK {
+		framework.Logf("Health check on %q failed, status=%d", url, resp.StatusCode)
+	}
+	return err == nil && resp.StatusCode == http.StatusOK
 }

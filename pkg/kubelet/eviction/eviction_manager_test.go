@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +39,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -279,6 +281,7 @@ type podToMake struct {
 }
 
 func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -329,7 +332,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	}
 
 	// synchronize to detect the memory pressure
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -364,6 +367,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 }
 
 func TestPIDPressure_VerifyPodStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	if goruntime.GOOS == "windows" {
 		t.Skip("PID pressure is not supported on Windows")
 	}
@@ -429,7 +433,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 		}
 
 		// synchronize to detect the PID pressure
-		_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+		_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 		if err != nil {
 			t.Fatalf("Manager expects no error but got %v", err)
@@ -462,6 +466,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 }
 
 func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := map[string]struct {
 		nodeFsStats                   string
 		imageFsStats                  string
@@ -605,7 +610,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 		}
 
 		// synchronize
-		pods, synchErr := manager.synchronize(diskInfoProvider, activePodsFunc)
+		pods, synchErr := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 		if synchErr == nil && tc.expectErr != "" {
 			t.Fatalf("Manager should report error but did not")
@@ -642,6 +647,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -709,7 +715,7 @@ func TestMemoryPressure(t *testing.T) {
 	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", ""), "0Gi")
 
 	// synchronize
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -723,7 +729,7 @@ func TestMemoryPressure(t *testing.T) {
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -731,7 +737,7 @@ func TestMemoryPressure(t *testing.T) {
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -750,7 +756,7 @@ func TestMemoryPressure(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -779,7 +785,7 @@ func TestMemoryPressure(t *testing.T) {
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -793,7 +799,7 @@ func TestMemoryPressure(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -816,7 +822,7 @@ func TestMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -825,7 +831,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -844,7 +850,7 @@ func TestMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -853,7 +859,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -872,7 +878,7 @@ func TestMemoryPressure(t *testing.T) {
 	// all pods should admit now
 	expected = []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -921,6 +927,7 @@ func TestPIDPressure(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			podMaker := makePodWithPIDStats
 			summaryStatsMaker := makePIDStats
 			pods := []*v1.Pod{}
@@ -979,7 +986,7 @@ func TestPIDPressure(t *testing.T) {
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, 50)
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -991,14 +998,14 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
 			// induce soft threshold for PID pressure
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.pressurePIDUsageWithGracePeriod, podStats)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1017,7 +1024,7 @@ func TestPIDPressure(t *testing.T) {
 			// step forward in time past the grace period
 			fakeClock.Step(3 * time.Minute)
 			// no change in PID stats to simulate continued pressure
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1047,7 +1054,7 @@ func TestPIDPressure(t *testing.T) {
 			// remove PID pressure by simulating increased PID availability
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats) // Simulate increased PID availability
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1061,7 +1068,7 @@ func TestPIDPressure(t *testing.T) {
 			// re-induce PID pressure
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.pressurePIDUsageWithoutGracePeriod, podStats)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1085,7 +1092,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1093,7 +1100,7 @@ func TestPIDPressure(t *testing.T) {
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1110,14 +1117,14 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
 			// move the clock past the transition period
 			fakeClock.Step(5 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1134,7 +1141,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -1142,6 +1149,7 @@ func TestPIDPressure(t *testing.T) {
 }
 
 func TestAdmitUnderNodeConditions(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	manager := &managerImpl{}
 	pods := []*v1.Pod{
 		newPod("guaranteed-pod", scheduling.DefaultPriorityWhenNoDefaultClassExists, makeContainersByQOS(v1.PodQOSGuaranteed), nil),
@@ -1151,7 +1159,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 
 	expected := []bool{true, true, true}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1159,7 +1167,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure}
 	expected = []bool{true, true, false}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1167,7 +1175,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
 	expected = []bool{false, false, false}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1302,6 +1310,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)
 
 			podMaker := makePodWithDiskStats
@@ -1356,7 +1365,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi", "0Gi", "0Gi", nil)
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1368,7 +1377,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -1383,7 +1392,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				diskStatStart.containerFsAvailableBytes = tc.softDiskPressure
 			}
 			summaryProvider.result = summaryStatsMaker(diskStatStart)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1402,7 +1411,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			// step forward in time pass the grace period
 			fakeClock.Step(3 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatStart)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1431,7 +1440,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1452,7 +1461,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				diskStatStart.containerFsAvailableBytes = tc.hardDiskPressure
 			}
 			summaryProvider.result = summaryStatsMaker(diskStatStart)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1473,7 +1482,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1482,7 +1491,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1498,7 +1507,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1506,7 +1515,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			fakeClock.Step(5 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1523,7 +1532,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -1532,6 +1541,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 // TestMinReclaim verifies that min-reclaim works as desired.
 func TestMinReclaim(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -1590,7 +1600,7 @@ func TestMinReclaim(t *testing.T) {
 	}
 
 	// synchronize
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 	if err != nil {
 		t.Errorf("Manager should not report any errors")
 	}
@@ -1602,7 +1612,7 @@ func TestMinReclaim(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1626,7 +1636,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1650,7 +1660,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1670,7 +1680,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1824,6 +1834,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)
 
 			podMaker := makePodWithDiskStats
@@ -1875,7 +1886,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			}
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1903,7 +1914,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			summaryProvider.result = summaryStatsMaker(newDiskAfterHardEviction)
 			// make GC successfully return disk usage to previous levels
 			diskGC.summaryAfterGC = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1933,7 +1944,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1945,7 +1956,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			}
 
 			// synchronize
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1963,7 +1974,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// make GC return disk usage bellow the threshold, but not satisfying minReclaim
 			gcBelowThreshold := setDiskStatsBasedOnFs(tc.inducePressureOnWhichFs, "1.1G", newDiskAfterHardEviction)
 			diskGC.summaryAfterGC = summaryStatsMaker(gcBelowThreshold)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1994,7 +2005,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2011,7 +2022,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			summaryProvider.result = summaryStatsMaker(softDiskPressure)
 			// Don't reclaim any disk
 			diskGC.summaryAfterGC = summaryStatsMaker(softDiskPressure)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2044,7 +2055,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskGC.imageGCInvoked = false     // reset state
 			diskGC.containerGCInvoked = false // reset state
 			podKiller.pod = nil               // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2070,7 +2081,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskGC.imageGCInvoked = false     // reset state
 			diskGC.containerGCInvoked = false // reset state
 			podKiller.pod = nil               // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2287,6 +2298,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)
 
 			podMaker := podMaker
@@ -2335,7 +2347,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0", "0", "0")
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2347,14 +2359,14 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
 			// induce soft threshold
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = setINodesFreeBasedOnFs(tc.inducePressureOnWhichFs, tc.softINodePressure, startingStatsModified)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2373,7 +2385,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// step forward in time pass the grace period
 			fakeClock.Step(3 * time.Minute)
 			summaryProvider.result = setINodesFreeBasedOnFs(tc.inducePressureOnWhichFs, tc.softINodePressure, startingStatsModified)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2402,7 +2414,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// remove inode pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = startingStatsConst
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2416,7 +2428,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// induce inode pressure!
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = setINodesFreeBasedOnFs(tc.inducePressureOnWhichFs, tc.hardINodePressure, startingStatsModified)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2437,7 +2449,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -2445,7 +2457,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = startingStatsConst
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2462,7 +2474,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -2470,7 +2482,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			fakeClock.Step(5 * time.Minute)
 			summaryProvider.result = startingStatsConst
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2487,7 +2499,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -2496,6 +2508,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 
 // TestStaticCriticalPodsAreNotEvicted
 func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -2567,7 +2580,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2586,7 +2599,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2608,7 +2621,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2628,7 +2641,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2667,6 +2680,7 @@ func TestStorageLimitEvictions(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			podMaker := makePodWithDiskStats
 			summaryStatsMaker := makeDiskStats
 			podsToMake := []podToMake{
@@ -2727,7 +2741,7 @@ func TestStorageLimitEvictions(t *testing.T) {
 				localStorageCapacityIsolation: true,
 			}
 
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+			_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
 			}
@@ -2747,6 +2761,7 @@ func TestStorageLimitEvictions(t *testing.T) {
 
 // TestAllocatableMemoryPressure
 func TestAllocatableMemoryPressure(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -2806,7 +2821,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", ""), "0Gi")
 
 	// synchronize
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2820,7 +2835,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2830,7 +2845,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	pod, podStat := podMaker("guaranteed-high-2", defaultPriority, newResourceList("100m", "1Gi", ""), newResourceList("100m", "1Gi", ""), "1Gi")
 	podStats[pod] = podStat
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2856,7 +2871,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2870,7 +2885,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	}
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2889,7 +2904,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2898,7 +2913,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2917,13 +2932,14 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// all pods should admit now
 	expected = []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
 }
 
 func TestUpdateMemcgThreshold(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	activePodsFunc := func() []*v1.Pod {
 		return []*v1.Pod{}
 	}
@@ -2951,7 +2967,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", map[*v1.Pod]statsapi.PodStats{})}
 
 	thresholdNotifier := NewMockThresholdNotifier(t)
-	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(nil).Times(2)
+	thresholdNotifier.EXPECT().UpdateThreshold(mock.Anything, summaryProvider.result).Return(nil).Times(2)
 
 	manager := &managerImpl{
 		clock:                        fakeClock,
@@ -2968,14 +2984,14 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
 	}
 
 	// The UpdateThreshold method should not have been called again, since not enough time has passed
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2983,7 +2999,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 
 	// The UpdateThreshold method should be called again since enough time has passed
 	fakeClock.Step(2 * notifierRefreshInterval)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2991,14 +3007,14 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 
 	// new memory threshold notifier that returns an error
 	thresholdNotifier = NewMockThresholdNotifier(t)
-	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(fmt.Errorf("error updating threshold")).Times(1)
+	thresholdNotifier.EXPECT().UpdateThreshold(mock.Anything, summaryProvider.result).Return(fmt.Errorf("error updating threshold")).Times(1)
 	thresholdNotifier.EXPECT().Description().Return("mock thresholdNotifier").Times(1)
 	manager.thresholdNotifiers = []ThresholdNotifier{thresholdNotifier}
 
 	// The UpdateThreshold method should be called because at least notifierRefreshInterval time has passed.
 	// The Description method should be called because UpdateThreshold returned an error
 	fakeClock.Step(2 * notifierRefreshInterval)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3006,6 +3022,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 }
 
 func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	podMaker := makePodWithLocalStorageCapacityIsolationOpen
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
@@ -3066,7 +3083,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		return pods
 	}
 
-	evictedPods, err := mgr.synchronize(diskInfoProvider, activePodsFunc)
+	evictedPods, err := mgr.synchronize(tCtx, diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have error but got %v", err)
@@ -3077,5 +3094,81 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 
 	if diff := cmp.Diff(pods, evictedPods); diff != "" {
 		t.Fatalf("Unexpected evicted pod (-want,+got):\n%s", diff)
+	}
+}
+
+func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	initContainer := newRestartableInitContainer("sidecar", newResourceList("", "", ""), newResourceList("", "", "10Mi"))
+	mainContainer := newContainer("main", newResourceList("", "", ""), newResourceList("", "", ""))
+
+	pod := newPod("sidecar-ephemeral-repro", 0, []v1.Container{mainContainer}, nil)
+	pod.Spec.InitContainers = []v1.Container{initContainer}
+
+	sidecarQuantity := resource.MustParse("50Mi")
+	sidecarUsed := uint64(sidecarQuantity.Value())
+	mainUsed := uint64(0)
+	podStats := statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+		},
+		Containers: []statsapi.ContainerStats{
+			{
+				Name:   "sidecar",
+				Logs:   &statsapi.FsStats{UsedBytes: &sidecarUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &sidecarUsed},
+			},
+			{
+				Name:   "main",
+				Logs:   &statsapi.FsStats{UsedBytes: &mainUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &mainUsed},
+			},
+		},
+	}
+
+	diskStat := diskStats{
+		rootFsAvailableBytes:  "1Gi",
+		imageFsAvailableBytes: "200Mi",
+		podStats:              map[*v1.Pod]statsapi.PodStats{pod: podStats},
+	}
+	summaryProvider := &fakeSummaryProvider{result: makeDiskStats(diskStat)}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds:               []evictionapi.Threshold{},
+	}
+
+	podKiller := &mockPodKiller{}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	mgr := &managerImpl{
+		clock:                         fakeClock,
+		killPodFunc:                   podKiller.killPodNow,
+		imageGC:                       &mockDiskGC{err: nil},
+		containerGC:                   &mockDiskGC{err: nil},
+		config:                        config,
+		recorder:                      &record.FakeRecorder{},
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		localStorageCapacityIsolation: true,
+		dedicatedImageFs:              ptr.To(false),
+	}
+
+	activePodsFunc := func() []*v1.Pod {
+		return []*v1.Pod{pod}
+	}
+
+	evictedPods, err := mgr.synchronize(tCtx, &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have error but got %v", err)
+	}
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have evicted the pod for restartable init container exceeding ephemeral-storage limit")
+	}
+	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
+		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
 	}
 }

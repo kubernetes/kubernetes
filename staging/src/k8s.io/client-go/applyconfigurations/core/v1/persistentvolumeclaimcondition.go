@@ -25,13 +25,26 @@ import (
 
 // PersistentVolumeClaimConditionApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimCondition type for use
 // with apply.
+//
+// PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimConditionApplyConfiguration struct {
-	Type               *corev1.PersistentVolumeClaimConditionType `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus                    `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time                               `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time                               `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                    `json:"reason,omitempty"`
-	Message            *string                                    `json:"message,omitempty"`
+	// Type is the type of the condition.
+	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
+	Type *corev1.PersistentVolumeClaimConditionType `json:"type,omitempty"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
+	Status *corev1.ConditionStatus `json:"status,omitempty"`
+	// lastProbeTime is the time we probed the condition.
+	LastProbeTime *metav1.Time `json:"lastProbeTime,omitempty"`
+	// lastTransitionTime is the time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is a unique, this should be a short, machine understandable string that gives the reason
+	// for condition's last transition. If it reports "Resizing" that means the underlying
+	// persistent volume is being resized.
+	Reason *string `json:"reason,omitempty"`
+	// message is the human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // PersistentVolumeClaimConditionApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimCondition type for use with

@@ -17,7 +17,7 @@ func (e missingFieldError) Error() string {
 	return string(e)
 }
 
-func extractField(actual interface{}, field string, matchername string) (any, error) {
+func extractField(actual any, field string, matchername string) (any, error) {
 	fields := strings.SplitN(field, ".", 2)
 	actualValue := reflect.ValueOf(actual)
 
@@ -40,7 +40,12 @@ func extractField(actual interface{}, field string, matchername string) (any, er
 			extractedValue = actualValue.Addr().MethodByName(strings.TrimSuffix(fields[0], "()"))
 		}
 		if extractedValue == (reflect.Value{}) {
-			return nil, missingFieldError(fmt.Sprintf("%s could not find method named '%s' in struct of type %T.", matchername, fields[0], actual))
+			ptr := reflect.New(actualValue.Type())
+			ptr.Elem().Set(actualValue)
+			extractedValue = ptr.MethodByName(strings.TrimSuffix(fields[0], "()"))
+			if extractedValue == (reflect.Value{}) {
+				return nil, missingFieldError(fmt.Sprintf("%s could not find method named '%s' in struct of type %T.", matchername, fields[0], actual))
+			}
 		}
 		t := extractedValue.Type()
 		if t.NumIn() != 0 || t.NumOut() != 1 {
@@ -63,7 +68,7 @@ func extractField(actual interface{}, field string, matchername string) (any, er
 
 type HaveFieldMatcher struct {
 	Field    string
-	Expected interface{}
+	Expected any
 }
 
 func (matcher *HaveFieldMatcher) expectedMatcher() omegaMatcher {
@@ -75,7 +80,7 @@ func (matcher *HaveFieldMatcher) expectedMatcher() omegaMatcher {
 	return expectedMatcher
 }
 
-func (matcher *HaveFieldMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *HaveFieldMatcher) Match(actual any) (success bool, err error) {
 	extractedField, err := extractField(actual, matcher.Field, "HaveField")
 	if err != nil {
 		return false, err
@@ -84,7 +89,7 @@ func (matcher *HaveFieldMatcher) Match(actual interface{}) (success bool, err er
 	return matcher.expectedMatcher().Match(extractedField)
 }
 
-func (matcher *HaveFieldMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *HaveFieldMatcher) FailureMessage(actual any) (message string) {
 	extractedField, err := extractField(actual, matcher.Field, "HaveField")
 	if err != nil {
 		// this really shouldn't happen
@@ -96,7 +101,7 @@ func (matcher *HaveFieldMatcher) FailureMessage(actual interface{}) (message str
 	return message
 }
 
-func (matcher *HaveFieldMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *HaveFieldMatcher) NegatedFailureMessage(actual any) (message string) {
 	extractedField, err := extractField(actual, matcher.Field, "HaveField")
 	if err != nil {
 		// this really shouldn't happen

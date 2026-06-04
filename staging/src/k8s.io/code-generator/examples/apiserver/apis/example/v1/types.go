@@ -23,7 +23,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // TestType is a top-level type. A client is created for it.
 type TestType struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
@@ -35,7 +35,7 @@ type TestType struct {
 // TestTypeList is a top-level list type. The client methods for lists are automatically created.
 // You are not supposed to create a separated client for this one.
 type TestTypeList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
@@ -44,4 +44,49 @@ type TestTypeList struct {
 
 type TestTypeStatus struct {
 	Blah string `json:"blah"`
+}
+
+type Conversion struct {
+	Identical MemoryIdentical `json:"identical"`
+	Different MemoryDifferent `json:"different"`
+}
+type MemoryIdentical struct {
+	Items *MemoryIdentical `json:"items,omitempty"`
+
+	Properties map[string]MemoryIdentical `json:"properties,omitempty"`
+
+	// +listType=atomic
+	AllOf []MemoryIdentical `json:"allOf,omitempty"`
+
+	Bool bool `json:"bool"`
+}
+type MemoryDifferent struct {
+	Items *MemoryDifferent `json:"items,omitempty"`
+
+	Properties map[string]MemoryDifferent `json:"properties,omitempty"`
+
+	// +listType=atomic
+	AllOf []MemoryDifferent `json:"allOf,omitempty"`
+
+	Bool *bool `json:"bool"` // differs from internal representation
+}
+
+type ConversionPrivate struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
+}
+
+type ConversionCustomContainer struct {
+	// +listType=atomic
+	Slice []ConversionCustom `json:"slice"`
+	// +listType=atomic
+	SliceP  []*ConversionCustom          `json:"sliceP"`
+	Map     map[string]ConversionCustom  `json:"map"`
+	MapP    map[string]*ConversionCustom `json:"mapP"`
+	Struct  ConversionCustom             `json:"struct"`
+	StructP *ConversionCustom            `json:"structP"`
+}
+type ConversionCustom struct {
+	PublicField  string `json:"publicField"`
+	privateField string `json:"privateField"`
 }

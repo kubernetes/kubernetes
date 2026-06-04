@@ -20,6 +20,8 @@ package v1
 
 // ExampleSpecApplyConfiguration represents a declarative configuration of the ExampleSpec type for use
 // with apply.
+//
+// ExampleSpec is the spec for an Example resource
 type ExampleSpecApplyConfiguration struct {
 	Foo *string `json:"foo,omitempty"`
 	Bar *bool   `json:"bar,omitempty"`

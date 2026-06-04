@@ -19,6 +19,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -89,6 +90,9 @@ type Runtime interface {
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
 	GetPods(ctx context.Context, all bool) ([]*Pod, error)
+	// GetPod fetches the current sandboxes & containers for a pod.
+	// Returns ErrPodNotFound when no sandboxes are found for the requested pod.
+	GetPod(ctx context.Context, podUID types.UID) (*Pod, error)
 	// GarbageCollect removes dead containers using the specified container gc policy
 	// If allSourcesReady is not true, it means that kubelet doesn't have the
 	// complete list of pods from all available sources (e.g., apiserver, http,
@@ -100,7 +104,7 @@ type Runtime interface {
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(ctx context.Context, gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// SyncPod syncs the running pod into the desired pod.
-	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	SyncPod(ctx context.Context, pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -109,7 +113,7 @@ type Runtime interface {
 	KillPod(ctx context.Context, pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visible in Runtime.
-	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*PodStatus, error)
+	GetPodStatus(ctx context.Context, pod *Pod) (*PodStatus, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
@@ -128,7 +132,7 @@ type Runtime interface {
 	// and store the resulting archive to the checkpoint directory.
 	CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error
 	// Generate pod status from the CRI event
-	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*PodStatus, error)
+	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *PodStatus
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 	// This list should be static at startup: either the client and server restart together when
 	// adding or removing metrics descriptors, or they should not change.
@@ -138,11 +142,21 @@ type Runtime interface {
 	// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
-	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+	GetContainerStatus(ctx context.Context, podUID types.UID, id ContainerID) (*Status, error)
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
+	// (allocated resources != actuated resources).
+	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
+	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
+
+var (
+	// ErrPodNotFound is returned by GetPod when no sandboxes are found for the requested pod.
+	ErrPodNotFound = errors.New("pod sandboxes not found")
+)
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
@@ -204,8 +218,11 @@ type Pod struct {
 	// List of sandboxes associated with this pod. The sandboxes are converted
 	// to Container temporarily to avoid substantial changes to other
 	// components. This is only populated by kuberuntime.
+	// Sandboxes are sorted by creation time, newest -> oldest.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container
+	// Timestamp is the time that this Pod object was read from the runtime.
+	Timestamp time.Time
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -232,10 +249,10 @@ func BuildContainerID(typ, ID string) ContainerID {
 }
 
 // ParseContainerID is a convenience method for creating a ContainerID from an ID string.
-func ParseContainerID(containerID string) ContainerID {
+func ParseContainerID(logger klog.Logger, containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.ErrorS(err, "Parsing containerID failed")
+		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
 }
@@ -310,6 +327,10 @@ type Container struct {
 	Hash uint64
 	// State is the state of the container.
 	State State
+	// ID of the sandbox to which this container belongs.
+	PodSandboxID string
+	// Creation time of the container in nanoseconds.
+	CreatedAt int64
 }
 
 // PodStatus represents the status of the pod and its containers.
@@ -454,7 +475,7 @@ type Image struct {
 // EnvVar represents the environment variable.
 type EnvVar struct {
 	Name  string
-	Value string
+	Value string // TODO: switch to []byte
 }
 
 // Annotation represents an annotation.
@@ -644,7 +665,8 @@ func (c *RuntimeCondition) String() string {
 
 // RuntimeFeatures contains the set of features implemented by the runtime
 type RuntimeFeatures struct {
-	SupplementalGroupsPolicy bool
+	SupplementalGroupsPolicy  bool
+	UserNamespacesHostNetwork bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -652,7 +674,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
 }
 
 // Pods represents the list of pods

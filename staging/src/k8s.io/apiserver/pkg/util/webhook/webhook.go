@@ -83,6 +83,7 @@ func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 	clientConfig := rest.CopyConfig(config)
 
 	codec := codecFactory.LegacyCodec(groupVersions...)
+	clientConfig.ContentType = runtime.ContentTypeJSON
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	clientConfig.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(

@@ -18,7 +18,7 @@ package rollout
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -105,7 +105,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericiooptions.IOStreams)
 	return cmd
 }
 
-// Complete completes al the required options
+// Complete completes all the required options
 func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 
@@ -177,13 +177,21 @@ func (o *RolloutHistoryOptions) Run() error {
 			}
 
 			if o.Revision > 0 {
-				printer.PrintObj(historyInfo[o.Revision], o.Out)
+				// Ensure the specified revision exists before printing
+				revision, exists := historyInfo[o.Revision]
+				if !exists {
+					return fmt.Errorf("unable to find the specified revision")
+				}
+
+				if err := printer.PrintObj(revision, o.Out); err != nil {
+					return err
+				}
 			} else {
 				sortedKeys := make([]int64, 0, len(historyInfo))
 				for k := range historyInfo {
 					sortedKeys = append(sortedKeys, k)
 				}
-				sort.Slice(sortedKeys, func(i, j int) bool { return sortedKeys[i] < sortedKeys[j] })
+				slices.Sort(sortedKeys)
 				for _, k := range sortedKeys {
 					printer.PrintObj(historyInfo[k], o.Out)
 				}

@@ -18,20 +18,31 @@ package testing
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 )
+
+//go:embed testdata/exemplar_pod.yaml
+var exemplarPodYAML []byte
 
 type scope string
 
@@ -41,41 +52,319 @@ var (
 	namespace scope = "Namespace"
 )
 
-func RunBenchmarkStoreListCreate(ctx context.Context, b *testing.B, store storage.Interface, match metav1.ResourceVersionMatch) {
-	objectCount := atomic.Uint64{}
-	pods := make([]*example.Pod, 0, b.N)
-	for i := 0; i < b.N; i++ {
-		name := rand.String(100)
-		pods = append(pods, &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name}})
+const (
+	loadNone            = "None"
+	loadWatcher         = "Watcher"
+	loadLister          = "Lister"
+	loadWatchList       = "WatchList"
+	trafficDeleteCreate = "DeleteCreate"
+	trafficPatch        = "Patch"
+)
+
+func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, hasIndex bool) {
+	require.NoError(b, PrecreateBenchmarkPods(ctx, store, data))
+	require.NoError(b, waitForConsistent(ctx, store))
+
+	for _, trafficType := range []string{trafficDeleteCreate, trafficPatch} {
+		b.Run(fmt.Sprintf("Traffic=%s", trafficType), func(b *testing.B) {
+			for _, parallelism := range []int{25} {
+				b.Run(fmt.Sprintf("Parallelism=%d", parallelism), func(b *testing.B) {
+					for _, loadType := range []string{loadNone, loadWatcher, loadLister, loadWatchList} {
+						useIndexOptions := []bool{false}
+						if hasIndex && loadType != loadNone {
+							useIndexOptions = []bool{false, true}
+						}
+						for _, readIndexed := range useIndexOptions {
+							b.Run(fmt.Sprintf("Background=%s/UseIndex=%v", loadType, readIndexed), func(b *testing.B) {
+								b.SetParallelism(parallelism)
+								runBenchmarkWriteThroughput(ctx, b, store, data, trafficType, loadType, readIndexed)
+							})
+						}
+					}
+				})
+			}
+		})
 	}
+}
+
+func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, loadType string, readIndexed bool) {
+	stopBackgroundLoadCh := make(chan struct{})
+	var workersWg sync.WaitGroup
+	var stopOnce sync.Once
+	stopBackgroundLoad := func() {
+		stopOnce.Do(func() {
+			close(stopBackgroundLoadCh)
+			workersWg.Wait()
+		})
+	}
+	defer stopBackgroundLoad()
+
+	var writes atomic.Uint64
+	var watchEvents atomic.Uint64
+	var listCalls atomic.Uint64
+	var listObjects atomic.Uint64
+
+	switch loadType {
+	case loadNone:
+	case loadWatcher:
+		startBackgroundWatchers(ctx, store, data, 10, readIndexed, &workersWg, stopBackgroundLoadCh, &watchEvents)
+	case loadLister:
+		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects)
+	case loadWatchList:
+		startBackgroundWatchListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects)
+	default:
+		panic(fmt.Sprintf("Unknown load type: %s", loadType))
+	}
+	writes.Store(0)
+	watchEvents.Store(0)
+	listCalls.Store(0)
+	listObjects.Store(0)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		pod := pods[i]
-		podOut := &example.Pod{}
-		err := store.Create(ctx, computePodKey(pod), pod, podOut, 0)
-		if err != nil {
-			panic(fmt.Sprintf("Unexpected error %s", err))
+	start := time.Now()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			writes.Add(runTraffic(ctx, b, store, data, trafficType))
 		}
-		listOut := &example.PodList{}
-		err = store.GetList(ctx, "/pods", storage.ListOptions{
-			Recursive:            true,
-			ResourceVersion:      podOut.ResourceVersion,
-			ResourceVersionMatch: match,
-			Predicate: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
-				Limit: 1,
-			},
-		}, listOut)
-		if err != nil {
-			panic(fmt.Sprintf("Unexpected error %s", err))
-		}
-		if len(listOut.Items) != 1 {
-			b.Errorf("Expected to get 1 element, got %d", len(listOut.Items))
-		}
-		objectCount.Add(uint64(len(listOut.Items)))
+	})
+	end := time.Now()
+	elapsedSeconds := end.Sub(start).Seconds()
+	require.NoError(b, waitForConsistent(ctx, store))
+	consistentDelaySeconds := float64(time.Since(end).Nanoseconds()) / float64(time.Second.Nanoseconds())
+	b.ReportMetric(consistentDelaySeconds, "seconds-delay")
+	b.ReportMetric(float64(writes.Load())/elapsedSeconds, "writes/s")
+
+	stopBackgroundLoad()
+
+	switch loadType {
+	case loadWatcher:
+		b.ReportMetric(float64(watchEvents.Load())/elapsedSeconds, "watch-events/s")
+	case loadLister, loadWatchList:
+		b.ReportMetric(float64(listCalls.Load())/elapsedSeconds, "list-calls/s")
+		b.ReportMetric(float64(listObjects.Load())/elapsedSeconds, "list-objs/s")
 	}
-	b.ReportMetric(float64(objectCount.Load())/float64(b.N), "objects/op")
+}
+
+func waitForConsistent(ctx context.Context, store storage.Interface) error {
+	listOut := &example.PodList{}
+	err := store.GetList(ctx, "/pods/", storage.ListOptions{
+		Recursive: true,
+		Predicate: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.Everything(),
+			Limit: 1,
+		},
+	}, listOut)
+	if err != nil {
+		return fmt.Errorf("unexpected error waiting for consistency: %w", err)
+	}
+	return nil
+}
+
+func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string) (writes uint64) {
+	var podOut *example.Pod
+	switch trafficType {
+	case trafficDeleteCreate:
+		i := rand.Intn(len(data.PodKeys))
+		podOut = &example.Pod{}
+		err := store.Delete(ctx, data.PodKeys[i], podOut, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+		if err == nil {
+			writes += 1
+		} else if !storage.IsNotFound(err) {
+			panic(fmt.Sprintf("Unexpected error on Delete %q: %v", data.PodKeys[i], err))
+		}
+		pod := data.Pods[i]
+		podOut = &example.Pod{}
+		err = store.Create(ctx, data.PodKeys[i], pod, podOut, 0)
+		if err == nil {
+			writes += 1
+		} else if !storage.IsExist(err) {
+			panic(fmt.Sprintf("Unexpected error on Create %q: %v", data.PodKeys[i], err))
+		}
+	case trafficPatch:
+		i := rand.Intn(len(data.PodKeys))
+		podOut = &example.Pod{}
+		err := store.GuaranteedUpdate(ctx, data.PodKeys[i], podOut, false, nil, patchFunc(i), nil)
+		if err != nil {
+			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[i], err))
+		} else {
+			writes += 1
+		}
+		// Execute patch second time to match 2 operations.
+		j := rand.Intn(len(data.PodKeys))
+		podOut = &example.Pod{}
+		err = store.GuaranteedUpdate(ctx, data.PodKeys[j], podOut, false, nil, patchFunc(j), nil)
+		if err != nil {
+			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[j], err))
+		} else {
+			writes += 1
+		}
+	default:
+		panic(fmt.Sprintf("Unknown traffic type: %s", trafficType))
+	}
+	return writes
+}
+
+func patchFunc(i int) func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	return func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		curr := input.(*example.Pod)
+		if curr.Annotations == nil {
+			curr.Annotations = make(map[string]string)
+		}
+		curr.Annotations["updated-by-benchmark"] = strconv.Itoa(i)
+		return curr, nil, nil
+	}
+}
+
+func startBackgroundWatchers(ctx context.Context, store storage.Interface, data BenchmarkData, count int, readIndexed bool, wg *sync.WaitGroup, stopCh <-chan struct{}, eventCounter *atomic.Uint64) {
+	for i := range count {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			opts := storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.Everything,
+			}
+			if readIndexed {
+				nodeName := "default-node"
+				if len(data.NodeNames) > 0 {
+					nodeName = data.NodeNames[i%len(data.NodeNames)]
+				}
+				opts.Predicate.GetAttrs = podAttr
+				opts.Predicate.IndexFields = []string{"spec.nodeName"}
+				opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
+			}
+			w, err := store.Watch(ctx, "/pods/", opts)
+			if err != nil {
+				return
+			}
+			defer w.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ctx.Done():
+					return
+				case ev, ok := <-w.ResultChan():
+					if !ok {
+						return
+					}
+					eventCounter.Add(1)
+					_ = ev
+				}
+			}
+		}(i)
+	}
+}
+
+func startBackgroundListers(ctx context.Context, store storage.Interface, data BenchmarkData, count int, readIndexed bool, wg *sync.WaitGroup, stopCh <-chan struct{}, listCounter *atomic.Uint64, objCounter *atomic.Uint64) {
+	for i := range count {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			listOut := &example.PodList{}
+			ticker := time.NewTicker(10 * time.Millisecond)
+			defer ticker.Stop()
+			opts := storage.ListOptions{
+				Recursive: true,
+				Predicate: storage.Everything,
+			}
+			if readIndexed {
+				nodeName := "default-node"
+				if len(data.NodeNames) > 0 {
+					nodeName = data.NodeNames[i%len(data.NodeNames)]
+				}
+				opts.Predicate.GetAttrs = podAttr
+				opts.Predicate.IndexFields = []string{"spec.nodeName"}
+				opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
+			}
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					err := store.GetList(ctx, "/pods/", opts, listOut)
+					if err == nil {
+						listCounter.Add(1)
+						objCounter.Add(uint64(len(listOut.Items)))
+					}
+				}
+			}
+		}(i)
+	}
+}
+
+func startBackgroundWatchListers(ctx context.Context, store storage.Interface, data BenchmarkData, count int, readIndexed bool, wg *sync.WaitGroup, stopCh <-chan struct{}, listCounter *atomic.Uint64, objCounter *atomic.Uint64) {
+	for i := range count {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			opts := storage.ListOptions{
+				Recursive:         true,
+				Predicate:         storage.Everything,
+				SendInitialEvents: new(true),
+			}
+			opts.Predicate.AllowWatchBookmarks = true
+
+			if readIndexed {
+				nodeName := "default-node"
+				if len(data.NodeNames) > 0 {
+					nodeName = data.NodeNames[i%len(data.NodeNames)]
+				}
+				opts.Predicate.GetAttrs = podAttr
+				opts.Predicate.IndexFields = []string{"spec.nodeName"}
+				opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
+			}
+
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				w, err := store.Watch(ctx, "/pods/", opts)
+				if err != nil {
+					time.Sleep(10 * time.Millisecond)
+					continue
+				}
+
+				initialFinished := false
+				for !initialFinished {
+					select {
+					case <-stopCh:
+						w.Stop()
+						return
+					case <-ctx.Done():
+						w.Stop()
+						return
+					case ev, ok := <-w.ResultChan():
+						if !ok {
+							initialFinished = true
+							break
+						}
+						switch ev.Type {
+						case watch.Bookmark:
+							pod, ok := ev.Object.(*example.Pod)
+							if !ok {
+								panic("Unexpected type in event")
+							}
+							if pod.Annotations != nil && pod.Annotations[metav1.InitialEventsAnnotationKey] == "true" {
+								initialFinished = true
+							}
+						default:
+							objCounter.Add(1)
+						}
+					}
+				}
+				w.Stop()
+				listCounter.Add(1)
+			}
+		}(i)
+	}
 }
 
 func RunBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, useIndex bool) {
@@ -198,7 +487,8 @@ func podAttr(obj runtime.Object) (labels.Set, fields.Set, error) {
 	}, nil
 }
 
-func PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (data BenchmarkData) {
+func PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (data BenchmarkData) {
+	exemplar := loadExemplarPod()
 	data.NodeNames = make([]string, nodeCount)
 	for i := 0; i < nodeCount; i++ {
 		data.NodeNames[i] = rand.String(10)
@@ -208,15 +498,59 @@ func PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int)
 		namespace := rand.String(10)
 		data.NamespaceNames[i] = namespace
 		for j := 0; j < podPerNamespaceCount; j++ {
-			name := rand.String(10)
-			data.Pods = append(data.Pods, &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}, Spec: example.PodSpec{NodeName: data.NodeNames[rand.Intn(nodeCount)]}})
+			p := exemplar.DeepCopy()
+			randomizePod(p, namespace, data.NodeNames[rand.Intn(nodeCount)])
+			data.Pods = append(data.Pods, p)
+			data.PodKeys = append(data.PodKeys, computePodKey(p))
 		}
 	}
 	return data
 }
 
+func PrecreateBenchmarkPods(ctx context.Context, store storage.Interface, data BenchmarkData) error {
+	podOut := &example.Pod{}
+	for _, pod := range data.Pods {
+		key := computePodKey(pod)
+		err := store.Create(ctx, key, pod, podOut, 0)
+		if err != nil && !storage.IsExist(err) {
+			return fmt.Errorf("unexpected error pre-creating pod %q: %w", key, err)
+		}
+	}
+	return nil
+}
+
 type BenchmarkData struct {
 	Pods           []*example.Pod
+	PodKeys        []string
 	NamespaceNames []string
 	NodeNames      []string
+}
+
+func loadExemplarPod() *example.Pod {
+	var pod example.Pod
+	if len(exemplarPodYAML) == 0 {
+		panic("exemplar pod empty")
+	}
+	if err := yaml.Unmarshal(exemplarPodYAML, &pod); err != nil {
+		panic(fmt.Sprintf("decode exemplar pod: %v", err))
+	}
+	return &pod
+}
+
+func randomizePod(pod *example.Pod, ns string, nodeName string) {
+	pod.Namespace = ns
+	pod.Name = pod.GenerateName + rand.String(10)
+	pod.UID = types.UID(rand.String(36))
+	pod.ResourceVersion = ""
+	pod.Spec.NodeName = nodeName
+}
+
+func RunBenchmarkStoreStats(ctx context.Context, b *testing.B, store storage.Interface) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := store.Stats(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }

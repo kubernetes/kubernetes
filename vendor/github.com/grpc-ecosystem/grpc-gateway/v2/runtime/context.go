@@ -201,12 +201,12 @@ func annotateContext(ctx context.Context, mux *ServeMux, req *http.Request, rpcM
 	if timeout != 0 {
 		ctx, _ = context.WithTimeout(ctx, timeout)
 	}
-	if len(pairs) == 0 {
-		return ctx, nil, nil
-	}
 	md := metadata.Pairs(pairs...)
 	for _, mda := range mux.metadataAnnotators {
 		md = metadata.Join(md, mda(ctx, req))
+	}
+	if len(md) == 0 {
+		return ctx, nil, nil
 	}
 	return ctx, md, nil
 }

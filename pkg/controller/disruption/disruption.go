@@ -19,6 +19,8 @@ package disruption
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sync"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
@@ -264,8 +266,10 @@ func NewDisruptionControllerInternal(ctx context.Context,
 // way to take advantage of listers with scale subresources, we use the workload
 // resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet, dc.getScaleController}
+	return []podControllerFinder{
+		dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
+		dc.getPodStatefulSet, dc.getScaleController,
+	}
 }
 
 var (
@@ -437,13 +441,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 		return false, nil
 	}
 
-	for _, group := range expectedGroups {
-		if group == gv.Group {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return slices.Contains(expectedGroups, gv.Group), nil
 }
 
 func (dc *DisruptionController) Run(ctx context.Context) {
@@ -459,21 +457,30 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	}
 	defer dc.broadcaster.Shutdown()
 
-	defer dc.queue.ShutDown()
-	defer dc.recheckQueue.ShutDown()
-	defer dc.stalePodDisruptionQueue.ShutDown()
-
 	logger.Info("Starting disruption controller")
-	defer logger.Info("Shutting down disruption controller")
 
-	if !cache.WaitForNamedCacheSync("disruption", ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down disruption controller")
+		dc.queue.ShutDown()
+		dc.recheckQueue.ShutDown()
+		dc.stalePodDisruptionQueue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, dc.worker, time.Second)
-	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
-	go wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
-
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, dc.worker, time.Second)
+	})
+	wg.Go(func() {
+		wait.Until(dc.recheckWorker, time.Second, ctx.Done())
+	})
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
+	})
 	<-ctx.Done()
 }
 
@@ -644,7 +651,7 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:stylecheck
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing PodDisruptionBudget, requeuing", "key", dKey)
 	dc.queue.AddRateLimited(dKey)
 
 	return true
@@ -790,7 +797,7 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 	newPod := pod.DeepCopy()
 	updated := apipod.UpdatePodCondition(&newPod.Status, &v1.PodCondition{
 		Type:               v1.DisruptionTarget,
-		ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&newPod.Status, newPod.Generation, v1.DisruptionTarget),
+		ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&newPod.Status, newPod.Generation, v1.DisruptionTarget),
 		Status:             v1.ConditionFalse,
 	})
 	if !updated {
@@ -811,7 +818,7 @@ func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *po
 	// handled the same way for integer and percentage minAvailable
 
 	if pdb.Spec.MaxUnavailable != nil {
-		expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pdb, pods)
+		expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pods)
 		if err != nil {
 			return
 		}
@@ -829,7 +836,7 @@ func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *po
 			desiredHealthy = pdb.Spec.MinAvailable.IntVal
 			expectedCount = int32(len(pods))
 		} else if pdb.Spec.MinAvailable.Type == intstr.String {
-			expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pdb, pods)
+			expectedCount, unmanagedPods, err = dc.getExpectedScale(ctx, pods)
 			if err != nil {
 				return
 			}
@@ -845,7 +852,7 @@ func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *po
 	return
 }
 
-func (dc *DisruptionController) getExpectedScale(ctx context.Context, pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, unmanagedPods []string, err error) {
+func (dc *DisruptionController) getExpectedScale(ctx context.Context, pods []*v1.Pod) (expectedCount int32, unmanagedPods []string, err error) {
 	// When the user specifies a fraction of pods that must be available, we
 	// use as the fraction's denominator
 	// SUM_{all c in C} scale(c)

@@ -19,18 +19,28 @@ limitations under the License.
 package v1
 
 import (
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	internal "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/internal"
 	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // CustomResourceDefinitionApplyConfiguration represents a declarative configuration of the CustomResourceDefinition type for use
 // with apply.
+//
+// CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
+// <.spec.name>.<.spec.group>.
 type CustomResourceDefinitionApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// Standard object's metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *CustomResourceDefinitionSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
+	// spec describes how the user wants the resources to appear
+	Spec *CustomResourceDefinitionSpecApplyConfiguration `json:"spec,omitempty"`
+	// status indicates the actual state of the CustomResourceDefinition
+	Status *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CustomResourceDefinition constructs a declarative configuration of the CustomResourceDefinition type for use with
@@ -42,6 +52,48 @@ func CustomResourceDefinition(name string) *CustomResourceDefinitionApplyConfigu
 	b.WithAPIVersion("apiextensions.k8s.io/v1")
 	return b
 }
+
+// ExtractCustomResourceDefinitionFrom extracts the applied configuration owned by fieldManager from
+// customResourceDefinition for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// customResourceDefinition must be a unmodified CustomResourceDefinition API object that was retrieved from the Kubernetes API.
+// ExtractCustomResourceDefinitionFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCustomResourceDefinitionFrom(customResourceDefinition *apiextensionsv1.CustomResourceDefinition, fieldManager string, subresource string) (*CustomResourceDefinitionApplyConfiguration, error) {
+	b := &CustomResourceDefinitionApplyConfiguration{}
+	err := managedfields.ExtractInto(customResourceDefinition, internal.Parser().Type("io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(customResourceDefinition.Name)
+
+	b.WithKind("CustomResourceDefinition")
+	b.WithAPIVersion("apiextensions.k8s.io/v1")
+	return b, nil
+}
+
+// ExtractCustomResourceDefinition extracts the applied configuration owned by fieldManager from
+// customResourceDefinition. If no managedFields are found in customResourceDefinition for fieldManager, a
+// CustomResourceDefinitionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// customResourceDefinition must be a unmodified CustomResourceDefinition API object that was retrieved from the Kubernetes API.
+// ExtractCustomResourceDefinition provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCustomResourceDefinition(customResourceDefinition *apiextensionsv1.CustomResourceDefinition, fieldManager string) (*CustomResourceDefinitionApplyConfiguration, error) {
+	return ExtractCustomResourceDefinitionFrom(customResourceDefinition, fieldManager, "")
+}
+
+// ExtractCustomResourceDefinitionStatus extracts the applied configuration owned by fieldManager from
+// customResourceDefinition for the status subresource.
+func ExtractCustomResourceDefinitionStatus(customResourceDefinition *apiextensionsv1.CustomResourceDefinition, fieldManager string) (*CustomResourceDefinitionApplyConfiguration, error) {
+	return ExtractCustomResourceDefinitionFrom(customResourceDefinition, fieldManager, "status")
+}
+
+func (b CustomResourceDefinitionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -217,8 +269,24 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithStatus(value *CustomRes
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CustomResourceDefinitionApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

@@ -19,6 +19,7 @@ package nonzerodefaults
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -27,13 +28,16 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero-values.
-	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":    {"Required value"},
-		"stringPtrField": {"Required value"},
-		"intField":       {"Required value"},
-		"intPtrField":    {"Required value"},
-		"boolField":      {"Required value"},
-		"boolPtrField":   {"Required value"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("stringField"), ""),
+		field.Required(field.NewPath("stringPtrField"), ""),
+		field.Required(field.NewPath("intField"), ""),
+		field.Required(field.NewPath("intPtrField"), ""),
+		field.Required(field.NewPath("boolField"), ""),
+		field.Required(field.NewPath("boolPtrField"), ""),
+		field.Required(field.NewPath("structPtrField"), ""),
+		field.Required(field.NewPath("sliceField"), ""),
+		field.Required(field.NewPath("mapField"), ""),
 	})
 
 	st.Value(&Struct{
@@ -43,5 +47,8 @@ func Test(t *testing.T) {
 		IntPtrField:    ptr.To(0),
 		BoolField:      true,
 		BoolPtrField:   ptr.To(false),
+		StructPtrField: &Submarker{Name: "x"},
+		SliceField:     []string{"foo"},
+		MapField:       map[string]string{"k": "v"},
 	}).ExpectValid()
 }

@@ -25,10 +25,35 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
+
+// resetMetricsGlobalState resets all global state used by metrics tests.
+// NOTE: This should be called at the start of tests and in cleanup to ensure test isolation.
+func resetMetricsGlobalState(t *testing.T) {
+	resetter := func() {
+		hiddenMetricsTotal.Reset()
+		disabledMetricsTotal.Reset()
+
+		showHidden.Store(false)
+		showHiddenOnce = sync.Once{}
+
+		alphaCounter.ClearState()
+		alphaDeprecatedCounter.ClearState()
+		betaDeprecatedCounter.ClearState()
+		alphaHiddenCounter.ClearState()
+
+		disabledMetricsLock.Lock()
+		disabledMetrics = map[string]struct{}{}
+		disabledMetricsLock.Unlock()
+	}
+
+	// Reset at the start of tests
+	resetter()
+
+	// Register cleanup to reset again after test completes
+	t.Cleanup(resetter)
+}
 
 var (
 	v115         = semver.MustParse("1.15.0")
@@ -51,6 +76,16 @@ var (
 			DeprecatedVersion: "1.15.0",
 		},
 	)
+	betaDeprecatedCounter = NewCounter(
+		&CounterOpts{
+			Namespace:         "some_namespace",
+			Name:              "test_beta_dep_counter",
+			Subsystem:         "subsystem",
+			StabilityLevel:    BETA,
+			Help:              "counter help",
+			DeprecatedVersion: "1.15.0",
+		},
+	)
 	alphaHiddenCounter = NewCounter(
 		&CounterOpts{
 			Namespace:         "some_namespace",
@@ -64,25 +99,186 @@ var (
 )
 
 func TestShouldHide(t *testing.T) {
-	currentVersion := parseVersion(apimachineryversion.Info{
-		Major:      "1",
-		Minor:      "17",
-		GitVersion: "v1.17.1-alpha-1.12345",
-	})
+	currentV1_17 := parseSemver("1.17.0")
+	currentV1_18Alpha0 := parseSemver("1.18.0-alpha.0")
+	currentV1_18Alpha1 := parseSemver("1.18.0-alpha.1")
 
 	var tests = []struct {
 		desc              string
+		currentVersion    *semver.Version
+		stabilityLevel    StabilityLevel
 		deprecatedVersion string
 		shouldHide        bool
 	}{
 		{
-			desc:              "current minor release should not be hidden",
+			desc:              "INTERNAL metric deprecated in the current release - should be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.17.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "INTERNAL metric deprecated 1 release ago - should be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.16.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "INTERNAL metric to be deprecated 1 release later - should not be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "BETA metric deprecated in the current release - should not be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    BETA,
 			deprecatedVersion: "1.17.0",
 			shouldHide:        false,
 		},
 		{
-			desc:              "older minor release should be hidden",
+			desc:              "BETA metric deprecated 1 release ago - should be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    BETA,
 			deprecatedVersion: "1.16.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "BETA metric to be deprecated 1 release later - should not be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    BETA,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric deprecated in the current release - should not be hidden",
+			currentVersion:    parseSemver("1.17.0"),
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.17.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric deprecated 3 releases ago - should be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.14.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "STABLE metric deprecated 2 releases ago - should not be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.15.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric to be deprecated 1 release later - should not be hidden",
+			currentVersion:    currentV1_17,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		// --- Pre-Alpha.0 Tests ---
+		{
+			desc:              "INTERNAL metric deprecated in the current minor - should not be hidden",
+			currentVersion:    currentV1_18Alpha0,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "INTERNAL metric deprecated 1 release ago - should be hidden",
+			currentVersion:    currentV1_18Alpha0,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.17.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "BETA metric deprecated in the current minor - should not be hidden",
+			currentVersion:    currentV1_18Alpha0,
+			stabilityLevel:    BETA,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "BETA metric deprecated 1 release ago - should not be hidden",
+			currentVersion:    currentV1_18Alpha0,
+			stabilityLevel:    BETA,
+			deprecatedVersion: "1.17.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric deprecated in the current minor - should be hidden",
+			currentVersion:    currentV1_18Alpha0,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric deprecated 1 release ago - should not be hidden",
+			currentVersion:    currentV1_18Alpha0,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.17.0",
+			shouldHide:        false,
+		},
+		// --- Pre-Alpha.1 Tests ---
+		{
+
+			desc:              "INTERNAL metric in the current minor - should be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "INTERNAL metric deprecated in prior patch - should be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    INTERNAL,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "BETA metric deprecated in the current minor - should not be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    BETA,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "BETA metric deprecated in prior patch - should not be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    BETA,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "BETA metric deprecated 1 release ago - should be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    BETA,
+			deprecatedVersion: "1.17.0",
+			shouldHide:        true,
+		},
+		{
+			desc:              "STABLE metric deprecated in the current minor - should not be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric deprecated in prior patch - should not be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.18.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "STABLE metric deprecated 3 minors ago - should be hidden",
+			currentVersion:    currentV1_18Alpha1,
+			stabilityLevel:    STABLE,
+			deprecatedVersion: "1.15.0",
 			shouldHide:        true,
 		},
 	}
@@ -90,13 +286,15 @@ func TestShouldHide(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.desc, func(t *testing.T) {
-			result := shouldHide(&currentVersion, parseSemver(tc.deprecatedVersion))
+			result := shouldHide(tc.stabilityLevel, tc.currentVersion, parseSemver(tc.deprecatedVersion))
 			assert.Equalf(t, tc.shouldHide, result, "expected should hide %v, but got %v", tc.shouldHide, result)
 		})
 	}
 }
 
 func TestRegister(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	var tests = []struct {
 		desc                    string
 		metrics                 []*Counter
@@ -125,9 +323,9 @@ func TestRegister(t *testing.T) {
 			desc:                    "test alpha deprecated metric",
 			metrics:                 []*Counter{alphaDeprecatedCounter},
 			expectedErrors:          []error{nil},
-			expectedIsCreatedValues: []bool{true},
+			expectedIsCreatedValues: []bool{false},
 			expectedIsDeprecated:    []bool{true},
-			expectedIsHidden:        []bool{false},
+			expectedIsHidden:        []bool{true},
 		},
 		{
 			desc:                    "test alpha hidden metric",
@@ -166,6 +364,8 @@ func TestRegister(t *testing.T) {
 }
 
 func TestMustRegister(t *testing.T) {
+	resetMetricsGlobalState(t)
+
 	var tests = []struct {
 		desc            string
 		metrics         []*Counter
@@ -192,7 +392,7 @@ func TestMustRegister(t *testing.T) {
 		},
 		{
 			desc:            "test must registering same deprecated metric",
-			metrics:         []*Counter{alphaDeprecatedCounter, alphaDeprecatedCounter},
+			metrics:         []*Counter{betaDeprecatedCounter, betaDeprecatedCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false, true},
 		},
@@ -223,254 +423,6 @@ func TestMustRegister(t *testing.T) {
 		})
 	}
 
-}
-func TestShowHiddenMetric(t *testing.T) {
-	registry := newKubeRegistry(apimachineryversion.Info{
-		Major:      "1",
-		Minor:      "15",
-		GitVersion: "v1.15.0-alpha-1.12345",
-	})
-
-	expectedMetricCount := 0
-	registry.MustRegister(alphaHiddenCounter)
-
-	ms, err := registry.Gather()
-	require.NoError(t, err, "Gather failed %v", err)
-	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-
-	showHidden.Store(true)
-	defer showHidden.Store(false)
-	registry.MustRegister(NewCounter(
-		&CounterOpts{
-			Namespace:         "some_namespace",
-			Name:              "test_alpha_show_hidden_counter",
-			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
-			Help:              "counter help",
-			DeprecatedVersion: "1.14.0",
-		},
-	))
-	expectedMetricCount = 1
-
-	ms, err = registry.Gather()
-	require.NoError(t, err, "Gather failed %v", err)
-	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-}
-
-func TestValidateShowHiddenMetricsVersion(t *testing.T) {
-	currentVersion := parseVersion(apimachineryversion.Info{
-		Major:      "1",
-		Minor:      "17",
-		GitVersion: "v1.17.1-alpha-1.12345",
-	})
-
-	var tests = []struct {
-		desc          string
-		targetVersion string
-		expectedError bool
-	}{
-		{
-			desc:          "invalid version is not allowed",
-			targetVersion: "1.invalid",
-			expectedError: true,
-		},
-		{
-			desc:          "patch version is not allowed",
-			targetVersion: "1.16.0",
-			expectedError: true,
-		},
-		{
-			desc:          "old version is not allowed",
-			targetVersion: "1.15",
-			expectedError: true,
-		},
-		{
-			desc:          "new version is not allowed",
-			targetVersion: "1.17",
-			expectedError: true,
-		},
-		{
-			desc:          "valid version is allowed",
-			targetVersion: "1.16",
-			expectedError: false,
-		},
-	}
-
-	for _, test := range tests {
-		tc := test
-		t.Run(tc.desc, func(t *testing.T) {
-			err := validateShowHiddenMetricsVersion(currentVersion, tc.targetVersion)
-
-			if tc.expectedError {
-				assert.Errorf(t, err, "Failed to test: %s", tc.desc)
-			} else {
-				assert.NoErrorf(t, err, "Failed to test: %s", tc.desc)
-			}
-		})
-	}
-}
-
-func TestEnableHiddenMetrics(t *testing.T) {
-	currentVersion := apimachineryversion.Info{
-		Major:      "1",
-		Minor:      "17",
-		GitVersion: "v1.17.1-alpha-1.12345",
-	}
-
-	var tests = []struct {
-		name           string
-		fqName         string
-		counter        *Counter
-		mustRegister   bool
-		expectedMetric string
-	}{
-		{
-			name:   "hide by register",
-			fqName: "hidden_metric_register",
-			counter: NewCounter(&CounterOpts{
-				Name:              "hidden_metric_register",
-				Help:              "counter help",
-				StabilityLevel:    STABLE,
-				DeprecatedVersion: "1.16.0",
-			}),
-			mustRegister: false,
-			expectedMetric: `
-				# HELP hidden_metric_register [STABLE] (Deprecated since 1.16.0) counter help
-				# TYPE hidden_metric_register counter
-				hidden_metric_register 1
-				`,
-		},
-		{
-			name:   "hide by must register",
-			fqName: "hidden_metric_must_register",
-			counter: NewCounter(&CounterOpts{
-				Name:              "hidden_metric_must_register",
-				Help:              "counter help",
-				StabilityLevel:    STABLE,
-				DeprecatedVersion: "1.16.0",
-			}),
-			mustRegister: true,
-			expectedMetric: `
-				# HELP hidden_metric_must_register [STABLE] (Deprecated since 1.16.0) counter help
-				# TYPE hidden_metric_must_register counter
-				hidden_metric_must_register 1
-				`,
-		},
-	}
-
-	for _, test := range tests {
-		tc := test
-		t.Run(tc.name, func(t *testing.T) {
-			registry := newKubeRegistry(currentVersion)
-			if tc.mustRegister {
-				registry.MustRegister(tc.counter)
-			} else {
-				_ = registry.Register(tc.counter)
-			}
-
-			tc.counter.Inc() // no-ops, because counter hasn't been initialized
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(""), tc.fqName); err != nil {
-				t.Fatal(err)
-			}
-
-			SetShowHidden()
-			defer func() {
-				showHiddenOnce = *new(sync.Once)
-				showHidden.Store(false)
-			}()
-
-			tc.counter.Inc()
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetric), tc.fqName); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestEnableHiddenStableCollector(t *testing.T) {
-	var currentVersion = apimachineryversion.Info{
-		Major:      "1",
-		Minor:      "17",
-		GitVersion: "v1.17.0-alpha-1.12345",
-	}
-	var normal = NewDesc("test_enable_hidden_custom_metric_normal", "this is a normal metric", []string{"name"}, nil, STABLE, "")
-	var hiddenA = NewDesc("test_enable_hidden_custom_metric_hidden_a", "this is the hidden metric A", []string{"name"}, nil, STABLE, "1.16.0")
-	var hiddenB = NewDesc("test_enable_hidden_custom_metric_hidden_b", "this is the hidden metric B", []string{"name"}, nil, STABLE, "1.16.0")
-
-	var tests = []struct {
-		name                      string
-		descriptors               []*Desc
-		metricNames               []string
-		expectMetricsBeforeEnable string
-		expectMetricsAfterEnable  string
-	}{
-		{
-			name:        "all hidden",
-			descriptors: []*Desc{hiddenA, hiddenB},
-			metricNames: []string{"test_enable_hidden_custom_metric_hidden_a",
-				"test_enable_hidden_custom_metric_hidden_b"},
-			expectMetricsBeforeEnable: "",
-			expectMetricsAfterEnable: `
-        		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.16.0) this is the hidden metric A
-        		# TYPE test_enable_hidden_custom_metric_hidden_a gauge
-        		test_enable_hidden_custom_metric_hidden_a{name="value"} 1
-        		# HELP test_enable_hidden_custom_metric_hidden_b [STABLE] (Deprecated since 1.16.0) this is the hidden metric B
-        		# TYPE test_enable_hidden_custom_metric_hidden_b gauge
-        		test_enable_hidden_custom_metric_hidden_b{name="value"} 1
-			`,
-		},
-		{
-			name:        "partial hidden",
-			descriptors: []*Desc{normal, hiddenA, hiddenB},
-			metricNames: []string{"test_enable_hidden_custom_metric_normal",
-				"test_enable_hidden_custom_metric_hidden_a",
-				"test_enable_hidden_custom_metric_hidden_b"},
-			expectMetricsBeforeEnable: `
-        		# HELP test_enable_hidden_custom_metric_normal [STABLE] this is a normal metric
-        		# TYPE test_enable_hidden_custom_metric_normal gauge
-        		test_enable_hidden_custom_metric_normal{name="value"} 1
-			`,
-			expectMetricsAfterEnable: `
-        		# HELP test_enable_hidden_custom_metric_normal [STABLE] this is a normal metric
-        		# TYPE test_enable_hidden_custom_metric_normal gauge
-        		test_enable_hidden_custom_metric_normal{name="value"} 1
-        		# HELP test_enable_hidden_custom_metric_hidden_a [STABLE] (Deprecated since 1.16.0) this is the hidden metric A
-        		# TYPE test_enable_hidden_custom_metric_hidden_a gauge
-        		test_enable_hidden_custom_metric_hidden_a{name="value"} 1
-        		# HELP test_enable_hidden_custom_metric_hidden_b [STABLE] (Deprecated since 1.16.0) this is the hidden metric B
-        		# TYPE test_enable_hidden_custom_metric_hidden_b gauge
-        		test_enable_hidden_custom_metric_hidden_b{name="value"} 1
-			`,
-		},
-	}
-
-	for _, test := range tests {
-		tc := test
-		t.Run(tc.name, func(t *testing.T) {
-			registry := newKubeRegistry(currentVersion)
-			customCollector := newTestCustomCollector(tc.descriptors...)
-			registry.CustomMustRegister(customCollector)
-
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetricsBeforeEnable), tc.metricNames...); err != nil {
-				t.Fatalf("before enable test failed: %v", err)
-			}
-
-			SetShowHidden()
-			defer func() {
-				showHiddenOnce = *new(sync.Once)
-				showHidden.Store(false)
-			}()
-
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetricsAfterEnable), tc.metricNames...); err != nil {
-				t.Fatalf("after enable test failed: %v", err)
-			}
-
-			// refresh descriptors so as to share with cases.
-			for _, d := range tc.descriptors {
-				d.ClearState()
-			}
-		})
-	}
 }
 
 func TestRegistryReset(t *testing.T) {
@@ -513,44 +465,6 @@ func TestRegistryReset(t *testing.T) {
 	}
 	registry.Reset()
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput), "reset_metric", "not_reset_metric"); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestDisabledMetrics(t *testing.T) {
-	o := NewOptions()
-	o.DisabledMetrics = []string{"should_be_disabled"}
-	o.Apply()
-	currentVersion := apimachineryversion.Info{
-		Major:      "1",
-		Minor:      "17",
-		GitVersion: "v1.17.1-alpha-1.12345",
-	}
-	registry := newKubeRegistry(currentVersion)
-	disabledMetric := NewCounterVec(&CounterOpts{
-		Name: "should_be_disabled",
-		Help: "this metric should be disabled",
-	}, []string{"label"})
-	// gauges cannot be reset
-	enabledMetric := NewGauge(&GaugeOpts{
-		Name: "should_be_enabled",
-		Help: "this metric should not be disabled",
-	})
-
-	registry.MustRegister(disabledMetric)
-	registry.MustRegister(enabledMetric)
-	disabledMetric.WithLabelValues("one").Inc()
-	disabledMetric.WithLabelValues("two").Inc()
-	disabledMetric.WithLabelValues("two").Inc()
-	enabledMetric.Inc()
-
-	enabledMetricOutput := `
-        # HELP should_be_enabled [ALPHA] this metric should not be disabled
-        # TYPE should_be_enabled gauge
-        should_be_enabled 1
-`
-
-	if err := testutil.GatherAndCompare(registry, strings.NewReader(enabledMetricOutput), "should_be_disabled", "should_be_enabled"); err != nil {
 		t.Fatal(err)
 	}
 }

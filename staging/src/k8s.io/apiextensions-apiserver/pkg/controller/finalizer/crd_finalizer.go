@@ -64,7 +64,7 @@ type CRDFinalizer struct {
 	crdSynced cache.InformerSynced
 
 	// To allow injection for testing.
-	syncFn func(key string) error
+	syncFn func(ctx context.Context, key string) error
 
 	queue workqueue.TypedRateLimitingInterface[string]
 }
@@ -109,7 +109,7 @@ func NewCRDFinalizer(
 	return c
 }
 
-func (c *CRDFinalizer) sync(key string) error {
+func (c *CRDFinalizer) sync(ctx context.Context, key string) error {
 	cachedCRD, err := c.crdLister.Get(key)
 	if apierrors.IsNotFound(err) {
 		return nil
@@ -132,7 +132,7 @@ func (c *CRDFinalizer) sync(key string) error {
 		Reason:  "InstanceDeletionInProgress",
 		Message: "CustomResource deletion is in progress",
 	})
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -152,10 +152,10 @@ func (c *CRDFinalizer) sync(key string) error {
 			Message: "instances overlap with built-in resources in storage",
 		})
 	} else if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
-		cond, deleteErr := c.deleteInstances(crd)
+		cond, deleteErr := c.deleteInstances(ctx, crd)
 		apiextensionshelpers.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
-			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{}); err != nil {
+			if _, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{}); err != nil {
 				utilruntime.HandleError(err)
 			}
 			return deleteErr
@@ -170,7 +170,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	apiextensionshelpers.CRDRemoveFinalizer(crd, apiextensionsv1.CustomResourceCleanupFinalizer)
-	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(ctx, crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -178,7 +178,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	return err
 }
 
-func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefinition) (apiextensionsv1.CustomResourceDefinitionCondition, error) {
+func (c *CRDFinalizer) deleteInstances(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) (apiextensionsv1.CustomResourceDefinitionCondition, error) {
 	// Now we can start deleting items. While it would be ideal to use a REST API client, doing so
 	// could incorrectly delete a ThirdPartyResource with the same URL as the CustomResource, so we go
 	// directly to the storage instead. Since we control the storage, we know that delete collection works.
@@ -193,7 +193,6 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 		}, err
 	}
 
-	ctx := genericapirequest.NewContext()
 	allResources, err := crClient.List(ctx, nil)
 	if err != nil {
 		return apiextensionsv1.CustomResourceDefinitionCondition{
@@ -243,7 +242,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 		if len(listObj.(*unstructured.UnstructuredList).Items) == 0 {
 			return true, nil
 		}
-		klog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
+		klog.FromContext(ctx).V(2).Info("Waiting for items to be removed", "resource", crd.Status.AcceptedNames.Plural, "group", crd.Spec.Group, "count", len(listObj.(*unstructured.UnstructuredList).Items))
 		return false, nil
 	})
 	if err != nil {
@@ -262,38 +261,46 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 	}, nil
 }
 
+// Run is a legacy wrapper that starts the controller.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *CRDFinalizer) Run(workers int, stopCh <-chan struct{}) {
+	c.RunWithContext(workers, wait.ContextForChannel(stopCh))
+}
+
+func (c *CRDFinalizer) RunWithContext(workers int, ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Info("Starting CRDFinalizer")
-	defer klog.Info("Shutting down CRDFinalizer")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting CRDFinalizer")
+	defer logger.Info("Shutting down CRDFinalizer")
 
-	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.crdSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *CRDFinalizer) runWorker() {
-	for c.processNextWorkItem() {
+func (c *CRDFinalizer) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *CRDFinalizer) processNextWorkItem() bool {
+func (c *CRDFinalizer) processNextWorkItem(ctx context.Context) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key)
+	err := c.syncFn(ctx, key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

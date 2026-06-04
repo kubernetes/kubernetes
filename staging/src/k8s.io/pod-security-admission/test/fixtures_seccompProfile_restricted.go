@@ -31,7 +31,7 @@ The check implementation looks at the appropriate value based on version.
 func init() {
 	fixtureData_restricted_1_19 := fixtureGenerator{
 		expectErrorSubstring: "seccompProfile",
-		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				tweak(p, func(p *corev1.Pod) {

@@ -20,7 +20,11 @@ package v1
 
 // ContainerUserApplyConfiguration represents a declarative configuration of the ContainerUser type for use
 // with apply.
+//
+// ContainerUser represents user identity information
 type ContainerUserApplyConfiguration struct {
+	// Linux holds user identity information initially attached to the first process of the containers in Linux.
+	// Note that the actual running identity can be changed if the process has enough privilege to do so.
 	Linux *LinuxContainerUserApplyConfiguration `json:"linux,omitempty"`
 }
 

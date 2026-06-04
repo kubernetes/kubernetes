@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -62,8 +63,15 @@ func (s *stringToStringValue) Type() string {
 }
 
 func (s *stringToStringValue) String() string {
+	keys := make([]string, 0, len(*s.value))
+	for k := range *s.value {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	records := make([]string, 0, len(*s.value)>>1)
-	for k, v := range *s.value {
+	for _, k := range keys {
+		v := (*s.value)[k]
 		records = append(records, k+"="+v)
 	}
 

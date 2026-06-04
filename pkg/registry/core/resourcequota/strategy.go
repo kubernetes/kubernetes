@@ -18,25 +18,27 @@ package resourcequota
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // resourcequotaStrategy implements behavior for ResourceQuota objects
 type resourcequotaStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating ResourceQuota
 // objects via the REST API.
-var Strategy = resourcequotaStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = resourcequotaStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for resourcequotas.
 func (resourcequotaStrategy) NamespaceScoped() bool {
@@ -74,9 +76,36 @@ func (resourcequotaStrategy) Validate(ctx context.Context, obj runtime.Object) f
 	return validation.ValidateResourceQuota(resourcequota)
 }
 
+// all known resource names that we want to check for request <= limit
+var knownResourceNames = []api.ResourceName{
+	api.ResourceCPU,
+	api.ResourceMemory,
+	api.ResourceStorage,
+	api.ResourceEphemeralStorage,
+}
+
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (resourcequotaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	resourcequota := obj.(*api.ResourceQuota)
+	var allWarnings []string
+	for _, resourceName := range knownResourceNames {
+		requestResourceName := api.ResourceName(fmt.Sprintf("requests.%s", resourceName))
+		request, requestOK := resourcequota.Spec.Hard[requestResourceName]
+		if !requestOK && (resourceName == api.ResourceCPU || resourceName == api.ResourceMemory) {
+			// try the bare name for cpu and memory
+			request, requestOK = resourcequota.Spec.Hard[resourceName]
+			if requestOK {
+				requestResourceName = resourceName
+			}
+		}
+		limitResourceName := api.ResourceName(fmt.Sprintf("limits.%s", resourceName))
+		limit, limitOK := resourcequota.Spec.Hard[limitResourceName]
+		if requestOK && limitOK && request.Cmp(limit) > 0 {
+			allWarnings = append(allWarnings, fmt.Sprintf("ResourceQuota %s (%s) should be less than %s (%s)",
+				requestResourceName, request.String(), limitResourceName, limit.String()))
+		}
+	}
+	return allWarnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -84,7 +113,7 @@ func (resourcequotaStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for resourcequotas.
-func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
+func (resourcequotaStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -99,7 +128,7 @@ func (resourcequotaStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 	return nil
 }
 
-func (resourcequotaStrategy) AllowUnconditionalUpdate() bool {
+func (resourcequotaStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

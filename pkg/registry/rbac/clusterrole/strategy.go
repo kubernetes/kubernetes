@@ -31,13 +31,13 @@ import (
 
 // strategy implements behavior for ClusterRoles
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // ClusterRole objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -51,7 +51,7 @@ func (strategy) NamespaceScoped() bool {
 }
 
 // AllowCreateOnUpdate is true for ClusterRoles.
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -93,8 +93,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldObj),
 	}
-	errorList := validation.ValidateClusterRole(newObj, opts)
-	return append(errorList, validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole), opts)...)
+	return validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -107,7 +106,7 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

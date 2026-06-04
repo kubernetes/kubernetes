@@ -20,13 +20,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ServiceAccountTokenCacheType is the type of cache key used for caching credentials returned by the plugin
+// when the service account token is used.
+type ServiceAccountTokenCacheType string
+
+const (
+	// TokenServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited
+	// to the input service account token's lifetime.
+	// For example, this must be used when returning the input service account token directly as a pull credential.
+	TokenServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Token"
+	// ServiceAccountServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. This should be set if the plugin's credential retrieval logic
+	// depends only on the service account and not on pod-specific claims.
+	// Use this when the returned credential is valid for all pods using the same service account.
+	ServiceAccountServiceAccountTokenCacheType ServiceAccountTokenCacheType = "ServiceAccount"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CredentialProviderConfig is the configuration containing information about
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials
@@ -117,6 +134,17 @@ type ServiceAccountTokenAttributes struct {
 	// +required
 	ServiceAccountTokenAudience string `json:"serviceAccountTokenAudience"`
 
+	// cacheType indicates the type of cache key use for caching the credentials returned by the plugin
+	// when the service account token is used.
+	// The most conservative option is to set this to "Token", which means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited to the service account
+	// token's lifetime.
+	// If the plugin's credential retrieval logic depends only on the service account and not on pod-specific claims,
+	// then the plugin can set this to "ServiceAccount". In this case, the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. Use this when the returned credential is valid for all pods using the same service account.
+	// +required
+	CacheType ServiceAccountTokenCacheType `json:"cacheType"`
+
 	// requireServiceAccount indicates whether the plugin requires the pod to have a service account.
 	// If set to true, kubelet will only invoke the plugin if the pod has a service account.
 	// If set to false, kubelet will invoke the plugin even if the pod does not have a service account
@@ -134,6 +162,8 @@ type ServiceAccountTokenAttributes struct {
 	// additional information required to fetch credentials or allow workloads to opt in to
 	// using service account tokens for image pull.
 	// If non-empty, requireServiceAccount must be set to true.
+	// Keys in this list must be unique.
+	// This list needs to be mutually exclusive with optionalServiceAccountAnnotationKeys.
 	// +optional
 	// +listType=set
 	RequiredServiceAccountAnnotationKeys []string `json:"requiredServiceAccountAnnotationKeys,omitempty"`
@@ -145,6 +175,7 @@ type ServiceAccountTokenAttributes struct {
 	// the existence of annotations and their values.
 	// This field is optional and may be empty. Plugins may use this field to extract
 	// additional information required to fetch credentials.
+	// Keys in this list must be unique.
 	// +optional
 	// +listType=set
 	OptionalServiceAccountAnnotationKeys []string `json:"optionalServiceAccountAnnotationKeys,omitempty"`

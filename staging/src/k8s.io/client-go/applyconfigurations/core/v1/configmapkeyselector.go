@@ -20,10 +20,16 @@ package v1
 
 // ConfigMapKeySelectorApplyConfiguration represents a declarative configuration of the ConfigMapKeySelector type for use
 // with apply.
+//
+// Selects a key from a ConfigMap.
 type ConfigMapKeySelectorApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Key                                    *string `json:"key,omitempty"`
-	Optional                               *bool   `json:"optional,omitempty"`
+	// The ConfigMap to select from.
+	LocalObjectReferenceApplyConfiguration `json:""`
+	// The key to select from the ConfigMap's Data field.
+	// Keys in the BinaryData field are not currently propagated to container env vars.
+	Key *string `json:"key,omitempty"`
+	// Specify whether the ConfigMap or its key must be defined
+	Optional *bool `json:"optional,omitempty"`
 }
 
 // ConfigMapKeySelectorApplyConfiguration constructs a declarative configuration of the ConfigMapKeySelector type for use with

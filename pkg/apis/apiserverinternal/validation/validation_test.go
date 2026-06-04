@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateServerStorageVersion(t *testing.T) {
@@ -209,7 +209,7 @@ func TestValidateStorageVersionStatus(t *testing.T) {
 				EncodingVersion:   "v1alpha1",
 				DecodableVersions: []string{"v1alpha1", "v1"},
 			}},
-			CommonEncodingVersion: pointer.String("v1alpha1"),
+			CommonEncodingVersion: ptr.To("v1alpha1"),
 		},
 		expectedErr: "",
 	}, {
@@ -223,7 +223,7 @@ func TestValidateStorageVersionStatus(t *testing.T) {
 				EncodingVersion:   "v1beta1",
 				DecodableVersions: []string{"v1alpha1", "v1"},
 			}},
-			CommonEncodingVersion: pointer.String("v1alpha1"),
+			CommonEncodingVersion: ptr.To("v1alpha1"),
 		},
 		expectedErr: "storageVersions[1].apiServerID: Duplicate value: \"1\"",
 	}}
@@ -280,7 +280,7 @@ func TestValidateCommonVersion(t *testing.T) {
 			}},
 			CommonEncodingVersion: nil,
 		},
-		expectedErr: "Invalid value: \"null\": the common encoding version is v1alpha1",
+		expectedErr: "Invalid value: null: the common encoding version is v1alpha1",
 	}, {
 		status: apiserverinternal.StorageVersionStatus{
 			StorageVersions: []apiserverinternal.ServerStorageVersion{{
@@ -360,14 +360,14 @@ func TestValidateStorageVersionCondition(t *testing.T) {
 			Status:  "True",
 			Message: "unknown",
 		}},
-		expectedErr: "Required value: reason cannot be empty",
+		expectedErr: "Required value",
 	}, {
 		conditions: []apiserverinternal.StorageVersionCondition{{
 			Type:   "fea",
 			Status: "True",
 			Reason: "unknown",
 		}},
-		expectedErr: "Required value: message cannot be empty",
+		expectedErr: "Required value",
 	}, {
 		conditions: []apiserverinternal.StorageVersionCondition{{
 			Type:    "fea",

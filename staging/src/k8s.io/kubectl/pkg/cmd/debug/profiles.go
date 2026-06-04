@@ -43,6 +43,8 @@ const (
 	// --profile flag's help text
 
 	// ProfileLegacy represents the legacy debugging profile which is backwards-compatible with 1.23 behavior.
+	//
+	// Deprecated: legacyProfile is planned to be removed in v1.39.
 	ProfileLegacy = "legacy"
 	// ProfileGeneral contains a reasonable set of defaults tailored for each debugging journey.
 	ProfileGeneral = "general"

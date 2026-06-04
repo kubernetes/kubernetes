@@ -19,16 +19,14 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
-
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (
@@ -79,13 +77,11 @@ func runKubeletStart(c workflow.RunData) error {
 	}
 
 	// Write the instance kubelet configuration file to disk.
-	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
-		kubeletConfig := &kubeletconfig.KubeletConfiguration{
-			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
-		}
-		if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
-			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
-		}
+	kubeletConfig := &kubeletconfig.KubeletConfiguration{
+		ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
+	}
+	if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
+		return errors.Wrap(err, "error writing instance kubelet configuration to disk")
 	}
 
 	// Write the kubelet configuration file to disk.

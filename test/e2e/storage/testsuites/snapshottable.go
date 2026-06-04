@@ -315,7 +315,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 					framework.ExpectNoError(err)
 					volumesInUse := node.Status.VolumesInUse
 					framework.Logf("current volumes in use: %+v", volumesInUse)
-					for i := 0; i < len(volumesInUse); i++ {
+					for i := range volumesInUse {
 						if strings.HasSuffix(string(volumesInUse[i]), volumeName) {
 							return false
 						}
@@ -404,7 +404,7 @@ func deleteVolumeSnapshot(ctx context.Context, f *framework.Framework, dc dynami
 	vs := sr.Vs
 
 	// Wait for the Snapshot to be actually deleted from API server
-	err := storageutils.WaitForNamespacedGVRDeletion(ctx, dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetNamespace(), framework.Poll, f.Timeouts.SnapshotDelete)
+	err := storageutils.WaitForNamespacedGVRDeletion(ctx, dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
 	framework.ExpectNoError(err)
 
 	switch pattern.SnapshotDeletionPolicy {

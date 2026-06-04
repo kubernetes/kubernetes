@@ -160,7 +160,7 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 
 	// Set the emulation version mapping from the "Wardle" component to the kube component.
 	// This ensures that the emulation version of the latter is determined by the emulation version of the former.
-	utilruntime.Must(defaults.ComponentGlobalsRegistry.SetEmulationVersionMapping(apiserver.WardleComponentName, basecompatibility.DefaultKubeComponent, WardleVersionToKubeVersion))
+	utilruntime.Must(defaults.ComponentGlobalsRegistry.SetVersionMapping(apiserver.WardleComponentName, basecompatibility.DefaultKubeComponent, WardleVersionToKubeVersion))
 
 	defaults.ComponentGlobalsRegistry.AddFlags(flags)
 

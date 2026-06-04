@@ -53,7 +53,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 		The endpointslices mirrorowing must mirror endpoint create, update, and delete actions.
 	*/
 	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func(ctx context.Context) {
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
 			},
@@ -64,7 +64,9 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 					Protocol: v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		endpoints := &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
@@ -204,7 +206,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 
 	ginkgo.It("should mirror a custom Endpoint with multiple subsets and same IP address", func(ctx context.Context) {
 		ns := f.Namespace.Name
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
 			},
@@ -222,7 +224,9 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 					},
 				},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Add a backend pod to the service in the other node
 		port8080 := []v1.ContainerPort{

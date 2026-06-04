@@ -15,10 +15,10 @@
 package rafthttp
 
 import (
-	"go.etcd.io/etcd/client/pkg/v3/types"
-	"go.etcd.io/etcd/raft/v3/raftpb"
-
 	"go.uber.org/zap"
+
+	"go.etcd.io/etcd/client/pkg/v3/types"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 type remote struct {
@@ -51,7 +51,7 @@ func startRemote(tr *Transport, urls types.URLs, id types.ID) *remote {
 	}
 }
 
-func (g *remote) send(m raftpb.Message) {
+func (g *remote) send(m *raftpb.Message) {
 	select {
 	case g.pipeline.msgc <- m:
 	default:
@@ -59,9 +59,9 @@ func (g *remote) send(m raftpb.Message) {
 			if g.lg != nil {
 				g.lg.Warn(
 					"dropped internal Raft message since sending buffer is full (overloaded network)",
-					zap.String("message-type", m.Type.String()),
+					zap.String("message-type", m.GetType().String()),
 					zap.String("local-member-id", g.localID.String()),
-					zap.String("from", types.ID(m.From).String()),
+					zap.String("from", types.ID(m.GetFrom()).String()),
 					zap.String("remote-peer-id", g.id.String()),
 					zap.Bool("remote-peer-active", g.status.isActive()),
 				)
@@ -70,15 +70,15 @@ func (g *remote) send(m raftpb.Message) {
 			if g.lg != nil {
 				g.lg.Warn(
 					"dropped Raft message since sending buffer is full (overloaded network)",
-					zap.String("message-type", m.Type.String()),
+					zap.String("message-type", m.GetType().String()),
 					zap.String("local-member-id", g.localID.String()),
-					zap.String("from", types.ID(m.From).String()),
+					zap.String("from", types.ID(m.GetFrom()).String()),
 					zap.String("remote-peer-id", g.id.String()),
 					zap.Bool("remote-peer-active", g.status.isActive()),
 				)
 			}
 		}
-		sentFailures.WithLabelValues(types.ID(m.To).String()).Inc()
+		sentFailures.WithLabelValues(types.ID(m.GetTo()).String()).Inc()
 	}
 }
 

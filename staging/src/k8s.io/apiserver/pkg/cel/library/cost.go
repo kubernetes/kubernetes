@@ -421,26 +421,22 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			return &checker.CallEstimate{CostEstimate: strCost.Multiply(regexCost), ResultSize: &checker.SizeEstimate{Min: 0, Max: sz.Max}}
 		}
 	case "cidr", "isIP", "isCIDR":
-		if target != nil {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 		}
 	case "ip":
-		if target != nil && len(args) >= 1 {
-			if overloadId == "cidr_ip" {
-				// The IP member of the CIDR object is just accessing a field.
-				// Nominal cost.
-				return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
-			}
-
-			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
-		} else if target != nil {
-			// The IP member of a CIDR is a just accessing a field, nominal cost.
+		if overloadId == "cidr_ip" {
+			// The IP member of the CIDR object is just accessing a field.
+			// Nominal cost.
 			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 		}
+		if len(args) >= 1 {
+			sz := l.sizeEstimate(args[0])
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+		}
 	case "ip.isCanonical":
-		if target != nil && len(args) >= 1 {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			// We have to parse the string and then compare the parsed string to the original string.
 			// So we double the cost of parsing the string.
@@ -450,7 +446,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		// IP and CIDR accessors are nominal cost.
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "containsIP":
-		if target != nil && len(args) >= 1 {
+		if len(args) >= 1 {
 			// The base cost of the function is the cost of comparing two byte lists.
 			// The byte lists will be either ipv4 or ipv6 so will have a length of 4, or 16 bytes.
 			sz := checker.SizeEstimate{Min: 4, Max: 16}
@@ -466,7 +462,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
 	case "containsCIDR":
-		if target != nil && len(args) >= 1 {
+		if len(args) >= 1 {
 			// The base cost of the function is the cost of comparing two byte lists.
 			// The byte lists will be either ipv4 or ipv6 so will have a length of 4, or 16 bytes.
 			sz := checker.SizeEstimate{Min: 4, Max: 16}
@@ -488,12 +484,12 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
 	case "quantity", "isQuantity", "semver", "isSemver":
-		if target != nil {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 		}
 	case "validate":
-		if target != nil {
+		if len(args) >= 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor).MultiplyByCostFactor(cel.MaxNameFormatRegexSize * common.RegexStringLengthCostFactor)}
 		}

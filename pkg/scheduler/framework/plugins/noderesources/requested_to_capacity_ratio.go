@@ -19,8 +19,8 @@ package noderesources
 import (
 	"math"
 
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
@@ -28,7 +28,7 @@ const maxUtilization = 100
 
 // buildRequestedToCapacityRatioScorerFunction allows users to apply bin packing
 // on core resources like CPU, Memory as well as extended resources like accelerators.
-func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resources []config.ResourceSpec) func([]int64, []int64) int64 {
+func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resources []config.ResourceSpec) func([]int64, []int64, []int64) int64 {
 	rawScoringFunction := helper.BuildBrokenLinearFunction(scoringFunctionShape)
 	resourceScoringFunction := func(requested, capacity int64) int64 {
 		if capacity == 0 || requested > capacity {
@@ -37,7 +37,7 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 
 		return rawScoringFunction(requested * maxUtilization / capacity)
 	}
-	return func(requested, allocable []int64) int64 {
+	return func(requested, _, allocable []int64) int64 {
 		var nodeScore, weightSum int64
 		for i := range requested {
 			if allocable[i] == 0 {
@@ -57,7 +57,7 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 	}
 }
 
-func requestedToCapacityRatioScorer(resources []config.ResourceSpec, shape []config.UtilizationShapePoint) func([]int64, []int64) int64 {
+func requestedToCapacityRatioScorer(resources []config.ResourceSpec, shape []config.UtilizationShapePoint) func([]int64, []int64, []int64) int64 {
 	shapes := make([]helper.FunctionShapePoint, 0, len(shape))
 	for _, point := range shape {
 		shapes = append(shapes, helper.FunctionShapePoint{
@@ -65,7 +65,7 @@ func requestedToCapacityRatioScorer(resources []config.ResourceSpec, shape []con
 			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
 			// therefore we need to scale the score returned by requested to capacity ratio to the score range
 			// used by the scheduler.
-			Score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+			Score: int64(point.Score) * (fwk.MaxNodeScore / config.MaxCustomPriorityScore),
 		})
 	}
 

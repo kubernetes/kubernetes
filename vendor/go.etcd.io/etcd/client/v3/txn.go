@@ -18,9 +18,9 @@ import (
 	"context"
 	"sync"
 
-	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-
 	"google.golang.org/grpc"
+
+	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 )
 
 // Txn is the interface that wraps mini-transactions.
@@ -89,7 +89,8 @@ func (txn *txn) If(cs ...Cmp) Txn {
 	txn.cif = true
 
 	for i := range cs {
-		txn.cmps = append(txn.cmps, (*pb.Compare)(&cs[i]))
+		cmp := cs[i].Clone()
+		txn.cmps = append(txn.cmps, cmp.GetCompare())
 	}
 
 	return txn

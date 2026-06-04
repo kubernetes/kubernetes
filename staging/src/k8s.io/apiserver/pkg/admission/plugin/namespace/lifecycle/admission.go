@@ -54,7 +54,7 @@ const (
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewLifecycle(sets.NewString(metav1.NamespaceDefault, metav1.NamespaceSystem, metav1.NamespacePublic))
+		return NewLifecycle(sets.New[string](metav1.NamespaceDefault, metav1.NamespaceSystem, metav1.NamespacePublic))
 	})
 }
 
@@ -63,7 +63,7 @@ func Register(plugins *admission.Plugins) {
 type Lifecycle struct {
 	*admission.Handler
 	client             kubernetes.Interface
-	immortalNamespaces sets.String
+	immortalNamespaces sets.Set[string]
 	namespaceLister    corelisters.NamespaceLister
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
 	// if a namespace is in this cache, then we will ignore our local state and always fetch latest from api server.
@@ -186,11 +186,11 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 }
 
 // NewLifecycle creates a new namespace Lifecycle admission control handler
-func NewLifecycle(immortalNamespaces sets.String) (*Lifecycle, error) {
+func NewLifecycle(immortalNamespaces sets.Set[string]) (*Lifecycle, error) {
 	return newLifecycleWithClock(immortalNamespaces, clock.RealClock{})
 }
 
-func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock) (*Lifecycle, error) {
+func newLifecycleWithClock(immortalNamespaces sets.Set[string], clock utilcache.Clock) (*Lifecycle, error) {
 	forceLiveLookupCache := utilcache.NewLRUExpireCacheWithClock(100, clock)
 	return &Lifecycle{
 		Handler:              admission.NewHandler(admission.Create, admission.Update, admission.Delete),

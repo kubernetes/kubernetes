@@ -34,16 +34,12 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.DeviceTaintRuleList{}, func(obj interface{}) {
 		SetObjectDefaults_DeviceTaintRuleList(obj.(*resourcev1alpha3.DeviceTaintRuleList))
 	})
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*resourcev1alpha3.ResourceClaim)) })
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*resourcev1alpha3.ResourceClaimList)) })
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimTemplate{}, func(obj interface{}) {
-		SetObjectDefaults_ResourceClaimTemplate(obj.(*resourcev1alpha3.ResourceClaimTemplate))
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourcePoolStatusRequest{}, func(obj interface{}) {
+		SetObjectDefaults_ResourcePoolStatusRequest(obj.(*resourcev1alpha3.ResourcePoolStatusRequest))
 	})
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimTemplateList{}, func(obj interface{}) {
-		SetObjectDefaults_ResourceClaimTemplateList(obj.(*resourcev1alpha3.ResourceClaimTemplateList))
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourcePoolStatusRequestList{}, func(obj interface{}) {
+		SetObjectDefaults_ResourcePoolStatusRequestList(obj.(*resourcev1alpha3.ResourcePoolStatusRequestList))
 	})
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceSlice{}, func(obj interface{}) { SetObjectDefaults_ResourceSlice(obj.(*resourcev1alpha3.ResourceSlice)) })
-	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceSliceList{}, func(obj interface{}) { SetObjectDefaults_ResourceSliceList(obj.(*resourcev1alpha3.ResourceSliceList)) })
 	return nil
 }
 
@@ -58,92 +54,17 @@ func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1alpha3.DeviceTaintRuleL
 	}
 }
 
-func SetObjectDefaults_ResourceClaim(in *resourcev1alpha3.ResourceClaim) {
-	for i := range in.Spec.Devices.Requests {
-		a := &in.Spec.Devices.Requests[i]
-		SetDefaults_DeviceRequest(a)
-		for j := range a.FirstAvailable {
-			b := &a.FirstAvailable[j]
-			SetDefaults_DeviceSubRequest(b)
-			for k := range b.Tolerations {
-				c := &b.Tolerations[k]
-				if c.Operator == "" {
-					c.Operator = "Equal"
-				}
-			}
-		}
-		for j := range a.Tolerations {
-			b := &a.Tolerations[j]
-			if b.Operator == "" {
-				b.Operator = "Equal"
-			}
-		}
-	}
-	if in.Status.Allocation != nil {
-		for i := range in.Status.Allocation.Devices.Results {
-			a := &in.Status.Allocation.Devices.Results[i]
-			for j := range a.Tolerations {
-				b := &a.Tolerations[j]
-				if b.Operator == "" {
-					b.Operator = "Equal"
-				}
-			}
-		}
+func SetObjectDefaults_ResourcePoolStatusRequest(in *resourcev1alpha3.ResourcePoolStatusRequest) {
+	SetDefaults_ResourcePoolStatusRequestSpec(&in.Spec)
+	if in.Spec.Limit == nil {
+		var ptrVar1 int32 = 100
+		in.Spec.Limit = &ptrVar1
 	}
 }
 
-func SetObjectDefaults_ResourceClaimList(in *resourcev1alpha3.ResourceClaimList) {
+func SetObjectDefaults_ResourcePoolStatusRequestList(in *resourcev1alpha3.ResourcePoolStatusRequestList) {
 	for i := range in.Items {
 		a := &in.Items[i]
-		SetObjectDefaults_ResourceClaim(a)
-	}
-}
-
-func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1alpha3.ResourceClaimTemplate) {
-	for i := range in.Spec.Spec.Devices.Requests {
-		a := &in.Spec.Spec.Devices.Requests[i]
-		SetDefaults_DeviceRequest(a)
-		for j := range a.FirstAvailable {
-			b := &a.FirstAvailable[j]
-			SetDefaults_DeviceSubRequest(b)
-			for k := range b.Tolerations {
-				c := &b.Tolerations[k]
-				if c.Operator == "" {
-					c.Operator = "Equal"
-				}
-			}
-		}
-		for j := range a.Tolerations {
-			b := &a.Tolerations[j]
-			if b.Operator == "" {
-				b.Operator = "Equal"
-			}
-		}
-	}
-}
-
-func SetObjectDefaults_ResourceClaimTemplateList(in *resourcev1alpha3.ResourceClaimTemplateList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ResourceClaimTemplate(a)
-	}
-}
-
-func SetObjectDefaults_ResourceSlice(in *resourcev1alpha3.ResourceSlice) {
-	for i := range in.Spec.Devices {
-		a := &in.Spec.Devices[i]
-		if a.Basic != nil {
-			for j := range a.Basic.Taints {
-				b := &a.Basic.Taints[j]
-				SetDefaults_DeviceTaint(b)
-			}
-		}
-	}
-}
-
-func SetObjectDefaults_ResourceSliceList(in *resourcev1alpha3.ResourceSliceList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ResourceSlice(a)
+		SetObjectDefaults_ResourcePoolStatusRequest(a)
 	}
 }

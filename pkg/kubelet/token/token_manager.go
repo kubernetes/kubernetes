@@ -206,5 +206,14 @@ func keyFunc(name, namespace string, tr *authenticationv1.TokenRequest) string {
 		ref = *tr.Spec.BoundObjectRef
 	}
 
-	return fmt.Sprintf("%q/%q/%#v/%#v/%#v", name, namespace, tr.Spec.Audiences, exp, ref)
+	var uid types.UID
+	if len(tr.UID) > 0 {
+		// If UID is set in the token request it is used as a precondition
+		// to ensure that the token request is for the same service account.
+		// This is useful to prevent stale tokens from being returned after a service account
+		// is deleted and recreated with the same name.
+		uid = tr.UID
+	}
+
+	return fmt.Sprintf("%q/%q/%#v/%#v/%#v/%q", name, namespace, tr.Spec.Audiences, exp, ref, uid)
 }

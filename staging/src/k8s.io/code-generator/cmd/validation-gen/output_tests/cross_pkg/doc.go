@@ -21,6 +21,7 @@ limitations under the License.
 //nolint:unused
 
 // This is a test package.
+// +k8s:validation-gen-nolint
 package crosspkg
 
 import (

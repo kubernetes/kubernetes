@@ -116,7 +116,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 
 			container, fieldPath := podcmd.FindContainerByName(t, currOpts.Container)
 			if container == nil {
-				return nil, fmt.Errorf("container %s is not valid for pod %s", currOpts.Container, t.Name)
+				return nil, fmt.Errorf("container %s is not valid for pod %s out of: %s", currOpts.Container, t.Name, podcmd.AllContainerNames(t))
 			}
 			ref, err := reference.GetPartialReference(scheme.Scheme, t, fieldPath)
 			if err != nil {

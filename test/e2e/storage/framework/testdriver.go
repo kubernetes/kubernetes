@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -131,7 +130,12 @@ type SnapshottableTestDriver interface {
 	GetSnapshotClass(ctx context.Context, config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured
 }
 
-type VoulmeGroupSnapshottableTestDriver interface {
+type SnapshotMetadataTestDriver interface {
+	TestDriver
+}
+
+// VolumeGroupSnapshottableTestDriver represents an interface for a TestDriver that supports DynamicGroupSnapshot
+type VolumeGroupSnapshottableTestDriver interface {
 	TestDriver
 	// GetVolumeGroupSnapshotClass returns a VolumeGroupSnapshotClass to create group snapshot.
 	GetVolumeGroupSnapshotClass(ctx context.Context, config *PerTestConfig, parameters map[string]string) *unstructured.Unstructured
@@ -143,7 +147,7 @@ type VolumeAttributesClassTestDriver interface {
 	TestDriver
 	// GetVolumeAttributesClass returns a VolumeAttributesClass to create/modify PVCs
 	// It will return nil if the TestDriver does not support VACs
-	GetVolumeAttributesClass(ctx context.Context, config *PerTestConfig) *storagev1beta1.VolumeAttributesClass
+	GetVolumeAttributesClass(ctx context.Context, config *PerTestConfig) *storagev1.VolumeAttributesClass
 }
 
 // CustomTimeoutsTestDriver represents an interface fo a TestDriver that supports custom timeouts.
@@ -171,6 +175,7 @@ const (
 	CapVolumeMountGroup    Capability = "volumeMountGroup"   // Driver has the VolumeMountGroup CSI node capability. Because this is a FSGroup feature, the fsGroup capability must also be set to true.
 	CapExec                Capability = "exec"               // exec a file in the volume
 	CapSnapshotDataSource  Capability = "snapshotDataSource" // support populate data from snapshot
+	CapSnapshotMetadata    Capability = "snapshotMetadata"   // support snapshot metadata
 	CapVolumeGroupSnapshot Capability = "groupSnapshot"      // support group snapshot
 	CapPVCDataSource       Capability = "pvcDataSource"      // support populate data from pvc
 
@@ -225,6 +230,9 @@ const (
 
 	// The driver supports ReadOnlyMany (ROX) access mode
 	CapReadOnlyMany Capability = "capReadOnlyMany"
+
+	// The driver supports SELinuxMount feature
+	CapSELinuxMount Capability = "seLinuxMount"
 )
 
 // DriverInfo represents static information about a TestDriver.
@@ -264,8 +272,12 @@ type DriverInfo struct {
 	StressTestOptions *StressTestOptions
 	// [Optional] Scale parameters for volume snapshot stress tests.
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
+	// [Optional] Scale parameters for volume modify stress tests.
+	VolumeModifyStressTestOptions *VolumeModifyStressTestOptions
 	// [Optional] Parameters for performance tests
 	PerformanceTestOptions *PerformanceTestOptions
+	// [Optional] Scale parameters for volume group snapshot stress tests.
+	VolumeGroupSnapshotStressTestOptions *VolumeGroupSnapshotStressTestOptions
 }
 
 // StressTestOptions contains parameters used for stress tests.
@@ -284,6 +296,13 @@ type VolumeSnapshotStressTestOptions struct {
 	NumPods int
 	// Number of snapshots to create for each volume.
 	NumSnapshots int
+}
+
+// VolumeModifyStressTestOptions contains parameters used for volume modify stress tests.
+type VolumeModifyStressTestOptions struct {
+	// Number of pods to create in the test. This may also create
+	// up to 1 volume with volumeAttributesClass per pod.
+	NumPods int
 }
 
 // Metrics to evaluate performance of an operation
@@ -305,4 +324,13 @@ type PerformanceTestProvisioningOptions struct {
 // PerformanceTestOptions contains parameters used for performance tests
 type PerformanceTestOptions struct {
 	ProvisioningOptions *PerformanceTestProvisioningOptions
+}
+
+// VolumeGroupSnapshotStressTestOptions contains parameters used for volume group snapshot stress tests.
+type VolumeGroupSnapshotStressTestOptions struct {
+	// Number of pods to create in the StatefulSet. This will create
+	// that many PVCs with the same label for group snapshotting.
+	NumPods int
+	// Number of volume group snapshots to create.
+	NumSnapshots int
 }

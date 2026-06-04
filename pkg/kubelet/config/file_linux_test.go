@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -40,24 +39,26 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
-	ch := make(chan interface{}, 1)
+	logger, _ := ktesting.NewTestContext(t)
+	ch := make(chan sourceUpdate, 1)
 	lw := newSourceFile("/some/fake/file", "localhost", time.Millisecond, ch)
-	err := lw.doWatch()
+	err := lw.doWatch(logger)
 	if err == nil {
 		t.Errorf("Expected error")
 	}
 }
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
-	ch := make(chan interface{})
-	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
+	logger, _ := ktesting.NewTestContext(t)
+	ch := make(chan sourceUpdate)
+	NewSourceFile(logger, "random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
-	case got := <-ch:
-		update := got.(kubetypes.PodUpdate)
-		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
+	case update := <-ch:
+		expected := createSourceUpdate() // Expect empty update.
 		if !apiequality.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("expected %#v, Got %#v", expected, update)
 		}
@@ -68,6 +69,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 }
 
 func TestReadPodsFromFileExistAlready(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -80,11 +82,10 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 			defer os.RemoveAll(dirName)
 			file := testCase.writeToFile(dirName, "test_pod_manifest", t)
 
-			ch := make(chan interface{})
-			NewSourceFile(file, hostname, time.Millisecond, ch)
+			ch := make(chan sourceUpdate)
+			NewSourceFile(logger, file, hostname, time.Millisecond, ch)
 			select {
-			case got := <-ch:
-				update := got.(kubetypes.PodUpdate)
+			case update := <-ch:
 				for _, pod := range update.Pods {
 					// TODO: remove the conversion when validation is performed on versioned objects.
 					internalPod := &api.Pod{}
@@ -138,7 +139,7 @@ type testCase struct {
 	lock     *sync.Mutex
 	desc     string
 	pod      runtime.Object
-	expected kubetypes.PodUpdate
+	expected sourceUpdate
 }
 
 func getTestCases(hostname types.NodeName) []*testCase {
@@ -167,7 +168,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					Phase: v1.PodPending,
 				},
 			},
-			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &v1.Pod{
+			expected: createSourceUpdate(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-" + string(hostname),
 					UID:         "12345",
@@ -228,6 +229,7 @@ func createSymbolicLink(link, target, name string, t *testing.T) string {
 }
 
 func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -251,11 +253,11 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 				createSymbolicLink(dirName, linkedDirName, fileName, t)
 			}
 
-			ch := make(chan interface{})
+			ch := make(chan sourceUpdate)
 			if watchDir {
-				NewSourceFile(dirName, hostname, 100*time.Millisecond, ch)
+				NewSourceFile(logger, dirName, hostname, 100*time.Millisecond, ch)
 			} else {
-				NewSourceFile(filepath.Join(dirName, fileName), hostname, 100*time.Millisecond, ch)
+				NewSourceFile(logger, filepath.Join(dirName, fileName), hostname, 100*time.Millisecond, ch)
 			}
 			expectEmptyUpdate(t, ch)
 
@@ -281,6 +283,7 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 }
 
 func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -305,7 +308,7 @@ func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *test
 			}
 
 			var file string
-			ch := make(chan interface{})
+			ch := make(chan sourceUpdate)
 			func() {
 				testCase.lock.Lock()
 				defer testCase.lock.Unlock()
@@ -319,9 +322,9 @@ func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *test
 			}()
 
 			if watchDir {
-				NewSourceFile(dirName, hostname, period, ch)
+				NewSourceFile(logger, dirName, hostname, period, ch)
 			} else {
-				NewSourceFile(file, hostname, period, ch)
+				NewSourceFile(logger, file, hostname, period, ch)
 			}
 
 			// await fsnotify to be ready
@@ -359,12 +362,11 @@ func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *test
 	}
 }
 
-func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
+func expectUpdate(t *testing.T, ch chan sourceUpdate, testCase *testCase) {
 	timer := time.After(5 * time.Second)
 	for {
 		select {
-		case got := <-ch:
-			update := got.(kubetypes.PodUpdate)
+		case update := <-ch:
 			if len(update.Pods) == 0 {
 				// filter out the empty updates from reading a non-existing path
 				continue
@@ -390,12 +392,11 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 	}
 }
 
-func expectEmptyUpdate(t *testing.T, ch chan interface{}) {
+func expectEmptyUpdate(t *testing.T, ch chan sourceUpdate) {
 	timer := time.After(5 * time.Second)
 	for {
 		select {
-		case got := <-ch:
-			update := got.(kubetypes.PodUpdate)
+		case update := <-ch:
 			if len(update.Pods) != 0 {
 				t.Fatalf("expected empty update, got %#v", update)
 			}

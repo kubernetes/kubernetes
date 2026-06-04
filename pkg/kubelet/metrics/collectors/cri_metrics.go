@@ -41,7 +41,8 @@ var _ metrics.StableCollector = &criMetricsCollector{}
 func NewCRIMetricsCollector(ctx context.Context, listPodSandboxMetricsFn func(context.Context) ([]*runtimeapi.PodSandboxMetrics, error), listMetricDescriptorsFn func(context.Context) ([]*runtimeapi.MetricDescriptor, error)) metrics.StableCollector {
 	descs, err := listMetricDescriptorsFn(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Error reading MetricDescriptors")
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "Error reading MetricDescriptors")
 		return &criMetricsCollector{
 			listPodSandboxMetricsFn: listPodSandboxMetricsFn,
 		}
@@ -68,22 +69,26 @@ func (c *criMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 // Collect implements the metrics.CollectWithStability interface.
 // TODO(haircommander): would it be better if these were processed async?
 func (c *criMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	podMetrics, err := c.listPodSandboxMetricsFn(context.Background())
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	podMetrics, err := c.listPodSandboxMetricsFn(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get pod metrics")
+		logger.Error(err, "Failed to get pod metrics")
 		return
 	}
 
 	for _, podMetric := range podMetrics {
 		for _, metric := range podMetric.GetMetrics() {
-			promMetric, err := c.criMetricToProm(metric)
+			promMetric, err := c.criMetricToProm(logger, metric)
 			if err == nil {
 				ch <- promMetric
 			}
 		}
 		for _, ctrMetric := range podMetric.GetContainerMetrics() {
 			for _, metric := range ctrMetric.GetMetrics() {
-				promMetric, err := c.criMetricToProm(metric)
+				promMetric, err := c.criMetricToProm(logger, metric)
 				if err == nil {
 					ch <- promMetric
 				}
@@ -98,11 +103,11 @@ func criDescToProm(m *runtimeapi.MetricDescriptor) *metrics.Desc {
 	return metrics.NewDesc(m.Name, m.Help, m.LabelKeys, nil, metrics.INTERNAL, "")
 }
 
-func (c *criMetricsCollector) criMetricToProm(m *runtimeapi.Metric) (metrics.Metric, error) {
+func (c *criMetricsCollector) criMetricToProm(logger klog.Logger, m *runtimeapi.Metric) (metrics.Metric, error) {
 	desc, ok := c.descriptors[m.Name]
 	if !ok {
 		err := fmt.Errorf("error converting CRI Metric to prometheus format")
-		klog.V(5).ErrorS(err, "Descriptor not present in pre-populated list of descriptors", "name", m.Name)
+		logger.V(5).Info("Descriptor not present in pre-populated list of descriptors", "name", m.Name, "err", err)
 		return nil, err
 	}
 
@@ -110,7 +115,7 @@ func (c *criMetricsCollector) criMetricToProm(m *runtimeapi.Metric) (metrics.Met
 
 	pm, err := metrics.NewConstMetric(desc, typ, float64(m.GetValue().Value), m.LabelValues...)
 	if err != nil {
-		klog.ErrorS(err, "Error getting CRI prometheus metric", "descriptor", desc.String())
+		logger.Error(err, "Error getting CRI prometheus metric", "descriptor", desc.String())
 		return nil, err
 	}
 	// If Timestamp is 0, then the runtime did not cache the result.

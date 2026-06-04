@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -390,15 +391,34 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: nil,
 		localEndpoints:   sets.New[string]("10.0.0.1:80"),
 		allEndpoints:     sets.New[string]("10.0.0.1:80"),
+	}, {
+		name:             "empty endpoints when no service endpoints exist",
+		serviceInfo:      &BaseServicePortInfo{},
+		endpoints:        nil,
+		clusterEndpoints: nil,
+		localEndpoints:   nil,
+		allEndpoints:     nil,
+	}, {
+		name:        "single endpoint not ready, not serving, not terminating",
+		nodeLabels:  map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo: &BaseServicePortInfo{},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{endpoint: "10.0.0.0:80", ready: false, serving: false, terminating: false},
+		},
+		clusterEndpoints: sets.New[string](),
+		localEndpoints:   nil,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.preferSameEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.preferSameEnabled)
 
 			clusterEndpoints, localEndpoints, allEndpoints, hasAnyEndpoints := CategorizeEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeName, tc.nodeLabels)
 
-			if tc.clusterEndpoints == nil && clusterEndpoints != nil {
+			if len(tc.clusterEndpoints) == 0 && len(clusterEndpoints) != 0 {
 				t.Errorf("expected no cluster endpoints but got %v", clusterEndpoints)
 			} else {
 				err := checkExpectedEndpoints(tc.clusterEndpoints, clusterEndpoints)
@@ -407,7 +427,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 				}
 			}
 
-			if tc.localEndpoints == nil && localEndpoints != nil {
+			if len(tc.localEndpoints) == 0 && len(localEndpoints) != 0 {
 				t.Errorf("expected no local endpoints but got %v", localEndpoints)
 			} else {
 				err := checkExpectedEndpoints(tc.localEndpoints, localEndpoints)
@@ -417,9 +437,9 @@ func TestCategorizeEndpoints(t *testing.T) {
 			}
 
 			var expectedAllEndpoints sets.Set[string]
-			if tc.clusterEndpoints != nil && tc.localEndpoints == nil {
+			if len(tc.clusterEndpoints) != 0 && len(tc.localEndpoints) == 0 {
 				expectedAllEndpoints = tc.clusterEndpoints
-			} else if tc.localEndpoints != nil && tc.clusterEndpoints == nil {
+			} else if len(tc.localEndpoints) != 0 && len(tc.clusterEndpoints) == 0 {
 				expectedAllEndpoints = tc.localEndpoints
 			} else {
 				expectedAllEndpoints = tc.allEndpoints

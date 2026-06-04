@@ -32,7 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-var _ = SIGDescribe("Terminate Pods", func() {
+var _ = SIGDescribe("Terminate Pods", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("terminate-pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -78,7 +78,7 @@ var _ = SIGDescribe("Terminate Pods", func() {
 				}
 			}
 			return false
-		}, 20*time.Second, 1*time.Second).Should(gomega.BeTrueBecause("expected container to be ready"))
+		}, 20*time.Second, 1*time.Second).Should(gomega.BeTrueBecause("expected container to be not ready"))
 
 		err := client.Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 

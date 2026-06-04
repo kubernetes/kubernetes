@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: docker.io/library/redis:5.0.5-alpine
+        image: registry.k8s.io/e2e-test-images/redis:5.0.5-alpine
         resources:
           requests:
             cpu: 100m

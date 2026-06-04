@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cost.go",
+        "doc.go",
         "error.go",
         "errors.go",
         "location.go",
@@ -25,6 +26,7 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
+        "doc_test.go",
         "errors_test.go",
         "source_test.go",
     ],

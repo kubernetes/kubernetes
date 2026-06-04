@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -33,8 +32,11 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -369,7 +371,7 @@ func TestSerializeObject(t *testing.T) {
 			if !reflect.DeepEqual(result.Header, tt.wantHeaders) {
 				t.Fatal(cmp.Diff(tt.wantHeaders, result.Header))
 			}
-			body, _ := ioutil.ReadAll(result.Body)
+			body, _ := io.ReadAll(result.Body)
 			if !bytes.Equal(tt.wantBody, body) {
 				t.Fatalf("wanted:\n%s\ngot:\n%s", hex.Dump(tt.wantBody), hex.Dump(body))
 			}
@@ -672,12 +674,15 @@ func randPod(b *testing.B, pod *v1.Pod, r *rand.Rand) {
 
 func benchmarkItems(b *testing.B, file string, n int) *v1.PodList {
 	pod := v1.Pod{}
-	f, err := os.Open(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
-		b.Fatalf("Failed to open %q: %v", file, err)
+		b.Fatalf("Failed to read %q: %v", file, err)
 	}
-	defer f.Close()
-	err = json.NewDecoder(f).Decode(&pod)
+	if strings.HasSuffix(file, ".yaml") {
+		err = yaml.Unmarshal(data, &pod)
+	} else {
+		err = json.Unmarshal(data, &pod)
+	}
 	if err != nil {
 		b.Fatalf("Failed to decode %q: %v", file, err)
 	}
@@ -710,16 +715,16 @@ func toJSON(b *testing.B, list *v1.PodList) []byte {
 	return out
 }
 
-func benchmarkSerializeObject(b *testing.B, payload []byte) {
-	input, output := len(payload), len(gzipContent(payload, defaultGzipContentEncodingLevel))
-	b.Logf("Payload size: %d, expected output size: %d, ratio: %.2f", input, output, float64(output)/float64(input))
-
+func benchmarkSerializeObject(b *testing.B, payload []byte, gzip bool) {
 	req := &http.Request{
-		Header: http.Header{
-			"Accept-Encoding": []string{"gzip"},
-		},
 		URL: &url.URL{Path: "/path"},
 	}
+	if gzip {
+		req.Header = http.Header{
+			"Accept-Encoding": []string{"gzip"},
+		}
+	}
+
 	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)
 
 	encoder := &fakeEncoder{
@@ -727,34 +732,42 @@ func benchmarkSerializeObject(b *testing.B, payload []byte) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	responseBytesTotal := 0
+	for b.Loop() {
 		recorder := httptest.NewRecorder()
 		SerializeObject("application/json", encoder, recorder, req, http.StatusOK, nil /* object */)
 		result := recorder.Result()
 		if result.StatusCode != http.StatusOK {
 			b.Fatalf("incorrect status code: got %v;  want: %v", result.StatusCode, http.StatusOK)
 		}
+		responseBytesTotal += recorder.Body.Len()
 	}
+	b.ReportMetric(float64(responseBytesTotal/b.N), "writtenBytes/op")
 }
 
-func BenchmarkSerializeObject1000PodsPB(b *testing.B) {
-	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 1000)))
-}
-func BenchmarkSerializeObject10000PodsPB(b *testing.B) {
-	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 10000)))
-}
-func BenchmarkSerializeObject100000PodsPB(b *testing.B) {
-	benchmarkSerializeObject(b, toProtoBuf(b, benchmarkItems(b, "testdata/pod.json", 100000)))
-}
-
-func BenchmarkSerializeObject1000PodsJSON(b *testing.B) {
-	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 1000)))
-}
-func BenchmarkSerializeObject10000PodsJSON(b *testing.B) {
-	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 10000)))
-}
-func BenchmarkSerializeObject100000PodsJSON(b *testing.B) {
-	benchmarkSerializeObject(b, toJSON(b, benchmarkItems(b, "testdata/pod.json", 100000)))
+func BenchmarkSerializeObject(b *testing.B) {
+	for _, count := range []int{1_000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("Count=%d", count), func(b *testing.B) {
+			medias := []struct {
+				name    string
+				convert func(*testing.B, *v1.PodList) []byte
+			}{
+				{"Json", toJSON},
+				{"Protobuf", toProtoBuf},
+			}
+			podList := benchmarkItems(b, "testdata/exemplar_pod.yaml", count)
+			for _, media := range medias {
+				b.Run(fmt.Sprintf("MediaType=%s", media.name), func(b *testing.B) {
+					payload := media.convert(b, podList)
+					for _, gzip := range []bool{true, false} {
+						b.Run(fmt.Sprintf("Compression=%v", gzip), func(b *testing.B) {
+							benchmarkSerializeObject(b, payload, gzip)
+						})
+					}
+				})
+			}
+		})
+	}
 }
 
 type fakeResponseRecorder struct {

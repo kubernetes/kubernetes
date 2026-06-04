@@ -113,13 +113,16 @@ type Service interface {
 }
 
 type service struct {
+	csi.UnimplementedControllerServer
+	csi.UnimplementedIdentityServer
+	csi.UnimplementedNodeServer
 	sync.Mutex
 	nodeID       string
 	vols         []csi.Volume
 	volsRWL      sync.RWMutex
-	volsNID      uint64
+	volsNID      atomic.Uint64
 	snapshots    cache.SnapshotCache
-	snapshotsNID uint64
+	snapshotsNID atomic.Uint64
 	config       Config
 }
 
@@ -170,7 +173,7 @@ const (
 
 func (s *service) newVolume(name string, capcity int64) csi.Volume {
 	vol := csi.Volume{
-		VolumeId:      fmt.Sprintf("%d", atomic.AddUint64(&s.volsNID, 1)),
+		VolumeId:      fmt.Sprintf("%d", s.volsNID.Add(1)),
 		VolumeContext: map[string]string{"name": name},
 		CapacityBytes: capcity,
 	}
@@ -260,7 +263,7 @@ func (s *service) newSnapshot(name, sourceVolumeId string, parameters map[string
 		Name:       name,
 		Parameters: parameters,
 		SnapshotCSI: csi.Snapshot{
-			SnapshotId:     fmt.Sprintf("%d", atomic.AddUint64(&s.snapshotsNID, 1)),
+			SnapshotId:     fmt.Sprintf("%d", s.snapshotsNID.Add(1)),
 			CreationTime:   ptime,
 			SourceVolumeId: sourceVolumeId,
 			ReadyToUse:     true,

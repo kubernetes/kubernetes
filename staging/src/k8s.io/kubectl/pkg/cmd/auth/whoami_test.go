@@ -75,9 +75,7 @@ func TestWhoAmIRun(t *testing.T) {
 				`{
     "kind": "SelfSubjectReview",
     "apiVersion": "authentication.k8s.io/v1",
-    "metadata": {
-        "creationTimestamp": null
-    },
+    "metadata": {},
     "status": {
         "userInfo": {
             "username": "jane.doe",
@@ -131,9 +129,7 @@ func TestWhoAmIRun(t *testing.T) {
 				`{
     "kind": "SelfSubjectReview",
     "apiVersion": "authentication.k8s.io/v1beta1",
-    "metadata": {
-        "creationTimestamp": null
-    },
+    "metadata": {},
     "status": {
         "userInfo": {
             "username": "jane.doe",
@@ -186,9 +182,7 @@ func TestWhoAmIRun(t *testing.T) {
 				`{
     "kind": "SelfSubjectReview",
     "apiVersion": "authentication.k8s.io/v1",
-    "metadata": {
-        "creationTimestamp": null
-    },
+    "metadata": {},
     "status": {
         "userInfo": {
             "username": "jane.doe",

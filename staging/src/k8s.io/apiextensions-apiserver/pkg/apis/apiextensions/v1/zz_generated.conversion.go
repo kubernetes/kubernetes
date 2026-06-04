@@ -356,6 +356,7 @@ func autoConvert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomRes
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -370,6 +371,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomRes
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -525,6 +527,7 @@ func autoConvert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResour
 		return err
 	}
 	out.StoredVersions = *(*[]string)(unsafe.Pointer(&in.StoredVersions))
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -539,6 +542,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResour
 		return err
 	}
 	out.StoredVersions = *(*[]string)(unsafe.Pointer(&in.StoredVersions))
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 

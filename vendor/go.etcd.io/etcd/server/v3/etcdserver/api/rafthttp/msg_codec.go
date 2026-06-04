@@ -19,8 +19,10 @@ import (
 	"errors"
 	"io"
 
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/pkg/v3/pbutil"
-	"go.etcd.io/etcd/raft/v3/raftpb"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 // messageEncoder is a encoder that can encode all kinds of messages.
@@ -30,10 +32,10 @@ type messageEncoder struct {
 }
 
 func (enc *messageEncoder) encode(m *raftpb.Message) error {
-	if err := binary.Write(enc.w, binary.BigEndian, uint64(m.Size())); err != nil {
+	if err := binary.Write(enc.w, binary.BigEndian, uint64(proto.Size(m))); err != nil {
 		return err
 	}
-	_, err := enc.w.Write(pbutil.MustMarshal(m))
+	_, err := enc.w.Write(pbutil.MustMarshalMessage(m))
 	return err
 }
 
@@ -47,22 +49,22 @@ var (
 	ErrExceedSizeLimit        = errors.New("rafthttp: error limit exceeded")
 )
 
-func (dec *messageDecoder) decode() (raftpb.Message, error) {
+func (dec *messageDecoder) decode() (*raftpb.Message, error) {
 	return dec.decodeLimit(readBytesLimit)
 }
 
-func (dec *messageDecoder) decodeLimit(numBytes uint64) (raftpb.Message, error) {
+func (dec *messageDecoder) decodeLimit(numBytes uint64) (*raftpb.Message, error) {
 	var m raftpb.Message
 	var l uint64
 	if err := binary.Read(dec.r, binary.BigEndian, &l); err != nil {
-		return m, err
+		return nil, err
 	}
 	if l > numBytes {
-		return m, ErrExceedSizeLimit
+		return nil, ErrExceedSizeLimit
 	}
 	buf := make([]byte, int(l))
 	if _, err := io.ReadFull(dec.r, buf); err != nil {
-		return m, err
+		return nil, err
 	}
-	return m, m.Unmarshal(buf)
+	return &m, proto.Unmarshal(buf, &m)
 }

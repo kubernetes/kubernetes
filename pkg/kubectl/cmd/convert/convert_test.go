@@ -62,35 +62,6 @@ func TestConvertObject(t *testing.T) {
 			},
 		},
 		{
-			name:          "v1 HPA to v2beta1 HPA",
-			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v1HPA.yaml",
-			outputVersion: "autoscaling/v2beta1",
-			fields: []checkField{
-				{
-					expected: "apiVersion: autoscaling/v2beta1",
-				},
-				{
-					expected: "name: cpu",
-				},
-				{
-					expected: "targetAverageUtilization: 50",
-				},
-			},
-		},
-		{
-			name:          "v2beta1 HPA to v1 HPA",
-			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v2beta1HPA.yaml",
-			outputVersion: "autoscaling/v1",
-			fields: []checkField{
-				{
-					expected: "apiVersion: autoscaling/v1",
-				},
-				{
-					expected: "targetCPUUtilizationPercentage: 50",
-				},
-			},
-		},
-		{
 			name:          "v1beta1 Ingress to extensions Ingress",
 			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v1beta1ingress.yaml",
 			outputVersion: "extensions/v1beta1",

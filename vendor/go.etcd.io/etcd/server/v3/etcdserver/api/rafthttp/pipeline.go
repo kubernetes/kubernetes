@@ -18,18 +18,19 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"runtime"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
-	"go.etcd.io/etcd/raft/v3"
-	"go.etcd.io/etcd/raft/v3/raftpb"
 	stats "go.etcd.io/etcd/server/v3/etcdserver/api/v2stats"
-
-	"go.uber.org/zap"
+	"go.etcd.io/raft/v3"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 const (
@@ -54,7 +55,7 @@ type pipeline struct {
 	// deprecate when we depercate v2 API
 	followerStats *stats.FollowerStats
 
-	msgc chan raftpb.Message
+	msgc chan *raftpb.Message
 	// wait for the handling routines
 	wg    sync.WaitGroup
 	stopc chan struct{}
@@ -62,7 +63,7 @@ type pipeline struct {
 
 func (p *pipeline) start() {
 	p.stopc = make(chan struct{})
-	p.msgc = make(chan raftpb.Message, pipelineBufSize)
+	p.msgc = make(chan *raftpb.Message, pipelineBufSize)
 	p.wg.Add(connPerPipeline)
 	for i := 0; i < connPerPipeline; i++ {
 		go p.handle()
@@ -97,31 +98,31 @@ func (p *pipeline) handle() {
 		select {
 		case m := <-p.msgc:
 			start := time.Now()
-			err := p.post(pbutil.MustMarshal(&m))
+			err := p.post(pbutil.MustMarshalMessage(m))
 			end := time.Now()
 
 			if err != nil {
 				p.status.deactivate(failureType{source: pipelineMsg, action: "write"}, err.Error())
 
-				if m.Type == raftpb.MsgApp && p.followerStats != nil {
+				if isMsgApp(m) && p.followerStats != nil {
 					p.followerStats.Fail()
 				}
-				p.raft.ReportUnreachable(m.To)
+				p.raft.ReportUnreachable(m.GetTo())
 				if isMsgSnap(m) {
-					p.raft.ReportSnapshot(m.To, raft.SnapshotFailure)
+					p.raft.ReportSnapshot(m.GetTo(), raft.SnapshotFailure)
 				}
-				sentFailures.WithLabelValues(types.ID(m.To).String()).Inc()
+				sentFailures.WithLabelValues(types.ID(m.GetTo()).String()).Inc()
 				continue
 			}
 
 			p.status.activate()
-			if m.Type == raftpb.MsgApp && p.followerStats != nil {
+			if isMsgApp(m) && p.followerStats != nil {
 				p.followerStats.Succ(end.Sub(start))
 			}
 			if isMsgSnap(m) {
-				p.raft.ReportSnapshot(m.To, raft.SnapshotFinish)
+				p.raft.ReportSnapshot(m.GetTo(), raft.SnapshotFinish)
 			}
-			sentBytes.WithLabelValues(types.ID(m.To).String()).Add(float64(m.Size()))
+			sentBytes.WithLabelValues(types.ID(m.GetTo()).String()).Add(float64(proto.Size(m)))
 		case <-p.stopc:
 			return
 		}
@@ -154,7 +155,7 @@ func (p *pipeline) post(data []byte) (err error) {
 		return err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		p.picker.unreachable(u)
 		return err
@@ -165,7 +166,7 @@ func (p *pipeline) post(data []byte) (err error) {
 		p.picker.unreachable(u)
 		// errMemberRemoved is a critical error since a removed member should
 		// always be stopped. So we use reportCriticalError to report it to errorc.
-		if err == errMemberRemoved {
+		if errors.Is(err, errMemberRemoved) {
 			reportCriticalError(err, p.errorc)
 		}
 		return err

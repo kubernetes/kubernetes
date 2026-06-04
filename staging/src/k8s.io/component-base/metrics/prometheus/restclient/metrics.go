@@ -165,6 +165,17 @@ var (
 		[]string{"code", "call_status"},
 	)
 
+	execPluginPolicyCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			StabilityLevel: k8smetrics.ALPHA,
+			Name:           "rest_client_exec_plugin_policy_call_total",
+			Help: "Number of comparisons of an exec plugin to the plugin policy " +
+				"and allowlist (if any), partitioned by whether or not the policy " +
+				"permits the plugin",
+		},
+		[]string{"allowed", "denied"},
+	)
+
 	transportCacheEntries = k8smetrics.NewGauge(
 		&k8smetrics.GaugeOpts{
 			Name:           "rest_client_transport_cache_entries",
@@ -178,7 +189,33 @@ var (
 			Name:           "rest_client_transport_create_calls_total",
 			StabilityLevel: k8smetrics.ALPHA,
 			Help: "Number of calls to get a new transport, partitioned by the result of the operation " +
-				"hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached",
+				"hit: obtained from the cache, miss: created and added to the cache, miss-gc: recreated and added back to the cache after being garbage collected, uncacheable: created and not cached",
+		},
+		[]string{"result"},
+	)
+
+	transportCAReloads = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_transport_ca_reload_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of times a CA reload is attempted, partitioned by the result and reason for the reload attempt",
+		},
+		[]string{"result", "reason"},
+	)
+
+	transportCertRotationGCCalls = k8smetrics.NewCounter(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_transport_cert_rotation_gc_calls_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of times a cert rotation goroutine cancel func is called via GC cleanup of the associated transport",
+		},
+	)
+
+	transportCacheGCCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_transport_cache_gc_calls_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of times a GC cleanup attempts to delete a transport cache entry, partitioned by the result: deleted, skipped",
 		},
 		[]string{"result"},
 	)
@@ -197,19 +234,26 @@ func init() {
 	legacyregistry.MustRegister(execPluginCalls)
 	legacyregistry.MustRegister(transportCacheEntries)
 	legacyregistry.MustRegister(transportCacheCalls)
+	legacyregistry.MustRegister(transportCAReloads)
+	legacyregistry.MustRegister(transportCertRotationGCCalls)
+	legacyregistry.MustRegister(transportCacheGCCalls)
 	metrics.Register(metrics.RegisterOpts{
-		ClientCertExpiry:      execPluginCertTTLAdapter,
-		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
-		RequestLatency:        &latencyAdapter{m: requestLatency},
-		ResolverLatency:       &resolverLatencyAdapter{m: resolverLatency},
-		RequestSize:           &sizeAdapter{m: requestSize},
-		ResponseSize:          &sizeAdapter{m: responseSize},
-		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
-		RequestResult:         &resultAdapter{requestResult},
-		RequestRetry:          &retryAdapter{requestRetry},
-		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
-		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
-		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
+		ClientCertExpiry:             execPluginCertTTLAdapter,
+		ClientCertRotationAge:        &rotationAdapter{m: execPluginCertRotation},
+		RequestLatency:               &latencyAdapter{m: requestLatency},
+		ResolverLatency:              &resolverLatencyAdapter{m: resolverLatency},
+		RequestSize:                  &sizeAdapter{m: requestSize},
+		ResponseSize:                 &sizeAdapter{m: responseSize},
+		RateLimiterLatency:           &latencyAdapter{m: rateLimiterLatency},
+		RequestResult:                &resultAdapter{requestResult},
+		RequestRetry:                 &retryAdapter{requestRetry},
+		ExecPluginCalls:              &callsAdapter{m: execPluginCalls},
+		ExecPluginPolicyCalls:        &policyAdapter{m: execPluginPolicyCalls},
+		TransportCacheEntries:        &transportCacheAdapter{m: transportCacheEntries},
+		TransportCreateCalls:         &transportCacheCallsAdapter{m: transportCacheCalls},
+		TransportCAReloads:           &transportCAReloadsAdapter{m: transportCAReloads},
+		TransportCertRotationGCCalls: &transportCertRotationGCCallsAdapter{m: transportCertRotationGCCalls},
+		TransportCacheGCCalls:        &transportCacheGCCallsAdapter{m: transportCacheGCCalls},
 	})
 }
 
@@ -269,6 +313,14 @@ func (r *callsAdapter) Increment(code int, callStatus string) {
 	r.m.WithLabelValues(fmt.Sprintf("%d", code), callStatus).Inc()
 }
 
+type policyAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *policyAdapter) Increment(status string) {
+	r.m.WithLabelValues(status).Inc()
+}
+
 type retryAdapter struct {
 	m *k8smetrics.CounterVec
 }
@@ -290,5 +342,29 @@ type transportCacheCallsAdapter struct {
 }
 
 func (t *transportCacheCallsAdapter) Increment(result string) {
+	t.m.WithLabelValues(result).Inc()
+}
+
+type transportCAReloadsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (t *transportCAReloadsAdapter) Increment(result, reason string) {
+	t.m.WithLabelValues(result, reason).Inc()
+}
+
+type transportCertRotationGCCallsAdapter struct {
+	m *k8smetrics.Counter
+}
+
+func (t *transportCertRotationGCCallsAdapter) Increment() {
+	t.m.Inc()
+}
+
+type transportCacheGCCallsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (t *transportCacheGCCallsAdapter) Increment(result string) {
 	t.m.WithLabelValues(result).Inc()
 }

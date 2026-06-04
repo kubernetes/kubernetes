@@ -1,15 +1,13 @@
 syntax = "proto3";
 package v3electionpb;
 
-import "gogoproto/gogo.proto";
 import "etcd/api/etcdserverpb/rpc.proto";
 import "etcd/api/mvccpb/kv.proto";
 
 // for grpc-gateway
 import "google/api/annotations.proto";
 
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.unmarshaler_all) = true;
+option go_package = "go.etcd.io/etcd/server/v3/etcdserver/api/v3election/v3electionpb";
 
 // The election service exposes client-side election facilities as a gRPC interface.
 service Election {
@@ -74,7 +72,7 @@ message CampaignResponse {
 }
 
 message LeaderKey {
-  // name is the election identifier that correponds to the leadership key.
+  // name is the election identifier that corresponds to the leadership key.
   bytes name = 1;
   // key is an opaque key representing the ownership of the election. If the key
   // is deleted, then leadership is lost.

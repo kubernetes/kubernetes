@@ -16,20 +16,21 @@ package v3rpc
 
 import (
 	"context"
+	"errors"
 	"io"
 
+	"go.uber.org/zap"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
-	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/server/v3/etcdserver"
 	"go.etcd.io/etcd/server/v3/lease"
-
-	"go.uber.org/zap"
 )
 
 type LeaseServer struct {
 	lg  *zap.Logger
 	hdr header
 	le  etcdserver.Lessor
+	pb.UnsafeLeaseServer
 }
 
 func NewLeaseServer(s *etcdserver.EtcdServer) pb.LeaseServer {
@@ -42,7 +43,6 @@ func NewLeaseServer(s *etcdserver.EtcdServer) pb.LeaseServer {
 
 func (ls *LeaseServer) LeaseGrant(ctx context.Context, cr *pb.LeaseGrantRequest) (*pb.LeaseGrantResponse, error) {
 	resp, err := ls.le.LeaseGrant(ctx, cr)
-
 	if err != nil {
 		return nil, togRPCError(err)
 	}
@@ -61,10 +61,10 @@ func (ls *LeaseServer) LeaseRevoke(ctx context.Context, rr *pb.LeaseRevokeReques
 
 func (ls *LeaseServer) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
 	resp, err := ls.le.LeaseTimeToLive(ctx, rr)
-	if err != nil && err != lease.ErrLeaseNotFound {
+	if err != nil && !errors.Is(err, lease.ErrLeaseNotFound) {
 		return nil, togRPCError(err)
 	}
-	if err == lease.ErrLeaseNotFound {
+	if errors.Is(err, lease.ErrLeaseNotFound) {
 		resp = &pb.LeaseTimeToLiveResponse{
 			Header: &pb.ResponseHeader{},
 			ID:     rr.ID,
@@ -77,10 +77,10 @@ func (ls *LeaseServer) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLi
 
 func (ls *LeaseServer) LeaseLeases(ctx context.Context, rr *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
 	resp, err := ls.le.LeaseLeases(ctx, rr)
-	if err != nil && err != lease.ErrLeaseNotFound {
+	if err != nil && !errors.Is(err, lease.ErrLeaseNotFound) {
 		return nil, togRPCError(err)
 	}
-	if err == lease.ErrLeaseNotFound {
+	if errors.Is(err, lease.ErrLeaseNotFound) {
 		resp = &pb.LeaseLeasesResponse{
 			Header: &pb.ResponseHeader{},
 			Leases: []*pb.LeaseStatus{},
@@ -98,11 +98,12 @@ func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) (err
 	select {
 	case err = <-errc:
 	case <-stream.Context().Done():
-		// the only server-side cancellation is noleader for now.
+		// We end up here due to:
+		// 1. Client cancellation
+		// 2. Server cancellation: the client ctx is wrapped with WithRequireLeader,
+		//		monitorLeader() detects no leader and thus cancels this stream with ErrGRPCNoLeader.
+		// 3. Server cancellation: the server is shutting down.
 		err = stream.Context().Err()
-		if err == context.Canceled {
-			err = rpctypes.ErrGRPCNoLeader
-		}
 	}
 	return err
 }
@@ -110,7 +111,7 @@ func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) (err
 func (ls *LeaseServer) leaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) error {
 	for {
 		req, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -133,7 +134,7 @@ func (ls *LeaseServer) leaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) erro
 		ls.hdr.fill(resp.Header)
 
 		ttl, err := ls.le.LeaseRenew(stream.Context(), lease.LeaseID(req.ID))
-		if err == lease.ErrLeaseNotFound {
+		if errors.Is(err, lease.ErrLeaseNotFound) {
 			err = nil
 			ttl = 0
 		}

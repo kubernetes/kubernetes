@@ -1827,9 +1827,7 @@ func (ss SortableSliceOfMaps) Less(i, j int) bool {
 }
 
 func (ss SortableSliceOfMaps) Swap(i, j int) {
-	tmp := ss.s[i]
-	ss.s[i] = ss.s[j]
-	ss.s[j] = tmp
+	ss.s[i], ss.s[j] = ss.s[j], ss.s[i]
 }
 
 func deduplicateAndSortScalars(s []interface{}) []interface{} {
@@ -1875,9 +1873,7 @@ func (ss SortableSliceOfScalars) Less(i, j int) bool {
 }
 
 func (ss SortableSliceOfScalars) Swap(i, j int) {
-	tmp := ss.s[i]
-	ss.s[i] = ss.s[j]
-	ss.s[j] = tmp
+	ss.s[i], ss.s[j] = ss.s[j], ss.s[i]
 }
 
 // Returns the type of the elements of N slice(s). If the type is different,

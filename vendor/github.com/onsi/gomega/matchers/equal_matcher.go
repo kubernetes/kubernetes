@@ -9,10 +9,10 @@ import (
 )
 
 type EqualMatcher struct {
-	Expected interface{}
+	Expected any
 }
 
-func (matcher *EqualMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *EqualMatcher) Match(actual any) (success bool, err error) {
 	if actual == nil && matcher.Expected == nil {
 		return false, fmt.Errorf("Refusing to compare <nil> to <nil>.\nBe explicit and use BeNil() instead.  This is to avoid mistakes where both sides of an assertion are erroneously uninitialized.")
 	}
@@ -27,7 +27,7 @@ func (matcher *EqualMatcher) Match(actual interface{}) (success bool, err error)
 	return reflect.DeepEqual(actual, matcher.Expected), nil
 }
 
-func (matcher *EqualMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *EqualMatcher) FailureMessage(actual any) (message string) {
 	actualString, actualOK := actual.(string)
 	expectedString, expectedOK := matcher.Expected.(string)
 	if actualOK && expectedOK {
@@ -37,6 +37,6 @@ func (matcher *EqualMatcher) FailureMessage(actual interface{}) (message string)
 	return format.Message(actual, "to equal", matcher.Expected)
 }
 
-func (matcher *EqualMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *EqualMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to equal", matcher.Expected)
 }

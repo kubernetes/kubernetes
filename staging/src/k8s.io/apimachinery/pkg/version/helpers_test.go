@@ -61,7 +61,7 @@ func Test_parseKubeVersion(t *testing.T) {
 		wantOk           bool
 	}{
 		{
-			name:             "invaild version for ga",
+			name:             "invalid version for ga",
 			v:                "v1.1",
 			wantMajorVersion: 0,
 			wantVType:        0,
@@ -69,7 +69,7 @@ func Test_parseKubeVersion(t *testing.T) {
 			wantOk:           false,
 		},
 		{
-			name:             "invaild version for alpha",
+			name:             "invalid version for alpha",
 			v:                "v1alpha1.1",
 			wantMajorVersion: 0,
 			wantVType:        0,

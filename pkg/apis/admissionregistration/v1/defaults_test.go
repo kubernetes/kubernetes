@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaultAdmissionWebhook(t *testing.T) {
@@ -107,7 +107,7 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 				Webhooks: []v1.MutatingWebhook{{
 					ClientConfig: v1.WebhookClientConfig{
 						Service: &v1.ServiceReference{
-							Port: utilpointer.Int32(443), // defaulted
+							Port: ptr.To[int32](443), // defaulted
 						},
 					},
 					FailurePolicy:      &fail,

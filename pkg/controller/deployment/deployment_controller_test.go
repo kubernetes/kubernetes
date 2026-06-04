@@ -24,7 +24,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -354,7 +353,7 @@ func TestReentrantRollback(t *testing.T) {
 
 	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
 	d.Annotations = map[string]string{util.RevisionAnnotation: "2"}
-	setRollbackTo(d, &extensions.RollbackConfig{Revision: 0})
+	setRollbackTo(d, new(int64))
 	f.dLister = append(f.dLister, d)
 
 	rs1 := newReplicaSet(d, "deploymentrs-old", 0)
@@ -377,75 +376,61 @@ func TestReentrantRollback(t *testing.T) {
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
-// will requeue a Recreate deployment iff there is no other pod returned from the
-// client.
+// will requeue a Recreate deployment regardless of whether other pods exist.
 func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-
-	f := newFixture(t)
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
-	rs := newReplicaSet(foo, "foo-1", 1)
-	pod := generatePodFromRS(rs)
-
-	f.dLister = append(f.dLister, foo)
-	f.rsLister = append(f.rsLister, rs)
-	f.objects = append(f.objects, foo, rs)
-
-	c, _, err := f.newController(ctx)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
-	enqueued := false
-	c.enqueueDeployment = func(d *apps.Deployment) {
-		if d.Name == "foo" {
-			enqueued = true
-		}
+	tests := []struct {
+		name      string
+		otherPods bool
+	}{
+		{
+			name:      "last pod deleted",
+			otherPods: false,
+		},
+		{
+			name:      "pod with siblings deleted",
+			otherPods: true,
+		},
 	}
 
-	c.deletePod(logger, pod)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			f := newFixture(t)
 
-	if !enqueued {
-		t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
-	}
-}
+			foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+			foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
+			rs := newReplicaSet(foo, "foo-1", 1)
+			pod := generatePodFromRS(rs)
 
-// TestPodDeletionDoesntEnqueueRecreateDeployment ensures that the deletion of a pod
-// will not requeue a Recreate deployment iff there are other pods returned from the
-// client.
-func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+			f.dLister = append(f.dLister, foo)
+			f.rsLister = append(f.rsLister, rs)
+			f.objects = append(f.objects, foo, rs)
+			f.podLister = append(f.podLister, pod)
 
-	f := newFixture(t)
+			if tc.otherPods {
+				// Add a sibling pod
+				pod2 := generatePodFromRS(rs)
+				pod2.Name = "foo-2"
+				f.podLister = append(f.podLister, pod2)
+			}
 
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
-	rs1 := newReplicaSet(foo, "foo-1", 1)
-	rs2 := newReplicaSet(foo, "foo-1", 1)
-	pod1 := generatePodFromRS(rs1)
-	pod2 := generatePodFromRS(rs2)
+			c, _, err := f.newController(ctx)
+			if err != nil {
+				t.Fatalf("error creating Deployment controller: %v", err)
+			}
+			enqueued := false
+			c.enqueueDeployment = func(d *apps.Deployment) {
+				if d.Name == "foo" {
+					enqueued = true
+				}
+			}
 
-	f.dLister = append(f.dLister, foo)
-	// Let's pretend this is a different pod. The gist is that the pod lister needs to
-	// return a non-empty list.
-	f.podLister = append(f.podLister, pod1, pod2)
+			c.deletePod(logger, pod)
 
-	c, _, err := f.newController(ctx)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
-	enqueued := false
-	c.enqueueDeployment = func(d *apps.Deployment) {
-		if d.Name == "foo" {
-			enqueued = true
-		}
-	}
-
-	c.deletePod(logger, pod1)
-
-	if enqueued {
-		t.Errorf("expected deployment %q not to be queued after pod deletion", foo.Name)
+			if !enqueued {
+				t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
+			}
+		})
 	}
 }
 
@@ -484,47 +469,6 @@ func TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment(t *testi
 
 	if !enqueued {
 		t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
-	}
-}
-
-// TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment that the
-// deletion of a pod will not requeue a Recreate deployment iff there are other pods
-// returned from the client in the case where a deployment has multiple replica sets,
-// some of which have empty owner references.
-func TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-
-	f := newFixture(t)
-
-	foo := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-	foo.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
-	rs1 := newReplicaSet(foo, "foo-1", 1)
-	rs2 := newReplicaSet(foo, "foo-2", 2)
-	rs2.OwnerReferences = nil
-	pod := generatePodFromRS(rs1)
-
-	f.dLister = append(f.dLister, foo)
-	f.rsLister = append(f.rsLister, rs1, rs2)
-	f.objects = append(f.objects, foo, rs1, rs2)
-	// Let's pretend this is a different pod. The gist is that the pod lister needs to
-	// return a non-empty list.
-	f.podLister = append(f.podLister, pod)
-
-	c, _, err := f.newController(ctx)
-	if err != nil {
-		t.Fatalf("error creating Deployment controller: %v", err)
-	}
-	enqueued := false
-	c.enqueueDeployment = func(d *apps.Deployment) {
-		if d.Name == "foo" {
-			enqueued = true
-		}
-	}
-
-	c.deletePod(logger, pod)
-
-	if enqueued {
-		t.Errorf("expected deployment %q not to be queued after pod deletion", foo.Name)
 	}
 }
 
@@ -1005,49 +949,74 @@ func TestDeleteReplicaSetOrphan(t *testing.T) {
 }
 
 func BenchmarkGetPodMapForDeployment(b *testing.B) {
-	_, ctx := ktesting.NewTestContext(b)
-
-	f := newFixture(b)
-
-	d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
-
-	rs1 := newReplicaSet(d, "rs1", 1)
-	rs2 := newReplicaSet(d, "rs2", 1)
-
-	var pods []*v1.Pod
-	var objects []runtime.Object
-	for i := 0; i < 100; i++ {
-		p1, p2 := generatePodFromRS(rs1), generatePodFromRS(rs2)
-		p1.Name, p2.Name = p1.Name+fmt.Sprintf("-%d", i), p2.Name+fmt.Sprintf("-%d", i)
-		pods = append(pods, p1, p2)
-		objects = append(objects, p1, p2)
+	cases := []struct {
+		name      string
+		numPods   int
+		extraPods int // Pods in namespace not owned by this deployment
+	}{
+		{name: "10-Pods-No-Noise", numPods: 10, extraPods: 0},
+		{name: "10-Pods-With-Noise", numPods: 10, extraPods: 100},
+		{name: "10000-Pods-No-Noise", numPods: 10000, extraPods: 0},
+		{name: "10000-Pods-With-Noise", numPods: 10000, extraPods: 100000},
 	}
 
-	f.dLister = append(f.dLister, d)
-	f.rsLister = append(f.rsLister, rs1, rs2)
-	f.podLister = append(f.podLister, pods...)
-	f.objects = append(f.objects, d, rs1, rs2)
-	f.objects = append(f.objects, objects...)
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			_, ctx := ktesting.NewTestContext(b)
 
-	// Start the fixture.
-	c, informers, err := f.newController(ctx)
-	if err != nil {
-		b.Fatalf("error creating Deployment controller: %v", err)
-	}
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
+			f := newFixture(b)
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		m, err := c.getPodMapForDeployment(d, f.rsLister)
-		if err != nil {
-			b.Fatalf("getPodMapForDeployment() error: %v", err)
-		}
-		if len(m) != 2 {
-			b.Errorf("Invalid map size, expected 2, got: %d", len(m))
-		}
+			d := newDeployment("foo", 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+			rs1 := newReplicaSet(d, "rs1", 1)
+			rs2 := newReplicaSet(d, "rs2", 1)
+
+			var pods []*v1.Pod
+			var objects []runtime.Object
+			for i := 0; i < tc.numPods; i++ {
+				p1, p2 := generatePodFromRS(rs1), generatePodFromRS(rs2)
+				p1.Name, p2.Name = p1.Name+fmt.Sprintf("-%d", i), p2.Name+fmt.Sprintf("-%d", i)
+				pods = append(pods, p1, p2)
+				objects = append(objects, p1, p2)
+			}
+
+			// Add extra pods that don't belong to the deployment
+			for i := 0; i < tc.extraPods; i++ {
+				p := generatePodFromRS(rs1)
+				p.Name = fmt.Sprintf("extra-pod-%d", i)
+				p.OwnerReferences = nil // Orphaned/unrelated
+				p.Labels = map[string]string{"foo": "notbar"}
+				pods = append(pods, p)
+				objects = append(objects, p)
+			}
+
+			f.dLister = append(f.dLister, d)
+			f.rsLister = append(f.rsLister, rs1, rs2)
+			f.podLister = append(f.podLister, pods...)
+			f.objects = append(f.objects, d, rs1, rs2)
+			f.objects = append(f.objects, objects...)
+
+			// Start the fixture.
+			c, informers, err := f.newController(ctx)
+			if err != nil {
+				b.Fatalf("error creating Deployment controller: %v", err)
+			}
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			informers.Start(stopCh)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				m, err := c.getPodMapForDeployment(d, f.rsLister)
+				if err != nil {
+					b.Fatalf("getPodMapForDeployment() error: %v", err)
+				}
+				if len(m) != 2 {
+					b.Errorf("Invalid map size, expected 2, got: %d", len(m))
+				}
+			}
+		})
 	}
 }
 

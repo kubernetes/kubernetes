@@ -22,6 +22,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -38,12 +39,13 @@ import (
 	"github.com/spf13/pflag"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/flagz"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
@@ -51,22 +53,20 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
-	"k8s.io/kubernetes/pkg/features"
-	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
-
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/test/e2e/invariants/metrics"
+	testutil "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -91,6 +91,8 @@ type TestServerInstanceOptions struct {
 	// SkipHealthzCheck returns without waiting for the server to become healthy.
 	// Useful for testing server configurations expected to prevent /healthz from completing.
 	SkipHealthzCheck bool
+	// DisableInvariantChecks skips the invariant checks at the end of the test.
+	DisableInvariantChecks bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
@@ -154,7 +156,11 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	// Some callers may have initialize ktesting already.
 	tCtx, ok := t.(ktesting.TContext)
-	if !ok {
+	if ok {
+		// tCtx.Cancel below must not cancel whatever else might be using
+		// this existing TContext.
+		tCtx = tCtx.WithCancel()
+	} else {
 		tCtx = ktesting.Init(t)
 	}
 
@@ -197,12 +203,19 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		effectiveVersion = basecompatibility.NewEffectiveVersionFromString(instanceOptions.BinaryVersion, "", "")
 	}
 	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	effectiveVersion.SetMinCompatibilityVersion(featureGate.MinCompatibilityVersion())
 	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 	if err := componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
 		return result, err
 	}
 
 	s := options.NewServerRunOptions()
+	if !effectiveVersion.BinaryVersion().EqualTo(effectiveVersion.EmulationVersion()) {
+		// Allow new APIs because features might be enabled explicitly which depend
+		// some API which gets disabled when emulating versions.
+		s.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
+	}
+
 	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
 	s.Options.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	if instanceOptions.RequestTimeout > 0 {
@@ -343,6 +356,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
 	}
+
+	// disable endpoint reconciliation when using a loopback "external" address
+	// unless the user has explicitly overridden the reconciler or advertise address
+	if !fs.Changed("advertise-address") && !fs.Changed("endpoint-reconciler-type") {
+		s.EndpointReconcilerType = "none"
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		s.Flagz = flagz.NamedFlagSetsReader{FlagSets: namedFlagSets}
 	}
@@ -370,24 +389,22 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	// If the local ComponentGlobalsRegistry is changed by the flags,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
 	// We cannot directly use DefaultFeatureGate in ComponentGlobalsRegistry because the changes done by ComponentGlobalsRegistry.Set() will not be undone at the end of the test.
-	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
+		featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
+	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
 		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+			featureOverrides[f] = featureGate.Enabled(f)
 		}
+	}
+	if len(featureOverrides) > 0 {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 	}
 	utilfeature.DefaultMutableFeatureGate.AddMetrics()
 
 	if instanceOptions.EnableCertAuth {
-		if featureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
-			if clientgotransport.DialerStopCh == wait.NeverStop {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-				t.Cleanup(cancel)
-				clientgotransport.DialerStopCh = ctx.Done()
-			}
+		if featureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
 			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
 		}
 	}
@@ -501,26 +518,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
-	tlsInfo := transport.TLSInfo{
-		CertFile:      storageConfig.Transport.CertFile,
-		KeyFile:       storageConfig.Transport.KeyFile,
-		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
+	etcdClient, _, err := GetEtcdClients(storageConfig.Transport)
 	if err != nil {
-		return result, err
-	}
-	etcdConfig := clientv3.Config{
-		Endpoints:   storageConfig.Transport.ServerList,
-		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
-	}
-	etcdClient, err := clientv3.New(etcdConfig)
-	if err != nil {
-		return result, err
+		return result, fmt.Errorf("create etcd client: %w", err)
 	}
 
 	// from here the caller must call tearDown
@@ -529,13 +529,63 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
 	result.TearDownFn = func() {
-		tearDown()
-		etcdClient.Close()
+		defer func() {
+			if err := etcdClient.Close(); err != nil {
+				tCtx.Errorf("Failed to close etcd client: %v", err)
+			}
+		}()
+		defer tearDown()
+		if instanceOptions.DisableInvariantChecks {
+			return
+		}
+		if tCtx.Err() != nil {
+			tCtx.Logf("Skipping metrics scrape because context is already canceled: %v", tCtx.Err())
+			return
+		}
+		if err := metrics.CheckMetricInvariants(tCtx, client, false); err != nil {
+			tCtx.Errorf("Invariant check failed (if the test intentionally breaks metrics/auth, consider setting DisableInvariantChecks: true in TestServerInstanceOptions): %v", err)
+		}
 	}
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix
 
 	return result, nil
+}
+
+// GetEtcdClients returns an initialized etcd clientv3.Client and clientv3.KV.
+func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
+	// clientv3.New ignores an invalid TLS config for http://, but not for unix:// (https://github.com/etcd-io/etcd/blob/5a8fba466087686fc15815f5bc041fb7eb1f23ea/client/v3/internal/endpoint/endpoint.go#L61-L66).
+	// To support unix://, we must not set Config.TLS unless we really have
+	// transport security.
+	var tlsConfig *tls.Config
+	if config.CertFile != "" ||
+		config.KeyFile != "" ||
+		config.TrustedCAFile != "" {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      config.CertFile,
+			KeyFile:       config.KeyFile,
+			TrustedCAFile: config.TrustedCAFile,
+		}
+
+		var err error
+		tlsConfig, err = tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	cfg := clientv3.Config{
+		Endpoints:   config.ServerList,
+		DialTimeout: 20 * time.Second,
+		TLS:         tlsConfig,
+	}
+
+	c, err := clientv3.New(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return c, clientv3.NewKV(c), nil
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.

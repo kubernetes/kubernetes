@@ -2,7 +2,9 @@
 
 approvers:
   - sig-scheduling-maintainers
+  - pohly
 reviewers:
   - sig-scheduling
+  - pohly
 labels:
   - sig/scheduling

@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -71,9 +70,11 @@ var (
 type VolumeProvider struct {
 }
 
-var quotaCmds = []string{"/sbin/xfs_quota",
+var quotaCmds = []string{
+	"/sbin/xfs_quota",
 	"/usr/sbin/xfs_quota",
-	"/bin/xfs_quota"}
+	"/bin/xfs_quota",
+}
 
 var quotaParseRegexp = regexp.MustCompilePOSIX("^[^ \t]*[ \t]*([0-9]+)")
 
@@ -192,7 +193,7 @@ func isFilesystemOfType(mountpoint string, backingDev string, typeMagic int64) b
 	var buf syscall.Statfs_t
 	err := syscall.Statfs(mountpoint, &buf)
 	if err != nil {
-		klog.Warningf("Warning: Unable to statfs %s: %v", mountpoint, err)
+		klog.Warningf("Unable to statfs %s: %v", mountpoint, err)
 		return false
 	}
 	if int64(buf.Type) != typeMagic {

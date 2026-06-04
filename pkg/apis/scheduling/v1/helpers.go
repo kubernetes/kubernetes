@@ -43,16 +43,29 @@ var systemPriorityClasses = []*v1.PriorityClass{
 	},
 }
 
-// SystemPriorityClasses returns the list of system priority classes.
-// NOTE: be careful not to modify any of elements of the returned array directly.
+// SystemPriorityClasses returns a deep copy of the list of system priority classes.
+// If only the names are needed, use SystemPriorityClassNames().
 func SystemPriorityClasses() []*v1.PriorityClass {
-	return systemPriorityClasses
+	retval := make([]*v1.PriorityClass, 0, len(systemPriorityClasses))
+	for _, c := range systemPriorityClasses {
+		retval = append(retval, c.DeepCopy())
+	}
+	return retval
+}
+
+// SystemPriorityClassNames returns the names of system priority classes.
+func SystemPriorityClassNames() []string {
+	retval := make([]string, 0, len(systemPriorityClasses))
+	for _, c := range systemPriorityClasses {
+		retval = append(retval, c.Name)
+	}
+	return retval
 }
 
 // IsKnownSystemPriorityClass returns true if there's any of the system priority classes exactly
 // matches "name", "value", "globalDefault". otherwise it will return an error.
 func IsKnownSystemPriorityClass(name string, value int32, globalDefault bool) (bool, error) {
-	for _, spc := range SystemPriorityClasses() {
+	for _, spc := range systemPriorityClasses {
 		if spc.Name == name {
 			if spc.Value != value {
 				return false, fmt.Errorf("value of %v PriorityClass must be %v", spc.Name, spc.Value)

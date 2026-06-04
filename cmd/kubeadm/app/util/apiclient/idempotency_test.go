@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +37,7 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func TestMain(m *testing.M) {
@@ -385,54 +385,6 @@ func TestPatchNodeOnce(t *testing.T) {
 				},
 			},
 			success: false,
-		},
-		{
-			name:       "patch node when timeout",
-			lookupName: "testnode",
-			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "testnode",
-					Labels: map[string]string{v1.LabelHostname: ""},
-				},
-			},
-			success:   false,
-			fakeError: apierrors.NewTimeoutError("fake timeout", -1),
-		},
-		{
-			name:       "patch node when conflict",
-			lookupName: "testnode",
-			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "testnode",
-					Labels: map[string]string{v1.LabelHostname: ""},
-				},
-			},
-			success:   false,
-			fakeError: apierrors.NewConflict(schema.GroupResource{}, "fake conflict", nil),
-		},
-		{
-			name:       "patch node when there is a server timeout",
-			lookupName: "testnode",
-			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "testnode",
-					Labels: map[string]string{v1.LabelHostname: ""},
-				},
-			},
-			success:   false,
-			fakeError: apierrors.NewServerTimeout(schema.GroupResource{}, "fake server timeout", 1),
-		},
-		{
-			name:       "patch node when the service is unavailable",
-			lookupName: "testnode",
-			node: v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "testnode",
-					Labels: map[string]string{v1.LabelHostname: ""},
-				},
-			},
-			success:   false,
-			fakeError: apierrors.NewServiceUnavailable("fake service unavailable"),
 		},
 		{
 			name:       "patch node failed with unknown error",

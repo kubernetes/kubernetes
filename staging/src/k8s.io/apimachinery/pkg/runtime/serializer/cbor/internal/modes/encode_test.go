@@ -96,6 +96,18 @@ func TestEncode(t *testing.T) {
 			want:          []byte{0xd6, 0x45, 'h', 'e', 'l', 'l', 'o'},
 			assertOnError: assertNilError,
 		},
+		{
+			name:          "text marshaler",
+			in:            &RoundtrippableText{Text: "a"},
+			want:          []byte{0x61, 0x61},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "json marshaler",
+			in:            &RoundtrippableJSON{Raw: `"a"`},
+			want:          []byte{0x41, 0x61},
+			assertOnError: assertNilError,
+		},
 	} {
 		encModes := tc.modes
 		if len(encModes) == 0 {

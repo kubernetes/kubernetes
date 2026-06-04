@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // Handler for containerd containers.
 package containerd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +28,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/cgroups"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"golang.org/x/net/context"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
@@ -44,12 +46,15 @@ type containerdContainerHandler struct {
 	reference info.ContainerReference
 	envs      map[string]string
 	labels    map[string]string
+	// Time at which this container was created.
+	creationTime time.Time
 	// Image name used for this container.
 	image string
 	// Filesystem handler.
 	includedMetrics container.MetricSet
 
 	libcontainerHandler *containerlibcontainer.Handler
+	client              ContainerdClient
 }
 
 var _ container.ContainerHandler = &containerdContainerHandler{}
@@ -143,6 +148,10 @@ func newContainerdContainerHandler(
 		includedMetrics:     metrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
+		client:              client,
+	}
+	if !cntr.CreatedAt.IsZero() && !cntr.CreatedAt.Before(time.Unix(0, 0)) {
+		handler.creationTime = cntr.CreatedAt
 	}
 	// Add the name and bare ID as aliases of the container.
 	handler.image = cntr.Image
@@ -179,6 +188,13 @@ func (h *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	spec.Labels = h.labels
 	spec.Envs = h.envs
 	spec.Image = h.image
+	startTime := spec.CreationTime
+	if !h.creationTime.IsZero() {
+		spec.CreationTime = h.creationTime
+	}
+	if !startTime.IsZero() {
+		spec.StartTime = startTime
+	}
 
 	return spec, err
 }
@@ -247,4 +263,13 @@ func (h *containerdContainerHandler) Cleanup() {
 func (h *containerdContainerHandler) GetContainerIPAddress() string {
 	// containerd doesnt take care of networking.So it doesnt maintain networking states
 	return ""
+}
+
+func (h *containerdContainerHandler) GetExitCode() (int, error) {
+	ctx := context.Background()
+	exitStatus, err := h.client.TaskExitStatus(ctx, h.reference.Id)
+	if err != nil {
+		return -1, err
+	}
+	return int(exitStatus), nil
 }

@@ -34,19 +34,6 @@ type MockCSIDriver struct {
 	interceptor grpc.UnaryServerInterceptor
 }
 
-func NewMockCSIDriver(servers *MockCSIDriverServers, interceptor grpc.UnaryServerInterceptor) *MockCSIDriver {
-	return &MockCSIDriver{
-		CSIDriver: CSIDriver{
-			servers: &CSIDriverServers{
-				Controller: servers.Controller,
-				Node:       servers.Node,
-				Identity:   servers.Identity,
-			},
-		},
-		interceptor: interceptor,
-	}
-}
-
 // StartOnAddress starts a new gRPC server listening on given address.
 func (m *MockCSIDriver) StartOnAddress(network, address string) error {
 	l, err := net.Listen(network, address)

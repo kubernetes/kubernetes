@@ -5,7 +5,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:bootstrap-signer
@@ -41,7 +40,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: extension-apiserver-authentication-reader
@@ -62,28 +60,12 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system::leader-locking-kube-controller-manager
     namespace: kube-system
   rules:
   - apiGroups:
-    - ""
-    resources:
-    - configmaps
-    verbs:
-    - watch
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-controller-manager
-    resources:
-    - configmaps
-    verbs:
-    - get
-    - update
-  - apiGroups:
     - coordination.k8s.io
     resources:
     - leases
@@ -108,28 +90,12 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system::leader-locking-kube-scheduler
     namespace: kube-system
   rules:
   - apiGroups:
-    - ""
-    resources:
-    - configmaps
-    verbs:
-    - watch
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-scheduler
-    resources:
-    - configmaps
-    verbs:
-    - get
-    - update
-  - apiGroups:
     - coordination.k8s.io
     resources:
     - leases
@@ -154,7 +120,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:bootstrap-signer
@@ -173,7 +138,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:cloud-provider
@@ -193,7 +157,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:token-cleaner

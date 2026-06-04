@@ -19,15 +19,18 @@ package etcd3
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
@@ -44,11 +47,18 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 var scheme = runtime.NewScheme()
@@ -61,7 +71,7 @@ func init() {
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
 
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
 }
 
 func newPod() runtime.Object {
@@ -155,6 +165,72 @@ func TestDeleteWithConflict(t *testing.T) {
 	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
 }
 
+type testTransformer struct {
+	value.Transformer
+	fail atomic.Bool
+}
+
+func (tt *testTransformer) setFailing(c bool) {
+	tt.fail.Store(c)
+}
+
+func (tt *testTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	if tt.fail.Load() {
+		return nil, false, errors.New("synthetic error")
+	}
+	return tt.Transformer.TransformFromStorage(ctx, data, dataCtx)
+}
+
+type testCodec struct {
+	runtime.Codec
+	fail atomic.Bool
+}
+
+func (tc *testCodec) setFailing(c bool) {
+	tc.fail.Store(c)
+}
+
+func (tc *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	if tc.fail.Load() {
+		return nil, nil, errors.New("synthetic error")
+	}
+	return tc.Codec.Decode(data, defaults, into)
+}
+
+func TestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	ctx, s, _ := testSetup(t, withCodec(codec))
+
+	storagetesting.RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx, t, s, codec.setFailing)
+}
+
+func TestDeleteWithConflictAndExpectedTransformError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	transformer := &testTransformer{Transformer: newTestTransformer()}
+	ctx, s, _ := testSetup(t, withTransformer(transformer))
+
+	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, s, transformer.setFailing)
+}
+
+func TestDeleteWithConflictAndExpectedDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	ctx, s, _ := testSetup(t, withCodec(codec))
+
+	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, s, codec.setFailing)
+}
+
+func TestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeFailure(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
@@ -172,12 +248,17 @@ func TestListPaging(t *testing.T) {
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(client.Client), store)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(client.Client), store)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
+}
+
+func TestKeySchema(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestKeySchema(ctx, t, store)
 }
 
 type storeWithPrefixTransformer struct {
@@ -249,15 +330,62 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false)
+	storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+}
+
+func TestListMetrics(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+
+	storagemetrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns"}}
+	if err := store.Create(ctx, computePodKey(pod), pod, &example.Pod{}, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	result := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/ns", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, result); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := `# HELP apiserver_storage_list_evaluated_objects_total [ALPHA] Number of objects tested in the course of serving a LIST request from storage
+# TYPE apiserver_storage_list_evaluated_objects_total counter
+apiserver_storage_list_evaluated_objects_total{group="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_fetched_objects_total [ALPHA] Number of objects read from storage in the course of serving a LIST request
+# TYPE apiserver_storage_list_fetched_objects_total counter
+apiserver_storage_list_fetched_objects_total{group="",index="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_returned_objects_total [ALPHA] Number of objects returned for a LIST request from storage
+# TYPE apiserver_storage_list_returned_objects_total counter
+apiserver_storage_list_returned_objects_total{group="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_total [ALPHA] Number of LIST requests served from storage
+# TYPE apiserver_storage_list_total counter
+apiserver_storage_list_total{group="",index="",resource="pods",storage="etcd"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"apiserver_storage_list_total",
+		"apiserver_storage_list_fetched_objects_total",
+		"apiserver_storage_list_evaluated_objects_total",
+		"apiserver_storage_list_returned_objects_total",
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true, false)
+	storagetesting.RunTestConsistentList(ctx, t, store, increaseRVFunc(client.Client), false, true, false)
 }
 
-func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
+func TestCompactRevision(t *testing.T) {
+	// Test requires store to observe extenal changes to compaction revision, requiring dedicated watch on compact key which is enabled by ListFromCacheSnapshot.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestCompactRevision(ctx, t, store, increaseRVFunc(client.Client), compactStorage(store, client.Client))
+}
+
+func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *storagetesting.KVRecorder) storagetesting.CallsValidation {
 	return func(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
 		if reads := transformer.GetReadsAndReset(); reads != estimatedProcessedObjects {
 			t.Errorf("unexpected reads: %d, expected: %d", reads, estimatedProcessedObjects)
@@ -288,23 +416,26 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 }
 
 func TestListContinuation(t *testing.T) {
-	ctx, store, client := testSetup(t, withRecorder())
+	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
 	storagetesting.RunTestListContinuation(ctx, t, store, validation)
 }
 
 func TestListPaginationRareObject(t *testing.T) {
-	ctx, store, client := testSetup(t, withRecorder())
+	// ListFromCacheSnapshots adds additional Get call to read compact key.
+	// TODO: Rewrite call validation to only count calls to pods.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
 	storagetesting.RunTestListPaginationRareObject(ctx, t, store, validation)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
-	ctx, store, client := testSetup(t, withRecorder())
+	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, store, validation)
 }
 
@@ -313,30 +444,51 @@ func TestNamespaceScopedList(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedList(ctx, t, store)
 }
 
-func compactStorage(client *clientv3.Client) storagetesting.Compaction {
+func compactStorage(s *store, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = client.Compact(ctx, int64(rv)); err != nil {
-			t.Fatalf("Unable to compact, %v", err)
+		var currentVersion int64
+		currentVersion, _, _, err = Compact(ctx, client, currentVersion, int64(rv))
+		if err != nil {
+			_, _, _, err = Compact(ctx, client, currentVersion, int64(rv))
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Wait for compaction to be observed.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+			for {
+				select {
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				case <-time.After(100 * time.Millisecond):
+				}
+				compactedRev := s.CompactRevision()
+				if compactedRev == int64(rv) {
+					break
+				}
+			}
 		}
 	}
 }
 
-func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
-	return func(ctx context.Context, t *testing.T) {
-		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+func increaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) int64 {
+		resp, err := client.KV.Put(ctx, "increaseRV", "ok")
+		if err != nil {
 			t.Fatalf("Could not update increaseRV: %v", err)
 		}
+		return resp.Header.Revision
 	}
 }
 
 func TestListInconsistentContinuation(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(client.Client))
+	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(store, client.Client))
 }
 
 func TestListResourceVersionMatch(t *testing.T) {
@@ -344,9 +496,19 @@ func TestListResourceVersionMatch(t *testing.T) {
 	storagetesting.RunTestListResourceVersionMatch(ctx, t, &storeWithPrefixTransformer{store})
 }
 
-func TestCount(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestCount(ctx, t, store)
+func TestStats(t *testing.T) {
+	for _, sizeBasedListCostEstimate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v", sizeBasedListCostEstimate), func(t *testing.T) {
+			ctx, store, _ := testSetup(t)
+			if sizeBasedListCostEstimate {
+				err := store.EnableResourceSizeEstimation(store.getKeys)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			storagetesting.RunTestStats(ctx, t, store, store.codec, store.transformer, sizeBasedListCostEstimate)
+		})
+	}
 }
 
 // =======================================================================
@@ -478,15 +640,15 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 		expectAttachedCount int64
 	}{
 		{
-			key:                 "testkey1",
+			key:                 "/pods/testkey1",
 			expectAttachedCount: 1,
 		},
 		{
-			key:                 "testkey2",
+			key:                 "/pods/testkey2",
 			expectAttachedCount: 2,
 		},
 		{
-			key: "testkey3",
+			key: "/pods/testkey3",
 			// We assume each time has 1 object attached to the lease
 			// so after granting a new lease, the recorded count is set to 1
 			expectAttachedCount: 1,
@@ -521,20 +683,6 @@ func newTestTransformer() value.Transformer {
 	return storagetesting.NewPrefixTransformer([]byte(defaultTestPrefix), false)
 }
 
-type clientRecorder struct {
-	reads uint64
-	clientv3.KV
-}
-
-func (r *clientRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
-	atomic.AddUint64(&r.reads, 1)
-	return r.KV.Get(ctx, key, opts...)
-}
-
-func (r *clientRecorder) GetReadsAndReset() uint64 {
-	return atomic.SwapUint64(&r.reads, 0)
-}
-
 type setupOptions struct {
 	client         func(testing.TB) *kubernetes.Client
 	codec          runtime.Codec
@@ -545,8 +693,6 @@ type setupOptions struct {
 	groupResource  schema.GroupResource
 	transformer    value.Transformer
 	leaseConfig    LeaseManagerConfig
-
-	recorderEnabled bool
 }
 
 type setupOption func(*setupOptions)
@@ -565,15 +711,27 @@ func withPrefix(prefix string) setupOption {
 	}
 }
 
+func withResourcePrefix(prefix string) setupOption {
+	return func(options *setupOptions) {
+		options.resourcePrefix = prefix
+	}
+}
+
 func withLeaseConfig(leaseConfig LeaseManagerConfig) setupOption {
 	return func(options *setupOptions) {
 		options.leaseConfig = leaseConfig
 	}
 }
 
-func withRecorder() setupOption {
+func withTransformer(transformer value.Transformer) setupOption {
 	return func(options *setupOptions) {
-		options.recorderEnabled = true
+		options.transformer = transformer
+	}
+}
+
+func withCodec(codec runtime.Codec) setupOption {
+	return func(options *setupOptions) {
+		options.codec = codec
 	}
 }
 
@@ -585,7 +743,7 @@ func withDefaults(options *setupOptions) {
 	options.newFunc = newPod
 	options.newListFunc = newPodList
 	options.prefix = ""
-	options.resourcePrefix = "/pods"
+	options.resourcePrefix = "/pods/"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
 	options.transformer = newTestTransformer()
 	options.leaseConfig = newTestLeaseManagerConfig()
@@ -600,12 +758,12 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		opt(&setupOpts)
 	}
 	client := setupOpts.client(t)
-	if setupOpts.recorderEnabled {
-		client.KV = &clientRecorder{KV: client.KV}
-	}
 	versioner := storage.APIObjectVersioner{}
-	store := newStore(
+	compactor := NewCompactor(client.Client, 0, clock.RealClock{}, nil)
+	t.Cleanup(compactor.Stop)
+	store, err := New(
 		client,
+		compactor,
 		setupOpts.codec,
 		setupOpts.newFunc,
 		setupOpts.newListFunc,
@@ -617,22 +775,40 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		NewDefaultDecoder(setupOpts.codec, versioner),
 		versioner,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(store.Close)
 	ctx := context.Background()
 	return ctx, store, client
 }
 
-func TestValidateKey(t *testing.T) {
+func TestPrepareKey(t *testing.T) {
 	validKeys := []string{
-		"/foo/bar/baz/a.b.c/",
-		"/foo",
-		"foo/bar/baz",
-		"/foo/bar..baz/",
-		"/foo/bar..",
-		"foo",
-		"foo/bar",
-		"/foo/bar/",
+		"/pods/foo/bar/baz/a.b.c/",
+		"/pods/foo",
+		"/pods/foo/bar/baz",
+		"/pods/foo/bar..baz/",
+		"/pods/foo/bar..",
+		"/pods/foo",
+		"/pods/foo/bar",
+		"/pods/foo/bar/",
+		"/pods/",
 	}
 	invalidKeys := []string{
+		"/pods",
+		"/pods/foo/bar/../a.b.c/",
+		"/pods/..",
+		"/pods/../",
+		"/pods/foo/bar/..",
+		"/pods/../foo/bar",
+		"/pods/../foo",
+		"/pods/foo/bar/../",
+		"/pods/.",
+		"/pods/./",
+		"/pods/foo/.",
+		"/pods/./bar",
+		"/pods/foo/./bar/",
 		"/foo/bar/../a.b.c/",
 		"..",
 		"/..",
@@ -655,21 +831,46 @@ func TestValidateKey(t *testing.T) {
 	)
 	_, store, _ := testSetup(t, withPrefix(pathPrefix))
 
-	for _, key := range validKeys {
-		k, err := store.prepareKey(key)
-		if err != nil {
-			t.Errorf("key %q should be valid; unexpected error: %v", key, err)
-		} else if !strings.HasPrefix(k, expectPrefix) {
-			t.Errorf("key %q should have prefix %q", k, expectPrefix)
+	t.Run("Non-recursive", func(t *testing.T) {
+		for _, key := range validKeys {
+			preparedKey, err := store.prepareKey(key, false)
+			if err != nil {
+				t.Errorf("preparing key %q should be valid; unexpected error: %v", key, err)
+				continue
+			}
+			if !strings.HasPrefix(preparedKey, expectPrefix) {
+				t.Errorf("prepared key %q should have prefix %q", preparedKey, expectPrefix)
+			}
+			if !strings.HasSuffix(preparedKey, key) {
+				t.Errorf("Prepared non-recursive key %q should have suffix %q", preparedKey, key)
+			}
 		}
-	}
+	})
 
-	for _, key := range invalidKeys {
-		_, err := store.prepareKey(key)
-		if err == nil {
-			t.Errorf("key %q should be invalid", key)
+	t.Run("Recursive", func(t *testing.T) {
+		for _, key := range validKeys {
+			preparedKey, err := store.prepareKey(key, true)
+			if err != nil {
+				t.Errorf("preparing key %q should be valid; unexpected error: %v", key, err)
+				continue
+			}
+			if !strings.HasPrefix(preparedKey, expectPrefix) {
+				t.Errorf("prepared key %q should have prefix %q", preparedKey, expectPrefix)
+			}
+			if !strings.HasSuffix(preparedKey, "/") {
+				t.Errorf("Prepared non-recursive key %q should have suffix '/'", preparedKey)
+			}
 		}
-	}
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		for _, key := range invalidKeys {
+			_, err := store.prepareKey(key, false)
+			if err == nil {
+				t.Errorf("key %q should be invalid", key)
+			}
+		}
+	})
 }
 
 func TestInvalidKeys(t *testing.T) {
@@ -692,8 +893,6 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
 	expectInvalidKey("GetList", store.GetList(ctx, invalidKey, storage.ListOptions{}, nil))
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
-	_, countErr := store.Count(invalidKey)
-	expectInvalidKey("Count", countErr)
 }
 
 func BenchmarkStore_GetList(b *testing.B) {
@@ -825,16 +1024,27 @@ func BenchmarkStore_GetList(b *testing.B) {
 	}
 }
 
-func BenchmarkStoreListCreate(b *testing.B) {
+func BenchmarkStoreWriteThroughput(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	b.Run("RV=NotOlderThan", func(b *testing.B) {
-		ctx, store, _ := testSetup(b)
-		storagetesting.RunBenchmarkStoreListCreate(ctx, b, store, metav1.ResourceVersionMatchNotOlderThan)
-	})
-	b.Run("RV=ExactMatch", func(b *testing.B) {
-		ctx, store, _ := testSetup(b)
-		storagetesting.RunBenchmarkStoreListCreate(ctx, b, store, metav1.ResourceVersionMatchExact)
-	})
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			ctx, store, _ := testSetup(b)
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			b.ResetTimer()
+			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false)
+		})
+	}
 }
 
 func BenchmarkStoreList(b *testing.B) {
@@ -862,18 +1072,15 @@ func BenchmarkStoreList(b *testing.B) {
 		},
 	}
 	for _, dims := range dimensions {
-		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
-			ctx, store, _ := testSetup(b)
-			var out example.Pod
-			for _, pod := range data.Pods {
-				err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
-			storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
-		})
+		for _, sizeBasedEnabled := range []bool{true, false} {
+			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
+			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+				data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+				ctx, store, _ := testSetup(b)
+				require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
+				storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
+			})
+		}
 	}
 }
 
@@ -890,14 +1097,14 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 		}
 	}
 	createPod := func(obj *example.Pod) *example.Pod {
-		key := "pods/" + obj.Namespace + "/" + obj.Name
+		key := "/pods/" + obj.Namespace + "/" + obj.Name
 		out := &example.Pod{}
 		err := store.Create(context.TODO(), key, obj, out, 0)
 		require.NoError(t, err)
 		return out
 	}
 	getPod := func(name, ns string) *example.Pod {
-		key := "pods/" + ns + "/" + name
+		key := "/pods/" + ns + "/" + name
 		out := &example.Pod{}
 		err := store.Get(context.TODO(), key, storage.GetOptions{}, out)
 		require.NoError(t, err)
@@ -925,4 +1132,139 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 	currentPodRV, err := store.versioner.ParseResourceVersion(currentPod.ResourceVersion)
 	require.NoError(t, err)
 	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
+}
+
+func BenchmarkStoreStats(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
+	ctx, store, _ := testSetup(b)
+	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
+	storagetesting.RunBenchmarkStoreStats(ctx, b, store)
+}
+
+// BenchmarkStatsCacheCleanKeys measures execution time of cleanupKeys which is important for watch latency as blocks watch updates.
+func BenchmarkStatsCacheCleanKeys(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	namespaceCount := 50
+	podPerNamespaceCount := 3_000
+	data := storagetesting.PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
+	ctx, store, _ := testSetup(b)
+	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
+	// List to fetch object sizes for statsCache.
+	listOut := &example.PodList{}
+	err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, listOut)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if len(store.resourceSizeEstimator.keys) < namespaceCount*podPerNamespaceCount {
+		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.resourceSizeEstimator.keys))
+	}
+	// Get keys to measure only cleanupKeys time
+	keys, err := store.getKeys(ctx)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.resourceSizeEstimator.cleanKeys(keys)
+	}
+	if len(store.resourceSizeEstimator.keys) < namespaceCount*podPerNamespaceCount {
+		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.resourceSizeEstimator.keys))
+	}
+}
+
+func TestPrefixGetKeys(t *testing.T) {
+	ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
+	_, err := c.KV.Put(ctx, "key", "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.KV.Put(ctx, "/registry/key", "b")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.KV.Put(ctx, "/registry/pods/key", "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.KV.Put(ctx, "/registry/podskey", "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotKeys, err := store.getKeys(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantKeys := []string{"/registry/pods/key"}
+	if diff := cmp.Diff(wantKeys, gotKeys); diff != "" {
+		t.Errorf("getKeys diff:\n%s", diff)
+	}
+}
+
+func TestPrefixStats(t *testing.T) {
+	tcs := []struct {
+		name        string
+		estimate    bool
+		expectStats storage.Stats
+	}{
+		{
+			name:        "Estimate=false",
+			estimate:    false,
+			expectStats: storage.Stats{ObjectCount: 1},
+		},
+		{
+			name:        "Estimate=true",
+			estimate:    true,
+			expectStats: storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: 3},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods/"))
+			if tc.estimate {
+				err := store.EnableResourceSizeEstimation(store.getKeys)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := c.KV.Put(ctx, "key", "a")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.KV.Put(ctx, "/registry/key", "ab")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.KV.Put(ctx, "/registry/pods/key", "abc")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = c.KV.Put(ctx, "/registry/podskey", "abcd")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			listOut := &example.PodList{}
+			// Ignore error as decode is expected to fail
+			_ = store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, listOut)
+
+			gotStats, err := store.Stats(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.expectStats, gotStats); diff != "" {
+				t.Errorf("Stats diff:\n%s", diff)
+			}
+
+		})
+	}
 }

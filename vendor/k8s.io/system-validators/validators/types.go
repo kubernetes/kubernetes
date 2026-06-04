@@ -46,10 +46,18 @@ type KernelSpec struct {
 	VersionsNote string `json:"versionsNote,omitempty"`
 	// Required contains all kernel configurations required to be enabled
 	// (built in or as module).
+	// RequiredCgroupsV1 and RequiredCgroupsV2 are mutually exclusive.
 	Required []KernelConfig `json:"required,omitempty"`
-	// Optional contains all kernel configurations are required for optional
-	// features.
+	// RequiredCgroupsV1 contains all kernel configurations required to be enabled for cgroups v1.
+	RequiredCgroupsV1 []KernelConfig `json:"requiredCgroupsV1,omitempty"`
+	// RequiredCgroupsV2 contains all kernel configurations required to be enabled for cgroups v2.
+	RequiredCgroupsV2 []KernelConfig `json:"requiredCgroupsV2,omitempty"`
+	// Optional contains optional kernel configurations.
 	Optional []KernelConfig `json:"optional,omitempty"`
+	// OptionalCgroupsV1 contains optional kernel configurations related to cgroups v1.
+	OptionalCgroupsV1 []KernelConfig `json:"optionalCgroupsV1,omitempty"`
+	// OptionalCgroupsV2 contains optional kernel configurations related to cgroups v2.
+	OptionalCgroupsV2 []KernelConfig `json:"optionalCgroupsV2,omitempty"`
 	// Forbidden contains all kernel configurations which areforbidden (disabled
 	// or not set)
 	Forbidden []KernelConfig `json:"forbidden,omitempty"`

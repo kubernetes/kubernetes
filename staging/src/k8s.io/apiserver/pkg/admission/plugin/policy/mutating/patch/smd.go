@@ -24,10 +24,10 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v4/schema"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
-	"sigs.k8s.io/structured-merge-diff/v4/value"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -107,8 +107,8 @@ func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCos
 	}
 
 	patchObject := unstructured.Unstructured{Object: value}
-	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.GetObjectKind().GroupVersionKind())
-	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject, &patchObject)
+	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.Object().GetObjectKind().GroupVersionKind())
+	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject.Object(), &patchObject)
 	if err != nil {
 		return nil, fmt.Errorf("error applying patch: %w", err)
 	}
@@ -138,7 +138,7 @@ func ApplyStructuredMergeDiff(
 		return nil, fmt.Errorf("invalid ApplyConfiguration: %w", err)
 	}
 
-	liveObjTyped, err := typeConverter.ObjectToTyped(originalObject)
+	liveObjTyped, err := typeConverter.ObjectToTyped(originalObject, typed.AllowDuplicates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert original object to typed object: %w", err)
 	}

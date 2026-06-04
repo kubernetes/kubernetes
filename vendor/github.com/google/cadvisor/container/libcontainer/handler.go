@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 package libcontainer
 
 import (
@@ -30,6 +32,7 @@ import (
 
 	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/fs2"
+	"github.com/opencontainers/cgroups/fscommon"
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
@@ -89,6 +92,10 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 		klog.V(4).Infof("Ignoring errors when gathering stats for root cgroup since some controllers don't have stats on the root cgroup: %v", err)
 	}
 	stats := newContainerStats(cgroupStats, h.includedMetrics)
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		setMemoryEvents(h.cgroupManager.Path(""), stats)
+	}
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
 		stats.Cpu.Schedstat, err = h.schedulerStatsFromProcs()
@@ -311,7 +318,7 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 func (h *Handler) schedulerStatsFromProcs() (info.CpuSchedstat, error) {
 	pids, err := h.cgroupManager.GetAllPids()
 	if err != nil {
-		return info.CpuSchedstat{}, fmt.Errorf("Could not get PIDs for container %d: %w", h.pid, err)
+		return info.CpuSchedstat{}, fmt.Errorf("could not get PIDs for container %d: %w", h.pid, err)
 	}
 	alivePids := make(map[int]struct{}, len(pids))
 	for _, pid := range pids {
@@ -771,6 +778,8 @@ func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 	ret.Cpu.CFS.Periods = s.CpuStats.ThrottlingData.Periods
 	ret.Cpu.CFS.ThrottledPeriods = s.CpuStats.ThrottlingData.ThrottledPeriods
 	ret.Cpu.CFS.ThrottledTime = s.CpuStats.ThrottlingData.ThrottledTime
+	ret.Cpu.CFS.BurstsPeriods = s.CpuStats.BurstData.BurstsPeriods
+	ret.Cpu.CFS.BurstTime = s.CpuStats.BurstData.BurstTime
 	setPSIStats(s.CpuStats.PSI, &ret.Cpu.PSI)
 
 	if !withPerCPU {
@@ -793,6 +802,10 @@ func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.DiskIo.IoWaitTime = diskStatsCopy(s.BlkioStats.IoWaitTimeRecursive)
 	ret.DiskIo.IoMerged = diskStatsCopy(s.BlkioStats.IoMergedRecursive)
 	ret.DiskIo.IoTime = diskStatsCopy(s.BlkioStats.IoTimeRecursive)
+	ret.DiskIo.IoCostUsage = diskStatsCopy(s.BlkioStats.IoCostUsage)
+	ret.DiskIo.IoCostWait = diskStatsCopy(s.BlkioStats.IoCostWait)
+	ret.DiskIo.IoCostIndebt = diskStatsCopy(s.BlkioStats.IoCostIndebt)
+	ret.DiskIo.IoCostIndelay = diskStatsCopy(s.BlkioStats.IoCostIndelay)
 	setPSIStats(s.BlkioStats.PSI, &ret.DiskIo.PSI)
 }
 
@@ -852,6 +865,15 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		}
 	}
 	ret.Memory.WorkingSet = workingSet
+}
+
+func setMemoryEvents(cgroupPath string, ret *info.ContainerStats) {
+	if val, err := fscommon.GetValueByKey(cgroupPath, "memory.events", "high"); err == nil {
+		ret.Memory.Events.High = val
+	}
+	if val, err := fscommon.GetValueByKey(cgroupPath, "memory.events", "max"); err == nil {
+		ret.Memory.Events.Max = val
+	}
 }
 
 func setCPUSetStats(s *cgroups.Stats, ret *info.ContainerStats) {

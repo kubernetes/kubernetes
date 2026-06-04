@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
-	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -78,7 +77,6 @@ func volumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	return allPlugins
@@ -93,6 +91,9 @@ func NewHollowKubelet(
 	imageService internalapi.ImageManagerService,
 	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
+	// Kubemark dependency construction does not have a higher-level logger.
+	nodeStartupLatencyTracker := kubeletutil.NewNodeStartupLatencyTracker(klog.TODO())
+
 	d := &kubelet.Dependencies{
 		KubeClient:                client,
 		HeartbeatClient:           heartbeatClient,
@@ -100,7 +101,6 @@ func NewHollowKubelet(
 		RemoteRuntimeService:      runtimeService,
 		RemoteImageService:        imageService,
 		CAdvisorInterface:         cadvisorInterface,
-		Cloud:                     nil,
 		OSInterface:               &containertest.FakeOS{},
 		ContainerManager:          containerManager,
 		VolumePlugins:             volumePlugins(),
@@ -110,7 +110,7 @@ func NewHollowKubelet(
 		Subpather:                 &subpath.FakeSubpath{},
 		HostUtil:                  hostutil.NewFakeHostUtil(nil),
 		PodStartupLatencyTracker:  kubeletutil.NewPodStartupLatencyTracker(),
-		NodeStartupLatencyTracker: kubeletutil.NewNodeStartupLatencyTracker(),
+		NodeStartupLatencyTracker: nodeStartupLatencyTracker,
 		TracerProvider:            noopoteltrace.NewTracerProvider(),
 		Recorder:                  &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
 	}
@@ -160,7 +160,6 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
-	f.RegisterSchedulable = true
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()

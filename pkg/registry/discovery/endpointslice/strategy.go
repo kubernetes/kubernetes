@@ -31,6 +31,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -44,12 +45,12 @@ import (
 
 // endpointSliceStrategy implements verification logic for Replication.
 type endpointSliceStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication EndpointSlice objects.
-var Strategy = endpointSliceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = endpointSliceStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all EndpointSlices need to be within a namespace.
 func (endpointSliceStrategy) NamespaceScoped() bool {
@@ -91,8 +92,7 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new EndpointSlice.
 func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	err := validation.ValidateEndpointSliceCreate(endpointSlice)
-	return err
+	return validation.ValidateEndpointSliceCreate(endpointSlice)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -112,7 +112,7 @@ func (endpointSliceStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for EndpointSlice; this means POST is needed to create one.
-func (endpointSliceStrategy) AllowCreateOnUpdate() bool {
+func (endpointSliceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -135,22 +135,18 @@ func (endpointSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 }
 
 // AllowUnconditionalUpdate is the default update policy for EndpointSlice objects.
-func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
+func (endpointSliceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
-	dropNodeHints := !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)
-	if !dropHints && !dropNodeHints {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
 		return
 	}
 
 	for i := range endpointSlice.Endpoints {
-		if dropHints {
-			endpointSlice.Endpoints[i].Hints = nil
-		} else if endpointSlice.Endpoints[i].Hints != nil {
+		if endpointSlice.Endpoints[i].Hints != nil {
 			endpointSlice.Endpoints[i].Hints.ForNodes = nil
 		}
 	}
@@ -159,27 +155,18 @@ func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
 func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
-	dropNodeHints := !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)
-	if dropHints || dropNodeHints {
-		for _, ep := range oldEPS.Endpoints {
-			if ep.Hints != nil {
-				dropHints = false
-				if ep.Hints.ForNodes != nil {
-					dropNodeHints = false
-					break
-				}
-			}
-		}
-	}
-	if !dropHints && !dropNodeHints {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
 		return
 	}
 
+	for _, ep := range oldEPS.Endpoints {
+		if ep.Hints != nil && ep.Hints.ForNodes != nil {
+			return
+		}
+	}
+
 	for i := range newEPS.Endpoints {
-		if dropHints {
-			newEPS.Endpoints[i].Hints = nil
-		} else if newEPS.Endpoints[i].Hints != nil {
+		if newEPS.Endpoints[i].Hints != nil {
 			newEPS.Endpoints[i].Hints.ForNodes = nil
 		}
 	}

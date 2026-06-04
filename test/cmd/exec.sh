@@ -63,7 +63,31 @@ __EOF__
   # These must be pass the validate
   kube::test::if_has_not_string "${output_message}" 'pod or type/name must be specified'
 
+  ### Test execute with invalid container name
+  output_message=$(! kubectl exec test-pod -c nonexistent -- date 2>&1)
+  kube::test::if_has_string "${output_message}" 'container nonexistent is not valid for pod test-pod out of: kubernetes-pause'
+
+  kubectl create -f - << __EOF__
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-test
+spec:
+  containers:
+  - name: container-a
+    image: registry.k8s.io/pause:3.10.1
+  - name: container-b
+    image: registry.k8s.io/pause:3.10.1
+__EOF__
+
+  ### Test execute with pod and container before dash separator
+  output_message=$(! kubectl exec -it pod-test -c container-a -- echo "test" 2>&1)
+  kube::test::if_has_not_string "${output_message}" 'exec \[POD\] \[COMMAND\] is not supported anymore'
+  kube::test::if_has_not_string "${output_message}" 'container container-a is not valid for pod pod-test'
+  kube::test::if_has_not_string "${output_message}" 'pods "pod-test" not found'
+
   # Clean up
+  kubectl delete pods pod-test
   kubectl delete pods test-pod
 
   set +o nounset
@@ -78,12 +102,12 @@ run_kubectl_exec_resource_name_tests() {
   kube::log::status "Testing kubectl exec TYPE/NAME COMMAND"
 
   ### Test execute invalid resource type
-  output_message=$(! kubectl exec foo/bar date 2>&1)
+  output_message=$(! kubectl exec foo/bar -- date 2>&1)
   # resource type foo should error since it's invalid
   kube::test::if_has_string "${output_message}" 'error:'
 
   ### Test execute non-existing resources
-  output_message=$(! kubectl exec deployments/bar date 2>&1)
+  output_message=$(! kubectl exec deployments/bar -- date 2>&1)
   # resource type foo should error since it doesn't exist
   kube::test::if_has_string "${output_message}" '"bar" not found'
 
@@ -92,7 +116,7 @@ run_kubectl_exec_resource_name_tests() {
   kubectl create -f hack/testdata/configmap.yaml
 
   ### Test execute non-implemented resources
-  output_message=$(! kubectl exec configmap/test-set-env-config date 2>&1)
+  output_message=$(! kubectl exec configmap/test-set-env-config -- date 2>&1)
   # resource type configmap should error since configmap not implemented to be attached
   kube::test::if_has_string "${output_message}" 'not implemented'
 
@@ -100,13 +124,13 @@ run_kubectl_exec_resource_name_tests() {
   # Just check the output, since test-cmd not run kubelet, pod never be assigned.
   # and not really can run `kubectl exec` command
 
-  output_message=$(! kubectl exec pods/test-pod date 2>&1)
+  output_message=$(! kubectl exec pods/test-pod -- date 2>&1)
   # POD test-pod is exists this is shouldn't have output not found
   kube::test::if_has_not_string "${output_message}" 'not found'
   # These must be pass the validate
   kube::test::if_has_not_string "${output_message}" 'pod, type/name or --filename must be specified'
 
-  output_message=$(! kubectl exec replicaset/frontend date 2>&1)
+  output_message=$(! kubectl exec replicaset/frontend -- date 2>&1)
   # Replicaset frontend is valid and exists will select the first pod.
   # and Shouldn't have output not found
   kube::test::if_has_not_string "${output_message}" 'not found'

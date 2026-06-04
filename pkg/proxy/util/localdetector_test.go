@@ -105,6 +105,37 @@ func TestDetectLocalByBridgeInterface(t *testing.T) {
 	}
 }
 
+func TestDetectLocalNFTByBridgeInterface(t *testing.T) {
+	cases := []struct {
+		ifaceName               string
+		expectedJumpIfOutput    []string
+		expectedJumpIfNotOutput []string
+	}{
+		{
+			ifaceName:               "eth0",
+			expectedJumpIfOutput:    []string{"iifname", "eth0"},
+			expectedJumpIfNotOutput: []string{"iifname", "!=", "eth0"},
+		},
+	}
+	for _, c := range cases {
+		localDetector := NewDetectLocalByBridgeInterface(c.ifaceName)
+		if !localDetector.IsImplemented() {
+			t.Error("DetectLocalByBridgeInterface returns false for IsImplemented")
+		}
+
+		ifLocal := localDetector.IfLocalNFT()
+		ifNotLocal := localDetector.IfNotLocalNFT()
+
+		if !reflect.DeepEqual(ifLocal, c.expectedJumpIfOutput) {
+			t.Errorf("IfLocalNFT, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, ifLocal)
+		}
+
+		if !reflect.DeepEqual(ifNotLocal, c.expectedJumpIfNotOutput) {
+			t.Errorf("IfNotLocalNFT, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, ifNotLocal)
+		}
+	}
+}
+
 func TestDetectLocalByInterfaceNamePrefix(t *testing.T) {
 	cases := []struct {
 		ifacePrefix             string
@@ -134,6 +165,39 @@ func TestDetectLocalByInterfaceNamePrefix(t *testing.T) {
 
 		if !reflect.DeepEqual(ifNotLocal, c.expectedJumpIfNotOutput) {
 			t.Errorf("IfNotLocal, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, ifNotLocal)
+		}
+	}
+}
+
+func TestDetectLocalNFTByInterfaceNamePrefix(t *testing.T) {
+	cases := []struct {
+		ifacePrefix             string
+		chain                   string
+		args                    []string
+		expectedJumpIfOutput    []string
+		expectedJumpIfNotOutput []string
+	}{
+		{
+			ifacePrefix:             "eth",
+			expectedJumpIfOutput:    []string{"iifname", "eth*"},
+			expectedJumpIfNotOutput: []string{"iifname", "!=", "eth*"},
+		},
+	}
+	for _, c := range cases {
+		localDetector := NewDetectLocalByInterfaceNamePrefix(c.ifacePrefix)
+		if !localDetector.IsImplemented() {
+			t.Error("DetectLocalByInterfaceNamePrefix returns false for IsImplemented")
+		}
+
+		ifLocal := localDetector.IfLocalNFT()
+		ifNotLocal := localDetector.IfNotLocalNFT()
+
+		if !reflect.DeepEqual(ifLocal, c.expectedJumpIfOutput) {
+			t.Errorf("IfLocalNFT, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, ifLocal)
+		}
+
+		if !reflect.DeepEqual(ifNotLocal, c.expectedJumpIfNotOutput) {
+			t.Errorf("IfNotLocalNFT, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, ifNotLocal)
 		}
 	}
 }

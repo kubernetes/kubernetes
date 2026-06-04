@@ -28,11 +28,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/server/flagz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -127,7 +128,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"rather than being surprised when they are permanently removed in the release after that. "+
 			"This parameter is ignored if a config file is specified by --config.")
 	fs.BoolVar(&o.InitAndExit, "init-only", o.InitAndExit, "If true, perform any initialization steps that must be done with full root privileges, and then exit. After doing this, you can run kube-proxy again with only the CAP_NET_ADMIN capability.")
-	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: on Linux this can be 'iptables' (default), 'ipvs', or 'nftables'. On Windows the only supported value is 'kernelspace'."+
+	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: on Linux this can be 'iptables' (default), 'ipvs', or 'nftables'. On Windows the only supported value is 'kernelspace'. "+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", ptr.Deref(o.config.IPTables.MasqueradeBit, 14), "If using the iptables or ipvs proxy mode, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
@@ -240,6 +241,9 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
 		return err
 	}
+	// Propagate feature gate state to the metrics subsystem. This must be called
+	// after feature gates are set and before any histogram metrics are registered.
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		nfs := cliflag.NamedFlagSets{
@@ -387,7 +391,7 @@ func (o *Options) Run(ctx context.Context) error {
 // Return an error when updated
 func (o *Options) runLoop(ctx context.Context) error {
 	if o.watcher != nil {
-		o.watcher.Run()
+		o.watcher.Run(ctx)
 	}
 
 	// run the proxy in goroutine

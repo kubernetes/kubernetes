@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,26 +59,27 @@ func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duratio
 }
 
 // Start eager background caching of volume stats.
-func (s *fsResourceAnalyzer) Start() {
+func (s *fsResourceAnalyzer) Start(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	s.startOnce.Do(func() {
 		if s.calcPeriod <= 0 {
-			klog.InfoS("Volume stats collection disabled")
+			logger.Info("Volume stats collection disabled")
 			return
 		}
-		klog.InfoS("Starting FS ResourceAnalyzer")
-		go wait.Forever(func() { s.updateCachedPodVolumeStats() }, s.calcPeriod)
+		logger.Info("Starting FS ResourceAnalyzer")
+		go wait.Forever(func() { s.updateCachedPodVolumeStats(logger) }, s.calcPeriod)
 	})
 }
 
 // updateCachedPodVolumeStats calculates and caches the PodVolumeStats for every Pod known to the kubelet.
-func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
+func (s *fsResourceAnalyzer) updateCachedPodVolumeStats(logger klog.Logger) {
 	oldCache := s.cachedVolumeStats.Load().(statCache)
 	newCache := make(statCache)
 
 	// Copy existing entries to new map, creating/starting new entries for pods missing from the cache
 	for _, pod := range s.statsProvider.GetPods() {
 		if value, found := oldCache[pod.GetUID()]; !found {
-			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce()
+			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce(logger)
 		} else {
 			newCache[pod.GetUID()] = value
 		}

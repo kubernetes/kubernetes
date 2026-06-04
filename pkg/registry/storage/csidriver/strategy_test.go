@@ -17,16 +17,20 @@ limitations under the License.
 package csidriver
 
 import (
+	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func getValidCSIDriver(name string) *storage.CSIDriver {
@@ -36,11 +40,12 @@ func getValidCSIDriver(name string) *storage.CSIDriver {
 			Name: name,
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:    &enabled,
-			PodInfoOnMount:    &enabled,
-			StorageCapacity:   &enabled,
-			RequiresRepublish: &enabled,
-			SELinuxMount:      &enabled,
+			AttachRequired:                &enabled,
+			PodInfoOnMount:                &enabled,
+			StorageCapacity:               &enabled,
+			RequiresRepublish:             &enabled,
+			SELinuxMount:                  &enabled,
+			PreventPodSchedulingIfMissing: &enabled,
 		},
 	}
 }
@@ -54,7 +59,7 @@ func TestCSIDriverStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("CSIDriver must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("CSIDriver should not allow create on update")
 	}
 
@@ -191,6 +196,41 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			SELinuxMount: &disabled,
 		},
 	}
+	driverWithServiceAccountTokenInSecretsEnabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			ServiceAccountTokenInSecrets: &enabled,
+			TokenRequests:                []storage.TokenRequest{{Audience: gcp}},
+		},
+	}
+	driverWithServiceAccountTokenInSecretsDisabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			ServiceAccountTokenInSecrets: &disabled,
+			TokenRequests:                []storage.TokenRequest{{Audience: gcp}},
+		},
+	}
+
+	driverWithPreventPodSchedulingIfMissingEnabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			PreventPodSchedulingIfMissing: &enabled,
+		},
+	}
+	driverWithPreventPodSchedulingIfMissingDisabled := &storage.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: storage.CSIDriverSpec{
+			PreventPodSchedulingIfMissing: &disabled,
+		},
+	}
 
 	thirty := int64(30)
 	sixty := int64(60)
@@ -218,6 +258,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		old, update                            *storage.CSIDriver
 		seLinuxMountReadWriteOncePodEnabled    bool
 		mutableCSINodeAllocatableCountEnabled  bool
+		csiServiceAccountTokenSecretsEnabled   bool
 		wantCapacity                           *bool
 		wantModes                              []storage.VolumeLifecycleMode
 		wantTokenRequests                      []storage.TokenRequest
@@ -225,6 +266,9 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 		wantGeneration                         int64
 		wantSELinuxMount                       *bool
 		wantNodeAllocatableUpdatePeriodSeconds *int64
+		wantServiceAccountTokenInSecrets       *bool
+		volumeLimitScalingEnabled              bool
+		wantPreventPodSchedulingIfMissing      *bool
 	}{
 		{
 			name:           "podInfoOnMount feature enabled, before: none, update: enabled",
@@ -393,12 +437,90 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			wantNodeAllocatableUpdatePeriodSeconds: nil,
 			wantGeneration:                         0,
 		},
+		{
+			name:                                 "ServiceAccountTokenInSecrets feature enabled, before: nil, update: enabled",
+			csiServiceAccountTokenSecretsEnabled: true,
+			old:                                  driverWithNothing,
+			update:                               driverWithServiceAccountTokenInSecretsEnabled,
+			wantServiceAccountTokenInSecrets:     &enabled,
+			wantTokenRequests:                    []storage.TokenRequest{{Audience: gcp}},
+			wantGeneration:                       1,
+		},
+		{
+			name:                                 "ServiceAccountTokenInSecrets feature enabled, before: enabled, update: disabled",
+			csiServiceAccountTokenSecretsEnabled: true,
+			old:                                  driverWithServiceAccountTokenInSecretsEnabled,
+			update:                               driverWithServiceAccountTokenInSecretsDisabled,
+			wantServiceAccountTokenInSecrets:     &disabled,
+			wantTokenRequests:                    []storage.TokenRequest{{Audience: gcp}},
+			wantGeneration:                       1,
+		},
+		{
+			name:                                 "ServiceAccountTokenInSecrets feature disabled, before: nil, update: enabled",
+			csiServiceAccountTokenSecretsEnabled: false,
+			old:                                  driverWithNothing,
+			update:                               driverWithServiceAccountTokenInSecretsEnabled,
+			wantServiceAccountTokenInSecrets:     nil,
+			wantTokenRequests:                    []storage.TokenRequest{{Audience: gcp}},
+			wantGeneration:                       1,
+		},
+		{
+			name:                                 "ServiceAccountTokenInSecrets feature disabled, before: enabled, update: enabled",
+			csiServiceAccountTokenSecretsEnabled: false,
+			old:                                  driverWithServiceAccountTokenInSecretsEnabled,
+			update:                               driverWithServiceAccountTokenInSecretsEnabled,
+			wantServiceAccountTokenInSecrets:     &enabled,
+			wantTokenRequests:                    []storage.TokenRequest{{Audience: gcp}},
+			wantGeneration:                       0,
+		},
+		{
+			name:                              "VolumeLimitScaling feature enabled, before: nil, update: enabled",
+			volumeLimitScalingEnabled:         true,
+			old:                               driverWithNothing,
+			update:                            driverWithPreventPodSchedulingIfMissingEnabled,
+			wantPreventPodSchedulingIfMissing: &enabled,
+			wantGeneration:                    1,
+		},
+		{
+			name:                              "VolumeLimitScaling feature enabled, before: enabled, update: disabled",
+			volumeLimitScalingEnabled:         true,
+			old:                               driverWithPreventPodSchedulingIfMissingEnabled,
+			update:                            driverWithPreventPodSchedulingIfMissingDisabled,
+			wantPreventPodSchedulingIfMissing: &disabled,
+			wantGeneration:                    1,
+		},
+		{
+			name:                              "VolumeLimitScaling feature disabled, before: nil, update: enabled",
+			volumeLimitScalingEnabled:         false,
+			old:                               driverWithNothing,
+			update:                            driverWithPreventPodSchedulingIfMissingEnabled,
+			wantPreventPodSchedulingIfMissing: nil,
+			wantGeneration:                    0,
+		},
+		{
+			name:                              "VolumeLimitScaling feature disabled, before: enabled, update: enabled",
+			volumeLimitScalingEnabled:         false,
+			old:                               driverWithPreventPodSchedulingIfMissingEnabled,
+			update:                            driverWithPreventPodSchedulingIfMissingEnabled,
+			wantPreventPodSchedulingIfMissing: &enabled,
+			wantGeneration:                    0,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.seLinuxMountReadWriteOncePodEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, test.mutableCSINodeAllocatableCountEnabled)
+			if !test.csiServiceAccountTokenSecretsEnabled || !test.seLinuxMountReadWriteOncePodEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
+			if !test.mutableCSINodeAllocatableCountEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SELinuxMountReadWriteOncePod:   test.seLinuxMountReadWriteOncePodEnabled,
+				features.MutableCSINodeAllocatableCount: test.mutableCSINodeAllocatableCountEnabled,
+				features.CSIServiceAccountTokenSecrets:  test.csiServiceAccountTokenSecretsEnabled,
+				features.VolumeLimitScaling:             test.volumeLimitScalingEnabled,
+			})
 
 			csiDriver := test.update.DeepCopy()
 			Strategy.PrepareForUpdate(ctx, csiDriver, test.old)
@@ -409,6 +531,8 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			require.Equal(t, test.wantRequiresRepublish, csiDriver.Spec.RequiresRepublish)
 			require.Equal(t, test.wantSELinuxMount, csiDriver.Spec.SELinuxMount)
 			require.Equal(t, test.wantNodeAllocatableUpdatePeriodSeconds, csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds)
+			require.Equal(t, test.wantServiceAccountTokenInSecrets, csiDriver.Spec.ServiceAccountTokenInSecrets)
+			require.Equal(t, test.wantPreventPodSchedulingIfMissing, csiDriver.Spec.PreventPodSchedulingIfMissing)
 		})
 	}
 }
@@ -419,6 +543,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	gcp := "gcp"
 	validNodeAllocatableUpdatePeriodSeconds := int64(30)
 	invalidNodeAllocatableUpdatePeriodSeconds := int64(3)
+	tokenRequests := []storage.TokenRequest{{Audience: gcp}}
 
 	tests := []struct {
 		name        string
@@ -437,11 +562,12 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    &enabled,
-					PodInfoOnMount:    &enabled,
-					StorageCapacity:   &enabled,
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			false,
@@ -453,11 +579,12 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    &disabled,
-					PodInfoOnMount:    &disabled,
-					StorageCapacity:   &disabled,
-					RequiresRepublish: &disabled,
-					SELinuxMount:      &disabled,
+					AttachRequired:                &disabled,
+					PodInfoOnMount:                &disabled,
+					StorageCapacity:               &disabled,
+					RequiresRepublish:             &disabled,
+					SELinuxMount:                  &disabled,
+					PreventPodSchedulingIfMissing: &disabled,
 				},
 			},
 			false,
@@ -469,11 +596,12 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "*foo#",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    &enabled,
-					PodInfoOnMount:    &enabled,
-					StorageCapacity:   &enabled,
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			true,
@@ -491,8 +619,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecycleMode("no-such-mode"),
 					},
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			true,
@@ -510,8 +639,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecyclePersistent,
 					},
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			false,
@@ -529,8 +659,9 @@ func TestCSIDriverValidation(t *testing.T) {
 					VolumeLifecycleModes: []storage.VolumeLifecycleMode{
 						storage.VolumeLifecycleEphemeral,
 					},
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			false,
@@ -549,8 +680,9 @@ func TestCSIDriverValidation(t *testing.T) {
 						storage.VolumeLifecyclePersistent,
 						storage.VolumeLifecycleEphemeral,
 					},
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			false,
@@ -562,12 +694,13 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    &enabled,
-					PodInfoOnMount:    &enabled,
-					StorageCapacity:   &enabled,
-					TokenRequests:     []storage.TokenRequest{{Audience: gcp}},
-					RequiresRepublish: &enabled,
-					SELinuxMount:      &enabled,
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					TokenRequests:                 []storage.TokenRequest{{Audience: gcp}},
+					RequiresRepublish:             &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			false,
@@ -579,10 +712,11 @@ func TestCSIDriverValidation(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:  &enabled,
-					PodInfoOnMount:  &enabled,
-					StorageCapacity: &enabled,
-					SELinuxMount:    nil,
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  nil,
+					PreventPodSchedulingIfMissing: &enabled,
 				},
 			},
 			true,
@@ -598,6 +732,7 @@ func TestCSIDriverValidation(t *testing.T) {
 					PodInfoOnMount:                     &enabled,
 					StorageCapacity:                    &enabled,
 					SELinuxMount:                       &enabled,
+					PreventPodSchedulingIfMissing:      &enabled,
 					NodeAllocatableUpdatePeriodSeconds: &validNodeAllocatableUpdatePeriodSeconds,
 				},
 			},
@@ -614,7 +749,90 @@ func TestCSIDriverValidation(t *testing.T) {
 					PodInfoOnMount:                     &enabled,
 					StorageCapacity:                    &enabled,
 					SELinuxMount:                       &enabled,
+					PreventPodSchedulingIfMissing:      &enabled,
 					NodeAllocatableUpdatePeriodSeconds: &invalidNodeAllocatableUpdatePeriodSeconds,
+				},
+			},
+			true,
+		},
+		{
+			"valid ServiceAccountTokenInSecrets with TokenRequests",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
+					ServiceAccountTokenInSecrets:  &enabled,
+					TokenRequests:                 tokenRequests,
+				},
+			},
+			false,
+		},
+		{
+			"invalid ServiceAccountTokenInSecrets without TokenRequests",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
+					ServiceAccountTokenInSecrets:  &enabled,
+				},
+			},
+			true,
+		},
+		{
+			"valid PreventPodSchedulingIfMissing set to true",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &enabled,
+				},
+			},
+			false,
+		},
+		{
+			"valid PreventPodSchedulingIfMissing set to false",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:                &enabled,
+					PodInfoOnMount:                &enabled,
+					StorageCapacity:               &enabled,
+					SELinuxMount:                  &enabled,
+					PreventPodSchedulingIfMissing: &disabled,
+				},
+			},
+			false,
+		},
+		{
+			"invalid PreventPodSchedulingIfMissing not set (nil)",
+			&storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					AttachRequired:  &enabled,
+					PodInfoOnMount:  &enabled,
+					StorageCapacity: &enabled,
+					SELinuxMount:    &enabled,
 				},
 			},
 			true,
@@ -624,8 +842,14 @@ func TestCSIDriverValidation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// assume this feature is on for this test, detailed enabled/disabled tests in TestCSIDriverValidationSELinuxMountEnabledDisabled
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+			// and TestCSIDriverValidationServiceAccountTokenInSecretsEnabledDisabled
+			// and TestCSIDriverValidationPreventPodSchedulingIfMissingEnabledDisabled
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SELinuxMountReadWriteOncePod:   true,
+				features.MutableCSINodeAllocatableCount: true,
+				features.CSIServiceAccountTokenSecrets:  true,
+				features.VolumeLimitScaling:             true,
+			})
 
 			testValidation := func(csiDriver *storage.CSIDriver, apiVersion string) field.ErrorList {
 				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
@@ -643,6 +867,394 @@ func TestCSIDriverValidation(t *testing.T) {
 			if len(err) == 0 && test.expectError {
 				t.Errorf("Validation of v1 object unexpectedly succeeded")
 			}
+		})
+	}
+}
+
+func TestWarningsOnCreate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	tests := []struct {
+		name                                 string
+		csiDriver                            *storage.CSIDriver
+		csiServiceAccountTokenSecretsEnabled bool
+		wantWarnings                         []string
+	}{
+		{
+			name: "no warnings, serviceAccountTokenInSecrets=true, feature enabled",
+			csiDriver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(true),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warning for serviceAccountTokenInSecrets=false, feature enabled",
+			csiDriver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(false),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "warning for missing serviceAccountTokenInSecrets, feature enabled",
+			csiDriver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+			wantWarnings:                         []string{warningServiceAccountTokenInSecretsRecommended},
+		},
+		{
+			name: "no warning when no TokenRequests, feature enabled",
+			csiDriver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warning when feature disabled, even with tokenRequests and no serviceAccountTokenInSecrets",
+			csiDriver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if !test.csiServiceAccountTokenSecretsEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.CSIServiceAccountTokenSecrets: test.csiServiceAccountTokenSecretsEnabled,
+			})
+
+			warnings := Strategy.WarningsOnCreate(ctx, test.csiDriver)
+			if len(warnings) != len(test.wantWarnings) {
+				t.Errorf("got %d warnings, want %d warnings: %v", len(warnings), len(test.wantWarnings), warnings)
+			}
+			if slices.Compare(warnings, test.wantWarnings) != 0 {
+				t.Errorf("got warnings %v, want %v", warnings, test.wantWarnings)
+			}
+		})
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	tests := []struct {
+		name                                 string
+		oldObj                               *storage.CSIDriver
+		newObj                               *storage.CSIDriver
+		csiServiceAccountTokenSecretsEnabled bool
+		wantWarnings                         []string
+	}{
+		{
+			name: "no warnings when tokenRequests unchanged and serviceAccountTokenInSecrets=true, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(true),
+				},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(true),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warnings when tokenRequests unchanged even if serviceAccountTokenInSecrets=false, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(false),
+				},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(false),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warnings when tokenRequests unchanged even if serviceAccountTokenInSecrets=nil, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "warning when adding tokenRequests with serviceAccountTokenInSecrets=nil, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+			wantWarnings:                         []string{warningServiceAccountTokenInSecretsRecommended},
+		},
+		{
+			name: "no warning when adding tokenRequests with serviceAccountTokenInSecrets=false, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(false),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warning when adding tokenRequests with serviceAccountTokenInSecrets=true, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+					ServiceAccountTokenInSecrets: ptr.To(true),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "warning when changing tokenRequests audience with serviceAccountTokenInSecrets=nil, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "old-aud"}},
+				},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "new-aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+			wantWarnings:                         []string{warningServiceAccountTokenInSecretsRecommended},
+		},
+		{
+			name: "no warning when removing tokenRequests, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warning when updating unrelated field, feature enabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:  []storage.TokenRequest{{Audience: "aud"}},
+					PodInfoOnMount: ptr.To(false),
+				},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests:  []storage.TokenRequest{{Audience: "aud"}},
+					PodInfoOnMount: ptr.To(true),
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+		},
+		{
+			name: "no warning when adding tokenRequests with feature disabled",
+			oldObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{},
+			},
+			newObj: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if !test.csiServiceAccountTokenSecretsEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.CSIServiceAccountTokenSecrets: test.csiServiceAccountTokenSecretsEnabled,
+			})
+
+			warnings := Strategy.WarningsOnUpdate(ctx, test.newObj, test.oldObj)
+			if len(warnings) != len(test.wantWarnings) {
+				t.Errorf("got %d warnings, want %d warnings: %v", len(warnings), len(test.wantWarnings), warnings)
+			}
+			if slices.Compare(warnings, test.wantWarnings) != 0 {
+				t.Errorf("got warnings %v, want %v", warnings, test.wantWarnings)
+			}
+		})
+	}
+}
+
+func TestCSIDriverPrepareForCreate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csidrivers",
+	})
+
+	enabled := true
+
+	tests := []struct {
+		name                                 string
+		csiDriver                            *storage.CSIDriver
+		csiServiceAccountTokenSecretsEnabled bool
+		wantServiceAccountTokenInSecrets     *bool
+		volumeLimitScalingEnabled            bool
+		wantPreventPodSchedulingIfMissing    *bool
+	}{
+		{
+			name: "ServiceAccountTokenInSecrets feature enabled, field set to true",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					ServiceAccountTokenInSecrets: &enabled,
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+			wantServiceAccountTokenInSecrets:     &enabled,
+		},
+		{
+			name: "ServiceAccountTokenInSecrets feature disabled, field set to true should be cleared",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					ServiceAccountTokenInSecrets: &enabled,
+					TokenRequests:                []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: false,
+			wantServiceAccountTokenInSecrets:     nil,
+		},
+		{
+			name: "ServiceAccountTokenInSecrets feature enabled, field not set",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: true,
+			wantServiceAccountTokenInSecrets:     nil,
+		},
+		{
+			name: "ServiceAccountTokenInSecrets feature disabled, field not set",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{{Audience: "aud"}},
+				},
+			},
+			csiServiceAccountTokenSecretsEnabled: false,
+			wantServiceAccountTokenInSecrets:     nil,
+		},
+		{
+			name: "VolumeLimitScaling feature enabled, field set to true",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					PreventPodSchedulingIfMissing: &enabled,
+				},
+			},
+			volumeLimitScalingEnabled:         true,
+			wantPreventPodSchedulingIfMissing: &enabled,
+		},
+		{
+			name: "VolumeLimitScaling feature disabled, field set to true should be cleared",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{
+					PreventPodSchedulingIfMissing: &enabled,
+				},
+			},
+			volumeLimitScalingEnabled:         false,
+			wantPreventPodSchedulingIfMissing: nil,
+		},
+		{
+			name: "VolumeLimitScaling feature enabled, field not set",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{},
+			},
+			volumeLimitScalingEnabled:         true,
+			wantPreventPodSchedulingIfMissing: nil,
+		},
+		{
+			name: "VolumeLimitScaling feature disabled, field not set",
+			csiDriver: &storage.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: storage.CSIDriverSpec{},
+			},
+			volumeLimitScalingEnabled:         false,
+			wantPreventPodSchedulingIfMissing: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if !test.csiServiceAccountTokenSecretsEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.CSIServiceAccountTokenSecrets: test.csiServiceAccountTokenSecretsEnabled,
+				features.VolumeLimitScaling:            test.volumeLimitScalingEnabled,
+			})
+
+			csiDriver := test.csiDriver.DeepCopy()
+			Strategy.PrepareForCreate(ctx, csiDriver)
+			require.Equal(t, test.wantServiceAccountTokenInSecrets, csiDriver.Spec.ServiceAccountTokenInSecrets)
+			require.Equal(t, test.wantPreventPodSchedulingIfMissing, csiDriver.Spec.PreventPodSchedulingIfMissing)
 		})
 	}
 }

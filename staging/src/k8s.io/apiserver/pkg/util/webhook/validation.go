@@ -65,11 +65,11 @@ func ValidateWebhookService(fldPath *field.Path, namespace, name string, path *s
 	var allErrors field.ErrorList
 
 	if len(name) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("name"), "service name is required"))
+		allErrors = append(allErrors, field.Required(fldPath.Child("name"), ""))
 	}
 
 	if len(namespace) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("namespace"), "service namespace is required"))
+		allErrors = append(allErrors, field.Required(fldPath.Child("namespace"), ""))
 	}
 
 	if errs := validation.IsValidPortNum(int(port)); errs != nil {

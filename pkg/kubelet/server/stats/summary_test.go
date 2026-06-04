@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -20,7 +19,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -52,7 +50,7 @@ var (
 
 func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
+	ctx := t.Context()
 	assert := assert.New(t)
 
 	podStats := []statsapi.PodStats{
@@ -77,7 +75,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 
 	mockStatsProvider := statstest.NewMockProvider(t)
 
-	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
@@ -85,11 +83,11 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
 	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
 
 	kubeletCreationTime := metav1.Now()
 	systemBootTime := metav1.Now()
@@ -153,7 +151,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 
 func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
+	ctx := t.Context()
 	assert := assert.New(t)
 
 	podStats := []statsapi.PodStats{
@@ -178,18 +176,18 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 
 	mockStatsProvider := statstest.NewMockProvider(t)
 
-	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
 	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
-	mockStatsProvider.EXPECT().GetCgroupStats("/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
 
 	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, rootFsStats, nil)
 
@@ -256,7 +254,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 
 func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
-	ctx := context.Background()
+	ctx := t.Context()
 	assert := assert.New(t)
 
 	podStats := []statsapi.PodStats{
@@ -278,7 +276,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 
 	mockStatsProvider := statstest.NewMockProvider(t)
 
-	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats(ctx).Return(podStats, nil)
@@ -288,7 +286,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
-	provider := NewSummaryProvider(mockStatsProvider)
+	provider := NewSummaryProvider(ctx, mockStatsProvider)
 	summary, err := provider.GetCPUAndMemoryStats(ctx)
 	assert.NoError(err)
 

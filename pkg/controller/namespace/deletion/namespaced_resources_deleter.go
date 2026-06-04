@@ -32,11 +32,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // NamespacedResourcesDeleterInterface is the interface to delete a namespace with all resources in it.
@@ -161,7 +159,7 @@ func (d *namespacedResourcesDeleter) initOpCache(ctx context.Context) {
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to get all supported resources from server")
 	}
 	logger := klog.FromContext(ctx)
 	if len(resources) == 0 {
@@ -530,7 +528,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	}
 	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
-	if _, hasPods := groupVersionResources[podsGVR]; hasPods && utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
+	if _, hasPods := groupVersionResources[podsGVR]; hasPods {
 		// Ensure all pods in the namespace are deleted first
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, podsGVR, namespace, namespaceDeletedAt)
 		if err != nil {
@@ -555,7 +553,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 			logger.V(5).Info("Namespace controller - pods still remain, delaying deletion of other resources", "namespace", namespace)
 			if hasChanged := conditionUpdater.Update(ns); hasChanged {
 				if _, err = d.nsClient.UpdateStatus(ctx, ns, metav1.UpdateOptions{}); err != nil {
-					utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %w", namespace, err))
+					utilruntime.HandleErrorWithContext(ctx, err, "Couldn't update status condition for namespace", "namespace", namespace)
 				}
 			}
 			return estimate, utilerrors.NewAggregate(errs)
@@ -564,7 +562,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 
 	// Proceed with deleting other resources in the namespace
 	for gvr := range groupVersionResources {
-		if utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) && gvr.Group == podsGVR.Group &&
+		if gvr.Group == podsGVR.Group &&
 			gvr.Version == podsGVR.Version && gvr.Resource == podsGVR.Resource {
 			continue
 		}
@@ -595,7 +593,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	// NOT remove the resource instance.
 	if hasChanged := conditionUpdater.Update(ns); hasChanged {
 		if _, err = d.nsClient.UpdateStatus(ctx, ns, metav1.UpdateOptions{}); err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Couldn't update status condition for namespace", "namespace", namespace)
 		}
 	}
 

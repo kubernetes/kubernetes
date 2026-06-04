@@ -18,6 +18,7 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
+// +k8s:validation-gen-nolint
 package immutable
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
@@ -57,7 +58,8 @@ type Struct struct {
 }
 
 type ComparableStruct struct {
-	StringField string `json:"stringField"`
+	StringField    string  `json:"stringField"`
+	StringPtrField *string `json:"stringPtrField"`
 }
 
 type NonComparableStruct struct {

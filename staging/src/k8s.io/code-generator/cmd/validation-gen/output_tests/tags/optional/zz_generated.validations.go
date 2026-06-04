@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -37,75 +38,513 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
-	})
+	// type Struct
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
-func Validate_OtherStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
-	// type OtherStruct
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct")...)
+// Validate_IntType validates an instance of IntType according
+// to declarative validation rules in the API schema.
+func Validate_IntType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *IntType) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type IntType"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+// Validate_MapType validates an instance of MapType according
+// to declarative validation rules in the API schema.
+func Validate_MapType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj MapType) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapType"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_OtherStruct validates an instance of OtherStruct according
+// to declarative validation rules in the API schema.
+func Validate_OtherStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *OtherStruct) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_SliceType validates an instance of SliceType according
+// to declarative validation rules in the API schema.
+func Validate_SliceType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj SliceType) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type SliceType"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_StringType validates an instance of StringType according
+// to declarative validation rules in the API schema.
+func Validate_StringType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *StringType) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type StringType"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_Struct validates an instance of Struct according
+// to declarative validation rules in the API schema.
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.StringField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+	{ // field Struct.StringField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringField")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.StringField
+			})
+		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.StringPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+	{ // field Struct.StringPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringPtrField")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.StringPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("stringPtrField"), obj.StringPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.OtherStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+	{ // field Struct.StringTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.OtherStructPtrField")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_StringType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *StringType {
+				return &oldObj.StringTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("stringTypedefField"), &obj.StringTypedefField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.StringTypedefPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringTypedefPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_StringType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *StringType {
+				return oldObj.StringTypedefPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("stringTypedefPtrField"), obj.StringTypedefPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.IntField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *int {
+				return &oldObj.IntField
+			})
+		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.IntPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *int {
+				return oldObj.IntPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.IntTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *IntType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_IntType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *IntType {
+				return &oldObj.IntTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("intTypedefField"), &obj.IntTypedefField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.IntTypedefPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *IntType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntTypedefPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_IntType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *IntType {
+				return oldObj.IntTypedefPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("intTypedefPtrField"), obj.IntTypedefPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.OtherStructPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *OtherStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.OtherStructPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
 			errs = append(errs, Validate_OtherStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("otherStructPtrField"), obj.OtherStructPtrField, safe.Field(oldObj, func(oldObj *Struct) *OtherStruct { return oldObj.OtherStructPtrField }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *OtherStruct {
+				return oldObj.OtherStructPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("otherStructPtrField"), obj.OtherStructPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+	{ // field Struct.SliceField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceField")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []string {
+				return oldObj.SliceField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceField"), obj.SliceField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.MapField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+	{ // field Struct.SliceTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj SliceType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SliceType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }))...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) SliceType {
+				return oldObj.SliceTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceTypedefField"), obj.SliceTypedefField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.MapField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) map[string]string {
+				return oldObj.MapField
+			})
+		errs = append(errs, fn(fldPath.Child("mapField"), obj.MapField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.MapTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj MapType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_MapType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) MapType {
+				return oldObj.MapTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("mapTypedefField"), obj.MapTypedefField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

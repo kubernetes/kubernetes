@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,24 +39,21 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
 type rcStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
-var Strategy = rcStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = rcStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for v1 for backwards compatibility,
 // and DeleteDependents for all other versions.
@@ -127,26 +126,7 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	opts := pod.GetValidationOptionsFromPodTemplate(controller.Spec.Template, nil)
 
 	// Run imperative validation
-	allErrs := corevalidation.ValidateReplicationController(controller, opts)
-
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	// FIXME: isSpecRequest(ctx) limits Declarative validation to the spec until subresource support is introduced.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, controller, takeover)
-
-		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			allErrs = append(allErrs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-	return allErrs
+	return corevalidation.ValidateReplicationController(controller, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -166,7 +146,7 @@ func (rcStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for replication controllers; this means a POST is
 // needed to create one.
-func (rcStrategy) AllowCreateOnUpdate() bool {
+func (rcStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -176,10 +156,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	newRc := obj.(*api.ReplicationController)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
-	// This should be fixed to avoid the redundant calls, but carefully.
-	validationErrorList := corevalidation.ValidateReplicationController(newRc, opts)
-	updateErrorList := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
-	errs := append(validationErrorList, updateErrorList...)
+	errs := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
 		parts := strings.Split(key, "/")
@@ -198,32 +175,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 		}
 	}
 
-	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	// FIXME: This limits Declarative validation to the spec until subresource support is introduced.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
-		// Determine if takeover is enabled
-		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
-
-		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, newRc, oldRc, takeover)
-
-		// Compare imperative and declarative errors and emit metric if there's a mismatch
-		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
-
-		// Only apply declarative errors if takeover is enabled
-		if takeover {
-			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
-		}
-	}
-
 	return errs
-}
-
-func isSpecRequest(ctx context.Context) bool {
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		return len(requestInfo.Subresource) == 0
-	}
-	return false
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -237,7 +189,7 @@ func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 	return warnings
 }
 
-func (rcStrategy) AllowUnconditionalUpdate() bool {
+func (rcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

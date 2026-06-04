@@ -75,6 +75,8 @@ type pausePodConfig struct {
 	DeletionGracePeriodSeconds        *int64
 	TopologySpreadConstraints         []v1.TopologySpreadConstraint
 	SchedulingGates                   []v1.PodSchedulingGate
+	TerminationGracePeriodSeconds     *int64
+	PreStopHookSleepSeconds           *int64
 }
 
 var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
@@ -1009,6 +1011,18 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	if conf.DeletionGracePeriodSeconds != nil {
 		pod.ObjectMeta.DeletionGracePeriodSeconds = conf.DeletionGracePeriodSeconds
 	}
+	if conf.TerminationGracePeriodSeconds != nil {
+		pod.Spec.TerminationGracePeriodSeconds = conf.TerminationGracePeriodSeconds
+	}
+	if conf.PreStopHookSleepSeconds != nil {
+		pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{
+				Sleep: &v1.SleepAction{
+					Seconds: *conf.PreStopHookSleepSeconds,
+				},
+			},
+		}
+	}
 	return pod
 }
 
@@ -1253,6 +1267,12 @@ func getNodeHostIP(ctx context.Context, f *framework.Framework, nodeName string)
 	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
-	gomega.Expect(ips).ToNot(gomega.BeEmpty())
+	if len(ips) == 0 {
+		ips = e2enode.GetAddressesByTypeAndFamily(node, v1.NodeExternalIP, family)
+	}
+	if len(ips) == 0 {
+		framework.Failf("No address by family (%s) on node (%s) found.",
+			family, nodeName)
+	}
 	return ips[0]
 }

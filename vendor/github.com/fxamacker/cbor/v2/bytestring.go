@@ -38,7 +38,34 @@ func (bs ByteString) MarshalCBOR() ([]byte, error) {
 
 // UnmarshalCBOR decodes CBOR byte string (major type 2) to ByteString.
 // Decoding CBOR null and CBOR undefined sets ByteString to be empty.
+//
+// Deprecated: No longer used by this codec; kept for compatibility
+// with user apps that directly call this function.
 func (bs *ByteString) UnmarshalCBOR(data []byte) error {
+	if bs == nil {
+		return errors.New("cbor.ByteString: UnmarshalCBOR on nil pointer")
+	}
+
+	d := decoder{data: data, dm: defaultDecMode}
+
+	// Check well-formedness of CBOR data item.
+	// ByteString.UnmarshalCBOR() is exported, so
+	// the codec needs to support same behavior for:
+	// - Unmarshal(data, *ByteString)
+	// - ByteString.UnmarshalCBOR(data)
+	err := d.wellformed(false, false)
+	if err != nil {
+		return err
+	}
+
+	return bs.unmarshalCBOR(data)
+}
+
+// unmarshalCBOR decodes CBOR byte string (major type 2) to ByteString.
+// Decoding CBOR null and CBOR undefined sets ByteString to be empty.
+// This function assumes data is well-formed, and does not perform bounds checking.
+// This function is called by Unmarshal().
+func (bs *ByteString) unmarshalCBOR(data []byte) error {
 	if bs == nil {
 		return errors.New("cbor.ByteString: UnmarshalCBOR on nil pointer")
 	}

@@ -35,7 +35,6 @@ import (
 )
 
 func TestEnablingOpenAPIEnumTypes(t *testing.T) {
-	const typeToAddEnum = "k8s.io/api/core/v1.ContainerPort"
 	const typeToCheckEnum = "io.k8s.api.core.v1.ContainerPort"
 
 	for _, tc := range []struct {
@@ -60,7 +59,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 
 			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)
-				def := defs[typeToAddEnum]
+				def := defs[typeToCheckEnum]
 				// replace protocol to add the would-be enum field.
 				def.Schema.Properties["protocol"] = spec.Schema{
 					SchemaProps: spec.SchemaProps{
@@ -71,7 +70,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 						Enum:        []interface{}{"SCTP", "TCP", "UDP"},
 					},
 				}
-				defs[typeToAddEnum] = def
+				defs[typeToCheckEnum] = def
 				return defs
 			})
 

@@ -22,22 +22,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
+
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes/scheme"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/remotecommand"
 	clientexec "k8s.io/client-go/util/exec"
+	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	"github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
-// ExecOptions passed to ExecWithOptions
+// ExecOptions controls how [Exec] runs a command inside a pod container.
+// At minimum, Command, Namespace, and PodName must be set.
 type ExecOptions struct {
 	Command       []string
 	Namespace     string
@@ -51,22 +50,17 @@ type ExecOptions struct {
 	Quiet              bool
 }
 
-// ExecWithOptions executes a command in the specified container,
+// Exec executes a command in the specified container,
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
-func ExecWithOptions(f *framework.Framework, options ExecOptions) (string, string, error) {
-	return ExecWithOptionsContext(context.Background(), f, options)
-}
-
-func ExecWithOptionsContext(ctx context.Context, f *framework.Framework, options ExecOptions) (string, string, error) {
+func Exec(tCtx ktesting.TContext, options ExecOptions) (string, string, error) {
 	if !options.Quiet {
-		framework.Logf("ExecWithOptions %+v", options)
+		tCtx.Logf("Exec %+v", options)
 	}
 
 	const tty = false
-
-	framework.Logf("ExecWithOptions: Clientset creation")
-	req := f.ClientSet.CoreV1().RESTClient().Post().
+	tCtx.Logf("Exec: Clientset creation")
+	req := tCtx.Client().CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
 		Namespace(options.Namespace).
@@ -81,8 +75,9 @@ func ExecWithOptionsContext(ctx context.Context, f *framework.Framework, options
 	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
-	framework.Logf("ExecWithOptions: execute(%s)", req.URL())
-	err := execute(ctx, req.URL(), f.ClientConfig(), options.Stdin, &stdout, &stderr, tty)
+	tCtx.Logf("Exec: execute(%s)", req.URL())
+	executor := exec.DefaultRemoteExecutor{}
+	err := executor.ExecuteWithContext(tCtx, req.URL(), tCtx.RESTConfig(), options.Stdin, &stdout, &stderr, tty, nil)
 
 	if options.PreserveWhitespace {
 		return stdout.String(), stderr.String(), err
@@ -94,7 +89,7 @@ func ExecWithOptionsContext(ctx context.Context, f *framework.Framework, options
 // specified container and return stdout, stderr and error
 func ExecCommandInContainerWithFullOutput(f *framework.Framework, podName, containerName string, cmd ...string) (string, string, error) {
 	// TODO (pohly): add context support
-	return ExecWithOptions(f, ExecOptions{
+	return Exec(f.TContext(context.Background()), ExecOptions{
 		Command:            cmd,
 		Namespace:          f.Namespace.Name,
 		PodName:            podName,
@@ -121,28 +116,20 @@ func ExecShellInContainer(f *framework.Framework, podName, containerName string,
 	return ExecCommandInContainer(f, podName, containerName, "/bin/sh", "-c", cmd)
 }
 
-func execCommandInPod(ctx context.Context, f *framework.Framework, podName string, cmd ...string) string {
-	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod %v", podName)
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
-	return ExecCommandInContainer(f, podName, pod.Spec.Containers[0].Name, cmd...)
-}
-
-func execCommandInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd ...string) (string, string, error) {
-	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod %v", podName)
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
-	return ExecCommandInContainerWithFullOutput(f, podName, pod.Spec.Containers[0].Name, cmd...)
-}
-
 // ExecShellInPod executes the specified command on the pod.
 func ExecShellInPod(ctx context.Context, f *framework.Framework, podName string, cmd string) string {
-	return execCommandInPod(ctx, f, podName, "/bin/sh", "-c", cmd)
+	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get pod %v", podName)
+	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	return ExecCommandInContainer(f, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 }
 
 // ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
 func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd string) (string, string, error) {
-	return execCommandInPodWithFullOutput(ctx, f, podName, "/bin/sh", "-c", cmd)
+	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get pod %v", podName)
+	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	return ExecCommandInContainerWithFullOutput(f, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
@@ -180,35 +167,4 @@ func VerifyExecInPodFail(ctx context.Context, f *framework.Framework, pod *v1.Po
 		}
 	}
 	return fmt.Errorf("%q should fail with exit code %d, but exit without error", shExec, exitCode)
-}
-
-func execute(ctx context.Context, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	// WebSocketExecutor executor is default
-	// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
-	websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
-	if err != nil {
-		return err
-	}
-	spdyExec, err := remotecommand.NewSPDYExecutor(config, "POST", url)
-	if err != nil {
-		return err
-	}
-	exec, err := remotecommand.NewFallbackExecutor(websocketExec, spdyExec, func(err error) bool {
-		if httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err) {
-			framework.Logf("fallback to secondary dialer from primary dialer err: %v", err)
-			return true
-		}
-		framework.Logf("unexpected error trying to use websockets for pod exec: %v", err)
-		return false
-	})
-	if err != nil {
-		return err
-	}
-
-	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    tty,
-	})
 }

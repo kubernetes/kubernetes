@@ -83,7 +83,7 @@ func ForbiddenSlice[T any](_ context.Context, _ operation.Operation, fldPath *fi
 	return field.ErrorList{field.Forbidden(fldPath, "")}
 }
 
-// RequiredMap verifies that the specified map is empty.
+// ForbiddenMap verifies that the specified map is empty.
 func ForbiddenMap[K comparable, T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
 	if len(value) == 0 {
 		return nil

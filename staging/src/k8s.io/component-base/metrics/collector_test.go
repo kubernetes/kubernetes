@@ -70,7 +70,7 @@ func TestBaseCustomCollector(t *testing.T) {
 		deprecatedDesc = NewDesc("metric_deprecated", "stable deprecated metrics", []string{"name"}, nil,
 			STABLE, "1.17.0")
 		hiddenDesc = NewDesc("metric_hidden", "stable hidden metrics", []string{"name"}, nil,
-			STABLE, "1.16.0")
+			STABLE, "1.14.0")
 	)
 
 	registry := newKubeRegistry(currentVersion)

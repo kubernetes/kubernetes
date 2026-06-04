@@ -24,8 +24,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -42,6 +40,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // LoadOrDefaultConfigurationOptions holds the common LoadOrDefaultConfiguration options.
@@ -75,21 +74,23 @@ func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allo
 	// v1.22: v1beta2 read-only, writes only v1beta3 config. Errors if the user tries to use v1beta1 and older
 	// v1.27: only v1beta3 config. Errors if the user tries to use v1beta2 and older
 	// v1.31: v1beta3 read-only, writes only v1beta4 config, errors if the user tries to use older APIs.
+	// v1.37: only v1beta4 config. Errors if the user tries to use v1beta3 and older
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
 		"kubeadm.k8s.io/v1alpha3": "v1.14",
 		"kubeadm.k8s.io/v1beta1":  "v1.15",
 		"kubeadm.k8s.io/v1beta2":  "v1.22",
+		"kubeadm.k8s.io/v1beta3":  "v1.36",
 	}
 
 	// Experimental API versions are present here until released. Can be used only if allowed.
-	experimentalAPIVersions := map[string]string{}
+	experimentalAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1": {},
+	}
 
 	// Deprecated API versions are supported until removed. They throw a warning.
-	deprecatedAPIVersions := map[string]struct{}{
-		"kubeadm.k8s.io/v1beta3": {},
-	}
+	deprecatedAPIVersions := map[string]struct{}{}
 
 	gvString := gvk.GroupVersion().String()
 
@@ -323,12 +324,28 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 		newConfig = append(newConfig, b)
 	}
 
+	// Migrate UpgradeConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvks...) {
+		o, err := documentMapToUpgradeConfiguration(gvkmap, true, allowExperimental, true)
+		if err != nil {
+			return []byte{}, err
+		}
+		if err := mutators.mutate([]any{o}); err != nil {
+			return []byte{}, err
+		}
+		b, err := MarshalKubeadmConfigObject(o, gv)
+		if err != nil {
+			return []byte{}, err
+		}
+		newConfig = append(newConfig, b)
+	}
+
 	return bytes.Join(newConfig, []byte(constants.YAMLDocumentSeparator)), nil
 }
 
 // ValidateConfig takes a byte slice containing a kubeadm configuration and performs conversion
 // to internal types and validation.
-func ValidateConfig(config []byte, allowExperimental bool) error {
+func ValidateConfig(config []byte, allowDeprecated, allowExperimental bool) error {
 	gvkmap, err := kubeadmutil.SplitConfigDocuments(config)
 	if err != nil {
 		return err
@@ -345,21 +362,28 @@ func ValidateConfig(config []byte, allowExperimental bool) error {
 
 	// Validate InitConfiguration and ClusterConfiguration if there are any in the config
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvks...) {
-		if _, err := documentMapToInitConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToInitConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate JoinConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		if _, err := documentMapToJoinConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToJoinConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
 			return err
 		}
 	}
 
 	// Validate ResetConfiguration if there is any
 	if kubeadmutil.GroupVersionKindsHasResetConfiguration(gvks...) {
-		if _, err := documentMapToResetConfiguration(gvkmap, true, allowExperimental, true, true); err != nil {
+		if _, err := documentMapToResetConfiguration(gvkmap, allowDeprecated, allowExperimental, true, true); err != nil {
+			return err
+		}
+	}
+
+	// Validate UpgradeConfiguration if there is any
+	if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvks...) {
+		if _, err := documentMapToUpgradeConfiguration(gvkmap, allowDeprecated, allowExperimental, true); err != nil {
 			return err
 		}
 	}
@@ -445,41 +469,9 @@ func (mutators *migrateMutators) addEmpty(in []any) {
 }
 
 // defaultMutators returns the default list of mutators for known configuration objects.
-// TODO: make this function return defaultEmptyMutators() when v1beta3 is removed.
+// In case certain fileds need to be mutated during migration, it must be defined here.
 func defaultMigrateMutators() migrateMutators {
-	var (
-		mutators migrateMutators
-		mutator  migrateMutator
-	)
-
-	// mutator for InitConfiguration, ClusterConfiguration.
-	mutator = migrateMutator{
-		in: []any{(*kubeadmapi.InitConfiguration)(nil)},
-		mutateFunc: func(in []any) error {
-			a := in[0].(*kubeadmapi.InitConfiguration)
-			a.Timeouts.ControlPlaneComponentHealthCheck.Duration = a.APIServer.TimeoutForControlPlane.Duration
-			a.APIServer.TimeoutForControlPlane = nil
-			return nil
-		},
-	}
-	mutators = append(mutators, mutator)
-
-	// mutator for JoinConfiguration.
-	mutator = migrateMutator{
-		in: []any{(*kubeadmapi.JoinConfiguration)(nil)},
-		mutateFunc: func(in []any) error {
-			a := in[0].(*kubeadmapi.JoinConfiguration)
-			a.Timeouts.Discovery.Duration = a.Discovery.Timeout.Duration
-			a.Discovery.Timeout = nil
-			return nil
-		},
-	}
-	mutators = append(mutators, mutator)
-
-	// empty mutator for ResetConfiguration.
-	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
-
-	return mutators
+	return defaultEmptyMigrateMutators()
 }
 
 // defaultEmptyMigrateMutators returns a list of empty mutators for known types.
@@ -489,6 +481,7 @@ func defaultEmptyMigrateMutators() migrateMutators {
 	mutators.addEmpty([]any{(*kubeadmapi.InitConfiguration)(nil)})
 	mutators.addEmpty([]any{(*kubeadmapi.JoinConfiguration)(nil)})
 	mutators.addEmpty([]any{(*kubeadmapi.ResetConfiguration)(nil)})
+	mutators.addEmpty([]any{(*kubeadmapi.UpgradeConfiguration)(nil)})
 
 	return *mutators
 }

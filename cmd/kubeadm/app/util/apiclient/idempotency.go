@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +32,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // objectMutator is a function that mutates the given runtime object and optionally returns an error
@@ -193,10 +192,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 		if _, err := client.CoreV1().Nodes().Patch(ctx, n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			*lastError = errors.Wrapf(err, "error patching Node %q", n.Name)
-			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
-				return false, nil
-			}
-			return false, *lastError
+			return false, nil
 		}
 
 		return true, nil

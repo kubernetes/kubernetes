@@ -21,10 +21,21 @@ import (
 // Resources should be passed and stored as pointers
 // (`*resource.Resource`).  The `nil` value is equivalent to an empty
 // Resource.
+//
+// Note that the Go == operator compares not just the resource attributes but
+// also all other internals of the Resource type. Therefore, Resource values
+// should not be used as map or database keys. In general, the [Resource.Equal]
+// method should be used instead of direct comparison with ==, since that
+// method ensures the correct comparison of resource attributes, and the
+// [attribute.Distinct] returned from [Resource.Equivalent] should be used for
+// map and database keys instead.
 type Resource struct {
 	attrs     attribute.Set
 	schemaURL string
 }
+
+// Compile-time check that the Resource remains comparable.
+var _ map[Resource]struct{} = nil
 
 var (
 	defaultResource     *Resource
@@ -101,7 +112,7 @@ func (r *Resource) String() string {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Resource.
-func (r *Resource) MarshalLog() interface{} {
+func (r *Resource) MarshalLog() any {
 	return struct {
 		Attributes attribute.Set
 		SchemaURL  string
@@ -137,15 +148,19 @@ func (r *Resource) Iter() attribute.Iterator {
 	return r.attrs.Iter()
 }
 
-// Equal returns true when a Resource is equivalent to this Resource.
-func (r *Resource) Equal(eq *Resource) bool {
+// Equal reports whether r and o represent the same resource. Two resources can
+// be equal even if they have different schema URLs.
+//
+// See the documentation on the [Resource] type for the pitfalls of using ==
+// with Resource values; most code should use Equal instead.
+func (r *Resource) Equal(o *Resource) bool {
 	if r == nil {
 		r = Empty()
 	}
-	if eq == nil {
-		eq = Empty()
+	if o == nil {
+		o = Empty()
 	}
-	return r.Equivalent() == eq.Equivalent()
+	return r.Equivalent() == o.Equivalent()
 }
 
 // Merge creates a new [Resource] by merging a and b.
@@ -217,6 +232,15 @@ func Empty() *Resource {
 // Default returns an instance of Resource with a default
 // "service.name" and OpenTelemetrySDK attributes.
 func Default() *Resource {
+	return DefaultWithContext(context.Background())
+}
+
+// DefaultWithContext returns an instance of Resource with a default
+// "service.name" and OpenTelemetrySDK attributes.
+//
+// If the default resource has already been initialized, the provided ctx
+// is ignored and the cached resource is returned.
+func DefaultWithContext(ctx context.Context) *Resource {
 	defaultResourceOnce.Do(func() {
 		var err error
 		defaultDetectors := []Detector{
@@ -228,7 +252,7 @@ func Default() *Resource {
 			defaultDetectors = append([]Detector{defaultServiceInstanceIDDetector{}}, defaultDetectors...)
 		}
 		defaultResource, err = Detect(
-			context.Background(),
+			ctx,
 			defaultDetectors...,
 		)
 		if err != nil {
@@ -245,8 +269,14 @@ func Default() *Resource {
 // Environment returns an instance of Resource with attributes
 // extracted from the OTEL_RESOURCE_ATTRIBUTES environment variable.
 func Environment() *Resource {
+	return EnvironmentWithContext(context.Background())
+}
+
+// EnvironmentWithContext returns an instance of Resource with attributes
+// extracted from the OTEL_RESOURCE_ATTRIBUTES environment variable.
+func EnvironmentWithContext(ctx context.Context) *Resource {
 	detector := &fromEnv{}
-	resource, err := detector.Detect(context.Background())
+	resource, err := detector.Detect(ctx)
 	if err != nil {
 		otel.Handle(err)
 	}

@@ -35,13 +35,11 @@ func AfterSuiteActions(ctx context.Context) {
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
+	// TODO: nothing is using this? what should we do with it?
 	if framework.TestContext.GatherSuiteMetricsAfterTest {
 		if err := gatherTestSuiteMetrics(ctx); err != nil {
 			framework.Logf("Error gathering metrics: %v", err)
 		}
-	}
-	if framework.TestContext.NodeKiller.NodeKillerStop != nil {
-		framework.TestContext.NodeKiller.NodeKillerStop()
 	}
 }
 

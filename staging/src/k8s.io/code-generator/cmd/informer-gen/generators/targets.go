@@ -25,6 +25,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/code-generator/cmd/informer-gen/args"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
@@ -104,6 +105,11 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		externalVersionOutputPkg = path.Join(externalVersionOutputPkg, "externalversions")
 	}
 
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
 	var targetList []generator.Target
 	typesForGroupVersion := make(map[clientgentypes.GroupVersion][]*types.Type)
 
@@ -112,6 +118,14 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	groupGoNames := make(map[string]string)
 	for _, inputPkg := range context.Inputs {
 		p := context.Universe.Package(inputPkg)
+
+		info, err := apidefinitions.Identify(p, apidefinitions.Informer, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		if !info.ShouldGenerate() {
+			continue
+		}
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {
@@ -144,15 +158,23 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-			gv.Group = clientgentypes.Group(override[0])
+		override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
+		if err != nil {
+			klog.Fatalf("error resolving group name: %v", err)
+		}
+		if ok {
+			gv.Group = clientgentypes.Group(override)
 		}
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
 		groupGoNames[groupPackageName] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
-		if override := gengo.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
-			groupGoNames[groupPackageName] = namer.IC(override[0])
+		goName, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupGoName"}, p.Comments)
+		if err != nil {
+			klog.Fatalf("error extracting groupGoName tags: %v", err)
+		}
+		if goName["groupGoName"] != nil {
+			groupGoNames[groupPackageName] = namer.IC(goName["groupGoName"][0])
 		}
 
 		var typesToGenerate []*types.Type

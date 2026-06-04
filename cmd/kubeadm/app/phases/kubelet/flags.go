@@ -22,24 +22,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
-
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 
-	nodeutil "k8s.io/component-helpers/node/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
-	pauseImage               string
 	registerTaintsUsingFlags bool
-	// TODO: remove this field once the feature NodeLocalCRISocket is GA.
-	criSocket string
 }
 
 // GetNodeNameAndHostname obtains the name for this Node using the following precedence
@@ -65,14 +59,9 @@ func GetNodeNameAndHostname(cfg *kubeadmapi.NodeRegistrationOptions) (string, st
 func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeReg,
-		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		criSocket:                nodeReg.CRISocket,
 	}
 
-	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
-		flagOpts.criSocket = ""
-	}
 	stringMap := buildKubeletArgs(flagOpts)
 	return WriteKubeletArgsToFile(stringMap, nodeReg.KubeletExtraArgs, kubeletDir)
 }
@@ -89,15 +78,6 @@ func WriteKubeletArgsToFile(kubeletFlags, overridesFlags []kubeadmapi.Arg, kubel
 // that are common to both Linux and Windows
 func buildKubeletArgsCommon(opts kubeletFlagsOpts) []kubeadmapi.Arg {
 	kubeletFlags := []kubeadmapi.Arg{}
-	if opts.criSocket != "" {
-		kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "container-runtime-endpoint", Value: opts.criSocket})
-	}
-
-	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
-	// and prevents its garbage collection
-	if opts.pauseImage != "" {
-		kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "pod-infra-container-image", Value: opts.pauseImage})
-	}
 
 	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
 		taintStrs := []string{}
@@ -164,7 +144,7 @@ func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
 	// Split the flags string by whitespace to get individual arguments.
 	trimmedFlags := strings.Fields(flags)
 	if len(trimmedFlags) == 0 {
-		return nil, errors.Errorf("no flags found in file %q", kubeletEnvFilePath)
+		return nil, nil
 	}
 
 	var updatedFlags []string

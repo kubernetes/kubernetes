@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -30,10 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
-	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, fakeRuntimeSvc, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	containerConfig := &runtimeapi.ContainerConfig{}
@@ -81,7 +82,7 @@ func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 		},
 	}
 
-	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil)
+	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(tCtx, containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil)
 	require.NoError(t, err)
 
 	limit := int64(3000)
@@ -154,7 +155,8 @@ func TestCalculateWindowsResources(t *testing.T) {
 	// TODO: remove skip once the failing test has been fixed.
 	t.Skip("Skip failing test on Windows.")
 
-	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, fakeRuntimeSvc, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -192,7 +194,7 @@ func TestCalculateWindowsResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(&test.cpuLim, &test.memLim)
+		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(tCtx, &test.cpuLim, &test.memLim)
 		assert.Equal(t, test.expected, windowsContainerResources)
 	}
 }

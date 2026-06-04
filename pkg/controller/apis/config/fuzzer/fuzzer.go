@@ -33,7 +33,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Generic.Address = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
 			obj.Generic.ClientConnection.ContentType = fmt.Sprintf("%s/%s.%s.%s", c.String(0), c.String(0), c.String(0), c.String(0))
 			if obj.Generic.LeaderElection.ResourceLock == "" {
-				obj.Generic.LeaderElection.ResourceLock = "endpoints"
+				obj.Generic.LeaderElection.ResourceLock = "leases"
 			}
 			obj.Generic.Controllers = []string{c.String(0)}
 			if obj.KubeCloudShared.ClusterName == "" {

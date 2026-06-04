@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,8 +42,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
@@ -92,7 +93,10 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, err
 	}
 
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, false)
+	getNodeRegistration := true
+	getAPIEndpoint := staticpodutil.IsControlPlaneNode()
+	getComponentConfigs := true
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}

@@ -129,7 +129,7 @@ func (c *DynamicCertKeyPairContent) RunOnce(ctx context.Context) error {
 
 // Run starts the controller and blocks until context is killed.
 func (c *DynamicCertKeyPairContent) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	klog.InfoS("Starting controller", "name", c.name)

@@ -55,11 +55,9 @@ func TestObjectToUnstructuredConversion(t *testing.T) {
 				Object: map[string]interface{}{
 					"apiVersion": "v1",
 					"kind":       "Carp",
-					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-					},
-					"spec":   map[string]interface{}{},
-					"status": map[string]interface{}{},
+					"metadata":   map[string]interface{}{},
+					"spec":       map[string]interface{}{},
+					"status":     map[string]interface{}{},
 				},
 			},
 		},
@@ -78,8 +76,7 @@ func TestObjectToUnstructuredConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -155,8 +152,7 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -181,8 +177,7 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -207,8 +202,7 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 					"apiVersion": "v9",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -232,8 +226,7 @@ func TestUnstructuredToObjectConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -358,8 +351,7 @@ func TestUnstructuredToGVConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -388,8 +380,7 @@ func TestUnstructuredToGVConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",
@@ -414,8 +405,7 @@ func TestUnstructuredToGVConversion(t *testing.T) {
 					"apiVersion": "v1",
 					"kind":       "Carp",
 					"metadata": map[string]interface{}{
-						"creationTimestamp": nil,
-						"name":              "noxu",
+						"name": "noxu",
 					},
 					"spec": map[string]interface{}{
 						"hostname": "example.com",

@@ -29,11 +29,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
@@ -44,7 +45,7 @@ import (
 
 var lowPriority, mediumPriority, highPriority int32 = 100, 200, 300
 
-var _ framework.FilterPlugin = &fooPlugin{}
+var _ fwk.FilterPlugin = &fooPlugin{}
 
 type fooPlugin struct {
 }
@@ -53,27 +54,28 @@ func (pl *fooPlugin) Name() string {
 	return "foo"
 }
 
-func (pl *fooPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	logger := klog.FromContext(ctx)
 	taints := nodeInfo.Node().Spec.Taints
 	if len(taints) == 0 {
 		return nil
 	}
 
-	if corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0]) {
+	if corev1.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0], utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
 		return nil
 	}
-	return framework.NewStatus(framework.Unschedulable)
+	return fwk.NewStatus(fwk.Unschedulable)
 }
 
-func (pl *fooPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}},
+func (pl *fooPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}},
 	}, nil
 }
 
 // newPlugin returns a plugin factory with specified Plugin.
-func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func newPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return plugin, nil
 	}
 }
@@ -209,9 +211,11 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, qHintEnabled := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, qHintEnabled)
+		for _, asyncAPICallsEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", tt.name, asyncAPICallsEnabled), func(t *testing.T) {
+				// Handle SchedulerAsyncAPICalls feature only in 1.34+.
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+
 				// Set the SchedulerPopFromBackoffQ feature to false, because when it's enabled, we can't be sure the pod won't be popped from the backoffQ.
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, false)
 

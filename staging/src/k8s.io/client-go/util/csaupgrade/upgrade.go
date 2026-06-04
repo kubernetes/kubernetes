@@ -17,7 +17,6 @@ limitations under the License.
 package csaupgrade
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // Finds all managed fields owners of the given operation type which owns all of
@@ -323,12 +322,13 @@ func filter[T any](
 // Included from fieldmanager.internal to avoid dependency cycle
 // FieldsToSet creates a set paths from an input trie of fields
 func decodeManagedFieldsEntrySet(f metav1.ManagedFieldsEntry) (s fieldpath.Set, err error) {
-	err = s.FromJSON(bytes.NewReader(f.FieldsV1.Raw))
+	err = s.FromJSON(f.FieldsV1.GetRawReader())
 	return s, err
 }
 
 // SetToFields creates a trie of fields from an input set of paths
 func encodeManagedFieldsEntrySet(f *metav1.ManagedFieldsEntry, s fieldpath.Set) (err error) {
-	f.FieldsV1.Raw, err = s.ToJSON()
+	raw, err := s.ToJSON()
+	f.FieldsV1.SetRawBytes(raw)
 	return err
 }

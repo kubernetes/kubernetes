@@ -47,7 +47,7 @@ const (
 	// for write conflicts.
 	SerializableSnapshot Isolation = iota
 	// Serializable reads within the same transaction attempt return data
-	// from the at the revision of the first read.
+	// from the revision of the first read.
 	Serializable
 	// RepeatableReads reads within the same transaction attempt always
 	// return the same data.
@@ -65,15 +65,16 @@ type stmOptions struct {
 	prefetch []string
 }
 
-type stmOption func(*stmOptions)
+// STMOption configures STM.
+type STMOption func(*stmOptions)
 
 // WithIsolation specifies the transaction isolation level.
-func WithIsolation(lvl Isolation) stmOption {
+func WithIsolation(lvl Isolation) STMOption {
 	return func(so *stmOptions) { so.iso = lvl }
 }
 
 // WithAbortContext specifies the context for permanently aborting the transaction.
-func WithAbortContext(ctx context.Context) stmOption {
+func WithAbortContext(ctx context.Context) STMOption {
 	return func(so *stmOptions) { so.ctx = ctx }
 }
 
@@ -81,12 +82,12 @@ func WithAbortContext(ctx context.Context) stmOption {
 // If an STM transaction will unconditionally fetch a set of keys, prefetching
 // those keys will save the round-trip cost from requesting each key one by one
 // with Get().
-func WithPrefetch(keys ...string) stmOption {
+func WithPrefetch(keys ...string) STMOption {
 	return func(so *stmOptions) { so.prefetch = append(so.prefetch, keys...) }
 }
 
 // NewSTM initiates a new STM instance, using serializable snapshot isolation by default.
-func NewSTM(c *v3.Client, apply func(STM) error, so ...stmOption) (*v3.TxnResponse, error) {
+func NewSTM(c *v3.Client, apply func(STM) error, so ...STMOption) (*v3.TxnResponse, error) {
 	opts := &stmOptions{ctx: c.Ctx()}
 	for _, f := range so {
 		f(opts)
@@ -303,6 +304,10 @@ type stmSerializable struct {
 }
 
 func (s *stmSerializable) Get(keys ...string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+
 	if wv := s.wset.get(keys...); wv != nil {
 		return wv.val
 	}

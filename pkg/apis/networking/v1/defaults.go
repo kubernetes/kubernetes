@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -47,6 +47,6 @@ func SetDefaults_NetworkPolicy(obj *networkingv1.NetworkPolicy) {
 
 func SetDefaults_IngressClass(obj *networkingv1.IngressClass) {
 	if obj.Spec.Parameters != nil && obj.Spec.Parameters.Scope == nil {
-		obj.Spec.Parameters.Scope = utilpointer.String(networkingv1.IngressClassParametersReferenceScopeCluster)
+		obj.Spec.Parameters.Scope = ptr.To(networkingv1.IngressClassParametersReferenceScopeCluster)
 	}
 }

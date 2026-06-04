@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -104,6 +105,7 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Setup mock stats provider
 	mockStats := statstest.NewMockProvider(t)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
@@ -118,7 +120,7 @@ func TestPVCRef(t *testing.T) {
 
 	// Calculate stats for pod
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	statsCalculator.calcAndStoreStats()
+	statsCalculator.calcAndStoreStats(logger)
 	vs, _ := statsCalculator.GetLatest()
 
 	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
@@ -161,6 +163,7 @@ func TestPVCRef(t *testing.T) {
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	mockStats := statstest.NewMockProvider(t)
 
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
@@ -175,7 +178,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 
 	// Calculate stats for pod
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	statsCalculator.calcAndStoreStats()
+	statsCalculator.calcAndStoreStats(logger)
 
 	event, err := WatchEvent(eventStore)
 	assert.Error(t, err)
@@ -183,6 +186,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 }
 
 func TestAbnormalVolumeEvent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	// Setup mock stats provider
@@ -203,7 +207,7 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 		volumeCondition.Abnormal = true
 	}
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
-	statsCalculator.calcAndStoreStats()
+	statsCalculator.calcAndStoreStats(logger)
 
 	event, err := WatchEvent(eventStore)
 	assert.NoError(t, err)

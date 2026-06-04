@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -21,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -36,10 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/windows/service"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -53,13 +51,12 @@ const (
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
-	logger       klog.Logger
-	recorder     record.EventRecorder
-	nodeRef      *v1.ObjectReference
-	probeManager prober.Manager
+	logger   klog.Logger
+	recorder record.EventRecorder
+	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func()
+	syncNodeStatus func(context.Context)
 
 	nodeShuttingDownMutex sync.Mutex
 	nodeShuttingDownNow   bool
@@ -67,6 +64,15 @@ type managerImpl struct {
 
 	enableMetrics bool
 	storage       storage
+}
+
+type preShutdownHandler struct {
+	manager *managerImpl
+}
+
+func (h *preShutdownHandler) ProcessShutdownEvent() error {
+	// Windows SCM preshutdown callback has no context, so start a root context at this callback boundary.
+	return h.manager.ProcessShutdownEvent(context.Background())
 }
 
 // NewManager returns a new node shutdown manager.
@@ -88,7 +94,6 @@ func NewManager(conf *Config) Manager {
 
 	manager := &managerImpl{
 		logger:         conf.Logger,
-		probeManager:   conf.ProbeManager,
 		recorder:       conf.Recorder,
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,
@@ -108,7 +113,7 @@ func NewManager(conf *Config) Manager {
 }
 
 // Admit rejects all pods if node is shutting
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	nodeShuttingDown := m.ShutdownStatus() != nil
 
 	if nodeShuttingDown {
@@ -140,7 +145,7 @@ func (m *managerImpl) setMetrics() {
 }
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
-func (m *managerImpl) Start() error {
+func (m *managerImpl) Start(_ context.Context) error {
 	m.logger.V(1).Info("Shutdown manager get started")
 
 	_, err := m.start()
@@ -149,7 +154,7 @@ func (m *managerImpl) Start() error {
 		return err
 	}
 
-	service.SetPreShutdownHandler(m)
+	service.SetPreShutdownHandler(&preShutdownHandler{manager: m})
 
 	m.setMetrics()
 
@@ -161,44 +166,44 @@ func (m *managerImpl) start() (chan struct{}, error) {
 	// Process the shutdown only when it is running as a windows service
 	isServiceInitialized := service.IsServiceInitialized()
 	if !isServiceInitialized {
-		return nil, errors.Errorf("%s is NOT running as a Windows service", serviceKubelet)
+		return nil, fmt.Errorf("%s is NOT running as a Windows service", serviceKubelet)
 	}
 
 	// Update the registry key to add the kubelet dependencies to the existing order
 	mgr, err := mgr.Connect()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not connect to service manager")
+		return nil, fmt.Errorf("Could not connect to service manager: %w", err)
 	}
 	defer mgr.Disconnect()
 
 	s, err := mgr.OpenService(serviceKubelet)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not access service %s", serviceKubelet)
+		return nil, fmt.Errorf("Could not access service %s: %w", serviceKubelet, err)
 	}
 	defer s.Close()
 
 	preshutdownInfo, err := service.QueryPreShutdownInfo(s.Handle)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not query preshutdown info")
+		return nil, fmt.Errorf("Could not query preshutdown info: %w", err)
 	}
 	m.logger.V(1).Info("Shutdown manager get current preshutdown info", "PreshutdownTimeout", preshutdownInfo.PreshutdownTimeout)
 
 	config, err := s.Config()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not access config of service %s", serviceKubelet)
+		return nil, fmt.Errorf("Could not access config of service %s: %w", serviceKubelet, err)
 	}
 
 	// Open the registry key
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, shutdownOrderRegPath, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not access registry")
+		return nil, fmt.Errorf("Could not access registry: %w", err)
 	}
 	defer key.Close()
 
 	// Read the existing values
 	existingOrders, _, err := key.GetStringsValue(shutdownOrderStringValue)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not access registry value %s", shutdownOrderStringValue)
+		return nil, fmt.Errorf("Could not access registry value %s: %w", shutdownOrderStringValue, err)
 	}
 	m.logger.V(1).Info("Shutdown manager get current service preshutdown order", "Preshutdownorder", existingOrders)
 
@@ -206,7 +211,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 	newOrders := addToExistingOrder(config.Dependencies, existingOrders)
 	err = key.SetStringsValue("PreshutdownOrder", newOrders)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not set registry %s to be new value %s", shutdownOrderStringValue, newOrders)
+		return nil, fmt.Errorf("Could not set registry %s to be new value %s: %w", shutdownOrderStringValue, newOrders, err)
 	}
 
 	// If the preshutdown timeout is less than periodRequested, attempt to update the value to periodRequested.
@@ -242,7 +247,7 @@ func (m *managerImpl) ShutdownStatus() error {
 	return nil
 }
 
-func (m *managerImpl) ProcessShutdownEvent() error {
+func (m *managerImpl) ProcessShutdownEvent(ctx context.Context) error {
 	m.logger.V(1).Info("Shutdown manager detected new preshutdown event", "event", "preshutdown")
 
 	m.recorder.Event(m.nodeRef, v1.EventTypeNormal, kubeletevents.NodeShutdown, "Shutdown manager detected preshutdown event")
@@ -251,7 +256,8 @@ func (m *managerImpl) ProcessShutdownEvent() error {
 	m.nodeShuttingDownNow = true
 	m.nodeShuttingDownMutex.Unlock()
 
-	go m.syncNodeStatus()
+	nodeStatusCtx := klog.NewContext(ctx, m.logger)
+	go m.syncNodeStatus(nodeStatusCtx)
 
 	m.logger.V(1).Info("Shutdown manager processing preshutdown event")
 	activePods := m.getPods()
@@ -284,7 +290,7 @@ func (m *managerImpl) ProcessShutdownEvent() error {
 		}()
 	}
 
-	return m.podManager.killPods(activePods)
+	return m.podManager.killPods(ctx, activePods)
 }
 
 func (m *managerImpl) periodRequested() time.Duration {

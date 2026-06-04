@@ -35,17 +35,17 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.
 type cronJobStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating CronJob objects.
-var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = cronJobStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 for backwards compatibility,
 // and DeleteDependents for all other versions.
@@ -130,12 +130,12 @@ func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 func (cronJobStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (cronJobStrategy) AllowUnconditionalUpdate() bool {
+func (cronJobStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for scheduled jobs; this means a POST is needed to create one.
-func (cronJobStrategy) AllowCreateOnUpdate() bool {
+func (cronJobStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 

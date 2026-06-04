@@ -25,92 +25,51 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type Struct struct {
-	S string
-	I int
-	B bool
-}
-
 func TestImmutable(t *testing.T) {
-	structA := Struct{"abc", 123, true}
-	structB := Struct{"xyz", 456, false}
+	// The Immutable function relies on validation ratcheting to avoid being
+	// called when old and new values are equivalent. This unit test only needs
+	// to confirm two behaviors:
+	// 1. The function does nothing for non-update operations (e.g., create).
+	// 2. The function *always* returns an error for update operations, since
+	//    ratcheting should have prevented the call if the values were unchanged.
+
+	type simpleStruct struct {
+		S string
+	}
 
 	for _, tc := range []struct {
 		name string
-		fn   func(operation.Operation, *field.Path) field.ErrorList
-		fail bool
+		fn   func(op operation.Operation, fldPath *field.Path) field.ErrorList
 	}{{
-		name: "nil both values",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable[int](context.Background(), op, fld, nil, nil)
-		},
-	}, {
-		name: "nil value",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, nil, ptr.To(123))
-		},
-		fail: true,
-	}, {
-		name: "nil oldValue",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To(123), nil)
-		},
-		fail: true,
-	}, {
-		name: "int",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To(123), ptr.To(123))
-		},
-	}, {
-		name: "int fail",
+		name: "with primitive type",
 		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(123), ptr.To(456))
 		},
-		fail: true,
 	}, {
-		name: "string",
+		name: "with struct type",
 		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To("abc"), ptr.To("abc"))
+			return Immutable(context.Background(), op, fld, &simpleStruct{S: "a"}, &simpleStruct{S: "b"})
 		},
 	}, {
-		name: "string fail",
+		name: "with nil values",
 		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To("abc"), ptr.To("xyz"))
+			// Explicitly type the nil to satisfy the generic function signature.
+			return Immutable[*int](context.Background(), op, fld, nil, nil)
 		},
-		fail: true,
-	}, {
-		name: "bool",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To(true), ptr.To(true))
-		},
-	}, {
-		name: "bool fail",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To(true), ptr.To(false))
-		},
-		fail: true,
-	}, {
-		name: "struct",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To(structA), ptr.To(structA))
-		},
-	}, {
-		name: "struct fail",
-		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
-			return Immutable(context.Background(), op, fld, ptr.To(structA), ptr.To(structB))
-		},
-		fail: true,
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := tc.fn(operation.Operation{Type: operation.Create}, field.NewPath(""))
-			if len(errs) != 0 { // Create should always succeed
-				t.Errorf("case %q (create): expected success: %v", tc.name, errs)
+			// Create operations should never return an error.
+			errs := tc.fn(operation.Operation{Type: operation.Create}, field.NewPath("field"))
+			if len(errs) != 0 {
+				t.Errorf("expected success for create operation, but got errors: %v", errs)
 			}
-			errs = tc.fn(operation.Operation{Type: operation.Update}, field.NewPath(""))
-			if tc.fail && len(errs) == 0 {
-				t.Errorf("case %q (update): expected failure", tc.name)
-			} else if !tc.fail && len(errs) != 0 {
-				t.Errorf("case %q (update): expected success: %v", tc.name, errs)
+
+			// Update operations should always return exactly one error.
+			errs = tc.fn(operation.Operation{Type: operation.Update}, field.NewPath("field"))
+			if len(errs) == 0 {
+				t.Errorf("expected a failure for update operation, but got success")
+			} else if len(errs) > 1 {
+				t.Errorf("expected exactly one error for update operation, but got %d: %v", len(errs), errs)
 			}
 		})
 	}

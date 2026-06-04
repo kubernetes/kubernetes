@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -26,9 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 )
 
-func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
+func (i *internalContainerLifecycleImpl) PreCreateContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
 	if i.cpuManager != nil {
 		allocatedCPUs := i.cpuManager.GetCPUAffinity(string(pod.UID), container.Name)
 		if !allocatedCPUs.IsEmpty() {
@@ -37,7 +37,7 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 	}
 
 	if i.memoryManager != nil {
-		numaNodes := i.memoryManager.GetMemoryNUMANodes(pod, container)
+		numaNodes := i.memoryManager.GetMemoryNUMANodes(logger, pod, container)
 		if numaNodes.Len() > 0 {
 			var affinity []string
 			for _, numaNode := range sets.List(numaNodes) {

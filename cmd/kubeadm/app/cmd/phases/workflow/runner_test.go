@@ -22,9 +22,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func phaseBuilder(name string, phases ...Phase) Phase {

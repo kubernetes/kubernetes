@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/cel-go/common/overloads"
@@ -105,7 +106,7 @@ func (d Duration) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	case durationValueType:
 		// Unwrap the CEL value to its underlying proto value.
 		return dpb.New(d.Duration), nil
-	case jsonValueType:
+	case JSONValueType:
 		// CEL follows the proto3 to JSON conversion.
 		// Note, using jsonpb would wrap the result in extra double quotes.
 		v := d.ConvertToType(StringType)
@@ -183,6 +184,10 @@ func (d Duration) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (d Duration) Value() any {
 	return d.Duration
+}
+
+func (d Duration) format(sb *strings.Builder) {
+	fmt.Fprintf(sb, `duration("%ss")`, strconv.FormatFloat(d.Seconds(), 'f', -1, 64))
 }
 
 // DurationGetHours returns the duration in hours.

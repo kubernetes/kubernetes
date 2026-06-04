@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apiserver/pkg/server/flagz"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,8 +47,8 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
-	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -61,7 +62,7 @@ type Options struct {
 	// The default values.
 	ComponentConfig *kubeschedulerconfig.KubeSchedulerConfiguration
 
-	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	SecureServing  *apiserveroptions.SecureServingOptions
 	Authentication *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics        *metrics.Options
@@ -98,7 +99,7 @@ func NewOptions() *Options {
 
 func NewOptionsWithComponentGlobalsRegistry(componentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry) *Options {
 	o := &Options{
-		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		SecureServing:  apiserveroptions.NewSecureServingOptions(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Deprecated: &DeprecatedOptions{
@@ -250,7 +251,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	}
 	c.KubeConfig = kubeConfig
 
-	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
 	if o.SecureServing != nil && (o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil) {
@@ -261,6 +262,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 			return err
 		}
 	}
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 	o.Metrics.Apply()
 
 	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.

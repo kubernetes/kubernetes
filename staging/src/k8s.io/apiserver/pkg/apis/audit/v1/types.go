@@ -70,7 +70,7 @@ const (
 
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// AuditLevel at which event was generated
 	Level Level `json:"level" protobuf:"bytes,1,opt,name=level,casttype=Level"`
@@ -90,6 +90,9 @@ type Event struct {
 	// Impersonated user information.
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty" protobuf:"bytes,7,opt,name=impersonatedUser"`
+	// AuthenticationMetadata contains details about how the request was authenticated.
+	// +optional
+	AuthenticationMetadata *AuthenticationMetadata `json:"authenticationMetadata,omitempty" protobuf:"bytes,17,opt,name=authenticationMetadata"`
 	// Source IPs, from where the request originated and intermediate proxies.
 	// The source IPs are listed from (in order):
 	// 1. X-Forwarded-For request header IPs
@@ -142,11 +145,18 @@ type Event struct {
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,15,rep,name=annotations"`
 }
 
+type AuthenticationMetadata struct {
+	// ImpersonationConstraint is the verb associated with the constrained impersonation mode that was used to authorize
+	// the ImpersonatedUser associated with this audit event.  It is only set when constrained impersonation was used.
+	// +optional
+	ImpersonationConstraint string `json:"impersonationConstraint,omitempty" protobuf:"bytes,1,opt,name=impersonationConstraint"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EventList is a list of audit Events.
 type EventList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -158,7 +168,7 @@ type EventList struct {
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 type Policy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -190,7 +200,7 @@ type Policy struct {
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -268,6 +278,7 @@ type PolicyRule struct {
 type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
+	// `*` matches all groups
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources this rule applies to.

@@ -26,9 +26,11 @@ import (
 
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestFailedAuthnAudit(t *testing.T) {
+	ctx := t.Context()
 	sink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
@@ -36,7 +38,7 @@ func TestFailedAuthnAudit(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	req.SetBasicAuth("username", "password")
@@ -61,6 +63,7 @@ func TestFailedAuthnAudit(t *testing.T) {
 }
 
 func TestFailedMultipleAuthnAudit(t *testing.T) {
+	ctx := t.Context()
 	sink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
@@ -68,7 +71,7 @@ func TestFailedMultipleAuthnAudit(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	req.SetBasicAuth("username", "password")
@@ -94,6 +97,7 @@ func TestFailedMultipleAuthnAudit(t *testing.T) {
 }
 
 func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
+	ctx := t.Context()
 	sink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
@@ -101,7 +105,7 @@ func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -125,6 +129,7 @@ func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
 }
 
 func TestFailedAuthnAuditOmitted(t *testing.T) {
+	ctx := t.Context()
 	sink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, []auditinternal.Stage{auditinternal.StageResponseStarted})
 	handler := WithFailedAuthenticationAudit(
@@ -132,7 +137,7 @@ func TestFailedAuthnAuditOmitted(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)

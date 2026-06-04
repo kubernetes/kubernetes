@@ -1,5 +1,9 @@
 // Package assert provides a set of comprehensive testing tools for use with the normal Go testing system.
 //
+// # Note
+//
+// All functions in this package return a bool value indicating whether the assertion has passed.
+//
 // # Example Usage
 //
 // The following is a complete example using assert in a standard test function:

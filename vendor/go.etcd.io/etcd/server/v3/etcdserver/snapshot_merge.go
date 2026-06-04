@@ -17,25 +17,22 @@ package etcdserver
 import (
 	"io"
 
-	"go.etcd.io/etcd/raft/v3/raftpb"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
-	"go.etcd.io/etcd/server/v3/mvcc/backend"
-
 	humanize "github.com/dustin/go-humanize"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
+	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
+	"go.etcd.io/etcd/server/v3/storage/backend"
+	"go.etcd.io/raft/v3/raftpb"
 )
 
 // createMergedSnapshotMessage creates a snapshot message that contains: raft status (term, conf),
 // a snapshot of v2 store inside raft.Snapshot as []byte, a snapshot of v3 KV in the top level message
 // as ReadCloser.
-func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapt, snapi uint64, confState raftpb.ConfState) snap.Message {
+func (s *EtcdServer) createMergedSnapshotMessage(m *raftpb.Message, snapt, snapi uint64, confState *raftpb.ConfState) *snap.Message {
 	lg := s.Logger()
 	// get a snapshot of v2 store as []byte
-	clone := s.v2store.Clone()
-	d, err := clone.SaveNoCopy()
-	if err != nil {
-		lg.Panic("failed to save v2 store data", zap.Error(err))
-	}
+	d := GetMembershipInfoInV2Format(lg, s.cluster)
 
 	// commit kv to write metadata(for example: consistent index).
 	s.KV().Commit()
@@ -45,17 +42,20 @@ func (s *EtcdServer) createMergedSnapshotMessage(m raftpb.Message, snapt, snapi 
 
 	// put the []byte snapshot of store into raft snapshot and return the merged snapshot with
 	// KV readCloser snapshot.
-	snapshot := raftpb.Snapshot{
-		Metadata: raftpb.SnapshotMetadata{
-			Index:     snapi,
-			Term:      snapt,
-			ConfState: confState,
+	snapshot := &raftpb.Snapshot{
+		Metadata: &raftpb.SnapshotMetadata{
+			Index: &snapi,
+			Term:  &snapt,
+			// Defensive copy as sending snapshot is async
+			ConfState: proto.Clone(confState).(*raftpb.ConfState),
 		},
 		Data: d,
 	}
 	m.Snapshot = snapshot
 
-	return *snap.NewMessage(m, rc, dbsnap.Size())
+	verifySnapshotIndex(snapshot, s.consistIndex.ConsistentIndex())
+
+	return snap.NewMessage(m, rc, dbsnap.Size())
 }
 
 func newSnapshotReaderCloser(lg *zap.Logger, snapshot backend.Snapshot) io.ReadCloser {

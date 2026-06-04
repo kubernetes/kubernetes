@@ -19,7 +19,13 @@
 package mem
 
 import (
+	"fmt"
 	"io"
+)
+
+const (
+	// 32 KiB is what io.Copy uses.
+	readAllBufSize = 32 * 1024
 )
 
 // BufferSlice offers a means to represent data that spans one or more Buffer
@@ -112,48 +118,54 @@ func (s BufferSlice) MaterializeToBuffer(pool BufferPool) Buffer {
 
 // Reader returns a new Reader for the input slice after taking references to
 // each underlying buffer.
-func (s BufferSlice) Reader() Reader {
+func (s BufferSlice) Reader() *Reader {
 	s.Ref()
-	return &sliceReader{
+	return &Reader{
 		data: s,
 		len:  s.Len(),
 	}
 }
 
 // Reader exposes a BufferSlice's data as an io.Reader, allowing it to interface
-// with other parts systems. It also provides an additional convenience method
-// Remaining(), which returns the number of unread bytes remaining in the slice.
+// with other systems.
+//
 // Buffers will be freed as they are read.
-type Reader interface {
-	io.Reader
-	io.ByteReader
-	// Close frees the underlying BufferSlice and never returns an error. Subsequent
-	// calls to Read will return (0, io.EOF).
-	Close() error
-	// Remaining returns the number of unread bytes remaining in the slice.
-	Remaining() int
-}
-
-type sliceReader struct {
+//
+// A Reader can be constructed from a BufferSlice; alternatively the zero value
+// of a Reader may be used after calling Reset on it.
+type Reader struct {
 	data BufferSlice
 	len  int
 	// The index into data[0].ReadOnlyData().
 	bufferIdx int
 }
 
-func (r *sliceReader) Remaining() int {
+// Remaining returns the number of unread bytes remaining in the slice.
+func (r *Reader) Remaining() int {
 	return r.len
 }
 
-func (r *sliceReader) Close() error {
+// Reset frees the currently held buffer slice and starts reading from the
+// provided slice. This allows reusing the reader object.
+func (r *Reader) Reset(s BufferSlice) {
+	r.data.Free()
+	s.Ref()
+	r.data = s
+	r.len = s.Len()
+	r.bufferIdx = 0
+}
+
+// Close frees the underlying BufferSlice and never returns an error. Subsequent
+// calls to Read will return (0, io.EOF).
+func (r *Reader) Close() error {
 	r.data.Free()
 	r.data = nil
 	r.len = 0
 	return nil
 }
 
-func (r *sliceReader) freeFirstBufferIfEmpty() bool {
-	if len(r.data) == 0 || r.bufferIdx != len(r.data[0].ReadOnlyData()) {
+func (r *Reader) freeFirstBufferIfEmpty() bool {
+	if len(r.data) == 0 || r.bufferIdx != r.data[0].Len() {
 		return false
 	}
 
@@ -163,7 +175,7 @@ func (r *sliceReader) freeFirstBufferIfEmpty() bool {
 	return true
 }
 
-func (r *sliceReader) Read(buf []byte) (n int, _ error) {
+func (r *Reader) Read(buf []byte) (n int, _ error) {
 	if r.len == 0 {
 		return 0, io.EOF
 	}
@@ -186,7 +198,8 @@ func (r *sliceReader) Read(buf []byte) (n int, _ error) {
 	return n, nil
 }
 
-func (r *sliceReader) ReadByte() (byte, error) {
+// ReadByte reads a single byte.
+func (r *Reader) ReadByte() (byte, error) {
 	if r.len == 0 {
 		return 0, io.EOF
 	}
@@ -219,8 +232,114 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 // NewWriter wraps the given BufferSlice and BufferPool to implement the
 // io.Writer interface. Every call to Write copies the contents of the given
-// buffer into a new Buffer pulled from the given pool and the Buffer is added to
-// the given BufferSlice.
+// buffer into a new Buffer pulled from the given pool and the Buffer is
+// added to the given BufferSlice.
 func NewWriter(buffers *BufferSlice, pool BufferPool) io.Writer {
 	return &writer{buffers: buffers, pool: pool}
+}
+
+// ReadAll reads from r until an error or EOF and returns the data it read.
+// A successful call returns err == nil, not err == EOF. Because ReadAll is
+// defined to read from src until EOF, it does not treat an EOF from Read
+// as an error to be reported.
+//
+// Important: A failed call returns a non-nil error and may also return
+// partially read buffers. It is the responsibility of the caller to free the
+// BufferSlice returned, or its memory will not be reused.
+func ReadAll(r io.Reader, pool BufferPool) (BufferSlice, error) {
+	var result BufferSlice
+	if wt, ok := r.(io.WriterTo); ok {
+		// This is more optimal since wt knows the size of chunks it wants to
+		// write and, hence, we can allocate buffers of an optimal size to fit
+		// them. E.g. might be a single big chunk, and we wouldn't chop it
+		// into pieces.
+		w := NewWriter(&result, pool)
+		_, err := wt.WriteTo(w)
+		return result, err
+	}
+nextBuffer:
+	for {
+		buf := pool.Get(readAllBufSize)
+		// We asked for 32KiB but may have been given a bigger buffer.
+		// Use all of it if that's the case.
+		*buf = (*buf)[:cap(*buf)]
+		usedCap := 0
+		for {
+			n, err := r.Read((*buf)[usedCap:])
+			usedCap += n
+			if err != nil {
+				if usedCap == 0 {
+					// Nothing in this buf, put it back
+					pool.Put(buf)
+				} else {
+					*buf = (*buf)[:usedCap]
+					result = append(result, NewBuffer(buf, pool))
+				}
+				if err == io.EOF {
+					err = nil
+				}
+				return result, err
+			}
+			if len(*buf) == usedCap {
+				result = append(result, NewBuffer(buf, pool))
+				continue nextBuffer
+			}
+		}
+	}
+}
+
+// Discard skips the next n bytes, returning the number of bytes discarded.
+//
+// It frees buffers as they are fully consumed.
+//
+// If Discard skips fewer than n bytes, it also returns an error.
+func (r *Reader) Discard(n int) (discarded int, err error) {
+	total := n
+	for n > 0 && r.len > 0 {
+		curData := r.data[0].ReadOnlyData()
+		curSize := min(n, len(curData)-r.bufferIdx)
+		n -= curSize
+		r.len -= curSize
+		r.bufferIdx += curSize
+		if r.bufferIdx >= len(curData) {
+			r.data[0].Free()
+			r.data = r.data[1:]
+			r.bufferIdx = 0
+		}
+	}
+	discarded = total - n
+	if n > 0 {
+		return discarded, fmt.Errorf("insufficient bytes in reader")
+	}
+	return discarded, nil
+}
+
+// Peek returns the next n bytes without advancing the reader.
+//
+// Peek appends results to the provided res slice and returns the updated slice.
+// This pattern allows re-using the storage of res if it has sufficient
+// capacity.
+//
+// The returned subslices are views into the underlying buffers and are only
+// valid until the reader is advanced past the corresponding buffer.
+//
+// If Peek returns fewer than n bytes, it also returns an error.
+func (r *Reader) Peek(n int, res [][]byte) ([][]byte, error) {
+	for i := 0; n > 0 && i < len(r.data); i++ {
+		curData := r.data[i].ReadOnlyData()
+		start := 0
+		if i == 0 {
+			start = r.bufferIdx
+		}
+		curSize := min(n, len(curData)-start)
+		if curSize == 0 {
+			continue
+		}
+		res = append(res, curData[start:start+curSize])
+		n -= curSize
+	}
+	if n > 0 {
+		return nil, fmt.Errorf("insufficient bytes in reader")
+	}
+	return res, nil
 }

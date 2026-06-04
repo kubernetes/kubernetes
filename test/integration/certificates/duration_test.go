@@ -47,7 +47,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestCSRDuration(t *testing.T) {
@@ -135,50 +135,50 @@ func TestCSRDuration(t *testing.T) {
 		},
 		{
 			name:         "same duration set as certTTL",
-			duration:     pointer.Duration(24 * time.Hour),
+			duration:     ptr.To(24 * time.Hour),
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "longer duration than certTTL",
-			duration:     pointer.Duration(48 * time.Hour),
+			duration:     ptr.To(48 * time.Hour),
 			wantDuration: 24 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "slightly shorter duration set",
-			duration:     pointer.Duration(20 * time.Hour),
+			duration:     ptr.To(20 * time.Hour),
 			wantDuration: 20 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "even shorter duration set",
-			duration:     pointer.Duration(10 * time.Hour),
+			duration:     ptr.To(10 * time.Hour),
 			wantDuration: 10 * time.Hour,
 			wantError:    "",
 		},
 		{
 			name:         "short duration set",
-			duration:     pointer.Duration(2 * time.Hour),
+			duration:     ptr.To(2 * time.Hour),
 			wantDuration: 2*time.Hour + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "very short duration set",
-			duration:     pointer.Duration(30 * time.Minute),
+			duration:     ptr.To(30 * time.Minute),
 			wantDuration: 30*time.Minute + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "shortest duration set",
-			duration:     pointer.Duration(10 * time.Minute),
+			duration:     ptr.To(10 * time.Minute),
 			wantDuration: 10*time.Minute + 5*time.Minute,
 			wantError:    "",
 		},
 		{
 			name:         "just too short duration set",
 			csrName:      "invalid-csr-001",
-			duration:     pointer.Duration(10*time.Minute - time.Second),
+			duration:     ptr.To(10*time.Minute - time.Second),
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-001" is invalid: spec.expirationSeconds: Invalid value: 599: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -186,7 +186,7 @@ func TestCSRDuration(t *testing.T) {
 		{
 			name:         "really too short duration set",
 			csrName:      "invalid-csr-002",
-			duration:     pointer.Duration(3 * time.Minute),
+			duration:     ptr.To(3 * time.Minute),
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-002" is invalid: spec.expirationSeconds: Invalid value: 180: may not specify a duration less than 600 seconds (10 minutes)`,
@@ -194,14 +194,13 @@ func TestCSRDuration(t *testing.T) {
 		{
 			name:         "negative duration set",
 			csrName:      "invalid-csr-003",
-			duration:     pointer.Duration(-7 * time.Minute),
+			duration:     ptr.To(-7 * time.Minute),
 			wantDuration: 0,
 			wantError: `cannot create certificate signing request: ` +
 				`CertificateSigningRequest.certificates.k8s.io "invalid-csr-003" is invalid: spec.expirationSeconds: Invalid value: -420: may not specify a duration less than 600 seconds (10 minutes)`,
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

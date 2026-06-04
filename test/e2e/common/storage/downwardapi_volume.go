@@ -92,7 +92,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		})
 	})
 
-	f.It("should provide podname as non-root with fsgroup [LinuxOnly]", func(ctx context.Context) {
+	f.It("should provide podname as non-root with fsgroup [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
@@ -107,7 +107,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 		})
 	})
 
-	f.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]", func(ctx context.Context) {
+	f.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())

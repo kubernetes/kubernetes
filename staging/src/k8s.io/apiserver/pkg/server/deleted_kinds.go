@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/registry/rest"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/klog/v2"
@@ -71,6 +73,7 @@ type ResourceExpirationEvaluatorOptions struct {
 	Prerelease string
 	// EmulationForwardCompatible indicates whether the apiserver should serve resources that are introduced after the current version,
 	// when resources of the same group and resource name but with lower priority are served.
+	// Not applicable to alpha APIs.
 	EmulationForwardCompatible bool
 	// RuntimeConfigEmulationForwardCompatible indicates whether the apiserver should serve resources that are introduced after the current version,
 	// when the resource is explicitly enabled in runtime-config.
@@ -222,6 +225,9 @@ func (e *resourceExpirationEvaluator) RemoveUnavailableKinds(groupName string, v
 func (e *resourceExpirationEvaluator) removeUnintroducedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage, apiResourceConfigSource serverstorage.APIResourceConfigSource) error {
 	versionsToRemove := sets.NewString()
 	prioritizedVersions := versioner.PrioritizedVersionsForGroup(groupName)
+	sort.Slice(prioritizedVersions, func(i, j int) bool {
+		return version.CompareKubeAwareVersionStrings(prioritizedVersions[i].Version, prioritizedVersions[j].Version) > 0
+	})
 	enabledResources := sets.NewString()
 
 	// iterate from the end to the front, so that we remove the lower priority versions first.

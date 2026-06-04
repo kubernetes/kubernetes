@@ -20,6 +20,9 @@ type Replacement struct {
 
 	// The N fields to write the value to.
 	Targets []*TargetSelector `json:"targets,omitempty" yaml:"targets,omitempty"`
+
+	// Used to define an static value
+	SourceValue *string `json:"sourceValue,omitempty" yaml:"sourceValue,omitempty"`
 }
 
 // SourceSelector is the source of the replacement transformer.
@@ -61,6 +64,53 @@ type TargetSelector struct {
 
 	// Used to refine the interpretation of the field.
 	Options *FieldOptions `json:"options,omitempty" yaml:"options,omitempty"`
+}
+
+type TargetSelectorRegex struct {
+	targetSelector *TargetSelector
+	selectRegex    *SelectorRegex
+	rejectRegex    []*SelectorRegex
+}
+
+func NewTargetSelectorRegex(ts *TargetSelector) (*TargetSelectorRegex, error) {
+	tsr := new(TargetSelectorRegex)
+	tsr.targetSelector = ts
+	var err error
+
+	tsr.selectRegex, err = NewSelectorRegex(ts.Select)
+	if err != nil {
+		return nil, err
+	}
+
+	rej := []*SelectorRegex{}
+	for _, r := range ts.Reject {
+		rr, err := NewSelectorRegex(r)
+		if err != nil {
+			return nil, err
+		}
+		rej = append(rej, rr)
+	}
+	tsr.rejectRegex = rej
+
+	return tsr, nil
+}
+
+func (tsr *TargetSelectorRegex) Selects(id resid.ResId) bool {
+	return tsr.selectRegex.MatchGvk(id.Gvk) && tsr.selectRegex.MatchName(id.Name) && tsr.selectRegex.MatchNamespace(id.Namespace)
+}
+
+func (tsr *TargetSelectorRegex) RejectsAny(ids []resid.ResId) bool {
+	for _, r := range tsr.rejectRegex {
+		if r.selector.ResId.IsEmpty() {
+			continue
+		}
+		for _, id := range ids {
+			if r.MatchGvk(id.Gvk) && r.MatchName(id.Name) && r.MatchNamespace(id.Namespace) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // FieldOptions refine the interpretation of FieldPaths.

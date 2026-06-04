@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
@@ -128,15 +129,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(ctx context.Context, 
 		return nil
 	}
 
-	err = c.applyClusterRoles(ctx, sharedClusterRole.Name, newPolicyRules)
-	if errors.IsUnsupportedMediaType(err) { // TODO: Remove this fallback at least one release after ServerSideApply GA
-		// When Server Side Apply is not enabled, fallback to Update. This is required when running
-		// 1.21 since api-server can be 1.20 during the upgrade/downgrade.
-		// Since Server Side Apply is enabled by default in Beta, this fallback only kicks in
-		// if the feature has been disabled using its feature flag.
-		err = c.updateClusterRoles(ctx, sharedClusterRole, newPolicyRules)
-	}
-	return err
+	return c.applyClusterRoles(ctx, sharedClusterRole.Name, newPolicyRules)
 }
 
 func (c *ClusterRoleAggregationController) applyClusterRoles(ctx context.Context, name string, newPolicyRules []rbacv1.PolicyRule) error {
@@ -145,16 +138,6 @@ func (c *ClusterRoleAggregationController) applyClusterRoles(ctx context.Context
 
 	opts := metav1.ApplyOptions{FieldManager: "clusterrole-aggregation-controller", Force: true}
 	_, err := c.clusterRoleClient.ClusterRoles().Apply(ctx, clusterRoleApply, opts)
-	return err
-}
-
-func (c *ClusterRoleAggregationController) updateClusterRoles(ctx context.Context, sharedClusterRole *rbacv1.ClusterRole, newPolicyRules []rbacv1.PolicyRule) error {
-	clusterRole := sharedClusterRole.DeepCopy()
-	clusterRole.Rules = nil
-	for _, rule := range newPolicyRules {
-		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
-	}
-	_, err := c.clusterRoleClient.ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
 	return err
 }
 
@@ -188,20 +171,26 @@ func ruleExists(haystack []rbacv1.PolicyRule, needle rbacv1.PolicyRule) bool {
 // Run starts the controller and blocks until stopCh is closed.
 func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ClusterRoleAggregator controller")
-	defer logger.Info("Shutting down ClusterRoleAggregator controller")
 
-	if !cache.WaitForNamedCacheSync("ClusterRoleAggregator", ctx.Done(), c.clusterRolesSynced) {
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down ClusterRoleAggregator controller")
+		c.queue.ShutDown()
+		wg.Wait()
+	}()
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.clusterRolesSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		})
 	}
-
 	<-ctx.Done()
 }
 

@@ -1,5 +1,4 @@
 //go:build linux || darwin || windows
-// +build linux darwin windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -35,6 +34,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/mount-utils"
+	testingexec "k8s.io/utils/exec/testing"
 )
 
 const (
@@ -135,7 +135,7 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 	return tmpDir, plug
 }
 
-func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, volume.DeviceMountableVolumePlugin) {
+func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, *localVolumePlugin) {
 	var (
 		source string
 		err    error
@@ -169,7 +169,7 @@ func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (st
 	if plug.GetPluginName() != localVolumePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	return source, plug
+	return source, plug.(*localVolumePlugin)
 }
 
 func getTestVolume(readOnly bool, path string, isBlock bool, mountOptions []string) *volume.Spec {
@@ -258,7 +258,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 	tmpBlockDir, plug := getDeviceMountablePluginWithBlockPath(t, true)
 	defer os.RemoveAll(tmpBlockDir)
 
-	dm, err := plug.NewDeviceMounter()
+	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	if err != nil {
 		t.Errorf("Failed to make a new device mounter: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 		}
 	}
 
-	du, err := plug.NewDeviceUnmounter()
+	du, err := plug.newDeviceUnmounterInternal(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	if err != nil {
 		t.Fatalf("Create device unmounter error: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	tmpFSDir, plug := getDeviceMountablePluginWithBlockPath(t, false)
 	defer os.RemoveAll(tmpFSDir)
 
-	dm, err := plug.NewDeviceMounter()
+	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	if err != nil {
 		t.Errorf("Failed to make a new device mounter: %v", err)
 	}
@@ -544,11 +544,10 @@ func TestConstructVolumeSpec(t *testing.T) {
 			plug := &localVolumePlugin{
 				host: volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil),
 			}
-			mounter := plug.host.GetMounter(plug.GetPluginName())
+			mounter := plug.host.GetMounter()
 			fakeMountPoints := []mount.MountPoint{}
-			for _, mp := range tt.mountPoints {
-				fakeMountPoint := mp
-				fakeMountPoint.Path = filepath.Join(tmpDir, mp.Path)
+			for _, fakeMountPoint := range tt.mountPoints {
+				fakeMountPoint.Path = filepath.Join(tmpDir, fakeMountPoint.Path)
 				fakeMountPoints = append(fakeMountPoints, fakeMountPoint)
 			}
 			mounter.(*mount.FakeMounter).MountPoints = fakeMountPoints
