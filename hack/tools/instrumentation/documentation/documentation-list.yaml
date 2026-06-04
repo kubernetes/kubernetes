@@ -5650,36 +5650,6 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
-- name: resource_manager_allocation_errors_total
-  help: Number of errors encountered during exclusive resource allocation.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource_name
-  - source
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: resource_manager_allocations_total
-  help: Number of exclusive resource allocations performed by a resource manager.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - resource_name
-  - source
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: resource_manager_container_assignments
-  help: Number of containers with a specific type of resource assignment.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - assignment_type
-  - resource_name
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: request_processing_duration_seconds
   subsystem: resourcepoolstatusrequest_controller
   help: Time taken to process a ResourcePoolStatusRequest
@@ -7569,6 +7539,39 @@
   help: Number of requested image volumes.
   type: Counter
   stabilityLevel: BETA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: resource_manager_allocation_errors_total
+  subsystem: kubelet
+  help: Number of errors encountered during exclusive resource allocation.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - resource_name
+  - source
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: resource_manager_allocations_total
+  subsystem: kubelet
+  help: Number of exclusive resource allocations performed by a resource manager.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - resource_name
+  - source
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: resource_manager_container_assignments_total
+  subsystem: kubelet
+  help: Number of containers with a specific type of resource assignment.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - assignment_type
+  - resource_name
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics

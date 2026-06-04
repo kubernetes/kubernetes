@@ -80,7 +80,6 @@ var exceptionMetrics = []string{
 	"kubelet_topology_manager_admission_duration_ms",             // metric names should not contain abbreviated units
 	"kubelet_certificate_manager_client_expiration_renew_errors", // counter metrics should have "_total" suffix
 	"kubelet_pod_resize_duration_milliseconds",                   // use base unit "seconds" instead of "milliseconds"
-	"resource_manager_container_assignments",                     // counter metrics should have "_total" suffix
 
 	// kube-proxy
 	"kubeproxy_sync_proxy_rules_iptables_total",           // non-counter metrics should not have "_total" suffix
