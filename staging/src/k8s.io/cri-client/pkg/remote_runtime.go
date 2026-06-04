@@ -150,6 +150,12 @@ func NewRemoteRuntimeService(ctx context.Context, endpoint string, connectionTim
 	return service, nil
 }
 
+// StreamingEnabled returns whether streaming RPCs are currently active
+// for list operations.
+func (r *remoteRuntimeService) StreamingEnabled() bool {
+	return r.useStreaming.Load()
+}
+
 // Close will shutdown the internal gRPC client connection.
 func (r *remoteRuntimeService) Close(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
