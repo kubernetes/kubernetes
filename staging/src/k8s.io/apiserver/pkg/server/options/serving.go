@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -71,6 +72,15 @@ type SecureServingOptions struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// HTTP2WriteByteTimeout is the timeout after which a connection will be closed if no
+	// data can be written to it. A value of 0 disables the timeout.
+	HTTP2WriteByteTimeout time.Duration
+
+	// HTTP2ReadIdleTimeout is the timeout after which a health check using a ping frame
+	// will be carried out if no frame is received on the connection.
+	// A value of 0 disables the keepalive ping.
+	HTTP2ReadIdleTimeout time.Duration
 
 	// PermitPortSharing controls if SO_REUSEPORT is used when binding the port, which allows
 	// more than one instance to bind on the same address and port.
@@ -210,6 +220,15 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"the maximum number of streams in an HTTP/2 connection. "+
 		"Zero means to use golang's default.")
 
+	fs.DurationVar(&s.HTTP2WriteByteTimeout, "http2-write-byte-timeout", s.HTTP2WriteByteTimeout, ""+
+		"The timeout after which a connection will be closed if no data can be written to it. "+
+		"This bounds the duration that a misbehaving client can hold an HTTP/2 connection "+
+		"open while not reading the response body. Zero means no timeout.")
+
+	fs.DurationVar(&s.HTTP2ReadIdleTimeout, "http2-read-idle-timeout", s.HTTP2ReadIdleTimeout, ""+
+		"The timeout after which a health check using a ping frame will be carried out "+
+		"if no frame is received on the HTTP/2 connection. Zero means no keepalive ping.")
+
 	fs.BoolVar(&s.PermitPortSharing, "permit-port-sharing", s.PermitPortSharing,
 		"If true, SO_REUSEPORT will be used when binding the port, which allows "+
 			"more than one instance to bind on the same address and port. [default=false]")
@@ -259,9 +278,11 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	*config = &server.SecureServingInfo{
-		Listener:                     s.Listener,
+		Listener:                    s.Listener,
 		HTTP2MaxStreamsPerConnection: s.HTTP2MaxStreamsPerConnection,
-		DisableHTTP2:                 s.DisableHTTP2Serving,
+		HTTP2WriteByteTimeout:       s.HTTP2WriteByteTimeout,
+		HTTP2ReadIdleTimeout:        s.HTTP2ReadIdleTimeout,
+		DisableHTTP2:                s.DisableHTTP2Serving,
 	}
 	c := *config
 
