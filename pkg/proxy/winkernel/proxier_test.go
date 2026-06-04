@@ -2817,3 +2817,77 @@ func TestLBMetricEmission(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateServiceWhereFrontEndSameAsExistingLB validates service creation scenarios
+// where the frontend IP and port match those of an existing load balancer.
+// When a match is detected, the existing load balancer is expected to be deleted
+// and recreated with new configuration to ensure it is correctly associated with the new service.
+func TestCreateServiceWhereFrontEndSameAsExistingLB(t *testing.T) {
+	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_L2BRIDGE, true)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	lbIP := "14.0.0.14"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeLoadBalancer
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.LoadBalancerIP = lbIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{epIpAddressLocal1}, // Local Endpoint 1
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	hcn := (proxier.hcn).(*fakehcn.HcnMock)
+	// Populating the endpoint to the cache, since it's a local endpoint and local endpoints are managed by CNI and not KubeProxy
+	// Populating here marks the endpoint to local
+	hcn.PopulateQueriedEndpoints(endpointLocal1, networkId, epIpAddressLocal1, macAddressLocal1, prefixLen)
+	hcn.PopulateQueriedLoadbalancers(loadbalancerGuid2, svcIP, 6, uint16(svcPort), uint16(svcPort), false, endpointLocal2)
+
+	proxier.setInitialized(true)
+
+	// Test 1: When a local endpoint is added to the service, the service should continue to use the local endpoints and existing loadbalancer.
+	// If no existing loadbalancer is present, a new loadbalancer should be created.
+	proxier.syncProxyRules()
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointInfo)
+	assert.True(t, ok, fmt.Sprintf("Failed to cast endpointInfo %q", svcPortName.String()))
+	assert.NotEmpty(t, epInfo.hnsID, fmt.Sprintf("Expected HNS ID to be set for endpoint %s, but got empty value", epIpAddressRemote))
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	assert.Equal(t, svcInfo.hnsID, loadbalancerGuid1, fmt.Sprintf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1))
+	lb, err := proxier.hcn.GetLoadBalancerByID(loadbalancerGuid1)
+	assert.Equal(t, nil, err, fmt.Sprintf("Failed to fetch loadbalancer: %s. Error: %v", loadbalancerGuid1, err))
+	assert.NotNil(t, lb, "Loadbalancer object should not be nil")
+}

@@ -42,6 +42,7 @@ type HostNetworkService interface {
 	deleteEndpoint(hnsID string) error
 	getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error)
+	createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error)
 	updateLoadBalancer(hnsID string, sourceVip, vip string, endpoints []endpointInfo, flags loadBalancerFlags, protocol, internalPort, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
 }
@@ -56,6 +57,45 @@ var (
 	// LoadBalancerPortMappingFlagsVipExternalIP enables VipExternalIP.
 	LoadBalancerPortMappingFlagsVipExternalIP hcn.LoadBalancerPortMappingFlags = 16
 )
+
+const (
+	errorCodeHnsNotRunning     = "0x6b5"
+	errorCodeFileAlreadyExists = "0xb7"
+)
+
+// isHnsNotRunningError checks if the error is due to HNS service not running by looking for the specific error code in the error message.
+func isHnsNotRunningError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), errorCodeHnsNotRunning)
+}
+
+// isFileAlreadyExistsError checks if the error is due to an entity already existing by looking for the specific error code in the error message.
+func isFileAlreadyExistsError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), errorCodeFileAlreadyExists)
+}
+
+// findExistingLBIdByFrontend finds the ID of an existing load balancer that matches the frontend configuration of the proposed load balancer.
+func findExistingLBIdByFrontend(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) string {
+	if len(proposedLB.PortMappings) == 0 {
+		return ""
+	}
+	lbID, matchingLbIDsCount := "", 0
+	frontEndVIP, isProposedLbIPv6 := "", (proposedLB.Flags&LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
+	if len(proposedLB.FrontendVIPs) != 0 {
+		frontEndVIP = proposedLB.FrontendVIPs[0]
+	}
+	for id, lbInfo := range existingLBs {
+		if id.vip == frontEndVIP && id.protocol == uint16(proposedLB.PortMappings[0].Protocol) && id.internalPort == proposedLB.PortMappings[0].InternalPort && id.externalPort == proposedLB.PortMappings[0].ExternalPort && id.isIPv6 == isProposedLbIPv6 {
+			lbID = lbInfo.hnsID
+			matchingLbIDsCount++
+		}
+	}
+	if matchingLbIDsCount == 1 {
+		klog.V(1).InfoS("Found existing load balancer with matching frontend configuration", "lbID", lbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
+		return lbID
+	}
+	klog.V(1).InfoS("Did not find a unique existing load balancer with matching frontend configuration", "matchingLbIDsCount", matchingLbIDsCount, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
+	return ""
+}
 
 func getLoadBalancerPolicyFlags(flags loadBalancerFlags) (lbPortMappingFlags hcn.LoadBalancerPortMappingFlags, lbFlags hcn.LoadBalancerFlags) {
 	lbPortMappingFlags = hcn.LoadBalancerPortMappingFlagsNone
@@ -369,6 +409,29 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	return loadBalancers, nil
 }
 
+func (hns hns) createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error) {
+	lb, err := hns.hcn.CreateLoadBalancer(proposedLB)
+	if isFileAlreadyExistsError(err) && len(proposedLB.PortMappings) > 0 {
+		frontEndVIP := ""
+		if len(proposedLB.FrontendVIPs) != 0 {
+			frontEndVIP = proposedLB.FrontendVIPs[0]
+		}
+		existingLbID := findExistingLBIdByFrontend(proposedLB, existingLBs)
+		if existingLbID != "" {
+			klog.V(1).InfoS("Retrying create load balancer again", "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+			err = hns.deleteLoadBalancer(existingLbID)
+			if err != nil {
+				klog.V(1).InfoS("Failed to delete existing load balancer", "lbID", existingLbID, "error", err)
+				return nil, err
+			}
+			lb, err = hns.hcn.CreateLoadBalancer(proposedLB)
+		} else {
+			klog.V(1).InfoS("Did not find a unique existing load balancer with matching frontend configuration", "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+		}
+	}
+	return lb, err
+}
+
 func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	var id loadBalancerIdentifier
 	vips := []string{}
@@ -450,9 +513,10 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, ep.hnsID)
 	}
 
-	lb, err := hns.hcn.CreateLoadBalancer(loadBalancer)
+	lb, err := hns.createLoadbalancerWithRetry(loadBalancer, previousLoadBalancers)
 
 	if err != nil {
+		klog.V(2).ErrorS(err, "Error creating Hns loadbalancer policy resource", "error", err, "endpoints", endpoints)
 		return nil, err
 	}
 
@@ -546,8 +610,17 @@ func (hns hns) updateLoadBalancer(hnsID string,
 func (hns hns) deleteLoadBalancer(hnsID string) error {
 	lb, err := hns.hcn.GetLoadBalancerByID(hnsID)
 	if err != nil {
-		// Return silently
-		return nil
+		if hcn.IsNotFoundError(err) {
+			klog.V(1).InfoS("LoadBalancer policy resource not found, may have already been deleted", "lbID", hnsID)
+			// Return silently
+			return nil
+		}
+		if isHnsNotRunningError(err) {
+			klog.V(1).ErrorS(err, "HNS is not running, skipping delete loadbalancer", "lbID", hnsID)
+			return err
+		}
+		klog.V(2).ErrorS(err, "Error getting Hns loadbalancer policy resource by ID", "lbID", hnsID)
+		return err
 	}
 
 	err = hns.hcn.DeleteLoadBalancer(lb)

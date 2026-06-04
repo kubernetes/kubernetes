@@ -912,6 +912,7 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, mapSt
 func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[string]loadBalancerType, ipFamilyStr string) {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
+	klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for clusterip loadbalancer resources in cleanup", "clusterIPLoadbalancerID", svcInfo.hnsID)
 	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
 		mapStaleLoadbalancer[svcInfo.hnsID] = lbTypeClusterIP
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource.", "hnsID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
@@ -921,6 +922,7 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[st
 		svcInfo.hnsID = ""
 	}
 
+	klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for nodeport loadbalancer resources in cleanup", "nodePortLoadbalancerID", svcInfo.nodePorthnsID)
 	if err := hns.deleteLoadBalancer(svcInfo.nodePorthnsID); err != nil {
 		mapStaleLoadbalancer[svcInfo.nodePorthnsID] = lbTypeNodePort
 		klog.V(1).ErrorS(err, "Error deleting Hns NodePort policy resource.", "hnsID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
@@ -1199,6 +1201,11 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	prevNetworkID := proxier.network.id
 	updatedNetwork, err := hns.getNetworkByName(hnsNetworkName)
+	if isHnsNotRunningError(err) {
+		klog.V(1).ErrorS(err, "HNS is not running. Unable to read network. Skipping sync", "hnsNetworkName", hnsNetworkName)
+		return
+	}
+
 	if updatedNetwork == nil || updatedNetwork.id != prevNetworkID || isNetworkNotFoundError(err) {
 		klog.InfoS("The HNS network is not present or has changed since the last sync, please check the CNI deployment", "hnsNetworkName", hnsNetworkName)
 		proxier.cleanupAllPolicies()
