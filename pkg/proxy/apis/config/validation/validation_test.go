@@ -27,8 +27,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/ptr"
 )
@@ -429,8 +432,9 @@ func TestValidateProxyMode(t *testing.T) {
 func testValidateProxyModeLinux(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 	for name, testCase := range map[string]struct {
-		mode         kubeproxyconfig.ProxyMode
-		expectedErrs field.ErrorList
+		mode                kubeproxyconfig.ProxyMode
+		expectedErrs        field.ErrorList
+		enableKubeProxyIPVS *bool
 	}{
 		"blank mode should default": {
 			mode: kubeproxyconfig.ProxyMode(""),
@@ -438,12 +442,38 @@ func testValidateProxyModeLinux(t *testing.T) {
 		"iptables is allowed": {
 			mode: kubeproxyconfig.ProxyModeIPTables,
 		},
-		"ipvs is allowed": {
+		"iptables is allowed - with KubeProxyIPVS feature gate enabled": {
+			mode:                kubeproxyconfig.ProxyModeIPTables,
+			enableKubeProxyIPVS: new(true),
+		},
+		"iptables is allowed - with KubeProxyIPVS feature gate disabled": {
+			mode:                kubeproxyconfig.ProxyModeIPTables,
+			enableKubeProxyIPVS: new(false),
+		},
+		"ipvs is allowed - with KubeProxyIPVS feature gate in default state": {
 			mode: kubeproxyconfig.ProxyModeIPVS,
+		},
+		"ipvs is allowed - with KubeProxyIPVS feature gate enabled": {
+			mode:                kubeproxyconfig.ProxyModeIPVS,
+			enableKubeProxyIPVS: new(true),
+		},
+		"ipvs is not allowed - with KubeProxyIPVS feature gate disabled": {
+			mode:                kubeproxyconfig.ProxyModeIPVS,
+			enableKubeProxyIPVS: new(false),
+			expectedErrs:        field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "ipvs", "must be iptables, nftables or blank (blank means the best-available proxy [currently iptables])")},
 		},
 		"nftables is allowed": {
 			mode: kubeproxyconfig.ProxyModeNFTables,
 		},
+		"nftables is allowed - with KubeProxyIPVS feature gate enabled": {
+			mode:                kubeproxyconfig.ProxyModeNFTables,
+			enableKubeProxyIPVS: new(true),
+		},
+		"nftables is allowed - with KubeProxyIPVS feature gate disabled": {
+			mode:                kubeproxyconfig.ProxyModeNFTables,
+			enableKubeProxyIPVS: new(false),
+		},
+
 		"winkernel is not allowed": {
 			mode:         kubeproxyconfig.ProxyModeKernelspace,
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "kernelspace", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
@@ -454,6 +484,12 @@ func testValidateProxyModeLinux(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
+			if testCase.enableKubeProxyIPVS != nil {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.KubeProxyIPVS: *testCase.enableKubeProxyIPVS,
+				})
+			}
+
 			errs := validateProxyMode(testCase.mode, newPath)
 			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})

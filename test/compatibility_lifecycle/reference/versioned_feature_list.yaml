@@ -987,6 +987,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: KubeProxyIPVS
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.11"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
