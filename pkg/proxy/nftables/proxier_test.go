@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -449,6 +450,84 @@ func TestOverallNFTablesRules(t *testing.T) {
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+}
+
+func TestTruncateNFTablesComment(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "short comment unchanged",
+			input: "kube-system/kube-dns:dns",
+			want:  "kube-system/kube-dns:dns",
+		},
+		{
+			name:  "exactly max length unchanged",
+			input: strings.Repeat("a", knftables.CommentLengthMax),
+			want:  strings.Repeat("a", knftables.CommentLengthMax),
+		},
+		{
+			name:  "too long gets truncated",
+			input: strings.Repeat("a", knftables.CommentLengthMax+1),
+			want:  strings.Repeat("a", knftables.CommentLengthMax),
+		},
+		{
+			name:  "realistic long service name truncated",
+			input: "loft-acme-platform-services-team-dev-v-shared-workloads-ns-001/my-api-svc-x-my-api-namespace-x-acme-shared-vcluster--a1b2c3d4e:http",
+			want:  "loft-acme-platform-services-team-dev-v-shared-workloads-ns-001/my-api-svc-x-my-api-namespace-x-acme-shared-vcluster--a1b2c3d4e:h",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := truncateNFTablesComment(tc.input)
+			if got != tc.want {
+				t.Errorf("truncateNFTablesComment(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+			if len(got) > knftables.CommentLengthMax {
+				t.Errorf("result length %d exceeds max %d", len(got), knftables.CommentLengthMax)
+			}
+		})
+	}
+}
+
+func TestSyncProxyRulesTruncatesNoEndpointServiceComment(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	serviceNamespace := "loft-acme-platform-services-team-dev-v-shared-workloads-ns-001"
+	serviceName := "my-api-svc-x-my-api-namespace-x-acme-shared-vcluster--a1b2c3d4e"
+	portName := "http"
+	serviceComment := fmt.Sprintf("%s/%s:%s", serviceNamespace, serviceName, portName)
+	truncatedComment := truncateNFTablesComment(serviceComment)
+	if len(serviceComment) <= knftables.CommentLengthMax {
+		t.Fatalf("test service comment length %d should exceed max %d", len(serviceComment), knftables.CommentLengthMax)
+	}
+
+	makeServiceMap(fp,
+		makeTestService(serviceNamespace, serviceName, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = "172.30.0.47"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     portName,
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	expected := truncatedComment
+	elem := nft.Table.Maps["no-endpoint-services"].FindElement("172.30.0.47", "tcp", "80")
+	if elem == nil || elem.Comment == nil || *elem.Comment != expected {
+		t.Fatalf("expected nftables transaction to contain truncated comment %q, got: %+v", expected, elem)
+	}
+	if strings.Contains(nft.Dump(), serviceComment) {
+		t.Fatalf("nftables transaction contains untruncated comment %q", serviceComment)
+	}
 }
 
 // TestNoEndpointsReject tests that a service with no endpoints rejects connections to

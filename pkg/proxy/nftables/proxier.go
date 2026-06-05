@@ -855,6 +855,15 @@ func hashAndTruncate(name string) string {
 	return name
 }
 
+// truncateNFTablesComment truncates s to the maximum byte length accepted by
+// nftables. Comments are cosmetic, so truncation does not affect routing.
+func truncateNFTablesComment(s string) string {
+	if len(s) > knftables.CommentLengthMax {
+		return s[:knftables.CommentLengthMax]
+	}
+	return s
+}
+
 // servicePortChainNameBase returns the base name for a chain for the given ServicePort.
 // This is something like "HASH-namespace/serviceName/protocol/portName", e.g,
 // "ULMVA6XW-ns1/svc1/tcp/p80".
@@ -1188,7 +1197,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		}
 
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
-		svcPortNameString := svcInfo.nameString
+		svcPortComment := truncateNFTablesComment(svcInfo.nameString)
 
 		// Figure out the endpoints for Cluster and Local traffic policy.
 		// allLocallyReachableEndpoints is the set of all endpoints that can be routed to
@@ -1346,7 +1355,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				Value: []string{
 					internalTrafficFilterVerdict,
 				},
-				Comment: &svcPortNameString,
+				Comment: &svcPortComment,
 			})
 		}
 
@@ -1381,7 +1390,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Value: []string{
 						externalTrafficFilterVerdict,
 					},
-					Comment: &svcPortNameString,
+					Comment: &svcPortComment,
 				})
 			}
 		}
@@ -1437,7 +1446,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Value: []string{
 						externalTrafficFilterVerdict,
 					},
-					Comment: &svcPortNameString,
+					Comment: &svcPortComment,
 				})
 			}
 		}
@@ -1472,7 +1481,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Value: []string{
 						externalTrafficFilterVerdict,
 					},
-					Comment: &svcPortNameString,
+					Comment: &svcPortComment,
 				})
 			}
 		}
