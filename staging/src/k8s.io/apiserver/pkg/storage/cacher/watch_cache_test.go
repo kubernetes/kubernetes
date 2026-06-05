@@ -1231,59 +1231,77 @@ func TestHistogramCacheReadWait(t *testing.T) {
 	testedMetrics := "apiserver_watch_cache_read_wait_seconds"
 	store := newTestWatchCache(2, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
-
-	// In background, update the store.
-	go func() {
-		if err := store.Add(makeTestPod("foo", 2)); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if err := store.Add(makeTestPod("bar", 5)); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}()
+	fakeClock := store.clock.(*testingclock.FakeClock)
 
 	testCases := []struct {
 		desc            string
 		resourceVersion uint64
+		run             func(t *testing.T)
 		want            string
 	}{
 		{
 			desc:            "resourceVersion is non-zero",
 			resourceVersion: 5,
+			run: func(t *testing.T) {
+				if err := store.Add(makeTestPod("foo", 2)); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+
+				getCompleted := make(chan struct{})
+				go func() {
+					defer close(getCompleted)
+					if _, _, _, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar"); err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+				}()
+
+				time.Sleep(10 * time.Millisecond)
+
+				fakeClock.Step(1 * time.Second)
+
+				if err := store.Add(makeTestPod("bar", 5)); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+
+				<-getCompleted
+			},
 			want: `
-		# HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
-    # TYPE apiserver_watch_cache_read_wait_seconds histogram
-	    apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.05"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.1"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.2"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.4"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.6"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.8"} 1
+		    # HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
+        # TYPE apiserver_watch_cache_read_wait_seconds histogram
+	      apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.05"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.1"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.2"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.4"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.6"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.8"} 0
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.25"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.5"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="2"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="3"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="+Inf"} 1
-        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods"} 0
+        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods"} 1
         apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods"} 1
 `,
 		},
 		{
 			desc:            "resourceVersion is 0",
 			resourceVersion: 0,
-			want:            ``,
+			run: func(t *testing.T) {
+				if _, _, _, err := store.WaitUntilFreshAndGet(ctx, 0, "prefix/ns/bar"); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			},
+			want: ``,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			defer registry.Reset()
-			if _, _, _, err := store.WaitUntilFreshAndGet(ctx, test.resourceVersion, "prefix/ns/bar"); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			test.run(t)
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

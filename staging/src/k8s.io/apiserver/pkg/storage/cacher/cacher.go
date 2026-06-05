@@ -1305,13 +1305,20 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		//
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
-		if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) && c.watchCache.notFresh(requestedWatchRV) {
-			c.watchCache.waitingUntilFresh.Add()
-			defer c.watchCache.waitingUntilFresh.Remove()
-		}
-		err := c.watchCache.waitUntilFreshAndBlock(ctx, requestedWatchRV)
+		consistentReadSupported := delegator.ConsistentReadSupported()
+		c.watchCache.RLock()
 		defer c.watchCache.RUnlock()
-		return err
+		if requestedWatchRV > 0 && requestedWatchRV > c.watchCache.resourceVersion {
+			if consistentReadSupported {
+				c.watchCache.waitingUntilFresh.Add()
+				err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
+				c.watchCache.waitingUntilFresh.Remove()
+				return err
+			} else {
+				return c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
+			}
+		}
+		return nil
 	}
 	return nil
 }
