@@ -312,12 +312,20 @@ func (le *LeaderElector) renew(ctx context.Context) {
 }
 
 // release attempts to release the leader lease if we have acquired it.
+// It retries on conflict, which may occur if the context cancellation
+// races with an inflight renew() operation. The client will see a ctx
+// cancellation error while the apiserver completes the update and bumps
+// the resource version.
 func (le *LeaderElector) release(logger klog.Logger) bool {
-	ctx := context.Background()
+	ctx := klog.NewContext(context.Background(), logger)
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
 	defer timeoutCancel()
-	// update the resourceVersion of lease
-	oldLeaderElectionRecord, _, err := le.config.Lock.Get(timeoutCtx)
+	return le.tryRelease(timeoutCtx)
+}
+
+func (le *LeaderElector) tryRelease(ctx context.Context) bool {
+	logger := klog.FromContext(ctx)
+	oldLeaderElectionRecord, _, err := le.config.Lock.Get(ctx)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			logger.Error(err, "error retrieving resource lock", "lock", le.config.Lock.Describe())
@@ -337,7 +345,11 @@ func (le *LeaderElector) release(logger klog.Logger) bool {
 		RenewTime:            now,
 		AcquireTime:          now,
 	}
-	if err := le.config.Lock.Update(timeoutCtx, leaderElectionRecord); err != nil {
+	if err := le.config.Lock.Update(ctx, leaderElectionRecord); err != nil {
+		if errors.IsConflict(err) {
+			logger.V(4).Info("Conflict when releasing lease, retrying", "lock", le.config.Lock.Describe())
+			return le.tryRelease(ctx)
+		}
 		logger.Error(err, "Failed to release lease", "lock", le.config.Lock.Describe())
 		return false
 	}
