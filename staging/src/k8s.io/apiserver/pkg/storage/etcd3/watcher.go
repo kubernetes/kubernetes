@@ -295,10 +295,11 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
+	// TODO(jefftree): detect RangeStream support via the etcd feature checker.
 	if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) {
 		err := wc.syncStreamRecursive()
 		if !isUnimplementedErr(err) {
-			return interpretListError(err, true, wc.key, wc.key)
+			return err
 		}
 		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
 	}
@@ -380,7 +381,9 @@ func (wc *watchChan) syncStreamRecursive() error {
 	var initialRev int64
 	for r := range streamResp {
 		if err := r.Err(); err != nil {
-			return err
+			// paging=false: a compaction mid-stream can't be resumed with a
+			// continue token, so surface it as ResourceExpired for a relist.
+			return interpretListError(err, false, wc.key, wc.key)
 		}
 		rangeResp := r.RangeResponse
 		for i, kv := range rangeResp.Kvs {
