@@ -234,10 +234,6 @@ type grpcError interface {
 	GRPCStatus() *grpcstatus.Status
 }
 
-func isUnimplementedErr(err error) bool {
-	return grpcstatus.Code(err) == grpccodes.Unimplemented
-}
-
 func isCancelError(err error) bool {
 	if err == nil {
 		return false
@@ -298,7 +294,10 @@ func (wc *watchChan) sync() error {
 	// TODO(jefftree): detect RangeStream support via the etcd feature checker.
 	if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) {
 		err := wc.syncStreamRecursive()
-		if !isUnimplementedErr(err) {
+		if err == nil {
+			return nil
+		}
+		if grpcstatus.Code(err) != grpccodes.Unimplemented {
 			return err
 		}
 		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
