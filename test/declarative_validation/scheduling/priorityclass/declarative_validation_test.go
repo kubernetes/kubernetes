@@ -101,7 +101,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 		"value unset to set": {
-			oldObj: mkValidPriorityClass(setValue(0)),
+			oldObj:    mkValidPriorityClass(setValue(0)),
 			updateObj: mkValidPriorityClass(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
