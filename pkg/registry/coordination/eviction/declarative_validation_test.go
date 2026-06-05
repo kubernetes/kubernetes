@@ -25,8 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -86,29 +84,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 	}
 	clock := testing2.NewFakePassiveClock(time.Now())
-	for _, authDecision := range []authorizer.Decision{authorizer.DecisionAllow, authorizer.DecisionDeny} {
-		for k, tc := range testCases {
-			t.Run(fmt.Sprintf("%v authDecision=%v", k, authDecision.String()), func(t *testing.T) {
-				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-					APIGroup:          "coordination.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "evictions",
-					IsResourceRequest: true,
-					Verb:              "create",
-				})
-
-				userInfo := user.DefaultInfo{Name: "test"}
-				if authDecision == authorizer.DecisionAllow {
-					userInfo.Name = user.EvictionRequestController
-				}
-				ctx = genericapirequest.WithUser(ctx, &userInfo)
-				strategy := NewStrategy(clock)
-				if authDecision != authorizer.DecisionAllow {
-					tc.errors = field.ErrorList{field.Forbidden(field.NewPath(""), "Only \"evictionrequest-controller\" is allowed to create Eviction resources.")}
-				}
-				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, strategy, tc.errors)
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "coordination.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "evictions",
+				IsResourceRequest: true,
+				Verb:              "create",
 			})
-		}
+			strategy := NewStrategy(clock)
+			apitesting.VerifyValidationEquivalence(t, ctx, tc.input, strategy, tc.errors)
+		})
 	}
 }
 
@@ -150,30 +137,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 	}
 	clock := testing2.NewFakePassiveClock(time.Now())
-	for _, authDecision := range []authorizer.Decision{authorizer.DecisionAllow, authorizer.DecisionDeny} {
-		for k, tc := range testCases {
-			t.Run(fmt.Sprintf("%v authDecision=%v", k, authDecision.String()), func(t *testing.T) {
-				tc.oldInput.ResourceVersion = "0"
-				tc.input.ResourceVersion = "1"
-				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-					APIGroup:          "coordination.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "evictions",
-					IsResourceRequest: true,
-					Verb:              "update",
-				})
-				userInfo := user.DefaultInfo{Name: "test"}
-				if authDecision == authorizer.DecisionAllow {
-					userInfo.Name = user.EvictionRequestController
-				}
-				ctx = genericapirequest.WithUser(ctx, &userInfo)
-				strategy := NewStrategy(clock)
-				if authDecision != authorizer.DecisionAllow {
-					tc.errors = field.ErrorList{field.Forbidden(field.NewPath("spec"), "Only \"evictionrequest-controller\" is allowed to update Eviction resource .spec.")}
-				}
-				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.input, tc.oldInput, strategy, tc.errors)
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.oldInput.ResourceVersion = "0"
+			tc.input.ResourceVersion = "1"
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "coordination.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "evictions",
+				IsResourceRequest: true,
+				Verb:              "update",
 			})
-		}
+			strategy := NewStrategy(clock)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.input, tc.oldInput, strategy, tc.errors)
+		})
 	}
 }
 

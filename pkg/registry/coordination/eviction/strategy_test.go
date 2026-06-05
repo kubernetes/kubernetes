@@ -17,7 +17,6 @@ limitations under the License.
 package eviction
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -25,7 +24,6 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -50,7 +48,6 @@ func TestEvictionStrategy(t *testing.T) {
 		IsResourceRequest: true,
 		Verb:              "create",
 	})
-	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: user.EvictionRequestController})
 	strategy := NewStrategy(clock)
 
 	if !strategy.NamespaceScoped() {
@@ -101,38 +98,6 @@ func TestEvictionStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-}
-
-func TestEvictionStrategy_Unauthorized(t *testing.T) {
-	clock := testing2.NewFakePassiveClock(time.Now())
-	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:          "coordination.k8s.io",
-		APIVersion:        "v1alpha1",
-		Resource:          "evictions",
-		IsResourceRequest: true,
-		Verb:              "create",
-	})
-	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "unauthorized-user"})
-	strategy := NewStrategy(clock)
-
-	eviction := &coordination.Eviction{
-		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "foo"},
-		Spec: coordination.EvictionSpec{
-			Target: coordination.EvictionTarget{
-				Pod: &coordination.EvictionPodReference{
-					UID:  validUID,
-					Name: "foo.pod",
-				},
-			},
-		},
-	}
-
-	strategy.PrepareForCreate(ctx, eviction)
-	gotErr := strategy.Validate(ctx, eviction)
-	expectedErr := field.ErrorList{field.Forbidden(field.NewPath(""), "Only \"evictionrequest-controller\" is allowed to create Eviction resources.")}
-	errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByDetailExact()
-
-	errOutputMatcher.Test(t, expectedErr, gotErr)
 }
 
 func TestEvictionStrategy_Update(t *testing.T) {
@@ -297,41 +262,5 @@ func TestEvictionStatusStrategy(t *testing.T) {
 	errs = strategy.ValidateUpdate(ctx, newEviction, oldEviction)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
-	}
-}
-
-func TestIsAuthorized(t *testing.T) {
-	testCases := map[string]struct {
-		ctx                context.Context
-		expectedAuthorized bool
-		expectedErr        bool
-	}{
-		"empty context": {
-			ctx:                context.TODO(),
-			expectedAuthorized: false,
-			expectedErr:        true,
-		}, "context with unauthorized name": {
-			ctx:                genericapirequest.WithUser(context.TODO(), &user.DefaultInfo{Name: "unauthorized-user"}),
-			expectedAuthorized: false,
-			expectedErr:        false,
-		},
-		"context with authorized name": {
-			ctx:                genericapirequest.WithUser(context.TODO(), &user.DefaultInfo{Name: user.EvictionRequestController}),
-			expectedAuthorized: true,
-			expectedErr:        false,
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			gotAuthorized, gotErr := isAuthorized(tc.ctx)
-			if tc.expectedAuthorized != gotAuthorized {
-				t.Errorf("isAuthorized failed authorize: expected=%v, got=%v", tc.expectedAuthorized, gotAuthorized)
-			}
-			hasErr := gotErr != nil
-			if tc.expectedErr != hasErr {
-				t.Errorf("isAuthorized failed authorize with error: expected=%v, got=%v", tc.expectedErr, hasErr)
-			}
-		})
 	}
 }

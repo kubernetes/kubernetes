@@ -18,11 +18,8 @@ package eviction
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -91,15 +88,7 @@ func (*evictionStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new Eviction.
 func (s *evictionStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	eviction := obj.(*coordination.Eviction)
-	authorized, errs := isAuthorized(ctx)
-	if len(errs) > 0 {
-		return errs
-	}
-	if !authorized {
-		return field.ErrorList{
-			field.Forbidden(field.NewPath(""), "Only \"evictionrequest-controller\" is allowed to create Eviction resources."),
-		}
-	}
+
 	allErrs := validation.ValidateEviction(eviction)
 	allErrs = rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.DeclarativeValidationConfig{})
 	return allErrs
@@ -121,18 +110,6 @@ func (s *evictionStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	eviction := obj.(*coordination.Eviction)
 	oldEviction := old.(*coordination.Eviction)
 
-	if !apiequality.Semantic.DeepEqual(oldEviction.Spec, eviction.Spec) {
-		authorized, errs := isAuthorized(ctx)
-		if len(errs) > 0 {
-			return errs
-		}
-		if !authorized {
-			return field.ErrorList{
-				field.Forbidden(field.NewPath("spec"), "Only \"evictionrequest-controller\" is allowed to update Eviction resource .spec."),
-			}
-		}
-	}
-
 	allErrs = validation.ValidateEvictionUpdate(eviction, oldEviction)
 	allErrs = rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, eviction, oldEviction, allErrs, operation.Update, rest.DeclarativeValidationConfig{})
 	return allErrs
@@ -144,20 +121,6 @@ func (*evictionStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 
 func (*evictionStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
-}
-
-func isAuthorized(ctx context.Context) (bool, field.ErrorList) {
-	userInfo, ok := genericapirequest.UserFrom(ctx)
-	if !ok {
-		return false, field.ErrorList{
-			field.InternalError(field.NewPath(""), fmt.Errorf("cannot determine calling user to perform \"authorization\" check")),
-		}
-	}
-	switch userInfo.GetName() {
-	case user.APIServerUser, user.EvictionRequestController:
-		return true, nil
-	}
-	return false, nil
 }
 
 // evictionStatusStrategy is the default logic invoked when updating object status.

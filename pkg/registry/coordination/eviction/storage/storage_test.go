@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -65,7 +64,6 @@ func tester(t *testing.T, storage *REST) *genericregistrytest.Tester {
 		Resource:   "evictions",
 	}
 	test.SetRequestInfo(requestInfo)
-	test.SetUserInfo(&user.DefaultInfo{Name: user.EvictionRequestController})
 	return test
 }
 
@@ -274,6 +272,5 @@ func evictionContext() context.Context {
 		APIVersion: "v1alpha1",
 		Resource:   "evictions",
 	})
-	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: user.EvictionRequestController})
 	return ctx
 }
