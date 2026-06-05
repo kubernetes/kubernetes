@@ -53,7 +53,6 @@ func init() {
 				{ErrorType: "FieldValueDuplicate"},
 			},
 			"spec.podGroupTemplates[*].disruptionMode": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
 			"spec.podGroupTemplates[*].name": {
@@ -61,11 +60,9 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.podGroupTemplates[*].priority": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.podGroupTemplates[*].priorityClassName": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 			},
 			"spec.podGroupTemplates[*].resourceClaims": {
