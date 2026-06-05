@@ -215,10 +215,7 @@ type PodGroupTemplate struct {
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	DisruptionMode *DisruptionMode
 
@@ -226,10 +223,7 @@ type PodGroupTemplate struct {
 	// a pod group created from this template. If no priority class is specified, admission
 	// control can set this to the global default priority class if it exists. Otherwise,
 	// pod groups created from this template will have the priority set to zero.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	PriorityClassName string
 
@@ -238,10 +232,7 @@ type PodGroupTemplate struct {
 	// Priority Admission Controller is enabled, it prevents users from setting this field.
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	Priority *int32
 }
@@ -437,10 +428,7 @@ type PodGroupSpec struct {
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
 	// One of Single, All. Defaults to Single if unset.
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	DisruptionMode *DisruptionMode
 
@@ -450,10 +438,7 @@ type PodGroupSpec struct {
 	// (i.e. if no priority class is specified, admission control can set this to the global default
 	// priority class if it exists. Otherwise, the pod group's priority will be zero).
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	PriorityClassName string
 
@@ -463,10 +448,7 @@ type PodGroupSpec struct {
 	// controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	Priority *int32
 }
