@@ -103,6 +103,7 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	var watchEvents atomic.Uint64
 	var listCalls atomic.Uint64
 	var listObjects atomic.Uint64
+	var index atomic.Uint64
 
 	switch loadType {
 	case loadNone:
@@ -123,7 +124,8 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	start := time.Now()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			writes.Add(runTraffic(ctx, b, store, data, trafficType))
+			i := int(index.Add(1)) % len(data.PodKeys)
+			writes.Add(runTraffic(ctx, b, store, data, trafficType, i))
 		}
 	})
 	end := time.Now()
@@ -160,41 +162,30 @@ func waitForConsistent(ctx context.Context, store storage.Interface) error {
 	return nil
 }
 
-func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string) (writes uint64) {
+func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, index int) (writes uint64) {
 	var podOut *example.Pod
 	switch trafficType {
 	case trafficDeleteCreate:
-		i := rand.Intn(len(data.PodKeys))
 		podOut = &example.Pod{}
-		err := store.Delete(ctx, data.PodKeys[i], podOut, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+		err := store.Delete(ctx, data.PodKeys[index], podOut, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 		if err == nil {
 			writes += 1
 		} else if !storage.IsNotFound(err) {
-			panic(fmt.Sprintf("Unexpected error on Delete %q: %v", data.PodKeys[i], err))
+			panic(fmt.Sprintf("Unexpected error on Delete %q: %v", data.PodKeys[index], err))
 		}
-		pod := data.Pods[i]
+		pod := data.Pods[index]
 		podOut = &example.Pod{}
-		err = store.Create(ctx, data.PodKeys[i], pod, podOut, 0)
+		err = store.Create(ctx, data.PodKeys[index], pod, podOut, 0)
 		if err == nil {
 			writes += 1
 		} else if !storage.IsExist(err) {
-			panic(fmt.Sprintf("Unexpected error on Create %q: %v", data.PodKeys[i], err))
+			panic(fmt.Sprintf("Unexpected error on Create %q: %v", data.PodKeys[index], err))
 		}
 	case trafficPatch:
-		i := rand.Intn(len(data.PodKeys))
 		podOut = &example.Pod{}
-		err := store.GuaranteedUpdate(ctx, data.PodKeys[i], podOut, false, nil, patchFunc(i), nil)
+		err := store.GuaranteedUpdate(ctx, data.PodKeys[index], podOut, false, nil, patchFunc(index), nil)
 		if err != nil {
-			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[i], err))
-		} else {
-			writes += 1
-		}
-		// Execute patch second time to match 2 operations.
-		j := rand.Intn(len(data.PodKeys))
-		podOut = &example.Pod{}
-		err = store.GuaranteedUpdate(ctx, data.PodKeys[j], podOut, false, nil, patchFunc(j), nil)
-		if err != nil {
-			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[j], err))
+			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[index], err))
 		} else {
 			writes += 1
 		}
