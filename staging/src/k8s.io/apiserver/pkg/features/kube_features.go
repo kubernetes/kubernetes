@@ -146,6 +146,11 @@ const (
 	// Enabled cache inconsistency detection.
 	DetectCacheInconsistency featuregate.Feature = "DetectCacheInconsistency"
 
+	// owner: @jefftree
+	//
+	// Enables the RangeStream RPC for list operations in etcd.
+	EtcdRangeStream featuregate.Feature = "EtcdRangeStream"
+
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
 	// deprecated: v1.28
@@ -352,6 +357,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DetectCacheInconsistency: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	EtcdRangeStream: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	KMSv1: {
