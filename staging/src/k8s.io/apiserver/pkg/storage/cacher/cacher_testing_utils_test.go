@@ -61,7 +61,7 @@ func init() {
 	utilruntime.Must(metav1.AddMetaToScheme(scheme))
 	scheme.AddUnversionedTypes(corev1.SchemeGroupVersion, &metav1.Status{})
 	pb := protobuf.NewSerializer(scheme, scheme)
-	corev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, nil)
+	corev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, schema.GroupVersions{corev1.SchemeGroupVersion})
 	examplev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{examplev1.SchemeGroupVersion}, nil)
 }
 
