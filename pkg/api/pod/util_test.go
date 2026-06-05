@@ -5745,7 +5745,10 @@ func TestDropFileKeyRefInUse(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, tc.featureEnabled)
+			if !tc.featureEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, false)
+			}
 			newPodSpecCopy := tc.newPodSpec.DeepCopy()
 			dropFileKeyRefInUse(newPodSpecCopy, tc.oldPodSpec)
 
