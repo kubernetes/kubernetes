@@ -522,7 +522,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	pred := opts.Predicate
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 
 	readyGeneration, downtime, err := c.ready.checkAndReadGeneration()
@@ -691,7 +691,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	}
 	getRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
@@ -744,9 +744,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if err != nil {
 		return err
 	}
-	_, err = c.versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
-		return err
+
+	if _, err := c.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
+		return errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 
 	ctx, span := tracing.Start(ctx, "cacher.GetList",
@@ -1168,7 +1168,7 @@ func (c *Cacher) isStopped() bool {
 func (c *Cacher) Compact(resourceVersion string) error {
 	rv, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 	c.watchCache.Compact(rv)
 	return nil
@@ -1391,7 +1391,7 @@ func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (
 	}
 	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
-		return delegator.Result{}, err
+		return delegator.Result{}, errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 	return c.shouldDelegateExactRV(listRV)
 }
