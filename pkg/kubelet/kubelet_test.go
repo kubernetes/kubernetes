@@ -1542,10 +1542,13 @@ func TestCreateMirrorPod(t *testing.T) {
 			pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 			pods := []*v1.Pod{pod}
 			kl.podManager.SetPods(pods)
-			isTerminal, _, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
+			isTerminal, postSync, err := kl.SyncPod(tCtx, tt.updateType, pod, nil, &kubecontainer.PodStatus{})
 			assert.NoError(t, err)
 			if isTerminal {
 				t.Fatalf("pod should not be terminal: %#v", pod)
+			}
+			if postSync != nil {
+				postSync()
 			}
 			podFullName := kubecontainer.GetPodFullName(pod)
 			assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
@@ -1579,10 +1582,13 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*v1.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	isTerminal, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
+	isTerminal, postSync, err := kl.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
 	assert.NoError(t, err)
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
+	if postSync != nil {
+		postSync()
 	}
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)

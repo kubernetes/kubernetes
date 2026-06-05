@@ -2192,8 +2192,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	// Create Mirror Pod for Static Pod if it doesn't already exist
-	kl.tryReconcileMirrorPods(ctx, pod, mirrorPod)
+	// Reconcile mirror pod for static pods after container sync completes.
+	// Deferred to postSync to avoid blocking container operations on API
+	// server calls. This is critical when updating infrastructure static
+	// pods (e.g. etcd) that the API server itself depends on.
+	postSync = func() {
+		kl.tryReconcileMirrorPods(ctx, pod, mirrorPod)
+	}
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
@@ -3490,7 +3495,12 @@ func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirror
 			// it. The mirror pod will get recreated later.
 			logger.Info("Trying to delete pod", "pod", klog.KObj(mirrorPod), "podUID", mirrorPod.UID)
 			podFullName := kubecontainer.GetPodFullName(staticPod)
-			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(ctx, podFullName, &mirrorPod.UID); err != nil {
+			// Use a bounded timeout so mirror pod deletion doesn't block
+			// indefinitely if the API server is unreachable (e.g. during
+			// etcd restarts). Reconciliation will be retried on the next sync.
+			deleteCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(deleteCtx, podFullName, &mirrorPod.UID); err != nil {
 				logger.Error(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
 			} else if ok {
 				deleted = ok
