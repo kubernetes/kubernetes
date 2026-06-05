@@ -47,12 +47,10 @@ type Features struct {
 	EnablePodLevelResources                       bool
 	EnableStorageCapacityScoring                  bool
 	EnableNodeDeclaredFeatures                    bool
-	EnableGangScheduling                          bool
 	EnableGenericWorkload                         bool
 	EnableTaintTolerationComparisonOperators      bool
 	EnableInPlacePodLevelResourcesVerticalScaling bool
 	EnableTopologyAwareWorkloadScheduling         bool
-	EnableWorkloadAwarePreemption                 bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -79,12 +77,10 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRAPartitionableDevices:                 featureGate.Enabled(features.DRAPartitionableDevices),
 		EnableStorageCapacityScoring:                  featureGate.Enabled(features.StorageCapacityScoring),
 		EnableNodeDeclaredFeatures:                    featureGate.Enabled(features.NodeDeclaredFeatures),
-		EnableGangScheduling:                          featureGate.Enabled(features.GangScheduling),
 		EnableGenericWorkload:                         featureGate.Enabled(features.GenericWorkload),
 		EnableTaintTolerationComparisonOperators:      featureGate.Enabled(features.TaintTolerationComparisonOperators),
 		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		EnableTopologyAwareWorkloadScheduling:         featureGate.Enabled(features.TopologyAwareWorkloadScheduling),
 		EnableDRANodeAllocatableResources:             featureGate.Enabled(features.DRANodeAllocatableResources),
-		EnableWorkloadAwarePreemption:                 featureGate.Enabled(features.WorkloadAwarePreemption),
 	}
 }
