@@ -672,7 +672,7 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 	_, matchesSingle := opts.Predicate.MatchesSingle()
 	matchesSingle = matchesSingle && !opts.Recursive
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		return w.getIntervalFromStoreLocked(key, matchesSingle)
+		return w.storage.getInitialEventsIntervalLocked(w.resourceVersion, key, matchesSingle)
 	}
 
 	if resourceVersion == 0 {

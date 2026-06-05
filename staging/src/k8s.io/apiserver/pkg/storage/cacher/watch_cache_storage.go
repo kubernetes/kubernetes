@@ -53,6 +53,15 @@ func (w *watchCacheStorage) getIntervalLocked(resourceVersion uint64, key string
 	return ci, nil
 }
 
+func (w *watchCacheStorage) getInitialEventsIntervalLocked(resourceVersion uint64, key string, matchesSingle bool) (*watchCacheInterval, error) {
+	if !matchesSingle && w.snapshots != nil && w.snapshottingEnabled.Load() {
+		if snapshot, ok := w.snapshots.Latest(); ok {
+			return newCacheIntervalFromSnapshot(resourceVersion, snapshot, key), nil
+		}
+	}
+	return w.getIntervalLocked(resourceVersion, key, matchesSingle)
+}
+
 func (w *watchCacheStorage) Compact(rev uint64) {
 	if w.snapshots == nil {
 		return

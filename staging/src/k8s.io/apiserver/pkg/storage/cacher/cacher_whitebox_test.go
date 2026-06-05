@@ -1470,6 +1470,59 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 	}
 }
 
+// TestWatchListFallbackWhenSnapshotsDisabled verifies that a WatchList request
+// delivers all initial events ending with bookmark even when snapshotting is disabled.
+func TestWatchListFallbackWhenSnapshotsDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	forceRequestWatchProgressSupport(t)
+
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	require.NoError(t, err)
+	defer cacher.Stop()
+
+	// this should make it fall back to O(N) Rlock time codepath on watch-cache
+	cacher.watchCache.storage.snapshottingEnabled.Store(false)
+
+	makePod := func(index uint64) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", index),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%v", 100+index),
+			},
+		}
+	}
+
+	numberOfPods := 3
+	var expectedEvents []watch.Event
+	for i := 1; i <= numberOfPods; i++ {
+		pod := makePod(uint64(i))
+		if err := cacher.watchCache.Add(pod); err != nil {
+			t.Fatalf("failed to add a pod: %v", err)
+		}
+		expectedEvents = append(expectedEvents, watch.Event{Type: watch.Added, Object: pod})
+	}
+	expectedEvents = append(expectedEvents, watch.Event{Type: watch.Bookmark, Object: &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			ResourceVersion: "103",
+			Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+		},
+	}})
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+	w, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
+		ResourceVersion:   "100",
+		SendInitialEvents: ptr.To(true), //nolint:modernize
+		Predicate:         pred,
+	})
+	require.NoError(t, err)
+	defer w.Stop()
+
+	verifyEvents(t, w, expectedEvents, true)
+}
+
 func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
