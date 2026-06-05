@@ -88,9 +88,13 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 		// Can't use anything depending on kubectl here because it's not available in the node test environment
 		output := e2epod.ExecCommandInContainer(f, pod.Name, ecName, "/bin/echo", "marco")
 		gomega.Expect(output).To(gomega.ContainSubstring("marco"))
-		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, ecName)
-		framework.ExpectNoError(err, "Failed to get logs for pod %q ephemeral container %q", e2epod.FormatPod(pod), ecName)
-		gomega.Expect(log).To(gomega.ContainSubstring("polo"))
+		// Poll for the expected log output. The ephemeral container may report Running before
+		// it has actually executed the command and produced "polo" stdout, especially on
+		// runtimes with slower container startup (e.g. VM-isolated containers).
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, ecName)
+		}, f.Timeouts.PodStartShort, framework.PollInterval()).Should(gomega.ContainSubstring("polo"),
+			"Failed to get expected log output for pod %q ephemeral container %q", e2epod.FormatPod(pod), ecName)
 	})
 
 	/*
@@ -141,9 +145,13 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 		// Can't use anything depending on kubectl here because it's not available in the node test environment
 		output := e2epod.ExecCommandInContainer(f, pod.Name, ecName, "/bin/echo", "marco")
 		gomega.Expect(output).To(gomega.ContainSubstring("marco"))
-		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, ecName)
-		framework.ExpectNoError(err, "Failed to get logs for pod %q ephemeral container %q", e2epod.FormatPod(pod), ecName)
-		gomega.Expect(log).To(gomega.ContainSubstring("polo"))
+		// Poll for the expected log output. The ephemeral container may report Running before
+		// it has actually executed the command and produced "polo" stdout, especially on
+		// runtimes with slower container startup (e.g. VM-isolated containers).
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, ecName)
+		}, f.Timeouts.PodStartShort, framework.PollInterval()).Should(gomega.ContainSubstring("polo"),
+			"Failed to get expected log output for pod %q ephemeral container %q", e2epod.FormatPod(pod), ecName)
 
 		ginkgo.By(fmt.Sprintf("checking pod %q has only one ephemeralcontainer", pod.Name))
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
