@@ -651,12 +651,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.36"
-- name: GangScheduling
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.35"
 - name: GenericWorkload
   versionedSpecs:
   - default: false
@@ -2095,12 +2089,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
-- name: WorkloadAwarePreemption
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.36"
 - name: WorkloadWithJob
   versionedSpecs:
   - default: false

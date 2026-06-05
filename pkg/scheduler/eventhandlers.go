@@ -212,7 +212,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.Cache.AddPodGroupMember(pod)
 	sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
-	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
 	}
 }

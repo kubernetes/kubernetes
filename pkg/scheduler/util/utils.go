@@ -279,7 +279,6 @@ func PodGroupPriority(pg *schedulingv1alpha3.PodGroup) int32 {
 	}
 	// When priority of a pod group is nil, it means it was created at a time
 	// that there was no global default priority class and the priority class
-	// name of the pod group was empty (or when the WorkloadAwarePreemption
-	// feature gate was disabled). So, we resolve to the static default priority.
+	// name of the pod group was empty. So, we resolve to the static default priority.
 	return 0
 }

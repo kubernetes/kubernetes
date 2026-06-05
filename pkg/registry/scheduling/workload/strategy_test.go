@@ -87,7 +87,6 @@ func TestStrategyCreate(t *testing.T) {
 		obj                           *scheduling.Workload
 		expectObj                     *scheduling.Workload
 		enableTopologyAwareScheduling bool
-		enableWorkloadAwarePreemption bool
 		expectValidationError         string
 	}{
 		"simple": {
@@ -156,41 +155,31 @@ func TestStrategyCreate(t *testing.T) {
 			enableTopologyAwareScheduling: true,
 			expectValidationError:         requiredError,
 		},
-		"workload aware preemption disabled - drop disruption mode": {
+		"disruption mode single": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
-			expectObj: workload,
-		},
-		"workload aware preemption enabled - preserve disruption mode (pod)": {
-			obj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
-				return w
-			}(),
-			enableWorkloadAwarePreemption: true,
 			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
 		},
-		"workload aware preemption enabled - preserve disruption mode (pod group)": {
+		"disruption mode all": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
 				return w
 			}(),
-			enableWorkloadAwarePreemption: true,
 			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
 				return w
 			}(),
 		},
-		"workload aware preemption enabled - both disruption modes set": {
+		"both disruption modes set": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{
@@ -199,38 +188,27 @@ func TestStrategyCreate(t *testing.T) {
 				}
 				return w
 			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         "must specify exactly one of",
+			expectValidationError: "must specify exactly one of",
 		},
-		"workload aware preemption enabled - preserve priorityClassName": {
+		"priorityClassName set": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
 				return w
 			}(),
-			enableWorkloadAwarePreemption: true,
 			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
 				return w
 			}(),
 		},
-		"workload aware preemption disabled - drop priorityClassName": {
-			obj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
-				return w
-			}(),
-			expectObj: workload,
-		},
-		"workload aware preemption enabled - invalid priorityClassName": {
+		"invalid priorityClassName": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "invalid/priority/class/name"
 				return w
 			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         subdomainNameError,
+			expectValidationError: subdomainNameError,
 		},
 	}
 
@@ -241,8 +219,6 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
-				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
 
 			Strategy.PrepareForCreate(ctx, workload)
@@ -275,7 +251,6 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                        *scheduling.Workload
 		newObj                        *scheduling.Workload
 		enableTopologyAwareScheduling bool
-		enableWorkloadAwarePreemption bool
 		expectValidationError         string
 		expectWorkload                *scheduling.Workload
 	}{
@@ -479,30 +454,16 @@ func TestStrategyUpdate(t *testing.T) {
 			enableTopologyAwareScheduling: true,
 			expectValidationError:         fieldImmutableError,
 		},
-		"disruption mode update, workload aware preemption disabled": {
-			oldObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
-				return w
-			}(),
-			newObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
-				return w
-			}(),
-			expectValidationError: fieldImmutableError,
-		},
-		"disruption mode update, workload aware preemption enabled": {
+		"changing disruption mode": {
 			oldObj: workload,
 			newObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationError: fieldImmutableError,
 		},
-		"priorityClassName update, workload aware preemption disabled": {
+		"changing priorityClassName": {
 			oldObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
@@ -514,20 +475,6 @@ func TestStrategyUpdate(t *testing.T) {
 				return w
 			}(),
 			expectValidationError: fieldImmutableError,
-		},
-		"priorityClassName update, workload aware preemption enabled": {
-			oldObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].PriorityClassName = "high-priority"
-				return w
-			}(),
-			newObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].PriorityClassName = "low-priority"
-				return w
-			}(),
-			enableWorkloadAwarePreemption: true,
-			expectValidationError:         fieldImmutableError,
 		},
 	}
 
@@ -536,8 +483,6 @@ func TestStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
-				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
 			oldWorkload := tc.oldObj.DeepCopy()
 			newWorkload := tc.newObj.DeepCopy()

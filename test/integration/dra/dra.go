@@ -228,8 +228,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRAExtendedResource:          true,
 				features.DRANodeAllocatableResources:  true,
 				features.DRAWorkloadResourceClaims:    true,
-				features.GangScheduling:               true,
-				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims, GangScheduling
+				features.GenericWorkload:              true, // dependency of DRAWorkloadResourceClaims
 			},
 			f: func(tCtx ktesting.TContext) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!

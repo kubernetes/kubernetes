@@ -111,9 +111,9 @@ type CoreResourceEnqueueTestCase struct {
 	EnableDRAExtendedResource bool
 	// EnableNodeDeclaredFeatures indicates if the test case runs with the NodeDeclaredFeatures feature gate enabled.
 	EnableNodeDeclaredFeatures bool
-	// EnableGangScheduling indicates wether the test case should run with feature gates
-	// GenericWorkload and GangScheduling enabled or not.
-	EnableGangScheduling bool
+	// EnableGenericWorkload indicates wether the test case should run with feature gate
+	// GenericWorkload enabled or not.
+	EnableGenericWorkload bool
 }
 
 // We define all the test cases here in the one place,
@@ -2543,7 +2543,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1", "pod3"),
-		EnableGangScheduling:          true,
+		EnableGenericWorkload:         true,
 	},
 	{
 		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching pod group is created",
@@ -2564,7 +2564,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1"),
-		EnableGangScheduling:          true,
+		EnableGenericWorkload:         true,
 	},
 }
 
@@ -2590,10 +2590,9 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		ndfFramework := ndf.New([]ndf.Feature{mockFeature})
 		ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
 	}
-	if tt.EnableGangScheduling {
+	if tt.EnableGenericWorkload {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.GenericWorkload: true,
-			features.GangScheduling:  true,
 		})
 	}
 	logger, _ := ktesting.NewTestContext(t)

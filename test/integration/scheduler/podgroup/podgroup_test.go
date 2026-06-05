@@ -110,7 +110,6 @@ func TestPodGroupScheduling(t *testing.T) {
 
 	tests := []struct {
 		name                                  string
-		enableWorkloadAwarePreemption         bool
 		enableTopologyAwareWorkloadScheduling []bool
 		steps                                 []stepsframework.Step
 	}{
@@ -305,43 +304,6 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "gang schedules with preemption",
-			steps: []stepsframework.Step{
-				{
-					Name:       "Create a low priority pod taking all resources",
-					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
-				},
-				{
-					Name:                 "Schedule the low priority resource-blocking pod",
-					WaitForPodsScheduled: []string{"low-priority-blocker"},
-				},
-				{
-					Name:           "Create the PodGroup object",
-					CreatePodGroup: gangPodGroup,
-				},
-				{
-					Name:       "Create high priority gang pods",
-					CreatePods: []*v1.Pod{p1, p2, p3, p4},
-				},
-				{
-					Name:                 "Verify all gang pods are scheduled successfully (after preemption)",
-					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
-				},
-				{
-					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
-					},
-				},
-				{
-					Name:               "Verify preemption victims were removed",
-					WaitForPodsRemoved: []string{"low-priority-blocker"},
-				},
-			},
-		},
-		{
 			name: "basic group schedules when pod group and resources are available, without gang enforcement",
 			steps: []stepsframework.Step{
 				{
@@ -408,38 +370,8 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "basic group schedules with preemption",
-			steps: []stepsframework.Step{
-				{
-					Name:       "Create a low priority pod taking all resources",
-					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
-				},
-				{
-					Name:                 "Schedule the low priority resource-blocking pod",
-					WaitForPodsScheduled: []string{"low-priority-blocker"},
-				},
-				{
-					Name:           "Create the PodGroup object",
-					CreatePodGroup: basicPodGroup,
-				},
-				{
-					Name:       "Create high priority group's pods",
-					CreatePods: []*v1.Pod{p1, p2, p3, p4},
-				},
-				{
-					Name:                 "Verify all group's pods are scheduled successfully (after preemption)",
-					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
-				},
-				{
-					Name:               "Verify preemption victims were removed",
-					WaitForPodsRemoved: []string{"low-priority-blocker"},
-				},
-			},
-		},
-		{
 			name:                                  "basic group schedules with workload-aware preemption",
 			enableTopologyAwareWorkloadScheduling: []bool{false},
-			enableWorkloadAwarePreemption:         true,
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create a low priority pod taking all resources",
@@ -468,8 +400,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name:                          "gang schedules with workload-aware preemption",
-			enableWorkloadAwarePreemption: true,
+			name: "gang schedules with workload-aware preemption",
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create low priority pods that take up all node resources",
@@ -480,7 +411,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodsScheduled: []string{"low-p1", "low-p2", "low-p3", "low-p4"},
 				},
 				{
-					Name:           "Create the Workload object",
+					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
 				},
 				{
@@ -492,14 +423,21 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
 				},
 				{
+					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          "Scheduled",
+					},
+				},
+				{
 					Name:               "Verify preemption victims were removed",
 					WaitForPodsRemoved: []string{"low-p1", "low-p2", "low-p3", "low-p4"},
 				},
 			},
 		},
 		{
-			name:                          "gang schedules with partial workload-aware preemption",
-			enableWorkloadAwarePreemption: true,
+			name: "gang schedules with partial workload-aware preemption",
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
@@ -555,7 +493,6 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name:                                  "tas gang with constraint does not use workload preemption",
-			enableWorkloadAwarePreemption:         true,
 			enableTopologyAwareWorkloadScheduling: []bool{true},
 			steps: []stepsframework.Step{
 				{
@@ -591,9 +528,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			t.Run(fmt.Sprintf("%s (TopologyAwareWorkloadScheduling enabled: %v)", tt.name, tasEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.GenericWorkload:                 true,
-					features.GangScheduling:                  true,
 					features.TopologyAwareWorkloadScheduling: tasEnabled,
-					features.WorkloadAwarePreemption:         tt.enableWorkloadAwarePreemption,
 				})
 
 				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
@@ -624,9 +559,7 @@ func TestPodGroupScheduling(t *testing.T) {
 
 func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.GangScheduling:          true,
-		features.WorkloadAwarePreemption: true,
+		features.GenericWorkload: true,
 	})
 
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
@@ -735,9 +668,7 @@ func (m *mockPostFilterPlugin) PostFilter(ctx context.Context, state framework.C
 
 func TestPostFilterInvocationCount(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.GangScheduling:          true,
-		features.WorkloadAwarePreemption: true,
+		features.GenericWorkload: true,
 	})
 
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()

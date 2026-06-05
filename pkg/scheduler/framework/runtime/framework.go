@@ -476,7 +476,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 
 	// Put default preemption as the only PodGroupPostFilterPlugin
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		if dp, ok := f.pluginsMap[names.DefaultPreemption]; ok {
 			if _, ok := dp.(framework.PodGroupPostFilterPlugin); ok {
 				f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, dp.(framework.PodGroupPostFilterPlugin))

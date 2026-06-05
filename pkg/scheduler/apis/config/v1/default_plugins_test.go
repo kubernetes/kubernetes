@@ -164,9 +164,8 @@ func TestApplyFeatureGates(t *testing.T) {
 			},
 		},
 		{
-			name: "Feature gate GangScheduling enabled",
+			name: "Feature gate GenericWorkload enabled",
 			features: map[featuregate.Feature]bool{
-				features.GangScheduling:  true,
 				features.GenericWorkload: true,
 			},
 			wantConfig: &v1.Plugins{
@@ -226,6 +225,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
 						{Name: names.NodeDeclaredFeatures},
+						{Name: names.GangScheduling},
 						{Name: names.TopologyPlacementGenerator},
 						{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)},
 					},

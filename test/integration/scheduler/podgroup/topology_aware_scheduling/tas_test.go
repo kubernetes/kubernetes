@@ -17,7 +17,6 @@ limitations under the License.
 package topologyawarescheduling
 
 import (
-	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -658,7 +657,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runTestScenario(t, tt, true /* gangSchedulingEnabled */)
+			runTestScenario(t, tt)
 		})
 	}
 }
@@ -1318,19 +1317,16 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 		},
 	}
 
-	for _, gangSchedulingEnabled := range []bool{true, false} {
-		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%s (GangScheduling enabled: %v)", tt.name, gangSchedulingEnabled), func(t *testing.T) {
-				runTestScenario(t, tt, gangSchedulingEnabled)
-			})
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runTestScenario(t, tt)
+		})
 	}
 }
 
-func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
+func runTestScenario(t *testing.T, tt scenario) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload:                 true,
-		features.GangScheduling:                  gangSchedulingEnabled,
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 

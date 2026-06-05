@@ -1021,7 +1021,6 @@ func Test_InFlightPods(t *testing.T) {
 			t.Run(fmt.Sprintf("%s (genericWorkloadEnabled: %v)", test.name, genericWorkloadEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.GenericWorkload: genericWorkloadEnabled,
-					features.GangScheduling:  true,
 				})
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
@@ -1392,7 +1391,6 @@ func TestPriorityQueue_Pop(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:          tt.genericWorkloadEnabled,
-				features.GangScheduling:           tt.genericWorkloadEnabled,
 				features.SchedulerPopFromBackoffQ: tt.popFromBackoffQEnabled,
 			})
 
@@ -6001,7 +5999,6 @@ func TestAddPodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			_, ctx := ktesting.NewTestContext(t)
@@ -6202,7 +6199,6 @@ func TestDeletePodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -6386,7 +6382,6 @@ func TestUpdatePodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			_, ctx := ktesting.NewTestContext(t)
@@ -6551,7 +6546,6 @@ func TestActivatePodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -6714,7 +6708,6 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -6858,7 +6851,6 @@ func TestFlushBackoffQCompletedPodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -6961,7 +6953,6 @@ func TestFlushUnschedulableEntitiesLeftoverPodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -7135,7 +7126,6 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)

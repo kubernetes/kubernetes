@@ -691,7 +691,6 @@ func TestPodGroupQueueing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			var testCtx *testutils.TestContext
@@ -835,7 +834,6 @@ func TestPodGroupSequentialQueueing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload: true,
-				features.GangScheduling:  true,
 			})
 
 			testCtx := testutils.InitTestSchedulerWithOptions(

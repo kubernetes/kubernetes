@@ -32,7 +32,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.GangScheduling), func() {
+var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.GenericWorkload), func() {
 	f := framework.NewDefaultFramework("gang-scheduling")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
