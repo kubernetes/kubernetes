@@ -95,13 +95,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"value set to unset": {
 			oldObj:    mkValidPriorityClass(),
-			updateObj: mkValidPriorityClass(func(pc *scheduling.PriorityClass) { pc.Value = 0 }),
+			updateObj: mkValidPriorityClass(setValue(0)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"value unset to set": {
-			oldObj:    mkValidPriorityClass(func(pc *scheduling.PriorityClass) { pc.Value = 0 }),
+			oldObj: mkValidPriorityClass(setValue(0)),
 			updateObj: mkValidPriorityClass(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
