@@ -79,6 +79,10 @@ type FakeRuntime struct {
 	imagePullErrBucket chan error
 	SwapBehavior       map[string]kubetypes.SwapBehavior
 	T                  TB
+	// BlockSyncPod will cause SyncPod to block until context is cancelled
+	BlockSyncPod bool
+	// BlockKillPod will cause KillPod to block until context is cancelled
+	BlockKillPod bool
 }
 
 const FakeHost = "localhost:12345"
@@ -259,7 +263,18 @@ func (f *FakeRuntime) GetPod(_ context.Context, podUID types.UID) (*kubecontaine
 	return nil, kubecontainer.ErrPodNotFound
 }
 
-func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) SyncPod(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
+	f.Lock()
+	blockSync := f.BlockSyncPod
+	f.Unlock()
+
+	// If BlockSyncPod is set, simulate a long-running operation that respects context
+	if blockSync {
+		<-ctx.Done()
+		result.Fail(ctx.Err())
+		return result
+	}
+
 	f.Lock()
 	defer f.Unlock()
 
@@ -278,7 +293,17 @@ func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.P
 	return
 }
 
-func (f *FakeRuntime) KillPod(_ context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	f.Lock()
+	blockKill := f.BlockKillPod
+	f.Unlock()
+
+	// If BlockKillPod is set, simulate a long-running kill that respects context
+	if blockKill {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
 	f.Lock()
 	defer f.Unlock()
 
