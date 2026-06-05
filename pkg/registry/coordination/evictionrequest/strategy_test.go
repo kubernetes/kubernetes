@@ -23,17 +23,13 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 )
 
-// TODO: this file needs to be proofread and the tests need to be run
-
 func TestEvictionRequestStrategy_ResetFields(t *testing.T) {
-	strategy := NewStrategy(nil)
+	strategy := NewStrategy()
 	for _, fields := range strategy.GetResetFields() {
 		if !fields.Has(fieldpath.MakePathOrDie("status")) {
 			t.Errorf("status should be reset on creation and update")
@@ -50,7 +46,7 @@ func TestEvictionRequestStrategy(t *testing.T) {
 		Verb:              "create",
 	})
 	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test"})
-	strategy := NewStrategy(&TestDecisionAuthorizer{authorizer.DecisionAllow})
+	strategy := NewStrategy()
 
 	if !strategy.NamespaceScoped() {
 		t.Errorf("EvictionRequest must be namespace scoped")
@@ -95,44 +91,6 @@ func TestEvictionRequestStrategy(t *testing.T) {
 	}
 }
 
-func TestEvictionRequestStrategy_Unauthorized(t *testing.T) {
-	for _, authDecision := range []authorizer.Decision{authorizer.DecisionDeny, authorizer.DecisionNoOpinion} {
-		t.Run(authDecision.String(), func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:          "coordination.k8s.io",
-				APIVersion:        "v1alpha1",
-				Resource:          "evictionrequests",
-				IsResourceRequest: true,
-				Verb:              "create",
-			})
-			ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test"})
-			strategy := NewStrategy(&TestDecisionAuthorizer{authDecision})
-
-			evictionRequest := &coordination.EvictionRequest{
-				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "foo"},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
-							UID:  validUID,
-							Name: "foo.pod",
-						},
-					},
-					RequesterName: "requester.domain/requester1",
-					Intent:        coordination.EvictionRequestIntentEviction,
-				},
-			}
-
-			strategy.PrepareForCreate(ctx, evictionRequest)
-			gotErr := strategy.Validate(ctx, evictionRequest)
-			expectedErr := field.ErrorList{field.Forbidden(field.NewPath(""), "User \"test\" must have permission to delete pods in \"foo\" namespace when spec.target.pod is set")}
-			errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByDetailExact()
-
-			errOutputMatcher.Test(t, expectedErr, gotErr)
-		})
-
-	}
-}
-
 func TestEvictionRequestStrategy_Update(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "coordination.k8s.io",
@@ -142,7 +100,7 @@ func TestEvictionRequestStrategy_Update(t *testing.T) {
 		Verb:              "update",
 	})
 	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test"})
-	strategy := NewStrategy(&TestDecisionAuthorizer{authorizer.DecisionAllow})
+	strategy := NewStrategy()
 
 	if len(strategy.WarningsOnUpdate(ctx, nil, nil)) != 0 {
 		t.Errorf("EvictionRequest warnings on update are expected to be empty")
@@ -198,61 +156,8 @@ func TestEvictionRequestStrategy_Update(t *testing.T) {
 	}
 }
 
-func TestEvictionRequestStrategy_UpdateUnauthorized(t *testing.T) {
-	for _, authDecision := range []authorizer.Decision{authorizer.DecisionDeny, authorizer.DecisionNoOpinion} {
-		t.Run(authDecision.String(), func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:          "coordination.k8s.io",
-				APIVersion:        "v1alpha1",
-				Resource:          "evictionrequests",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
-			ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test"})
-			strategy := NewStrategy(&TestDecisionAuthorizer{authDecision})
-
-			oldEvictionRequest := &coordination.EvictionRequest{
-				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "foo", Generation: 1, ResourceVersion: "2"},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
-							UID:  validUID,
-							Name: "foo.pod",
-						},
-					},
-					RequesterName: "requester.domain/requester1",
-					Intent:        coordination.EvictionRequestIntentWithdrawn,
-				},
-			}
-
-			newEvictionRequest := &coordination.EvictionRequest{
-				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "foo", ResourceVersion: "2"},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
-							UID:  validUID,
-							Name: "foo.pod",
-						},
-					},
-
-					RequesterName: "requester.domain/requester1",
-					// Any spec change is a privileged operation
-					Intent: coordination.EvictionRequestIntentEviction,
-				},
-			}
-
-			strategy.PrepareForUpdate(ctx, newEvictionRequest, oldEvictionRequest)
-			gotErr := strategy.ValidateUpdate(ctx, newEvictionRequest, oldEvictionRequest)
-			expectedErr := field.ErrorList{field.Forbidden(field.NewPath("spec", "requesters"), "User \"test\" must have permission to delete pods in \"foo\" namespace when spec.target.pod is set")}
-			errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByDetailExact()
-
-			errOutputMatcher.Test(t, expectedErr, gotErr)
-		})
-	}
-}
-
 func TestEvictionRequestStatusStrategy_ResetFields(t *testing.T) {
-	strategy := NewStrategy(nil)
+	strategy := NewStrategy()
 	statusStrategy := NewStatusStrategy(strategy)
 	for _, fields := range statusStrategy.GetResetFields() {
 		if !fields.Has(fieldpath.MakePathOrDie("spec")) {
@@ -265,7 +170,7 @@ func TestEvictionRequestStatusStrategy_ResetFields(t *testing.T) {
 }
 
 func TestEvictionRequestStatusStrategy(t *testing.T) {
-	strategy := NewStatusStrategy(NewStrategy(nil))
+	strategy := NewStatusStrategy(NewStrategy())
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "coordination.k8s.io",
 		APIVersion:        "v1alpha1",

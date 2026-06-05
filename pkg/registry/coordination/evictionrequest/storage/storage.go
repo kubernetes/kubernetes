@@ -23,7 +23,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -40,8 +39,8 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against evictionrequests.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer) (*REST, *StatusREST, error) {
-	strategy := evictionrequest.NewStrategy(authorizer)
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+	strategy := evictionrequest.NewStrategy()
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &coordinationapi.EvictionRequest{} },
 		NewListFunc:               func() runtime.Object { return &coordinationapi.EvictionRequestList{} },

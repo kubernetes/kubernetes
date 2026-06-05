@@ -17,13 +17,10 @@ limitations under the License.
 package rest
 
 import (
-	"fmt"
-
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -41,14 +38,9 @@ import (
 )
 
 type RESTStorageProvider struct {
-	Authorizer authorizer.Authorizer
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	if p.Authorizer == nil {
-		return genericapiserver.APIGroupInfo{}, fmt.Errorf("coordination REST storage requires an authorizer")
-	}
-
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(coordination.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
@@ -139,7 +131,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	}
 	if resource := "evictionrequests"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-			evictionRequestStorage, evictionRequestStatusStorage, err := evictionrequeststorage.NewREST(restOptionsGetter, p.Authorizer)
+			evictionRequestStorage, evictionRequestStatusStorage, err := evictionrequeststorage.NewREST(restOptionsGetter)
 			if err != nil {
 				return storage, err
 			}

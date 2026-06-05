@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -39,22 +38,6 @@ import (
 
 const validUID = "c88f9680-e6bc-4b18-9a4c-eed4292c4de9"
 
-type TestDecisionAuthorizer struct {
-	decision authorizer.Decision
-}
-
-func (t *TestDecisionAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
-	return authorizer.ConditionsAwareDecisionFromParts(t.Authorize(ctx, a))
-}
-
-func (t *TestDecisionAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
-}
-
-func (t *TestDecisionAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return t.decision, "", nil
-}
-
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, coordination.SchemeGroupVersion.WithResource("evictionrequests").GroupResource())
 	restOptions := generic.RESTOptions{
@@ -64,7 +47,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		ResourcePrefix:          "evictionrequests",
 	}
 
-	evictionRequestStorage, evictionRequestStatusStorage, err := NewREST(restOptions, &TestDecisionAuthorizer{authorizer.DecisionAllow})
+	evictionRequestStorage, evictionRequestStatusStorage, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

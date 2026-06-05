@@ -17,7 +17,6 @@ limitations under the License.
 package evictionrequest
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -25,8 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/coordination"
@@ -39,22 +36,6 @@ import (
 )
 
 const validUID = "5477c2ff-f59f-4eb9-a0be-e54232323faa"
-
-type TestDecisionAuthorizer struct {
-	decision authorizer.Decision
-}
-
-func (t *TestDecisionAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return t.decision, "", nil
-}
-
-func (t *TestDecisionAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
-	return authorizer.ConditionsAwareDecisionFromParts(t.Authorize(ctx, a))
-}
-
-func (t *TestDecisionAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorized authorizer.Decision, reason string, err error) {
-	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
-}
 
 func TestDeclarativeValidate(t *testing.T) {
 	apiVersions := []string{"v1alpha1"} // EvictionRequest is currently only in v1alpha1
@@ -119,24 +100,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
-	for _, authDecision := range []authorizer.Decision{authorizer.DecisionAllow, authorizer.DecisionDeny, authorizer.DecisionNoOpinion} {
-		for k, tc := range testCases {
-			t.Run(fmt.Sprintf("%v authDecision=%v", k, authDecision.String()), func(t *testing.T) {
-				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-					APIGroup:          "coordination.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "evictionrequests",
-					IsResourceRequest: true,
-					Verb:              "create",
-				})
-				ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test"})
-				strategy := NewStrategy(&TestDecisionAuthorizer{authDecision})
-				if tc.input.Spec.Target.Pod != nil && authDecision != authorizer.DecisionAllow {
-					tc.errors = field.ErrorList{field.Forbidden(field.NewPath(""), "User \"test\" must have permission to delete pods in \"foo\" namespace when spec.target.pod is set")}
-				}
-				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, strategy, tc.errors)
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "coordination.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "evictionrequests",
+				IsResourceRequest: true,
+				Verb:              "create",
 			})
-		}
+			strategy := NewStrategy()
+			apitesting.VerifyValidationEquivalence(t, ctx, tc.input, strategy, tc.errors)
+		})
 	}
 }
 
@@ -198,26 +173,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
-	for _, authDecision := range []authorizer.Decision{authorizer.DecisionAllow, authorizer.DecisionDeny, authorizer.DecisionNoOpinion} {
-		for k, tc := range testCases {
-			t.Run(fmt.Sprintf("%v authDecision=%v", k, authDecision.String()), func(t *testing.T) {
-				tc.oldInput.ResourceVersion = "0"
-				tc.input.ResourceVersion = "1"
-				ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-					APIGroup:          "coordination.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "evictionrequests",
-					IsResourceRequest: true,
-					Verb:              "update",
-				})
-				ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test"})
-				strategy := NewStrategy(&TestDecisionAuthorizer{authDecision})
-				if tc.input.Spec.Target.Pod != nil && authDecision != authorizer.DecisionAllow {
-					tc.errors = field.ErrorList{field.Forbidden(field.NewPath("spec", "requesters"), "User \"test\" must have permission to delete pods in \"foo\" namespace when spec.target.pod is set")}
-				}
-				apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.input, tc.oldInput, strategy, tc.errors)
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.oldInput.ResourceVersion = "0"
+			tc.input.ResourceVersion = "1"
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:          "coordination.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "evictionrequests",
+				IsResourceRequest: true,
+				Verb:              "update",
 			})
-		}
+			strategy := NewStrategy()
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, tc.input, tc.oldInput, strategy, tc.errors)
+		})
 	}
 }
 
@@ -277,7 +246,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			evictionRequest := mkValidEvictionRequest()
 			evictionRequest.ResourceVersion = "1"
 			evictionRequest.Status = *tc.input
-			strategy := NewStatusStrategy(NewStrategy(nil))
+			strategy := NewStatusStrategy(NewStrategy())
 
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "coordination.k8s.io",

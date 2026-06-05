@@ -423,7 +423,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
-		coordinationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
+		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
