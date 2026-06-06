@@ -893,6 +893,8 @@ var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithFeatureGa
 	})
 
 	doPodResizeInitContainerResizeTest(f)
+	doPodResizeOOMKilledInitContainerTest(f)
+	doPodResizeOOMKilledSidecarTest(f)
 })
 
 func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, doRollback bool, mountPodCgroup bool) {
@@ -1056,6 +1058,307 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 			return nil, nil
 		})),
 	)
+}
+
+func doPodResizeOOMKilledInitContainerTest(f *framework.Framework) {
+	// doPodResizeOOMKilledInitContainerTest verifies that an in-place memory resize applied while
+	// a sidecar (restartable init container) is OOMKilling correctly updates both the
+	// container-level and pod-level cgroups.
+	// Steps:
+	// 1. Pod created with a sidecar at 128Mi memory limit and a long-running main container.
+	// 2. Wait for RestartCount>=1 with LastTerminationState.Reason=="OOMKilled" and
+	//    State.Waiting.Reason=="CrashLoopBackOff". container in 10s backoff, not running.
+	// 3. Apply resize 128Mi to 256Mi while container is in backoff with actuatedState==128Mi guaranteed.
+	// 4. Wait for pod to become Ready with new limits actuated.
+	// 5. Verify container exits cleanly (dd succeeds) after the resize.
+	const (
+		initialMemLimit   = "128Mi"
+		allocateMem       = "150M"
+		resizedMemLimit   = "256Mi"
+		initContainerName = "oom-init-container"
+		mainContainerName = "main-container"
+	)
+
+	ginkgo.It("should update pod-level cgroup after resizing an OOMKilled init container",
+		feature.InPlacePodVerticalScaling, func(ctx context.Context) {
+
+			podClient := e2epod.NewPodClient(f)
+
+			initialResources := &cgroups.ContainerResources{
+				MemReq: initialMemLimit,
+				MemLim: initialMemLimit,
+			}
+			initContainerInfo := podresize.ResizableContainerInfo{
+				Name:          initContainerName,
+				Resources:     initialResources,
+				InitCtr:       true,
+				RestartPolicy: v1.ContainerRestartPolicyAlways,
+			}
+			mainContainerInfo := podresize.ResizableContainerInfo{
+				Name:      mainContainerName,
+				Resources: &cgroups.ContainerResources{MemReq: "64Mi", MemLim: "64Mi"},
+			}
+
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			testPod := podresize.MakePodWithResizableContainers(
+				f.Namespace.Name, "resize-oomkilled-init", tStamp,
+				[]podresize.ResizableContainerInfo{initContainerInfo, mainContainerInfo}, nil)
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			for i := range testPod.Spec.InitContainers {
+				if testPod.Spec.InitContainers[i].Name == initContainerName {
+					testPod.Spec.InitContainers[i].Image = imageutils.GetE2EImage(imageutils.BusyBox)
+					testPod.Spec.InitContainers[i].Command = []string{"/bin/sh"}
+					testPod.Spec.InitContainers[i].Args = []string{
+						"-c",
+						fmt.Sprintf("dd if=/dev/zero of=/tmp/oom bs=%s count=1", allocateMem),
+					}
+					break
+				}
+			}
+
+			testPod.Spec.RestartPolicy = v1.RestartPolicyAlways
+
+			ginkgo.By("Creating pod with low memory limit on init container to trigger OOMKill")
+			newPod := podClient.Create(ctx, testPod)
+
+			// Wait for RestartCount>=1 with an OOMKill in LastTerminationState and the container
+			// in CrashLoopBackOff.
+			ginkgo.By("Waiting for first CrashLoopBackOff after OOMKill (RestartCount>=1)")
+			framework.ExpectNoError(
+				framework.Gomega().
+					Eventually(ctx, framework.RetryNotFound(
+						framework.GetObject(f.ClientSet.CoreV1().Pods(newPod.Namespace).Get, newPod.Name, metav1.GetOptions{}))).
+					WithTimeout(f.Timeouts.PodStart).
+					Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+						for _, cs := range pod.Status.InitContainerStatuses {
+							if cs.Name != initContainerName {
+								continue
+							}
+							if cs.RestartCount >= 1 &&
+								cs.LastTerminationState.Terminated != nil &&
+								cs.LastTerminationState.Terminated.Reason == "OOMKilled" &&
+								cs.State.Waiting != nil &&
+								cs.State.Waiting.Reason == "CrashLoopBackOff" {
+								return nil, nil
+							}
+						}
+						return func() string {
+							return "waiting for RestartCount>=1 with OOMKill in LastTerminationState and CrashLoopBackOff"
+						}, nil
+					})),
+			)
+
+			resizedResources := &cgroups.ContainerResources{
+				MemReq: resizedMemLimit,
+				MemLim: resizedMemLimit,
+			}
+			resizedInitContainerInfo := podresize.ResizableContainerInfo{
+				Name:          initContainerName,
+				Resources:     resizedResources,
+				InitCtr:       true,
+				RestartPolicy: v1.ContainerRestartPolicyAlways,
+			}
+			patch := podresize.MakeResizePatch(
+				[]podresize.ResizableContainerInfo{initContainerInfo, mainContainerInfo},
+				[]podresize.ResizableContainerInfo{resizedInitContainerInfo, mainContainerInfo},
+				nil, nil)
+
+			ginkgo.By("Applying in-place resize while init container is in CrashLoopBackOff with actuatedState==128Mi guaranteed")
+			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(
+				ctx, newPod.Name,
+				types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+			ginkgo.By("Waiting for pod to become Ready after resize. verifies pod-level cgroup was updated")
+			expectedContainers := []podresize.ResizableContainerInfo{resizedInitContainerInfo, mainContainerInfo}
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expectedContainers)
+
+			ginkgo.By("Verifying init container allocated 200M successfully after resize. exits cleanly, not OOMKilled")
+			framework.ExpectNoError(
+				framework.Gomega().
+					Eventually(ctx, framework.RetryNotFound(
+						framework.GetObject(f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Get, resizedPod.Name, metav1.GetOptions{}))).
+					WithTimeout(f.Timeouts.PodStart).
+					Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+						for _, cs := range pod.Status.InitContainerStatuses {
+							if cs.Name != initContainerName {
+								continue
+							}
+							lt := cs.LastTerminationState.Terminated
+							if lt == nil {
+								return func() string { return "waiting for post-resize LastTerminationState" }, nil
+							}
+							if lt.ExitCode == 0 {
+								return nil, nil
+							}
+							if lt.Reason == "OOMKilled" {
+								return func() string {
+									return fmt.Sprintf("init container still OOMKilling after resize (restartCount=%d); waiting for clean exit", cs.RestartCount)
+								}, nil
+							}
+							return func() string {
+								return fmt.Sprintf("waiting for clean exit (last exit code=%d reason=%q)", lt.ExitCode, lt.Reason)
+							}, nil
+						}
+						return func() string { return "waiting for init container status" }, nil
+					})),
+			)
+
+			ginkgo.By("Deleting pod")
+			podClient.DeleteSync(ctx, resizedPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		})
+}
+
+func doPodResizeOOMKilledSidecarTest(f *framework.Framework) {
+	// doPodResizeOOMKilledSidecarTest verifies that an in-place memory resize applied while a
+	// sidecar is OOMKilling correctly updates both the
+	// container-level and pod-level cgroups.
+	// Steps:
+	// 1. Pod created with a sidecar at 128Mi memory limit and a long-running main container.
+	// 2. Wait for RestartCount>=1 with OOMKill in LastTerminationState and CrashLoopBackOff.
+	// 3. Apply resize 128Mi to 256Mi while sidecar is in backoff with actuatedState==128Mi guaranteed.
+	// 4. Wait for pod to become Ready with new limits actuated.
+	// 5. Verify sidecar exits cleanly (dd succeeds) after the resize.
+	const (
+		initialMemLimit   = "128Mi"
+		allocateMem       = "150M"
+		resizedMemLimit   = "256Mi"
+		sidecarName       = "oom-sidecar"
+		mainContainerName = "main-container"
+	)
+
+	ginkgo.It("should update pod-level cgroup after resizing an OOMKilled sidecar",
+		feature.InPlacePodVerticalScaling, func(ctx context.Context) {
+
+			podClient := e2epod.NewPodClient(f)
+
+			restartPolicy := v1.RestartContainer
+			initialResources := &cgroups.ContainerResources{
+				MemReq: initialMemLimit,
+				MemLim: initialMemLimit,
+			}
+			sidecarInfo := podresize.ResizableContainerInfo{
+				Name:          sidecarName,
+				Resources:     initialResources,
+				MemPolicy:     &restartPolicy,
+				InitCtr:       true,
+				RestartPolicy: v1.ContainerRestartPolicyAlways,
+			}
+			mainContainerInfo := podresize.ResizableContainerInfo{
+				Name:      mainContainerName,
+				Resources: &cgroups.ContainerResources{MemReq: "64Mi", MemLim: "64Mi"},
+			}
+
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			testPod := podresize.MakePodWithResizableContainers(
+				f.Namespace.Name, "resize-oomkilled-sidecar", tStamp,
+				[]podresize.ResizableContainerInfo{sidecarInfo, mainContainerInfo}, nil)
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			for i := range testPod.Spec.InitContainers {
+				if testPod.Spec.InitContainers[i].Name == sidecarName {
+					testPod.Spec.InitContainers[i].Image = imageutils.GetE2EImage(imageutils.BusyBox)
+					testPod.Spec.InitContainers[i].Command = []string{"/bin/sh"}
+					testPod.Spec.InitContainers[i].Args = []string{
+						"-c",
+						fmt.Sprintf("dd if=/dev/zero of=/tmp/oom bs=%s count=1", allocateMem),
+					}
+					break
+				}
+			}
+
+			testPod.Spec.RestartPolicy = v1.RestartPolicyAlways
+
+			ginkgo.By("Creating pod with low memory limit on sidecar to trigger OOMKill")
+			newPod := podClient.Create(ctx, testPod)
+
+			// Wait for RestartCount>=1 with OOMKill in LastTerminationState and CrashLoopBackOff.
+			ginkgo.By("Waiting for first CrashLoopBackOff after OOMKill (RestartCount>=1)")
+			framework.ExpectNoError(
+				framework.Gomega().
+					Eventually(ctx, framework.RetryNotFound(
+						framework.GetObject(f.ClientSet.CoreV1().Pods(newPod.Namespace).Get, newPod.Name, metav1.GetOptions{}))).
+					WithTimeout(f.Timeouts.PodStart).
+					Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+						for _, cs := range pod.Status.InitContainerStatuses {
+							if cs.Name != sidecarName {
+								continue
+							}
+							if cs.RestartCount >= 1 &&
+								cs.LastTerminationState.Terminated != nil &&
+								cs.LastTerminationState.Terminated.Reason == "OOMKilled" &&
+								cs.State.Waiting != nil &&
+								cs.State.Waiting.Reason == "CrashLoopBackOff" {
+								return nil, nil
+							}
+						}
+						return func() string {
+							return "waiting for RestartCount>=1 with OOMKill in LastTerminationState and CrashLoopBackOff"
+						}, nil
+					})),
+			)
+
+			resizedResources := &cgroups.ContainerResources{
+				MemReq: resizedMemLimit,
+				MemLim: resizedMemLimit,
+			}
+			resizedSidecarInfo := podresize.ResizableContainerInfo{
+				Name:          sidecarName,
+				Resources:     resizedResources,
+				MemPolicy:     &restartPolicy,
+				InitCtr:       true,
+				RestartPolicy: v1.ContainerRestartPolicyAlways,
+			}
+			patch := podresize.MakeResizePatch(
+				[]podresize.ResizableContainerInfo{sidecarInfo, mainContainerInfo},
+				[]podresize.ResizableContainerInfo{resizedSidecarInfo, mainContainerInfo},
+				nil, nil)
+
+			ginkgo.By("Applying in-place resize while sidecar is in CrashLoopBackOff (actuatedState==128Mi guaranteed)")
+			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(
+				ctx, newPod.Name,
+				types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+			ginkgo.By("Waiting for pod to become Ready after resize (verifies pod-level cgroup was updated)")
+			expectedContainers := []podresize.ResizableContainerInfo{resizedSidecarInfo, mainContainerInfo}
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expectedContainers)
+
+			ginkgo.By("Verifying sidecar allocated 200M successfully after resize (exits cleanly, not OOMKilled)")
+			framework.ExpectNoError(
+				framework.Gomega().
+					Eventually(ctx, framework.RetryNotFound(
+						framework.GetObject(f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Get, resizedPod.Name, metav1.GetOptions{}))).
+					WithTimeout(f.Timeouts.PodStart).
+					Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+						for _, cs := range pod.Status.InitContainerStatuses {
+							if cs.Name != sidecarName {
+								continue
+							}
+							lt := cs.LastTerminationState.Terminated
+							if lt == nil {
+								return func() string { return "waiting for post-resize LastTerminationState" }, nil
+							}
+							if lt.ExitCode == 0 {
+								return nil, nil
+							}
+							if lt.Reason == "OOMKilled" {
+								return func() string {
+									return fmt.Sprintf("sidecar still OOMKilling after resize (restartCount=%d); waiting for clean exit", cs.RestartCount)
+								}, nil
+							}
+							return func() string {
+								return fmt.Sprintf("waiting for clean exit (last exit code=%d reason=%q)", lt.ExitCode, lt.Reason)
+							}, nil
+						}
+						return func() string { return "waiting for sidecar status" }, nil
+					})),
+			)
+
+			ginkgo.By("Deleting pod")
+			podClient.DeleteSync(ctx, resizedPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		})
 }
 
 func doPodResizeOOMKilledTest(f *framework.Framework) {
