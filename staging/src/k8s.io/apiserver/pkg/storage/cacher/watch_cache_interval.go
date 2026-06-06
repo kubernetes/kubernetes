@@ -101,6 +101,12 @@ type watchCacheInterval struct {
 
 	// initialEventsEndBookmark will be sent after sending all events in cacheInterval
 	initialEventsEndBookmark *watchCacheEvent
+
+	// orderedStoreSnapshot lazily supplies initial events from an immutable store
+	// snapshot. This keeps expensive list materialization out of the watch-cache
+	// critical section while preserving the snapshot boundary captured under it.
+	orderedStoreSnapshot store.OrderedLister
+	orderedStoreLoaded   bool
 }
 
 type indexerFunc func(int) *watchCacheEvent
@@ -134,10 +140,22 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 		if exists {
 			allItems = append(allItems, item)
 		}
+	} else if orderedIndexer, ok := indexer.(store.OrderedIndexer); ok {
+		return &watchCacheInterval{
+			startIndex:           0,
+			endIndex:             0,
+			buffer:               buffer,
+			resourceVersion:      resourceVersion,
+			orderedStoreSnapshot: orderedIndexer.Clone(),
+		}, nil
 	} else {
 		allItems = indexer.List()
 	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
+	return newCacheIntervalFromStoreItems(resourceVersion, allItems)
+}
+
+func newCacheIntervalFromStoreItems(resourceVersion uint64, allItems []interface{}) (*watchCacheInterval, error) {
+	buffer := &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, len(allItems))}
 	for i, item := range allItems {
 		elem, ok := item.(*store.Element)
 		if !ok {
@@ -168,6 +186,9 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 // interval is still valid. An error is returned if the interval is
 // invalidated.
 func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
+	if err := wci.ensureStoreSnapshotLoaded(); err != nil {
+		return nil, err
+	}
 	// if there are items in the buffer to return, return from
 	// the buffer.
 	if event, exists := wci.buffer.next(); exists {
@@ -190,6 +211,23 @@ func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
 		return event, nil
 	}
 	return nil, nil
+}
+
+func (wci *watchCacheInterval) ensureStoreSnapshotLoaded() error {
+	if wci.orderedStoreSnapshot == nil || wci.orderedStoreLoaded {
+		return nil
+	}
+	wci.orderedStoreLoaded = true
+	ci, err := newCacheIntervalFromStoreItems(
+		wci.resourceVersion,
+		wci.orderedStoreSnapshot.OrderedListPrefix("", ""),
+	)
+	if err != nil {
+		return err
+	}
+	wci.buffer = ci.buffer
+	wci.orderedStoreSnapshot = nil
+	return nil
 }
 
 func (wci *watchCacheInterval) fillBuffer() {
