@@ -178,6 +178,31 @@ func TestDeleteResourceDeleteOptions(t *testing.T) {
 			expectCode: 400,
 		},
 		{
+			name:       "gracePeriodSeconds invalid Go type",
+			body:       `{"gracePeriodSeconds": "true"}`,
+			expectCode: 400,
+		},
+		{
+			name:       "ignoreStoreReadErrorWithClusterBreakingPotential invalid Go type",
+			body:       `{"ignoreStoreReadErrorWithClusterBreakingPotential": 1}`,
+			expectCode: 400,
+		},
+		{
+			name:       "orphanDependents invalid integer Go type",
+			body:       `{"orphanDependents": 1}`,
+			expectCode: 400,
+		},
+		{
+			name:       "propagationPolicy invalid Go type",
+			body:       `{"propagationPolicy": 1}`,
+			expectCode: 400,
+		},
+		{
+			name:       "preconditions invalid Go type",
+			body:       `{"preconditions": "fix"}`,
+			expectCode: 400,
+		},
+		{
 			name:       "apiVersion/kind mismatch",
 			body:       `{ "apiVersion": "v1", "kind": "APIResourceList" }`,
 			expectCode: 400,
@@ -191,7 +216,7 @@ func TestDeleteResourceDeleteOptions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequestWithContext(ctx, request.MethodDelete, "/api/v1/namespaces/default/pods/testpod", strings.NewReader(test.body))
+			req, err := http.NewRequestWithContext(ctx, http.MethodDelete, "/api/v1/namespaces/default/pods/testpod", strings.NewReader(test.body))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -314,6 +339,31 @@ func TestDeleteCollectionDeleteOptions(t *testing.T) {
 			expectCode: 400,
 		},
 		{
+			name:       "gracePeriodSeconds invalid Go type",
+			body:       `{"gracePeriodSeconds": "true"}`,
+			expectCode: 400,
+		},
+		{
+			name:       "ignoreStoreReadErrorWithClusterBreakingPotential invalid Go type",
+			body:       `{"ignoreStoreReadErrorWithClusterBreakingPotential": 1}`,
+			expectCode: 400,
+		},
+		{
+			name:       "orphanDependents invalid integer Go type",
+			body:       `{"orphanDependents": 1}`,
+			expectCode: 400,
+		},
+		{
+			name:       "propagationPolicy invalid Go type",
+			body:       `{"propagationPolicy": 1}`,
+			expectCode: 400,
+		},
+		{
+			name:       "preconditions invalid Go type",
+			body:       `{"preconditions": "fix"}`,
+			expectCode: 400,
+		},
+		{
 			name:       "apiVersion/kind mismatch",
 			body:       `{ "apiVersion": "v1", "kind": "APIResourceList" }`,
 			expectCode: 400,
@@ -327,7 +377,7 @@ func TestDeleteCollectionDeleteOptions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequestWithContext(ctx, request.MethodDelete, "/api/v1/namespaces/default/pods/testpod", strings.NewReader(test.body))
+			req, err := http.NewRequestWithContext(ctx, http.MethodDelete, "/api/v1/namespaces/default/pods/testpod", strings.NewReader(test.body))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
