@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -376,6 +377,10 @@ func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, true)
 
+	origChecker := etcdfeature.DefaultFeatureSupportChecker
+	etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
+	t.Cleanup(func() { etcdfeature.DefaultFeatureSupportChecker = origChecker })
+
 	origCtx, store, _ := testSetup(t)
 	initList, err := initStoreData(origCtx, store)
 	if err != nil {
@@ -397,6 +402,9 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	}
 	if w.initialRev <= 0 {
 		t.Errorf("expected initialRev to be set by the paginated fallback, got %d", w.initialRev)
+	}
+	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream) {
+		t.Error("expected RangeStream to be marked unsupported after the Unimplemented fallback")
 	}
 
 	close(w.incomingEventChan)
