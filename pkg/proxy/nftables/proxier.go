@@ -178,6 +178,11 @@ type Proxier struct {
 
 	// staleChains contains information about chains to be deleted later
 	staleChains map[string]time.Time
+	// activeChains and activeAffinitySets are the service-related chains and
+	// affinity sets that kube-proxy believes are committed in nftables after the
+	// previous successful sync. They allow incremental syncs to avoid ListAll.
+	activeChains       sets.Set[string]
+	activeAffinitySets sets.Set[string]
 
 	// serviceCIDRs is a comma separated list of ServiceCIDRs belonging to the IPFamily
 	// which proxier is operating on, can be directly consumed by knftables.
@@ -254,6 +259,8 @@ func NewProxier(ctx context.Context,
 		nodePortAddresses:   nodePortAddresses,
 		networkInterfacer:   proxyutil.RealNetwork{},
 		staleChains:         make(map[string]time.Time),
+		activeChains:        sets.New[string](),
+		activeAffinitySets:  sets.New[string](),
 		logger:              logger,
 		logRateLimiter:      rate.NewLimiter(rate.Every(24*time.Hour), 1),
 		clusterIPs:          newNFTElementStorage("set", clusterIPsSet),
@@ -1151,16 +1158,21 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	var existingChains sets.Set[string]
 	var existingAffinitySets sets.Set[string]
-	if allObjects, err := proxier.nftables.ListAll(context.TODO()); err == nil {
-		existingChains = sets.New(allObjects["chain"]...)
-		existingAffinitySets = sets.New[string]()
-		for _, set := range allObjects["set"] {
-			if isAffinitySetName(set) {
-				existingAffinitySets.Insert(set)
+	if doFullSync {
+		if allObjects, err := proxier.nftables.ListAll(context.TODO()); err == nil {
+			existingChains = sets.New(allObjects["chain"]...)
+			existingAffinitySets = sets.New[string]()
+			for _, set := range allObjects["set"] {
+				if isAffinitySetName(set) {
+					existingAffinitySets.Insert(set)
+				}
 			}
+		} else {
+			proxier.logger.Error(err, "Failed to list existing nftables objects")
 		}
 	} else {
-		proxier.logger.Error(err, "Failed to list existing nftables objects")
+		existingChains = proxier.activeChains.Clone()
+		existingAffinitySets = proxier.activeAffinitySets.Clone()
 	}
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
@@ -1726,6 +1738,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 	success = true
 	proxier.needFullSync = false
+	proxier.activeChains = activeChains
+	proxier.activeAffinitySets = activeAffinitySets
 
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {

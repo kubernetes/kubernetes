@@ -19,6 +19,7 @@ limitations under the License.
 package nftables
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -128,6 +129,8 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nodePortAddresses),
 		networkInterfacer:   networkInterfacer,
 		staleChains:         make(map[string]time.Time),
+		activeChains:        sets.New[string](),
+		activeAffinitySets:  sets.New[string](),
 		serviceCIDRs:        serviceCIDRs,
 		logRateLimiter:      rate.NewLimiter(rate.Every(24*time.Hour), 1),
 		clusterIPs:          newNFTElementStorage("set", clusterIPsSet),
@@ -3826,6 +3829,58 @@ func assertNumOperations(t *testing.T, nft *knftables.Fake, ops ...int) {
 	}
 	if nft.LastTransaction.NumOperations() != expectedOps {
 		t.Errorf("Expected transaction with %d operations, got %d", expectedOps, nft.LastTransaction.NumOperations())
+	}
+}
+
+type countingNFTables struct {
+	knftables.Interface
+	listAllCalls int
+}
+
+func (nft *countingNFTables) ListAll(ctx context.Context) (map[string][]string, error) {
+	nft.listAllCalls++
+	return nft.Interface.ListAll(ctx)
+}
+
+func TestSyncProxyRulesSkipsListAllOnIncrementalSync(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	countingNFT := &countingNFTables{Interface: nft}
+	fp.nftables = countingNFT
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = "172.30.0.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.0.1.1"},
+				NodeName:  ptr.To(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To("p80"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+	if countingNFT.listAllCalls != 1 {
+		t.Fatalf("expected initial full sync to call ListAll once, got %d", countingNFT.listAllCalls)
+	}
+
+	fp.syncProxyRules()
+	if countingNFT.listAllCalls != 1 {
+		t.Fatalf("expected incremental sync to skip ListAll, got %d calls", countingNFT.listAllCalls)
 	}
 }
 
