@@ -1308,17 +1308,7 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		consistentReadSupported := delegator.ConsistentReadSupported()
 		c.watchCache.RLock()
 		defer c.watchCache.RUnlock()
-		if requestedWatchRV > 0 && requestedWatchRV > c.watchCache.resourceVersion {
-			if consistentReadSupported {
-				c.watchCache.waitingUntilFresh.Add()
-				err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
-				c.watchCache.waitingUntilFresh.Remove()
-				return err
-			} else {
-				return c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
-			}
-		}
-		return nil
+		return c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
 	}
 	return nil
 }
