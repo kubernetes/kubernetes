@@ -60,11 +60,10 @@ type WatchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
-// StoreLocked returns the live store as a Snapshot.
-// Unlike GetExactSnapshotLocked this is not an immutable point-in-time copy.
-// The caller must hold the lock for the duration of use.
+// StoreLocked returns an immutable snapshot of the live store.
+// The caller must hold the watch-cache lock while the snapshot is created.
 func (w *WatchCacheStorage) StoreLocked() Snapshot {
-	return w.store
+	return w.store.Clone()
 }
 
 func (w *WatchCacheStorage) SnapshottingEnabled() bool {

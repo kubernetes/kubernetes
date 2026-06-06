@@ -434,6 +434,30 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 }
 
+func TestCacheIntervalFromOrderedStoreDefersListUntilNext(t *testing.T) {
+	elem := makeTestStoreElement(makeTestPod("pod", 1))
+	snapshot := &deferredListSnapshot{items: []interface{}{elem}}
+
+	wci, err := newCacheIntervalFromStore(1, snapshot, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.listCalled {
+		t.Fatal("List was called while constructing cache interval")
+	}
+
+	event, err := wci.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event == nil {
+		t.Fatal("expected event from deferred store snapshot")
+	}
+	if !snapshot.listCalled {
+		t.Fatal("expected snapshot to be listed on first Next")
+	}
+}
+
 // TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
 // events sorted by Key for both indexer backends.
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
@@ -475,4 +499,20 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			}
 		})
 	}
+}
+
+type deferredListSnapshot struct {
+	items      []interface{}
+	listCalled bool
+}
+
+var _ store.Snapshot = (*deferredListSnapshot)(nil)
+
+func (d *deferredListSnapshot) GetByKey(key string) (interface{}, bool, error) {
+	return nil, false, nil
+}
+
+func (d *deferredListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+	d.listCalled = true
+	return d.items, nil
 }

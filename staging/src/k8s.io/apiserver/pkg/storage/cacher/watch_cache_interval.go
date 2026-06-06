@@ -75,7 +75,6 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
-	var err error
 	if matchesSingle {
 		item, exists, err := snap.GetByKey(key)
 		if err != nil {
@@ -85,12 +84,30 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems, err = snap.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
+		return &watchCacheInterval{
+			source: &snapshotCacheIntervalSource{
+				snapshot:        snap,
+				key:             key,
+				buffer:          buffer,
+				resourceVersion: resourceVersion,
+			},
+			resourceVersion: resourceVersion,
+		}, nil
 	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
+	buffer, err := newCacheIntervalBufferFromStoreItems(resourceVersion, allItems)
+	if err != nil {
+		return nil, err
+	}
+	ci := &watchCacheInterval{
+		source:          &snapshotCacheIntervalSource{buffer: buffer},
+		resourceVersion: resourceVersion,
+	}
+
+	return ci, nil
+}
+
+func newCacheIntervalBufferFromStoreItems(resourceVersion uint64, allItems []interface{}) (*watchCacheIntervalBuffer, error) {
+	buffer := &watchCacheIntervalBuffer{buffer: make([]*watchCacheEvent, len(allItems))}
 	for i, item := range allItems {
 		elem, ok := item.(*store.Element)
 		if !ok {
@@ -99,12 +116,7 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 		buffer.buffer[i] = storeElementToWatchCacheEvent(elem, resourceVersion)
 		buffer.endIndex++
 	}
-	ci := &watchCacheInterval{
-		source:          &snapshotCacheIntervalSource{buffer: buffer},
-		resourceVersion: resourceVersion,
-	}
-
-	return ci, nil
+	return buffer, nil
 }
 
 func storeElementToWatchCacheEvent(elem *store.Element, resourceVersion uint64) *watchCacheEvent {
@@ -232,17 +244,42 @@ func (s *historyCacheIntervalSource) fillBuffer() {
 	}
 }
 
-// snapshotCacheIntervalSource serves events from a pre-populated buffer.
+// snapshotCacheIntervalSource serves events from a snapshot. Large snapshot
+// lists are materialized lazily so interval construction can stay cheap while
+// the watch-cache lock is held.
 type snapshotCacheIntervalSource struct {
-	buffer *watchCacheIntervalBuffer
+	buffer          *watchCacheIntervalBuffer
+	snapshot        store.Snapshot
+	key             string
+	resourceVersion uint64
 }
 
 func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+	if err := s.ensureLoaded(); err != nil {
+		return nil, err
+	}
 	event, exists := s.buffer.next()
 	if !exists {
 		return nil, nil
 	}
 	return event, nil
+}
+
+func (s *snapshotCacheIntervalSource) ensureLoaded() error {
+	if s.snapshot == nil {
+		return nil
+	}
+	allItems, err := s.snapshot.OrderedListPrefix(s.key, "")
+	if err != nil {
+		return err
+	}
+	buffer, err := newCacheIntervalBufferFromStoreItems(s.resourceVersion, allItems)
+	if err != nil {
+		return err
+	}
+	s.buffer = buffer
+	s.snapshot = nil
+	return nil
 }
 
 const bufferSize = 100
