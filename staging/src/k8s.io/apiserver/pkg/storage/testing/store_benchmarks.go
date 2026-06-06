@@ -56,6 +56,7 @@ const (
 	loadNone            = "None"
 	loadWatcher         = "Watcher"
 	loadLister          = "Lister"
+	loadListerExactRV   = "ListerExactRV"
 	loadWatchList       = "WatchList"
 	trafficDeleteCreate = "DeleteCreate"
 	trafficPatch        = "Patch"
@@ -69,7 +70,7 @@ func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 		b.Run(fmt.Sprintf("Traffic=%s", trafficType), func(b *testing.B) {
 			for _, parallelism := range []int{25} {
 				b.Run(fmt.Sprintf("Parallelism=%d", parallelism), func(b *testing.B) {
-					for _, loadType := range []string{loadNone, loadWatcher, loadLister, loadWatchList} {
+					for _, loadType := range []string{loadNone, loadWatcher, loadLister, loadListerExactRV, loadWatchList} {
 						useIndexOptions := []bool{false}
 						if hasIndex && loadType != loadNone {
 							useIndexOptions = []bool{false, true}
@@ -104,13 +105,18 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	var listCalls atomic.Uint64
 	var listObjects atomic.Uint64
 	var index atomic.Uint64
+	var latestRV atomic.Pointer[string]
+	initialRV := "0"
+	latestRV.Store(&initialRV)
 
 	switch loadType {
 	case loadNone:
 	case loadWatcher:
 		startBackgroundWatchers(ctx, store, data, 10, readIndexed, &workersWg, stopBackgroundLoadCh, &watchEvents)
 	case loadLister:
-		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects)
+		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects, "", &latestRV)
+	case loadListerExactRV:
+		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects, metav1.ResourceVersionMatchExact, &latestRV)
 	case loadWatchList:
 		startBackgroundWatchListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects)
 	default:
@@ -124,7 +130,7 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			i := int(index.Add(1)) % len(data.PodKeys)
-			writes.Add(runTraffic(ctx, b, store, data, trafficType, i))
+			writes.Add(runTraffic(ctx, store, data, trafficType, i, &latestRV))
 		}
 	})
 	elapsedSeconds := b.Elapsed().Seconds()
@@ -139,7 +145,7 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	switch loadType {
 	case loadWatcher:
 		b.ReportMetric(float64(watchEvents.Load())/elapsedSeconds, "watch-events/s")
-	case loadLister, loadWatchList:
+	case loadLister, loadListerExactRV, loadWatchList:
 		b.ReportMetric(float64(listCalls.Load())/elapsedSeconds, "list-calls/s")
 		b.ReportMetric(float64(listObjects.Load())/elapsedSeconds, "list-objs/s")
 	}
@@ -161,7 +167,7 @@ func waitForConsistent(ctx context.Context, store storage.Interface) error {
 	return nil
 }
 
-func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, index int) (writes uint64) {
+func runTraffic(ctx context.Context, store storage.Interface, data BenchmarkData, trafficType string, index int, latestRV *atomic.Pointer[string]) (writes uint64) {
 	var podOut *example.Pod
 	switch trafficType {
 	case trafficDeleteCreate:
@@ -177,6 +183,7 @@ func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data
 		err = store.Create(ctx, data.PodKeys[index], pod, podOut, 0)
 		if err == nil {
 			writes += 1
+			latestRV.Store(&podOut.ResourceVersion)
 		} else if !storage.IsExist(err) {
 			panic(fmt.Sprintf("Unexpected error on Create %q: %v", data.PodKeys[index], err))
 		}
@@ -187,6 +194,7 @@ func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data
 			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[index], err))
 		} else {
 			writes += 1
+			latestRV.Store(&podOut.ResourceVersion)
 		}
 	default:
 		panic(fmt.Sprintf("Unknown traffic type: %s", trafficType))
@@ -246,7 +254,7 @@ func startBackgroundWatchers(ctx context.Context, store storage.Interface, data 
 	}
 }
 
-func startBackgroundListers(ctx context.Context, store storage.Interface, data BenchmarkData, count int, readIndexed bool, wg *sync.WaitGroup, stopCh <-chan struct{}, listCounter *atomic.Uint64, objCounter *atomic.Uint64) {
+func startBackgroundListers(ctx context.Context, store storage.Interface, data BenchmarkData, count int, readIndexed bool, wg *sync.WaitGroup, stopCh <-chan struct{}, listCounter *atomic.Uint64, objCounter *atomic.Uint64, rvMatch metav1.ResourceVersionMatch, latestRV *atomic.Pointer[string]) {
 	for i := range count {
 		wg.Add(1)
 		go func(i int) {
@@ -254,19 +262,6 @@ func startBackgroundListers(ctx context.Context, store storage.Interface, data B
 			listOut := &example.PodList{}
 			ticker := time.NewTicker(10 * time.Millisecond)
 			defer ticker.Stop()
-			opts := storage.ListOptions{
-				Recursive: true,
-				Predicate: storage.Everything,
-			}
-			if readIndexed {
-				nodeName := "default-node"
-				if len(data.NodeNames) > 0 {
-					nodeName = data.NodeNames[i%len(data.NodeNames)]
-				}
-				opts.Predicate.GetAttrs = podAttr
-				opts.Predicate.IndexFields = []string{"spec.nodeName"}
-				opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-			}
 			for {
 				select {
 				case <-stopCh:
@@ -274,6 +269,31 @@ func startBackgroundListers(ctx context.Context, store storage.Interface, data B
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
+					opts := storage.ListOptions{
+						Recursive:            true,
+						ResourceVersionMatch: rvMatch,
+						Predicate:            storage.Everything,
+					}
+					switch rvMatch {
+					case metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan:
+						rv := *latestRV.Load()
+						if rv == "0" || rv == "" {
+							continue
+						}
+						opts.ResourceVersion = rv
+					case "":
+					default:
+						panic(fmt.Sprintf("Unknown rvMatch: %s", rvMatch))
+					}
+					if readIndexed {
+						nodeName := "default-node"
+						if len(data.NodeNames) > 0 {
+							nodeName = data.NodeNames[i%len(data.NodeNames)]
+						}
+						opts.Predicate.GetAttrs = podAttr
+						opts.Predicate.IndexFields = []string{"spec.nodeName"}
+						opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
+					}
 					err := store.GetList(ctx, "/pods/", opts, listOut)
 					if err == nil {
 						listCounter.Add(1)
