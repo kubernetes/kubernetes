@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -706,6 +707,38 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 		} else if probeType == startup && !w.onHold {
 			t.Errorf("Prober should be on hold due to %s check success", probeType)
 		}
+	}
+}
+
+func TestLivenessProbeErrorCountsAsFailure(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	msg := "initial probe success"
+	expectContinue(t, w, w.doProbe(ctx), msg)
+	expectResult(t, w, results.Success, msg)
+
+	m.prober.exec = fakeExecProber{probe.Unknown, errors.New("exec probe failed")}
+	for i := 0; i < 2; i++ {
+		msg := fmt.Sprintf("%d probe error below threshold", i+1)
+		expectContinue(t, w, w.doProbe(ctx), msg)
+		expectResult(t, w, results.Success, msg)
+		if w.resultRun != i+1 {
+			t.Errorf("Prober resultRun should be %d, but %d", i+1, w.resultRun)
+		}
+	}
+
+	msg = "probe error reached threshold"
+	expectContinue(t, w, w.doProbe(ctx), msg)
+	expectResult(t, w, results.Failure, msg)
+	if !w.onHold {
+		t.Errorf("Prober should be on hold after liveness probe error reaches failure threshold")
+	}
+	if w.resultRun != 0 {
+		t.Errorf("Prober resultRun should be reset to 0, but %d", w.resultRun)
 	}
 }
 
