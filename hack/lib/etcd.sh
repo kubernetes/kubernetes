@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-$(grep -oP "etcd_version',\s*'\K[0-9.]+" "${KUBE_ROOT}/cluster/gce/manifests/etcd.manifest" 2>/dev/null || echo "3.6.11")}
+ETCD_VERSION=${ETCD_VERSION:-$(v=$(grep -oP "etcd_version',\s*'\K[^']+" "${KUBE_ROOT}/cluster/gce/manifests/etcd.manifest" 2>/dev/null | sed 's/-[0-9][0-9]*$//'); echo "${v:-3.6.11}")}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
@@ -175,24 +175,26 @@ kube::etcd::install() {
     local github_base_url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}"
     local gcs_base_url="https://storage.googleapis.com/etcd/v${ETCD_VERSION}"
 
+    local download_file
     if [[ ${os} == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
-      kube::util::download_file "${github_base_url}/${download_file}" "${download_file}" || \
-        kube::util::download_file "${gcs_base_url}/${download_file}" "${download_file}"
-      unzip -o "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
-      rm "${download_file}"
     elif [[ ${os} == "linux" ]]; then
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
-      kube::util::download_file "${github_base_url}/${download_file}" "${download_file}" || \
-        kube::util::download_file "${gcs_base_url}/${download_file}" "${download_file}"
-      tar xzf "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
-      rm "${download_file}"
     else
       kube::log::info "${os} is NOT supported."
       return 1
     fi
+
+    kube::util::download_file "${github_base_url}/${download_file}" "${download_file}" || \
+      kube::util::download_file "${gcs_base_url}/${download_file}" "${download_file}"
+
+    if [[ ${download_file} == *.zip ]]; then
+      unzip -o "${download_file}"
+    else
+      tar xzf "${download_file}"
+    fi
+    ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
+    rm "${download_file}"
     V=4 kube::log::info "installed etcd v${ETCD_VERSION}"
     return 0 # newly installed
   )
