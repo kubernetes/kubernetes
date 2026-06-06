@@ -317,6 +317,31 @@ func doCleanSubPath(mounter mount.Interface, fullContainerDirPath, subPathIndex 
 	klog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
 	fullSubPath := filepath.Join(fullContainerDirPath, subPathIndex)
 
+	// Subpath targets are bind mounts created by kubelet, so cleanup should not
+	// invoke filesystem-specific umount helpers.
+	unmountErr := unix.Unmount(fullSubPath, 0)
+	if unmountErr == nil {
+		if err := os.Remove(fullSubPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("error deleting subpath mount %s: %s", fullSubPath, err)
+		}
+		klog.V(4).Infof("Successfully cleaned subpath directory %s", fullSubPath)
+		return nil
+	}
+	if unmountErr == unix.ENOENT {
+		mounts, err := mounter.List()
+		if err != nil {
+			return fmt.Errorf("error listing mounts while cleaning subpath mount %s: %s", fullSubPath, err)
+		}
+		for _, mp := range mounts {
+			if mp.Path != fullSubPath && strings.TrimSuffix(mp.Path, "\\040(deleted)") != fullSubPath {
+				continue
+			}
+			return fmt.Errorf("error unmounting deleted subpath mount %s: %s", fullSubPath, unmountErr)
+		}
+	} else if unmountErr != unix.EINVAL && unmountErr != unix.EPERM {
+		return fmt.Errorf("error unmounting subpath mount %s: %s", fullSubPath, unmountErr)
+	}
+
 	if err := mount.CleanupMountPoint(fullSubPath, mounter, true); err != nil {
 		return fmt.Errorf("error cleaning subpath mount %s: %s", fullSubPath, err)
 	}
