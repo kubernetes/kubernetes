@@ -1042,7 +1042,7 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 			ctx, store, _ := testSetup(b)
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			b.ResetTimer()
-			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false)
+			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false, nil)
 		})
 	}
 }
