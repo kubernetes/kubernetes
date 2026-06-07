@@ -1237,7 +1237,7 @@ func TestGetRequest(t *testing.T) {
 		},
 		{
 			name:        "invalid pod ip",
-			podIp:       "http://123123", // Assuming httprobe fails on scheme in IP
+			podIp:       "scheme://invalid-pod-ip", // httprobe fails on scheme in IP
 			expectError: true,
 		},
 	}
