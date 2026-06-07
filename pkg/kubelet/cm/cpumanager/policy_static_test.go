@@ -773,6 +773,48 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 	}
 }
 
+func TestStaticPolicyPrefersReusableCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	if err != nil {
+		t.Fatalf("NewStaticPolicy() failed: %v", err)
+	}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+	}
+	pod := makeMultiContainerPod(
+		[]struct{ request, limit string }{
+			{"1000m", "1000m"}},
+		[]struct{ request, limit string }{
+			{"2000m", "2000m"}})
+
+	if err := policy.Allocate(logger, st, pod, &pod.Spec.InitContainers[0]); err != nil {
+		t.Fatalf("StaticPolicy Allocate() init container error: %v", err)
+	}
+	initCSet := st.assignments[string(pod.UID)][pod.Spec.InitContainers[0].Name]
+	if initCSet.Size() != 1 {
+		t.Fatalf("StaticPolicy Allocate() expected one init container CPU, got %s", initCSet)
+	}
+	defaultCPUSetAfterInit := st.defaultCPUSet.Clone()
+
+	if err := policy.Allocate(logger, st, pod, &pod.Spec.Containers[0]); err != nil {
+		t.Fatalf("StaticPolicy Allocate() app container error: %v", err)
+	}
+	appCSet := st.assignments[string(pod.UID)][pod.Spec.Containers[0].Name]
+	if appCSet.Size() != 2 {
+		t.Fatalf("StaticPolicy Allocate() expected two app container CPUs, got %s", appCSet)
+	}
+	if !initCSet.IsSubsetOf(appCSet) {
+		t.Errorf("StaticPolicy Allocate() expected app container cpuset %s to reuse init container cpuset %s", appCSet, initCSet)
+	}
+	freshCPUs := appCSet.Difference(initCSet)
+	if !st.defaultCPUSet.Equals(defaultCPUSetAfterInit.Difference(freshCPUs)) {
+		t.Errorf("StaticPolicy Allocate() default cpuset %s lost CPUs outside app fresh allocation %s", st.defaultCPUSet, freshCPUs)
+	}
+}
+
 func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 	testCases := []struct {
 		staticPolicyTest
