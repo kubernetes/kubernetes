@@ -22,6 +22,7 @@ import (
 	"io"
 	"time"
 
+	"golang.org/x/sync/singleflight"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -47,6 +48,8 @@ type prober struct {
 	tcp    tcpprobe.Prober
 	grpc   grpcprobe.Prober
 	runner kubecontainer.CommandRunner
+
+	execProbeGroup singleflight.Group
 
 	recorder record.EventRecorderLogger
 }
@@ -155,7 +158,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 	case p.Exec != nil:
 		logger.V(4).Info("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(ctx, pod, container, containerID, command, timeout))
+		return pb.runExecProbe(ctx, pod, container, containerID, command, timeout)
 
 	case p.HTTPGet != nil:
 		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
@@ -200,6 +203,29 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)
 		return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
 	}
+}
+
+type execProbeResult struct {
+	result probe.Result
+	output string
+}
+
+func execProbeKey(containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) string {
+	return fmt.Sprintf("%s\x00%s\x00%q", containerID.String(), timeout, cmd)
+}
+
+func (pb *prober) runExecProbe(ctx context.Context, pod *v1.Pod, container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) (probe.Result, string, error) {
+	key := execProbeKey(containerID, cmd, timeout)
+	value, err, _ := pb.execProbeGroup.Do(key, func() (any, error) {
+		result, output, err := pb.exec.Probe(pb.newExecInContainer(ctx, pod, container, containerID, cmd, timeout))
+		return execProbeResult{result: result, output: output}, err
+	})
+	if value == nil {
+		return probe.Unknown, "", err
+	}
+
+	execResult := value.(execProbeResult)
+	return execResult.result, execResult.output, err
 }
 
 type execInContainer struct {
