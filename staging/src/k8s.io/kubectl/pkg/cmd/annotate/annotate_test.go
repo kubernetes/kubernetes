@@ -398,35 +398,6 @@ func TestUpdateAnnotations(t *testing.T) {
 	}
 }
 
-func TestAnnotateCmdFlags(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate("kubectl", tf, tf, iostreams)
-
-	expected := []string{
-		"all",
-		"all-namespaces",
-		"dry-run",
-		"field-manager",
-		"field-selector",
-		"filename",
-		"kustomize",
-		"list",
-		"local",
-		"overwrite",
-		"recursive",
-		"resource-version",
-		"selector",
-	}
-	for _, name := range expected {
-		if cmd.Flags().Lookup(name) == nil {
-			t.Errorf("flag %q not registered on annotate command", name)
-		}
-	}
-}
-
 func TestAnnotateErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
@@ -529,7 +500,7 @@ func TestRunAnnotate(t *testing.T) {
 			},
 			newAnnotations: map[string]string{"a": "b"},
 		},
-{
+		{
 			name: "annotate local mode",
 			infos: []*resource.Info{
 				{

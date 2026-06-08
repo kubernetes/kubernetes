@@ -175,36 +175,9 @@ func (flags *AnnotateFlags) AddFlags(cmd *cobra.Command, ioStreams genericioopti
 
 // ToOptions converts from CLI inputs to runtime inputs.
 func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*AnnotateOptions, error) {
-	options := &AnnotateOptions{
-		FieldManager:    flags.FieldManager,
-		IOStreams:       flags.IOStreams,
-		List:            flags.List,
-		Local:           *flags.ResourceBuilderFlags.Local,
-		Overwrite:       flags.Overwrite,
-		ResourceVersion: flags.ResourceVersion,
-		Recorder:        genericclioptions.NoopRecorder{},
-	}
-
-	var err error
-
-	flags.RecordFlags.Complete(cmd)
-	options.Recorder, err = flags.RecordFlags.ToRecorder()
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return nil, err
-	}
-
-	options.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, options.DryRunStrategy)
-	printer, err := flags.PrintFlags.ToPrinter()
-	if err != nil {
-		return nil, err
-	}
-	options.PrintObj = func(obj runtime.Object, out io.Writer) error {
-		return printer.PrintObj(obj, out)
 	}
 
 	// retrieves resource and annotation args from args
@@ -214,7 +187,7 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 		return nil, err
 	}
 
-	options.NewAnnotations, options.RemoveAnnotations, err = parseAnnotations(annotationArgs)
+	newAnnotations, removeAnnotations, err := parseAnnotations(annotationArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +210,7 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 			return nil, fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 		}
 	} else {
-		if options.DryRunStrategy == cmdutil.DryRunServer {
+		if dryRunStrategy == cmdutil.DryRunServer {
 			return nil, fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 		}
 		if len(resources) > 0 {
@@ -247,12 +220,39 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 			return nil, fmt.Errorf("one or more files must be specified as -f rsrc.yaml or --filename=rsrc.json")
 		}
 	}
-	if len(options.NewAnnotations) < 1 && len(options.RemoveAnnotations) < 1 && !flags.List {
+	if len(newAnnotations) < 1 && len(removeAnnotations) < 1 && !flags.List {
 		return nil, fmt.Errorf("at least one annotation update is required")
 	}
-	err = validateAnnotations(options.RemoveAnnotations, options.NewAnnotations)
+	if err := validateAnnotations(removeAnnotations, newAnnotations); err != nil {
+		return nil, err
+	}
+
+	options := &AnnotateOptions{
+		FieldManager:      flags.FieldManager,
+		IOStreams:         flags.IOStreams,
+		List:              flags.List,
+		Local:             *flags.ResourceBuilderFlags.Local,
+		Overwrite:         flags.Overwrite,
+		ResourceVersion:   flags.ResourceVersion,
+		Recorder:          genericclioptions.NoopRecorder{},
+		DryRunStrategy:    dryRunStrategy,
+		NewAnnotations:    newAnnotations,
+		RemoveAnnotations: removeAnnotations,
+	}
+
+	flags.RecordFlags.Complete(cmd)
+	options.Recorder, err = flags.RecordFlags.ToRecorder()
 	if err != nil {
 		return nil, err
+	}
+
+	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, options.DryRunStrategy)
+	printer, err := flags.PrintFlags.ToPrinter()
+	if err != nil {
+		return nil, err
+	}
+	options.PrintObj = func(obj runtime.Object, out io.Writer) error {
+		return printer.PrintObj(obj, out)
 	}
 
 	options.ResourceBuilder = flags.ResourceBuilderFlags.ToBuilder(flags.RESTClientGetter, resources)
