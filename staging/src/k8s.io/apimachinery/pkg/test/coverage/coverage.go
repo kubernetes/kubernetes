@@ -51,9 +51,10 @@ type ruleKey struct {
 var indexKeyRe = regexp.MustCompile(`\[[^\]]+\]`)
 
 var (
-	rulesMu  sync.Mutex
-	declared = sets.New[ruleKey]()
-	observed = sets.New[ruleKey]()
+	rulesMu       sync.Mutex
+	declared      = sets.New[ruleKey]()
+	observed      = sets.New[ruleKey]()
+	nilPathString = (*field.Path)(nil).String()
 )
 
 // RegisterDeclaredRules records the rules declared for one GVK by
@@ -79,7 +80,7 @@ func RecordObservedRules(gvk schema.GroupVersionKind, errs field.ErrorList) {
 	// "[...]" with "[*]" so the lookup in AssertDeclarativeCoverage matches.
 	for _, e := range errs {
 		path := e.Field
-		if path == "<nil>" {
+		if path == nilPathString {
 			path = ""
 		}
 		path = indexKeyRe.ReplaceAllString(path, "[*]")
