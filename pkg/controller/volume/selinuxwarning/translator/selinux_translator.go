@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/internal/parse"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -70,18 +71,16 @@ func (c *ControllerSELinuxTranslator) SELinuxOptionsToFileLabel(opts *v1.SELinux
 // However: "system_u:system_r:container_t:s0:c1,c2" *does* conflict with ":::s0:c98,c99".
 // And ":::s0:c1,c2" *does* conflict with "" or ":::", because it's never defaulted by the OS.
 func (c *ControllerSELinuxTranslator) Conflicts(labelA, labelB string) bool {
-	partsA := strings.SplitN(labelA, ":", 4)
-	partsB := strings.SplitN(labelB, ":", 4)
+	return c.ConflictsParsed(parse.ParseSELinuxLabel(labelA), parse.ParseSELinuxLabel(labelB))
+}
 
-	// Reorder, so partsA is always longer than partsB
-	if len(partsA) < len(partsB) {
-		partsB, partsA = partsA, partsB
-	}
-
-	for len(partsB) < len(partsA) {
-		partsB = append(partsB, "")
-	}
-	for i := range partsA {
+// ConflictsParsed returns true if two pre-parsed SELinux labels conflict.
+// This is an optimized version of Conflicts() that operates on pre-split labels
+// to avoid repeated string allocations in hot paths (e.g., metrics collection).
+// partsA and partsB must be 4-element arrays in the format: [user, role, type, level]
+func (c *ControllerSELinuxTranslator) ConflictsParsed(partsA, partsB [4]string) bool {
+	// Compare each component
+	for i := range 4 {
 		if partsA[i] == partsB[i] {
 			continue
 		}
