@@ -47,10 +47,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		expectedErrs field.ErrorList
 	}{
 		"maxFailedIndexes and backoffLimitPerIndex both set": {
-			input: mkJob(),
+			input: mkJob(
+				tweakMaxFailedIndexes(ptr.To[int32](5)),
+				tweakBackoffLimitPerIndex(ptr.To[int32](1)),
+			),
 		},
 		"maxFailedIndexes set without backoffLimitPerIndex": {
-			input: mkJob(tweakBackoffLimitPerIndex(nil)),
+			input: mkJob(tweakMaxFailedIndexes(ptr.To[int32](5))),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
 			},
@@ -78,6 +81,12 @@ func mkJob(mutators ...func(*batch.Job)) batch.Job {
 	return job
 }
 
+func tweakMaxFailedIndexes(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.MaxFailedIndexes = v
+	}
+}
+
 func tweakBackoffLimitPerIndex(v *int32) func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.BackoffLimitPerIndex = v
@@ -97,9 +106,7 @@ var validJobSpec = batch.JobSpec{
 		ObjectMeta: metav1.ObjectMeta{Labels: validJobLabels},
 		Spec:       podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever)),
 	},
-	CompletionMode:       ptr.To(batch.IndexedCompletion),
-	Completions:          ptr.To[int32](10),
-	Parallelism:          ptr.To[int32](10),
-	BackoffLimitPerIndex: ptr.To[int32](1),
-	MaxFailedIndexes:     ptr.To[int32](5),
+	CompletionMode: ptr.To(batch.IndexedCompletion),
+	Completions:    ptr.To[int32](10),
+	Parallelism:    ptr.To[int32](10),
 }
