@@ -35,12 +35,15 @@ const (
 	CgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey  = "pod_worker_start_duration_seconds"
 	PLEGRelistDurationKey      = "pleg_relist_duration_seconds"
-	PLEGDiscardEventsKey       = "pleg_discard_events_total"
+	PLEGDiscardEventsKey       = "pleg_discard_events"
+	PLEGDiscardEventsTotalKey  = "pleg_discard_events_total"
 	PLEGRelistIntervalKey      = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey            = "pleg_last_seen_seconds"
 	EvictionsKey               = "evictions"
+	EvictionsTotalKey          = "evictions_total"
 	EvictionStatsAgeKey        = "eviction_stats_age_seconds"
-	PreemptionsKey             = "preemptions_total"
+	PreemptionsKey             = "preemptions"
+	PreemptionsTotalKey        = "preemptions_total"
 	RunningPodsKey             = "running_pods"
 	RunningContainersKey       = "running_containers"
 	// Metrics keys of remote runtime operations
@@ -51,11 +54,15 @@ const (
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 	// Metrics keys of pod resources operations
-	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
-	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list_total"
-	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable_total"
-	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list_total"
-	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable_total"
+	PodResourcesEndpointRequestsTotalKey               = "pod_resources_endpoint_requests_total"
+	PodResourcesEndpointRequestsListKey                = "pod_resources_endpoint_requests_list"
+	PodResourcesEndpointRequestsListTotalKey           = "pod_resources_endpoint_requests_list_total"
+	PodResourcesEndpointRequestsGetAllocatableKey      = "pod_resources_endpoint_requests_get_allocatable"
+	PodResourcesEndpointRequestsGetAllocatableTotalKey = "pod_resources_endpoint_requests_get_allocatable_total"
+	PodResourcesEndpointErrorsListKey                  = "pod_resources_endpoint_errors_list"
+	PodResourcesEndpointErrorsListTotalKey             = "pod_resources_endpoint_errors_list_total"
+	PodResourcesEndpointErrorsGetAllocatableKey        = "pod_resources_endpoint_errors_get_allocatable"
+	PodResourcesEndpointErrorsGetAllocatableTotalKey   = "pod_resources_endpoint_errors_get_allocatable_total"
 
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
@@ -250,8 +257,19 @@ var (
 	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
 	PLEGDiscardEvents = metrics.NewCounter(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PLEGDiscardEventsKey,
+			Help:              "The number of discard events in PLEG.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+	)
+
+	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
+	PLEGDiscardEventsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PLEGDiscardEventsKey,
+			Name:           PLEGDiscardEventsTotalKey,
 			Help:           "The number of discard events in PLEG.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -316,13 +334,27 @@ var (
 	// Broken down by eviction signal.
 	Evictions = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              EvictionsKey,
+			Help:              "Cumulative number of pod evictions by eviction signal",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"eviction_signal"},
+	)
+
+	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
+	// Broken down by eviction signal.
+	EvictionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           EvictionsKey,
+			Name:           EvictionsTotalKey,
 			Help:           "Cumulative number of pod evictions by eviction signal",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"eviction_signal"},
 	)
+
 	// EvictionStatsAge is a Histogram that tracks the time (in seconds) between when stats are collected and when a pod is evicted
 	// based on those stats. Broken down by eviction signal.
 	EvictionStatsAge = metrics.NewHistogramVec(
@@ -340,13 +372,28 @@ var (
 	// is the number of preemptions on the given node.
 	Preemptions = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PreemptionsKey,
+			Help:              "Cumulative number of pod preemptions by preemption resource",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"preemption_signal"},
+	)
+
+	// Preemptions is a Counter that tracks the cumulative number of pod preemptions initiated by the kubelet.
+	// Broken down by preemption signal. A preemption is only recorded for one resource, the sum of all signals
+	// is the number of preemptions on the given node.
+	PreemptionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PreemptionsKey,
+			Name:           PreemptionsTotalKey,
 			Help:           "Cumulative number of pod preemptions by preemption resource",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"preemption_signal"},
 	)
+
 	// MultiLineHelp tests that we can parse multi-line strings
 	MultiLineHelp = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -425,8 +472,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsListCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointRequestsListKey,
+			Help:              "Number of requests to the PodResource List endpoint. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsListCount is a Counter that tracks the number of requests to the PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsListCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsListKey,
+			Name:           PodResourcesEndpointRequestsListTotalKey,
 			Help:           "Number of requests to the PodResource List endpoint. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -437,8 +497,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsGetAllocatableCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointRequestsGetAllocatableKey,
+			Help:              "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsGetAllocatableCount is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsGetAllocatableCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsGetAllocatableKey,
+			Name:           PodResourcesEndpointRequestsGetAllocatableTotalKey,
 			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -449,8 +522,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsListCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointErrorsListKey,
+			Help:              "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsListCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsListCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsListKey,
+			Name:           PodResourcesEndpointErrorsListTotalKey,
 			Help:           "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -461,8 +547,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsGetAllocatableCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointErrorsGetAllocatableKey,
+			Help:              "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsGetAllocatableCount is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsGetAllocatableCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsGetAllocatableKey,
+			Name:           PodResourcesEndpointErrorsGetAllocatableTotalKey,
 			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -594,12 +693,14 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(ContainersPerPodCount)
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
+		legacyregistry.MustRegister(PLEGDiscardEventsTotal)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
 		legacyregistry.MustRegister(Evictions)
+		legacyregistry.MustRegister(EvictionsTotal)
 		legacyregistry.MustRegister(EvictionStatsAge)
 		legacyregistry.MustRegister(Preemptions)
 		legacyregistry.MustRegister(DevicePluginRegistrationCount)

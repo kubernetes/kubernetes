@@ -48,16 +48,21 @@ const (
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
 	PLEGRelistDurationKey              = "pleg_relist_duration_seconds"
-	PLEGDiscardEventsKey               = "pleg_discard_events_total"
+	PLEGDiscardEventsKey               = "pleg_discard_events"
+	PLEGDiscardEventsTotalKey          = "pleg_discard_events_total"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
 	PLEGPodRelistDurationKey           = "pleg_pod_relist_duration_seconds"
-	EventedPLEGConnErrKey              = "evented_pleg_connection_error_total"
-	EventedPLEGConnKey                 = "evented_pleg_connection_success_total"
+	EventedPLEGConnErrTotalKey         = "evented_pleg_connection_error_total"
+	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
+	EventedPLEGConnKey                 = "evented_pleg_connection_success_count"
+	EventedPLEGConnTotalKey            = "evented_pleg_connection_success_total"
 	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
-	EvictionsKey                       = "evictions_total"
+	EvictionsKey                       = "evictions"
+	EvictionsTotalKey                  = "evictions_total"
 	EvictionStatsAgeKey                = "eviction_stats_age_seconds"
-	PreemptionsKey                     = "preemptions_total"
+	PreemptionsKey                     = "preemptions"
+	PreemptionsTotalKey                = "preemptions_total"
 	VolumeStatsCapacityBytesKey        = "volume_stats_capacity_bytes"
 	VolumeStatsAvailableBytesKey       = "volume_stats_available_bytes"
 	VolumeStatsUsedBytesKey            = "volume_stats_used_bytes"
@@ -85,13 +90,19 @@ const (
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 	// Metrics keys of pod resources operations
-	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
-	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list_total"
-	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable_total"
-	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list_total"
-	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable_total"
-	PodResourcesEndpointRequestsGetKey            = "pod_resources_endpoint_requests_get_total"
-	PodResourcesEndpointErrorsGetKey              = "pod_resources_endpoint_errors_get_total"
+	PodResourcesEndpointRequestsTotalKey               = "pod_resources_endpoint_requests_total"
+	PodResourcesEndpointRequestsListKey                = "pod_resources_endpoint_requests_list"
+	PodResourcesEndpointRequestsListTotalKey           = "pod_resources_endpoint_requests_list_total"
+	PodResourcesEndpointRequestsGetAllocatableKey      = "pod_resources_endpoint_requests_get_allocatable"
+	PodResourcesEndpointRequestsGetAllocatableTotalKey = "pod_resources_endpoint_requests_get_allocatable_total"
+	PodResourcesEndpointErrorsListKey                  = "pod_resources_endpoint_errors_list"
+	PodResourcesEndpointErrorsListTotalKey             = "pod_resources_endpoint_errors_list_total"
+	PodResourcesEndpointErrorsGetAllocatableKey        = "pod_resources_endpoint_errors_get_allocatable"
+	PodResourcesEndpointErrorsGetAllocatableTotalKey   = "pod_resources_endpoint_errors_get_allocatable_total"
+	PodResourcesEndpointRequestsGetKey                 = "pod_resources_endpoint_requests_get"
+	PodResourcesEndpointRequestsGetTotalKey            = "pod_resources_endpoint_requests_get_total"
+	PodResourcesEndpointErrorsGetKey                   = "pod_resources_endpoint_errors_get"
+	PodResourcesEndpointErrorsGetTotalKey              = "pod_resources_endpoint_errors_get_total"
 
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
@@ -136,7 +147,8 @@ const (
 	CPUManagerPinningRequestsTotalKey         = "cpu_manager_pinning_requests_total"
 	CPUManagerPinningErrorsTotalKey           = "cpu_manager_pinning_errors_total"
 	CPUManagerSharedPoolSizeMilliCoresKey     = "cpu_manager_shared_pool_size_millicores"
-	CPUManagerExclusiveCPUsAllocationCountKey = "cpu_manager_exclusive_cpu_allocated"
+	CPUManagerExclusiveCPUsAllocationCountKey = "cpu_manager_exclusive_cpu_allocation_count"
+	CPUManagerExclusiveCPUsAllocationKey      = "cpu_manager_exclusive_cpu_allocated"
 	CPUManagerAllocationPerNUMAKey            = "cpu_manager_allocation_per_numa"
 
 	// Metrics to track the Memory manager behavior
@@ -144,9 +156,10 @@ const (
 	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
 
 	// Metrics to track the Topology manager behavior
-	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
-	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
-	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_seconds"
+	TopologyManagerAdmissionRequestsTotalKey  = "topology_manager_admission_requests_total"
+	TopologyManagerAdmissionErrorsTotalKey    = "topology_manager_admission_errors_total"
+	TopologyManagerAdmissionDurationKey       = "topology_manager_admission_duration_ms"
+	TopologyManagerAdmissionDurationSecondKey = "topology_manager_admission_duration_seconds"
 
 	// Metrics to track orphan pod cleanup
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
@@ -156,10 +169,12 @@ const (
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
 
 	// Metric for tracking alignment of compute resources
-	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_total"
-	ContainerAlignedComputeResourcesFailureNameKey   = "container_aligned_compute_resources_failure_total"
-	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
-	ContainerAlignedComputeResourcesBoundaryLabelKey = "boundary"
+	ContainerAlignedComputeResourcesNameKey             = "container_aligned_compute_resources_total"
+	ContainerAlignedComputeResourcesTotalNameKey        = "container_aligned_compute_resources_count"
+	ContainerAlignedComputeResourcesFailureNameKey      = "container_aligned_compute_resources_failure_count"
+	ContainerAlignedComputeResourcesFailureTotalNameKey = "container_aligned_compute_resources_failure_total"
+	ContainerAlignedComputeResourcesScopeLabelKey       = "scope"
+	ContainerAlignedComputeResourcesBoundaryLabelKey    = "boundary"
 
 	// Metric keys for DRA operations
 	DRAOperationsDurationKey     = "operations_duration_seconds"
@@ -384,8 +399,19 @@ var (
 	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
 	PLEGDiscardEvents = metrics.NewCounter(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PLEGDiscardEventsKey,
+			Help:              "The number of discard events in PLEG.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+	)
+
+	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
+	PLEGDiscardEventsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PLEGDiscardEventsKey,
+			Name:           PLEGDiscardEventsTotalKey,
 			Help:           "The number of discard events in PLEG.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -428,8 +454,20 @@ var (
 	// the establishment of streaming connection with the CRI runtime.
 	EventedPLEGConnErr = metrics.NewCounter(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              EventedPLEGConnErrKey,
+			Help:              "The number of errors encountered during the establishment of streaming connection with the CRI runtime.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+	)
+
+	// EventedPLEGConnErr is a Counter that tracks the number of errors encountered during
+	// the establishment of streaming connection with the CRI runtime.
+	EventedPLEGConnErrTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           EventedPLEGConnErrKey,
+			Name:           EventedPLEGConnErrTotalKey,
 			Help:           "The number of errors encountered during the establishment of streaming connection with the CRI runtime.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -439,8 +477,20 @@ var (
 	// was obtained to receive CRI Events.
 	EventedPLEGConn = metrics.NewCounter(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              EventedPLEGConnKey,
+			Help:              "The number of times a streaming client was obtained to receive CRI Events.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+	)
+
+	// EventedPLEGConn is a Counter that tracks the number of times a streaming client
+	// was obtained to receive CRI Events.
+	EventedPLEGConnTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           EventedPLEGConnKey,
+			Name:           EventedPLEGConnTotalKey,
 			Help:           "The number of times a streaming client was obtained to receive CRI Events.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -496,13 +546,27 @@ var (
 	// Broken down by eviction signal.
 	Evictions = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              EvictionsKey,
+			Help:              "Cumulative number of pod evictions by eviction signal",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"eviction_signal"},
+	)
+
+	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
+	// Broken down by eviction signal.
+	EvictionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           EvictionsKey,
+			Name:           EvictionsTotalKey,
 			Help:           "Cumulative number of pod evictions by eviction signal",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"eviction_signal"},
 	)
+
 	// EvictionStatsAge is a Histogram that tracks the time (in seconds) between when stats are collected and when a pod is evicted
 	// based on those stats. Broken down by eviction signal.
 	EvictionStatsAge = metrics.NewHistogramVec(
@@ -520,13 +584,28 @@ var (
 	// is the number of preemptions on the given node.
 	Preemptions = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PreemptionsKey,
+			Help:              "Cumulative number of pod preemptions by preemption resource",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"preemption_signal"},
+	)
+
+	// Preemptions is a Counter that tracks the cumulative number of pod preemptions initiated by the kubelet.
+	// Broken down by preemption signal. A preemption is only recorded for one resource, the sum of all signals
+	// is the number of preemptions on the given node.
+	PreemptionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PreemptionsKey,
+			Name:           PreemptionsTotalKey,
 			Help:           "Cumulative number of pod preemptions by preemption resource",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"preemption_signal"},
 	)
+
 	// DevicePluginRegistrationCount is a Counter that tracks the cumulative number of device plugin registrations.
 	// Broken down by resource name.
 	DevicePluginRegistrationCount = metrics.NewCounterVec(
@@ -567,8 +646,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsListCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointRequestsListKey,
+			Help:              "Number of requests to the PodResource List endpoint. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsListCount is a Counter that tracks the number of requests to the PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsListCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsListKey,
+			Name:           PodResourcesEndpointRequestsListTotalKey,
 			Help:           "Number of requests to the PodResource List endpoint. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -579,8 +671,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsGetAllocatableCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointRequestsGetAllocatableKey,
+			Help:              "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsGetAllocatableCount is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsGetAllocatableCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsGetAllocatableKey,
+			Name:           PodResourcesEndpointRequestsGetAllocatableTotalKey,
 			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -591,8 +696,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsListCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointErrorsListKey,
+			Help:              "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsListCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsListCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsListKey,
+			Name:           PodResourcesEndpointErrorsListTotalKey,
 			Help:           "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -603,8 +721,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsGetAllocatableCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointErrorsGetAllocatableKey,
+			Help:              "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsGetAllocatableCount is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsGetAllocatableCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsGetAllocatableKey,
+			Name:           PodResourcesEndpointErrorsGetAllocatableTotalKey,
 			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -615,8 +746,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsGetCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointRequestsGetKey,
+			Help:              "Number of requests to the PodResource Get endpoint. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointRequestsGetCount is a Counter that tracks the number of requests to the PodResource Get() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsGetCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsGetKey,
+			Name:           PodResourcesEndpointRequestsGetTotalKey,
 			Help:           "Number of requests to the PodResource Get endpoint. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -627,8 +771,21 @@ var (
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsGetCount = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              PodResourcesEndpointErrorsGetKey,
+			Help:              "Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsGetCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsGetCountTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsGetKey,
+			Name:           PodResourcesEndpointErrorsGetTotalKey,
 			Help:           "Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -894,12 +1051,23 @@ var (
 	)
 
 	// CPUManagerExclusiveCPUsAllocationCount reports the total number of CPUs exclusively allocated to containers running on this node
-	CPUManagerExclusiveCPUsAllocationCount = metrics.NewGauge(
+	CPUManagerExclusiveCPUsAllocation = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           CPUManagerExclusiveCPUsAllocationCountKey,
+			Name:           CPUManagerExclusiveCPUsAllocationKey,
 			Help:           "The total number of CPUs exclusively allocated to containers running on this node",
 			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// CPUManagerExclusiveCPUsAllocationCount reports the total number of CPUs exclusively allocated to containers running on this node
+	CPUManagerExclusiveCPUsAllocationCount = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              CPUManagerExclusiveCPUsAllocationCountKey,
+			Help:              "The total number of CPUs exclusively allocated to containers running on this node",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
 		},
 	)
 
@@ -917,8 +1085,20 @@ var (
 	// ContainerAlignedComputeResources reports the count of resources allocation which granted aligned resources, per alignment boundary
 	ContainerAlignedComputeResources = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              ContainerAlignedComputeResourcesNameKey,
+			Help:              "Cumulative number of aligned compute resources allocated to containers by alignment type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
+	)
+
+	// ContainerAlignedComputeResourcesTotal reports the count of resources allocation which granted aligned resources, per alignment boundary
+	ContainerAlignedComputeResourcesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           ContainerAlignedComputeResourcesNameKey,
+			Name:           ContainerAlignedComputeResourcesTotalNameKey,
 			Help:           "Cumulative number of aligned compute resources allocated to containers by alignment type.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -928,8 +1108,20 @@ var (
 	// ContainerAlignedComputeResourcesFailure reports the count of resources allocation attempts which failed to align resources, per alignment boundary
 	ContainerAlignedComputeResourcesFailure = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              ContainerAlignedComputeResourcesFailureNameKey,
+			Help:              "Cumulative number of failures to allocate aligned compute resources to containers by alignment type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
+	)
+
+	// ContainerAlignedComputeResourcesFailure reports the count of resources allocation attempts which failed to align resources, per alignment boundary
+	ContainerAlignedComputeResourcesFailureTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           ContainerAlignedComputeResourcesFailureNameKey,
+			Name:           ContainerAlignedComputeResourcesFailureTotalNameKey,
 			Help:           "Cumulative number of failures to allocate aligned compute resources to containers by alignment type.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -997,8 +1189,20 @@ var (
 	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
 	TopologyManagerAdmissionDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              TopologyManagerAdmissionDurationKey,
+			Help:              "Duration in miliseconds to serve a pod admission request.",
+			Buckets:           metrics.ExponentialBuckets(.05, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.38.0",
+		},
+	)
+
+	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
+	TopologyManagerAdmissionDurationSecond = metrics.NewHistogram(
+		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           TopologyManagerAdmissionDurationKey,
+			Name:           TopologyManagerAdmissionDurationSecondKey,
 			Help:           "Duration in seconds to serve a pod admission request.",
 			Buckets:        metrics.ExponentialBuckets(.00005, 2, 15),
 			StabilityLevel: metrics.ALPHA,
@@ -1330,18 +1534,23 @@ func Register() {
 		legacyregistry.MustRegister(ContainersPerPodCount)
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
+		legacyregistry.MustRegister(PLEGDiscardEventsTotal)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
 		legacyregistry.MustRegister(PLEGPodRelistDuration)
 		legacyregistry.MustRegister(EventedPLEGConnErr)
+		legacyregistry.MustRegister(EventedPLEGConnErrTotal)
 		legacyregistry.MustRegister(EventedPLEGConn)
+		legacyregistry.MustRegister(EventedPLEGConnTotal)
 		legacyregistry.MustRegister(EventedPLEGConnLatency)
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
 		legacyregistry.MustRegister(Evictions)
+		legacyregistry.MustRegister(EvictionsTotal)
 		legacyregistry.MustRegister(EvictionStatsAge)
 		legacyregistry.MustRegister(Preemptions)
+		legacyregistry.MustRegister(PreemptionsTotal)
 		legacyregistry.MustRegister(DevicePluginRegistrationCount)
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
 		legacyregistry.MustRegister(RunningContainerCount)
@@ -1355,11 +1564,17 @@ func Register() {
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsListCountTotal)
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCountTotal)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCountTotal)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCountTotal)
 		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCountTotal)
 		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCountTotal)
 		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 			legacyregistry.MustRegister(StartedUserNamespacedPodsTotal)
 			legacyregistry.MustRegister(StartedUserNamespacedPodsErrorsTotal)
@@ -1377,9 +1592,12 @@ func Register() {
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 		legacyregistry.MustRegister(CPUManagerSharedPoolSizeMilliCores)
 		legacyregistry.MustRegister(CPUManagerExclusiveCPUsAllocationCount)
+		legacyregistry.MustRegister(CPUManagerExclusiveCPUsAllocation)
 		legacyregistry.MustRegister(CPUManagerAllocationPerNUMA)
 		legacyregistry.MustRegister(ContainerAlignedComputeResources)
+		legacyregistry.MustRegister(ContainerAlignedComputeResourcesTotal)
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
+		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailureTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
@@ -1389,6 +1607,7 @@ func Register() {
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
+		legacyregistry.MustRegister(TopologyManagerAdmissionDurationSecond)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
