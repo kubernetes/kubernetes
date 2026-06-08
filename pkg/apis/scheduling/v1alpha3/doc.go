@@ -22,4 +22,9 @@ limitations under the License.
 // +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-input=k8s.io/api/scheduling/v1alpha3
 
+// This is the registered copy of the scheduling/v1alpha3 declarative
+// validation. It registers with the apiserver scheme and is the package
+// cross-package references resolve to. A non-registering copy is generated
+// in-package under k8s.io/api/scheduling/v1alpha3 for out-of-tree consumers.
+
 package v1alpha3
