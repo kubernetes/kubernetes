@@ -195,7 +195,8 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4
 
 	if len(checkpointV4.Data) > 0 || checkpointV4.DataChecksum != 0 {
 		// This is a corrupted V4 checkpoint version. Don't fall back to previous versions, but return error.
-		sc.logger.Error(err, "could not load v4 checkpoint, not falling back to previous versions")
+		err = fmt.Errorf("could not load v4 checkpoint: %w", err)
+		sc.logger.Error(err, "not falling back to previous versions")
 		return nil, err
 	}
 
