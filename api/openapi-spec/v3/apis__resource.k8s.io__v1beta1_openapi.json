@@ -1460,7 +1460,7 @@
             "type": "boolean"
           },
           "devices": {
-            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
+            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Device"
             },
@@ -1498,9 +1498,17 @@
             "description": "Pool describes the pool that this ResourceSlice belongs to."
           },
           "sharedCounters": {
-            "description": "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+            "description": "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.CounterSet"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "sharingAffinity": {
+            "description": "SharingAffinity carries CEL extractors for a metadata-only ResourceSlice. Each extractor evaluates against an in-scope request configuration object from the claim to derive an affinity value the scheduler uses to keep allocations on the same device compatible.\n\nA metadata-only ResourceSlice carries SharingAffinity instead of Devices or SharedCounters. At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.\n\nThe maximum number of extractors is 8.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.SharingAffinityExtractor"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1509,6 +1517,30 @@
         "required": [
           "driver",
           "pool"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta1.SharingAffinityExtractor": {
+        "description": "SharingAffinityExtractor publishes one group of CEL extractors that pull affinity keys out of in-scope request configuration objects.\n\nIf multiple applicable extractors produce non-empty values for the same affinity key for a single request, they must produce the same value. If they produce different values, the request is self-inconsistent and is not eligible for sharing-affinity matching; the Pod stays Pending and an Event explains the conflict.",
+        "properties": {
+          "cel": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "CEL maps an affinity key name to a CEL expression. Each CEL expression evaluates against an in-scope request configuration object from the claim and returns the string affinity value for its key.\n\nThe maximum number of keys is 8.",
+            "type": "object"
+          },
+          "selector": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+              }
+            ],
+            "description": "Selector, if set, limits this extractor to Device objects in the same pool that match the selector. When nil, the extractor applies to every Device object in the pool."
+          }
+        },
+        "required": [
+          "cel"
         ],
         "type": "object"
       },

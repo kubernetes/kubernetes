@@ -513,13 +513,24 @@ var map_ResourceSliceSpec = map[string]string{
 	"nodeName":               "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
 	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"allNodes":               "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
+	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.",
 	"perDeviceNodeSelection": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+	"sharingAffinity":        "SharingAffinity carries CEL extractors for a metadata-only ResourceSlice. Each extractor evaluates against an in-scope request configuration object from the claim to derive an affinity value the scheduler uses to keep allocations on the same device compatible.\n\nA metadata-only ResourceSlice carries SharingAffinity instead of Devices or SharedCounters. At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.\n\nThe maximum number of extractors is 8.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {
 	return map_ResourceSliceSpec
+}
+
+var map_SharingAffinityExtractor = map[string]string{
+	"":         "SharingAffinityExtractor publishes one group of CEL extractors that pull affinity keys out of in-scope request configuration objects.\n\nIf multiple applicable extractors produce non-empty values for the same affinity key for a single request, they must produce the same value. If they produce different values, the request is self-inconsistent and is not eligible for sharing-affinity matching; the Pod stays Pending and an Event explains the conflict.",
+	"selector": "Selector, if set, limits this extractor to Device objects in the same pool that match the selector. When nil, the extractor applies to every Device object in the pool.",
+	"cel":      "CEL maps an affinity key name to a CEL expression. Each CEL expression evaluates against an in-scope request configuration object from the claim and returns the string affinity value for its key.\n\nThe maximum number of keys is 8.",
+}
+
+func (SharingAffinityExtractor) SwaggerDoc() map[string]string {
+	return map_SharingAffinityExtractor
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
