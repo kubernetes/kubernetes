@@ -44,6 +44,7 @@ type informerGenerator struct {
 	clientSetPackage          string
 	listersPackage            string
 	internalInterfacesPackage string
+	pluralExceptions          map[string]string
 }
 
 var _ generator.Generator = &informerGenerator{}
@@ -103,7 +104,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"namespaceAll":                             c.Universe.Type(metav1NamespaceAll),
 		"namespaced":                               !tags.NonNamespaced,
 		"newLister":                                c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
-		"resourceName":                             strings.ToLower(t.Name.Name) + "s",
+		"resourceName":                             namer.NewAllLowercasePluralNamer(g.pluralExceptions).Name(t),
 		"runtimeObject":                            c.Universe.Type(runtimeObject),
 		"schemaGroupVersionResource":               c.Universe.Type(schemaGroupVersionResource),
 		"timeDuration":                             c.Universe.Type(timeDuration),
