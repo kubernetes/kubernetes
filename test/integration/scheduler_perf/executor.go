@@ -72,6 +72,7 @@ type WorkloadExecutor struct {
 	nextNodeIndex                int
 	opts                         *schedulerPerfOptions
 	cpuProfileFile               *os.File
+	churnCancels                 []context.CancelFunc
 }
 
 func (e *WorkloadExecutor) wait() {
@@ -355,6 +356,10 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 		return fmt.Errorf("unable to create namespace %v: %w", namespace, err)
 	}
 
+	// Create a cancellable child context for background churn loop
+	churnCtx, churnCancel := context.WithCancel(tCtx)
+	e.churnCancels = append(e.churnCancels, churnCancel)
+
 	var churnFns []func(name string) string
 
 	for i, path := range op.TemplatePaths {
@@ -378,13 +383,13 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 
 		churnFns = append(churnFns, func(name string) string {
 			if name != "" {
-				if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
+				if err := dynRes.Delete(churnCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
 					tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
 				}
 				return ""
 			}
 
-			live, err := dynRes.Create(tCtx, unstructuredObj, metav1.CreateOptions{})
+			live, err := dynRes.Create(churnCtx, unstructuredObj, metav1.CreateOptions{})
 			if err != nil {
 				return ""
 			}
@@ -415,7 +420,7 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 						churnFns[i]("")
 					}
 					count++
-				case <-tCtx.Done():
+				case <-churnCtx.Done():
 					return
 				}
 			}
@@ -439,7 +444,7 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 						retVals[i][count%op.Number] = churnFns[i](retVals[i][count%op.Number])
 					}
 					count++
-				case <-tCtx.Done():
+				case <-churnCtx.Done():
 					return
 				}
 			}
@@ -524,6 +529,16 @@ func (e *WorkloadExecutor) runStopCollectingProfileOp(tCtx ktesting.TContext, _ 
 		return nil
 	default:
 		return fmt.Errorf("unsupported profile type %q", op.Type)
+	}
+}
+
+func (e *WorkloadExecutor) stopAllBackgroundChurns(tCtx ktesting.TContext) {
+	if len(e.churnCancels) > 0 {
+		tCtx.Logf("Stopping all background churn generators (active: %d)", len(e.churnCancels))
+		for _, cancel := range e.churnCancels {
+			cancel()
+		}
+		e.churnCancels = nil
 	}
 }
 

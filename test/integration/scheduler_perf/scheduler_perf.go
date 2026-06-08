@@ -1135,6 +1135,9 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 		return nil, fmt.Errorf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos", unusedParams, w.Name)
 	}
 
+	// Stopping all churn generators to avoid adding inflight events after the workload is done.
+	executor.stopAllBackgroundChurns(tCtx)
+
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return executor.dataItems, nil

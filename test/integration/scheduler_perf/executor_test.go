@@ -1220,3 +1220,41 @@ func TestProfileCollection(t *testing.T) {
 		}
 	})
 }
+
+func TestStopAllBackgroundChurns(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	t.Run("stop all churns when some churns exist", func(t *testing.T) {
+		called1, called2 := false, false
+		exec := &WorkloadExecutor{
+			churnCancels: []context.CancelFunc{
+				func() { called1 = true },
+				func() { called2 = true },
+			},
+		}
+
+		exec.stopAllBackgroundChurns(tCtx)
+
+		if !called1 {
+			t.Errorf("Expected churn-1 to be cancelled")
+		}
+		if !called2 {
+			t.Errorf("Expected churn-2 to be cancelled")
+		}
+		if exec.churnCancels != nil {
+			t.Errorf("Expected churnCancels slice to be nil after stopping all")
+		}
+	})
+
+	t.Run("stop all churns when no churns exist", func(t *testing.T) {
+		exec := &WorkloadExecutor{
+			churnCancels: nil,
+		}
+
+		exec.stopAllBackgroundChurns(tCtx)
+
+		if exec.churnCancels != nil {
+			t.Errorf("Expected churnCancels slice to remain nil")
+		}
+	})
+}
