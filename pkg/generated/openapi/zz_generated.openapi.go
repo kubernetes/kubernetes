@@ -1159,6 +1159,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref),
 		schedulingv1alpha3.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha3_Workload(ref),
 		schedulingv1alpha3.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref),
+		schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupAllDisruptionMode(ref),
+		schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}.OpenAPIModelName():                                   schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}.OpenAPIModelName():                                          schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupDisruptionMode(ref),
+		schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}.OpenAPIModelName():                                    schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupGangSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadPodGroupResourceClaim{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupResourceClaim(ref),
+		schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{}.OpenAPIModelName():                                   schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSchedulingConstraints(ref),
+		schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{}.OpenAPIModelName():                                        schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}.OpenAPIModelName():                                    schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSingleDisruptionMode(ref),
 		schedulingv1alpha3.WorkloadPodGroupTemplateReference{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupTemplateReference(ref),
 		schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref),
 		schedulingv1beta1.PriorityClass{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref),
@@ -54665,6 +54673,206 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref common.ReferenceCallb
 		},
 		Dependencies: []string{
 			schedulingv1alpha3.Workload{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupAllDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupDisruptionMode defines how individual pods within a group can be disrupted. Exactly one mode must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Single specifies that pods can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "All specifies that all pods in the group must be disrupted together.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupGangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinCount is the minimum number of pods that must be scheduled at the same time for the scheduler to admit the entire group. If omitted, the controller should inject a context-specific sane default (e.g., parallelism for a Job).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name uniquely identifies this resource claim inside the group.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimName is the name of a ResourceClaim object in the same namespace.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimTemplateName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Topology specifies desired topological placements for all pods within the scheduling group.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"basic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Gang specifies all-or-nothing scheduling semantics.",
+							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSingleDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
+				Type:        []string{"object"},
+			},
+		},
 	}
 }
 

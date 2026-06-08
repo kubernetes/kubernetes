@@ -530,6 +530,118 @@ message WorkloadList {
   repeated Workload items = 2;
 }
 
+// WorkloadPodGroupAllDisruptionMode indicates that all pods in the
+// group must be disrupted together.
+message WorkloadPodGroupAllDisruptionMode {
+}
+
+// WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes
+// scheduling behavior.
+message WorkloadPodGroupBasicSchedulingPolicy {
+}
+
+// WorkloadPodGroupDisruptionMode defines how individual pods within a
+// group can be disrupted. Exactly one mode must be set.
+//
+// +union
+message WorkloadPodGroupDisruptionMode {
+  // Single specifies that pods can be disrupted independently from each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadPodGroupSingleDisruptionMode single = 1;
+
+  // All specifies that all pods in the group must be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadPodGroupAllDisruptionMode all = 2;
+}
+
+// WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang
+// (all-or-nothing) scheduling.
+message WorkloadPodGroupGangSchedulingPolicy {
+  // MinCount is the minimum number of pods that must be scheduled
+  // at the same time for the scheduler to admit the entire group.
+  // If omitted, the controller should inject a context-specific sane
+  // default (e.g., parallelism for a Job).
+  //
+  // +optional
+  // +k8s:optional
+  optional int32 minCount = 1;
+}
+
+// WorkloadPodGroupResourceClaim references a dynamic resource claim
+// that is shared across pods in the group.
+message WorkloadPodGroupResourceClaim {
+  // Name uniquely identifies this resource claim inside the group.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
+  optional string name = 1;
+
+  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // namespace.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  // +k8s:format=k8s-long-name
+  optional string resourceClaimName = 2;
+
+  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // object in the same namespace.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  // +k8s:format=k8s-long-name
+  optional string resourceClaimTemplateName = 3;
+}
+
+// WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling
+// constraints, such as topology.
+message WorkloadPodGroupSchedulingConstraints {
+  // Topology specifies desired topological placements for all pods
+  // within the scheduling group.
+  //
+  // +optional
+  // +k8s:optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  repeated TopologyConstraint topology = 1;
+}
+
+// WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a
+// group of pods managed by a workload controller.
+// Exactly one policy must be set.
+//
+// +union
+message WorkloadPodGroupSchedulingPolicy {
+  // Basic specifies that standard, pod-by-pod Kubernetes scheduling
+  // behavior should be used.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadPodGroupBasicSchedulingPolicy basic = 1;
+
+  // Gang specifies all-or-nothing scheduling semantics.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadPodGroupGangSchedulingPolicy gang = 2;
+}
+
+// WorkloadPodGroupSingleDisruptionMode indicates that individual pods
+// can be disrupted independently.
+message WorkloadPodGroupSingleDisruptionMode {
+}
+
 // WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.
 message WorkloadPodGroupTemplateReference {
   // WorkloadName defines the name of the Workload object.
