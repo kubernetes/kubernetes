@@ -2150,6 +2150,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	genericfeatures.ManagedFieldsOptOut: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	genericfeatures.ManifestBasedAdmissionControlConfig: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2645,6 +2649,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.KMSv1: {},
 
 	genericfeatures.ListFromCacheSnapshot: {},
+
+	genericfeatures.ManagedFieldsOptOut: {},
 
 	genericfeatures.ManifestBasedAdmissionControlConfig: {},
 
