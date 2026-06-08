@@ -1061,7 +1061,7 @@ func Test_InFlightPods(t *testing.T) {
 							t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 						}
 					case action.podGroupAttempted != nil:
-						err := q.AddAttemptedPodGroupIfNeeded(logger, action.podGroupAttempted, q.SchedulingCycle())
+						err := q.AddAttemptedPodGroupIfNeeded(logger, action.podGroupAttempted, q.SchedulingCycle(), false)
 						if err != nil {
 							t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 						}
@@ -3872,7 +3872,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 
 			test.setup(tCtx, q, pgInfo)
 
-			err := q.AddAttemptedPodGroupIfNeeded(tCtx.Logger(), pgInfo, q.SchedulingCycle())
+			err := q.AddAttemptedPodGroupIfNeeded(tCtx.Logger(), pgInfo, q.SchedulingCycle(), false)
 			if err != nil {
 				tCtx.Fatalf("Unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 			}
