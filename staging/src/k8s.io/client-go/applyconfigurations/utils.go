@@ -1716,6 +1716,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ResourceSliceApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1.ResourceSliceSpecApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("SharingAffinityExtractor"):
+		return &applyconfigurationsresourcev1.SharingAffinityExtractorApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
@@ -1830,6 +1832,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1beta1.ResourceSliceSpecApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("SharingAffinityExtractor"):
+		return &applyconfigurationsresourcev1beta1.SharingAffinityExtractorApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta2
 	case resourcev1beta2.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
@@ -1926,6 +1930,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ResourceSliceApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1beta2.ResourceSliceSpecApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("SharingAffinityExtractor"):
+		return &applyconfigurationsresourcev1beta2.SharingAffinityExtractorApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):
