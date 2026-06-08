@@ -1080,6 +1080,76 @@ func TestIsStaleMountFnNonExistentPath(t *testing.T) {
 	}
 }
 
+func TestPrepareSubpathTargetDifferentDevice(t *testing.T) {
+	defaultPerm := os.FileMode(0750)
+
+	base, err := os.MkdirTemp("", "different-device-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(base)
+
+	volPath, subpathMount := getTestPaths(base)
+	if err := os.MkdirAll(filepath.Dir(subpathMount), defaultPerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(volPath, defaultPerm); err != nil {
+		t.Fatal(err)
+	}
+
+	// create the bind-mount target as a file.
+	if err := os.WriteFile(subpathMount, []byte{}, 0640); err != nil {
+		t.Fatal(err)
+	}
+
+	// create the subpath source as a different file with different inode/device.
+	sourceFile := filepath.Join(volPath, "file-different")
+	if err := os.WriteFile(sourceFile, []byte{}, 0640); err != nil {
+		t.Fatal(err)
+	}
+
+	fm := setupFakeMounter([]string{subpathMount})
+
+	subpath := Subpath{
+		VolumeMountIndex: testSubpath,
+		Path:             sourceFile,
+		VolumeName:       testVol,
+		VolumePath:       volPath,
+		PodDir:           filepath.Join(base, "pod0"),
+		ContainerName:    testContainer,
+	}
+
+	// isStaleMountFn must return false, the mount looks healthy from the OS side.
+	origIsStaleMountFn := isStaleMountFn
+	defer func() { isStaleMountFn = origIsStaleMountFn }()
+	isStaleMountFn = func(string) bool { return false }
+
+	lazyUnmountCalled := false
+	origLazyUnmountFn := lazyUnmountFn
+	defer func() { lazyUnmountFn = origLazyUnmountFn }()
+	lazyUnmountFn = func(path string) error {
+		lazyUnmountCalled = true
+		return nil
+	}
+
+	alreadyMounted, gotTarget, err := prepareSubpathTarget(fm, subpath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if alreadyMounted {
+		t.Errorf("expected alreadyMounted=false after stale-device remount, got true")
+	}
+	if gotTarget != subpathMount {
+		t.Errorf("expected target %q, got %q", subpathMount, gotTarget)
+	}
+	if !lazyUnmountCalled {
+		t.Errorf("expected lazyUnmountFn to be called when source and bind-target have different inodes")
+	}
+	if actions := fm.GetLog(); len(actions) != 0 {
+		t.Errorf("expected no mounter.Unmount actions (should use lazyUnmountFn), got %v", actions)
+	}
+}
+
 func TestPrepareSubpathTargetStaleRemount(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
 

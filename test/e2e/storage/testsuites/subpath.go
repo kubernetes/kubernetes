@@ -363,6 +363,18 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testSubpathReconstruction(ctx, f, l.hostExec, l.pod, true)
 	})
 
+	f.It("should remount stale subpath bind mount after network filesystem disruption [LinuxOnly]",
+		f.WithDisruptive(), f.WithSlow(), func(ctx context.Context) {
+		init(ctx)
+		ginkgo.DeferCleanup(cleanup)
+
+		if strings.HasPrefix(driverName, "hostPath") {
+			e2eskipper.Skipf("Driver %s uses a local hostPath volume; stale-mount scenario requires a network filesystem, skipping", driverName)
+		}
+
+		testSubpathStaleBindMountRemount(ctx, f, l.pod)
+	})
+
 	ginkgo.It("should support readOnly directory specified in the volumeMount", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
@@ -1037,4 +1049,169 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		option = "-c"
 	}
 	return e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+}
+
+// testSubpathStaleBindMountRemount simulates the failure where a
+// network filesystem disruption leaves
+// a stale bind-mount entry in the kernel mount table.  After the filesystem
+// recovers the kubelet must detect the stale entry and recreate the bind mount
+// rather than returning alreadyMounted=true, which would cause runc to fail with ENOENT.
+func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+	// prepare the running pod
+	pod.Spec.Containers[0].Image = e2epod.GetDefaultTestImage()
+	pod.Spec.Containers[0].Command = e2epod.GenerateScriptCmd(e2epod.InfiniteSleepCommand)
+	pod.Spec.Containers[0].Args = nil
+	pod.Spec.Containers[1].Image = e2epod.GetDefaultTestImage()
+	pod.Spec.Containers[1].Command = e2epod.GenerateScriptCmd(e2epod.InfiniteSleepCommand)
+	pod.Spec.Containers[1].Args = nil
+	gracePeriod := int64(30)
+	pod.Spec.TerminationGracePeriodSeconds = &gracePeriod
+
+	ginkgo.By(fmt.Sprintf("Creating pod %s with subPath mount", pod.Name))
+	removeUnusedContainers(pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating pod with subPath mount")
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
+
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err, "waiting for pod with subPath mount to reach Running")
+
+	// refresh pod so we have the assigned node name.
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "refreshing pod after Running")
+
+	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+	framework.ExpectNoError(err, "listing schedulable nodes")
+
+	var podNode *v1.Node
+	for i := range nodeList.Items {
+		if nodeList.Items[i].Name == pod.Spec.NodeName {
+			podNode = &nodeList.Items[i]
+			break
+		}
+	}
+	gomega.Expect(podNode).NotTo(gomega.BeNil(), "pod node must be in the schedulable node list")
+
+	hostExec := storageutils.NewHostExec(f)
+	ginkgo.DeferCleanup(hostExec.Cleanup)
+
+	// kubeletExec launches a one-off privileged pod
+	kubeletExec := func(ctx context.Context, cmd string) (string, error) {
+		ns := f.Namespace.Name
+		execPodName := fmt.Sprintf("kubelet-ctrl-%s", rand.String(5))
+		privileged := true
+		hostPIDPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: execPodName, Namespace: ns},
+			Spec: v1.PodSpec{
+				HostNetwork:                  true,
+				HostPID:                      true,
+				RestartPolicy:                v1.RestartPolicyNever,
+				AutomountServiceAccountToken: func(b bool) *bool { return &b }(false),
+				NodeName:                     podNode.Name,
+				Volumes: []v1.Volume{{
+					Name:         "rootfs",
+					VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/"}},
+				}},
+				Containers: []v1.Container{{
+					Name:            "c",
+					Image:           e2epod.GetDefaultTestImage(),
+					Command:         []string{"nsenter", "--mount=/rootfs/proc/1/ns/mnt", "--", "sh", "-c", cmd},
+					SecurityContext: &v1.SecurityContext{Privileged: &privileged},
+					VolumeMounts: []v1.VolumeMount{{
+						Name:      "rootfs",
+						MountPath: "/rootfs",
+						ReadOnly:  true,
+					}},
+				}},
+			},
+		}
+		createdPod, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, hostPIDPod, metav1.CreateOptions{})
+		if err != nil {
+			return "", fmt.Errorf("creating kubelet-ctrl pod: %w", err)
+		}
+		defer func() { _ = e2epod.DeletePodWithWait(ctx, f.ClientSet, createdPod) }()
+		if err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, execPodName, ns, 2*time.Minute); err != nil {
+			return "", fmt.Errorf("kubelet-ctrl pod %s failed: %w", cmd, err)
+		}
+		return "", nil
+	}
+
+	// stop the kubelet via privileged pod
+	kubectlStop := "systemctl stop kubelet"
+	kubectlStart := "systemctl start kubelet"
+	ginkgo.By(fmt.Sprintf("Stopping kubelet on node %s via hostPID pod+nsenter", pod.Spec.NodeName))
+	// ensure kubelet is restarted even if the test fails.
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		framework.Logf("DeferCleanup: ensuring kubelet is running on %s", pod.Spec.NodeName)
+		if _, err := kubeletExec(ctx, kubectlStart); err != nil {
+			framework.Logf("Warning: deferred kubelet start returned: %v", err)
+		}
+		if ok := e2enode.WaitForNodeToBeReady(ctx, f.ClientSet, pod.Spec.NodeName, 5*time.Minute); !ok {
+			framework.Logf("Warning: node %s did not return Ready after deferred kubelet start", pod.Spec.NodeName)
+		}
+	})
+	_, err = kubeletExec(ctx, kubectlStop)
+	framework.ExpectNoError(err, "stopping kubelet via hostPID pod on node %s", podNode.Name)
+
+	// simulate stale bind-mount
+	subpathMountGlob := fmt.Sprintf("/var/lib/kubelet/pods/%s/volume-subpaths/*/*/*", pod.UID)
+	ginkgo.By(fmt.Sprintf("Manually unmounting stale subPath bind mounts matching %s", subpathMountGlob))
+
+	umountCmd := fmt.Sprintf(
+		`for mp in $(ls %s 2>/dev/null); do umount --lazy "$mp" || true; done`,
+		subpathMountGlob,
+	)
+	result, err := hostExec.IssueCommandWithResult(ctx, umountCmd, podNode)
+	framework.ExpectNoError(err, "issuing umount command on node %s: %s", podNode.Name, result)
+	framework.Logf("umount result: %s", result)
+
+	// restart the kubelet
+	ginkgo.By(fmt.Sprintf("Restarting kubelet on node %s via hostPID pod+nsenter", pod.Spec.NodeName))
+	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "getting node before kubelet restart")
+	heartbeatTime := e2enode.GetNodeHeartbeatTime(node)
+
+	_, err = kubeletExec(ctx, kubectlStart)
+	framework.ExpectNoError(err, "starting kubelet via hostPID pod on node %s", podNode.Name)
+
+	// wait for the node to come back Ready with a fresh kubelet heartbeat.
+	e2enode.WaitForNodeHeartbeatAfter(ctx, f.ClientSet, pod.Spec.NodeName, heartbeatTime, 5*time.Minute)
+	if ok := e2enode.WaitForNodeToBeReady(ctx, f.ClientSet, pod.Spec.NodeName, 5*time.Minute); !ok {
+		framework.Failf("Node %s did not return to Ready after kubelet restart", pod.Spec.NodeName)
+	}
+
+	// give the kubelet a moment to complete its volume reconstruction pass
+	// before we launch the second pod.
+	ginkgo.By("Waiting for volume reconstruction after kubelet restart")
+	time.Sleep(20 * time.Second)
+
+	// create a second pod on the same node
+	recoveryPod := pod.DeepCopy()
+	recoveryPod.Name = fmt.Sprintf("%s-recovery-%s", pod.Name, rand.String(5))
+	recoveryPod.ResourceVersion = ""
+	recoveryPod.UID = ""
+	recoveryPod.Status = v1.PodStatus{}
+	// pin the recovery pod to the same node so it exercises the same
+	// bind-mount path that was just staled out.
+	e2epod.SetNodeAffinity(&recoveryPod.Spec, pod.Spec.NodeName)
+
+	ginkgo.By(fmt.Sprintf("Creating recovery pod %s on the same node (%s)", recoveryPod.Name, pod.Spec.NodeName))
+	recoveryPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, recoveryPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating recovery pod")
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, recoveryPod)
+
+	// the recovery pod must reach Running within PodStart timeout.
+	ginkgo.By("Verifying recovery pod reaches Running state (stale bind mount was remounted)")
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet,
+		recoveryPod.Name, recoveryPod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err,
+		"recovery pod failed to reach Running; this indicates the stale subPath bind mount was NOT remounted — "+
+			"check kubelet logs for 'stale bind mount' or runc 'no such file or directory' errors")
+
+	// the recovery pod should be able to write to its subPath.
+	ginkgo.By("Verifying recovery pod can write to its subPath mount")
+	writeCmd := fmt.Sprintf("echo stale-remount-ok > %s/stale-remount-probe", volumePath)
+	out, err := podContainerExec(recoveryPod, 0, writeCmd)
+	framework.Logf("Write probe output: %q", out)
+	framework.ExpectNoError(err, "writing probe file through remounted subPath")
 }
