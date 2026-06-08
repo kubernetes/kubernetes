@@ -103,6 +103,17 @@ func testResourceSliceWithSharedCounters(name, poolName, driverName string, numC
 	return slice
 }
 
+func testResourceSliceWithSharingAffinity(name, poolName, driverName string, numExtractors int) *resourceapi.ResourceSlice {
+	slice := testResourceSlice(name, poolName, driverName, 1)
+	slice.Spec.Devices = nil
+	for i := 0; i < numExtractors; i++ {
+		slice.Spec.SharingAffinity = append(slice.Spec.SharingAffinity, resourceapi.SharingAffinityExtractor{
+			CEL: map[string]string{"key": "true"},
+		})
+	}
+	return slice
+}
+
 func testResourceSliceWithBindingConditions(name, nodeName, driverName string, numDevices int, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
 	slice := testResourceSlice(name, nodeName, driverName, numDevices)
 	for i := range slice.Spec.Devices {
@@ -431,7 +442,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"both-shared-counters-and-devices": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), "", "only one of `sharedCounters` or `devices` is allowed"),
+				field.Invalid(field.NewPath("spec"), "{`devices`, `sharedCounters`}", "only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
@@ -441,6 +452,92 @@ func TestValidateResourceSlice(t *testing.T) {
 						Counters: testCounters(),
 					},
 				}
+				return slice
+			}(),
+		},
+		"both-devices-and-sharing-affinity": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "{`devices`, `sharingAffinity`}", "only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{
+					{CEL: map[string]string{"key": "true"}},
+				}
+				return slice
+			}(),
+		},
+		"both-shared-counters-and-sharing-affinity": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "{`sharedCounters`, `sharingAffinity`}", "only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{
+					{CEL: map[string]string{"key": "true"}},
+				}
+				return slice
+			}(),
+		},
+		"all-three-resource-slice-types": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "{`devices`, `sharedCounters`, `sharingAffinity`}", "only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     "counterset",
+						Counters: testCounters(),
+					},
+				}
+				slice.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{
+					{CEL: map[string]string{"key": "true"}},
+				}
+				return slice
+			}(),
+		},
+		"sharing-affinity-at-limit": {
+			slice: testResourceSliceWithSharingAffinity(goodName, goodName, driverName, resourceapi.SharingAffinityMaxEntries),
+		},
+		"too-many-sharing-affinity-entries": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharingAffinity"), resourceapi.SharingAffinityMaxEntries+1, resourceapi.SharingAffinityMaxEntries).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+			},
+			slice: testResourceSliceWithSharingAffinity(goodName, goodName, driverName, resourceapi.SharingAffinityMaxEntries+1),
+		},
+		"sharing-affinity-cel-not-set": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), "").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharingAffinity(goodName, goodName, driverName, 1)
+				slice.Spec.SharingAffinity[0].CEL = nil
+				return slice
+			}(),
+		},
+		"sharing-affinity-cel-at-key-limit": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharingAffinity(goodName, goodName, driverName, 1)
+				cel := make(map[string]string, resourceapi.SharingAffinityCELMaxKeys)
+				for i := 0; i < resourceapi.SharingAffinityCELMaxKeys; i++ {
+					cel[fmt.Sprintf("key-%d", i)] = "true"
+				}
+				slice.Spec.SharingAffinity[0].CEL = cel
+				return slice
+			}(),
+		},
+		"too-many-sharing-affinity-cel-keys": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), resourceapi.SharingAffinityCELMaxKeys+1, resourceapi.SharingAffinityCELMaxKeys).WithOrigin("maxProperties").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharingAffinity(goodName, goodName, driverName, 1)
+				cel := make(map[string]string, resourceapi.SharingAffinityCELMaxKeys+1)
+				for i := 0; i < resourceapi.SharingAffinityCELMaxKeys+1; i++ {
+					cel[fmt.Sprintf("key-%d", i)] = "true"
+				}
+				slice.Spec.SharingAffinity[0].CEL = cel
 				return slice
 			}(),
 		},
@@ -1452,6 +1549,14 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			Effect: "some-other-effect",
 		},
 	}
+	invalidResourceSliceWithNilSharingAffinityCEL := testResourceSliceWithSharingAffinity(name, name, name, 1)
+	invalidResourceSliceWithNilSharingAffinityCEL.Spec.SharingAffinity[0].CEL = nil
+	invalidResourceSliceWithTooManySharingAffinityCELKeys := testResourceSliceWithSharingAffinity(name, name, name, 1)
+	cel := make(map[string]string, resourceapi.SharingAffinityCELMaxKeys+1)
+	for i := 0; i < resourceapi.SharingAffinityCELMaxKeys+1; i++ {
+		cel[fmt.Sprintf("key-%d", i)] = "true"
+	}
+	invalidResourceSliceWithTooManySharingAffinityCELKeys.Spec.SharingAffinity[0].CEL = cel
 
 	scenarios := map[string]struct {
 		oldResourceSlice *resourceapi.ResourceSlice
@@ -1545,6 +1650,57 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				device := slice.Spec.Devices[0].DeepCopy()
 				device.Name += "-other"
 				slice.Spec.Devices = append(slice.Spec.Devices, *device)
+				return slice
+			},
+		},
+		"valid-ratcheting-unchanged-oversized-sharing-affinity": {
+			oldResourceSlice: testResourceSliceWithSharingAffinity(name, name, name, resourceapi.SharingAffinityMaxEntries+1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Labels = map[string]string{"foo": "bar"}
+				return slice
+			},
+		},
+		"valid-ratcheting-unchanged-sharing-affinity-nil-cel": {
+			oldResourceSlice: invalidResourceSliceWithNilSharingAffinityCEL,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Labels = map[string]string{"foo": "bar"}
+				return slice
+			},
+		},
+		"valid-ratcheting-unchanged-sharing-affinity-too-many-cel-keys": {
+			oldResourceSlice: invalidResourceSliceWithTooManySharingAffinityCELKeys,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Labels = map[string]string{"foo": "bar"}
+				return slice
+			},
+		},
+		"invalid-update-grows-sharing-affinity-over-limit": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharingAffinity"), resourceapi.SharingAffinityMaxEntries+1, resourceapi.SharingAffinityMaxEntries).WithOrigin("maxItems").MarkCoveredByDeclarative(),
+			},
+			oldResourceSlice: testResourceSliceWithSharingAffinity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.SharingAffinity = testResourceSliceWithSharingAffinity(name, name, name, resourceapi.SharingAffinityMaxEntries+1).Spec.SharingAffinity
+				return slice
+			},
+		},
+		"invalid-update-clears-sharing-affinity-cel": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), "").MarkCoveredByDeclarative(),
+			},
+			oldResourceSlice: testResourceSliceWithSharingAffinity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.SharingAffinity[0].CEL = nil
+				return slice
+			},
+		},
+		"invalid-update-grows-sharing-affinity-cel-over-limit": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), resourceapi.SharingAffinityCELMaxKeys+1, resourceapi.SharingAffinityCELMaxKeys).WithOrigin("maxProperties").MarkCoveredByDeclarative(),
+			},
+			oldResourceSlice: testResourceSliceWithSharingAffinity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.SharingAffinity[0].CEL = invalidResourceSliceWithTooManySharingAffinityCELKeys.Spec.SharingAffinity[0].CEL
 				return slice
 			},
 		},

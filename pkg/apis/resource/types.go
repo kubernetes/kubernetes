@@ -153,7 +153,7 @@ type ResourceSliceSpec struct {
 	//
 	// Must not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.
 	//
-	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	// Only one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.
 	//
 	// +optional
 	// +listType=atomic
@@ -177,7 +177,7 @@ type ResourceSliceSpec struct {
 	//
 	// The names of the counter sets must be unique in the ResourcePool.
 	//
-	// Only one of Devices and SharedCounters can be set in a ResourceSlice.
+	// Only one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.
 	//
 	// The maximum number of counter sets is 8.
 	//
@@ -186,7 +186,53 @@ type ResourceSliceSpec struct {
 	// +featureGate=DRAPartitionableDevices
 	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
+
+	// SharingAffinity carries CEL extractors for a metadata-only
+	// ResourceSlice. Each extractor evaluates against an in-scope request
+	// configuration object from the claim to derive an affinity value the
+	// scheduler uses to keep allocations on the same device compatible.
+	//
+	// At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.
+	//
+	// The maximum number of extractors is 8.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRASharingAffinity
+	// +zeroOrOneOf=ResourceSliceType
+	SharingAffinity []SharingAffinityExtractor
 }
+
+// SharingAffinityExtractor publishes one group of CEL extractors that pull
+// affinity keys out of in-scope request configuration objects.
+//
+// If multiple applicable extractors produce non-empty values for the same
+// affinity key for a single request, they must produce the same value. If
+// they produce different values, the request is self-inconsistent and is not
+// eligible for sharing-affinity matching; the Pod stays Pending and an Event
+// explains the conflict.
+type SharingAffinityExtractor struct {
+	// Selector, if set, limits this extractor to Device objects in the same
+	// pool that match the selector.
+	//
+	// +optional
+	Selector *DeviceSelector
+
+	// CEL maps an affinity key name to a CEL expression. Each CEL expression
+	// evaluates against an in-scope request configuration object from the
+	// claim and returns the string affinity value for its key.
+	//
+	// +required
+	CEL map[string]string
+}
+
+const (
+	// SharingAffinityMaxEntries is the maximum number of SharingAffinity extractors per ResourceSlice.
+	SharingAffinityMaxEntries = 8
+
+	// SharingAffinityCELMaxKeys is the maximum number of CEL expressions per SharingAffinity extractor.
+	SharingAffinityCELMaxKeys = 8
+)
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the

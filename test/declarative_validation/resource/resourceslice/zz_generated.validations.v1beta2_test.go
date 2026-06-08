@@ -74,6 +74,13 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.sharingAffinity": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.sharingAffinity[*].cel": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
 		},
 	)
 }
