@@ -34,6 +34,7 @@ import (
 	"time"
 
 	codes "google.golang.org/grpc/codes"
+
 	crierror "k8s.io/cri-api/pkg/errors"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -399,7 +400,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		e := opts.Envs[idx]
 		envs[idx] = &runtimeapi.KeyValue{
 			Key:   e.Name,
-			Value: e.Value,
+			Value: []byte(e.Value),
 		}
 	}
 	config.Envs = envs

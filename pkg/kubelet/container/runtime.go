@@ -462,7 +462,7 @@ type Image struct {
 // EnvVar represents the environment variable.
 type EnvVar struct {
 	Name  string
-	Value string
+	Value string // TODO: switch to []byte
 }
 
 // Annotation represents an annotation.
