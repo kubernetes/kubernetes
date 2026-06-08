@@ -20,6 +20,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +64,7 @@ const (
 	trafficPatch        = "Patch"
 )
 
-func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, hasIndex bool) {
+func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, hasIndex bool, tracker *WatchLatencyTracker) {
 	require.NoError(b, PrecreateBenchmarkPods(ctx, store, data))
 	require.NoError(b, waitForConsistent(ctx, store))
 
@@ -78,7 +80,10 @@ func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 						for _, readIndexed := range useIndexOptions {
 							b.Run(fmt.Sprintf("Background=%s/UseIndex=%v", loadType, readIndexed), func(b *testing.B) {
 								b.SetParallelism(parallelism)
-								runBenchmarkWriteThroughput(ctx, b, store, data, trafficType, loadType, readIndexed)
+								if tracker != nil {
+									tracker.Reset()
+								}
+								runBenchmarkWriteThroughput(ctx, b, store, data, trafficType, loadType, readIndexed, tracker)
 							})
 						}
 					}
@@ -88,7 +93,7 @@ func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	}
 }
 
-func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, loadType string, readIndexed bool) {
+func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, loadType string, readIndexed bool, tracker *WatchLatencyTracker) {
 	stopBackgroundLoadCh := make(chan struct{})
 	var workersWg sync.WaitGroup
 	var stopOnce sync.Once
@@ -130,14 +135,11 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			i := int(index.Add(1)) % len(data.PodKeys)
-			writes.Add(runTraffic(ctx, store, data, trafficType, i, &latestRV))
+			writes.Add(runTraffic(ctx, b, store, data, trafficType, i, &latestRV, tracker))
 		}
 	})
 	elapsedSeconds := b.Elapsed().Seconds()
-	consistentStart := time.Now()
 	require.NoError(b, waitForConsistent(ctx, store))
-	consistentDelaySeconds := time.Since(consistentStart).Seconds()
-	b.ReportMetric(consistentDelaySeconds, "seconds-delay")
 	b.ReportMetric(float64(writes.Load())/elapsedSeconds, "writes/s")
 
 	stopBackgroundLoad()
@@ -148,6 +150,12 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	case loadLister, loadListerExactRV, loadWatchList:
 		b.ReportMetric(float64(listCalls.Load())/elapsedSeconds, "list-calls/s")
 		b.ReportMetric(float64(listObjects.Load())/elapsedSeconds, "list-objs/s")
+	}
+
+	if tracker != nil {
+		if p99 := tracker.GetP99Latency(); p99 > 0 {
+			b.ReportMetric(p99.Seconds(), "watch-latency-p99-s")
+		}
 	}
 }
 
@@ -167,7 +175,7 @@ func waitForConsistent(ctx context.Context, store storage.Interface) error {
 	return nil
 }
 
-func runTraffic(ctx context.Context, store storage.Interface, data BenchmarkData, trafficType string, index int, latestRV *atomic.Pointer[string]) (writes uint64) {
+func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, trafficType string, index int, latestRV *atomic.Pointer[string], tracker *WatchLatencyTracker) (writes uint64) {
 	var podOut *example.Pod
 	switch trafficType {
 	case trafficDeleteCreate:
@@ -179,6 +187,9 @@ func runTraffic(ctx context.Context, store storage.Interface, data BenchmarkData
 			panic(fmt.Sprintf("Unexpected error on Delete %q: %v", data.PodKeys[index], err))
 		}
 		pod := data.Pods[index]
+		if tracker != nil {
+			tracker.RecordWrite(pod)
+		}
 		podOut = &example.Pod{}
 		err = store.Create(ctx, data.PodKeys[index], pod, podOut, 0)
 		if err == nil {
@@ -189,7 +200,7 @@ func runTraffic(ctx context.Context, store storage.Interface, data BenchmarkData
 		}
 	case trafficPatch:
 		podOut = &example.Pod{}
-		err := store.GuaranteedUpdate(ctx, data.PodKeys[index], podOut, false, nil, patchFunc(index), nil)
+		err := store.GuaranteedUpdate(ctx, data.PodKeys[index], podOut, false, nil, patchFunc(index, tracker), nil)
 		if err != nil {
 			panic(fmt.Sprintf("Unexpected error on Patch %q: %v", data.PodKeys[index], err))
 		} else {
@@ -202,13 +213,16 @@ func runTraffic(ctx context.Context, store storage.Interface, data BenchmarkData
 	return writes
 }
 
-func patchFunc(i int) func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+func patchFunc(i int, tracker *WatchLatencyTracker) func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 	return func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		curr := input.(*example.Pod)
 		if curr.Annotations == nil {
 			curr.Annotations = make(map[string]string)
 		}
 		curr.Annotations["updated-by-benchmark"] = strconv.Itoa(i)
+		if tracker != nil {
+			tracker.RecordWrite(curr)
+		}
 		return curr, nil, nil
 	}
 }
@@ -568,4 +582,83 @@ func RunBenchmarkStoreStats(ctx context.Context, b *testing.B, store storage.Int
 			b.Fatal(err)
 		}
 	}
+}
+
+const latencyTimestampAnnotation = "watch-latency-timestamp"
+
+type WatchLatencyTracker struct {
+	clock     clock.Clock
+	mu        sync.Mutex
+	durations []time.Duration
+}
+
+func NewWatchLatencyTracker(clk clock.Clock) *WatchLatencyTracker {
+	return &WatchLatencyTracker{
+		clock: clk,
+	}
+}
+
+func (t *WatchLatencyTracker) Reset() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.durations = nil
+}
+
+func (t *WatchLatencyTracker) RecordWrite(obj interface{}) {
+	metaObj, ok := obj.(metav1.Object)
+	if !ok {
+		return
+	}
+	annotations := metaObj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[latencyTimestampAnnotation] = serializeTimestamp(t.clock.Now())
+	metaObj.SetAnnotations(annotations)
+}
+
+func (t *WatchLatencyTracker) HandleEvent(obj interface{}) {
+	metaObj, ok := obj.(metav1.Object)
+	if !ok {
+		return
+	}
+	annotations := metaObj.GetAnnotations()
+	if annotations == nil {
+		return
+	}
+	tStr, ok := annotations[latencyTimestampAnnotation]
+	if !ok {
+		return
+	}
+	writeTime, err := parseTimestamp(tStr)
+	if err != nil {
+		return
+	}
+	delay := t.clock.Since(writeTime)
+	t.mu.Lock()
+	t.durations = append(t.durations, delay)
+	t.mu.Unlock()
+}
+
+func (t *WatchLatencyTracker) GetP99Latency() time.Duration {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.durations) < 100 {
+		return 0
+	}
+	slices.Sort(t.durations)
+	idx := len(t.durations)*99/100 - 1
+	return t.durations[idx]
+}
+
+func serializeTimestamp(t time.Time) string {
+	return strconv.FormatInt(t.UnixNano(), 10)
+}
+
+func parseTimestamp(s string) (time.Time, error) {
+	tNano, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, tNano), nil
 }
