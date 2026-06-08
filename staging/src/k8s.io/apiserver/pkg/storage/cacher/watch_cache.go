@@ -625,10 +625,10 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, resourceVersion ui
 	if err != nil {
 		return listResp{}, "", err
 	}
-	return w.listLatestRV(key, continueKey, matchValues)
+	return w.listLatestRVLocked(key, continueKey, matchValues)
 }
 
-func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+func (w *watchCache) listLatestRVLocked(key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
@@ -642,7 +642,14 @@ func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage
 			}, matchValue.IndexName, err
 		}
 	}
-	result := w.store.OrderedListPrefix(key, continueKey)
+	var store store.OrderedLister = w.store
+	if w.snapshots != nil {
+		snap, ok := w.snapshots.Latest()
+		if ok {
+			store = snap
+		}
+	}
+	result := store.OrderedListPrefix(key, continueKey)
 	return listResp{
 		Items:           result,
 		ResourceVersion: w.resourceVersion,

@@ -3178,6 +3178,9 @@ func (f *fakeSnapshotter) RemoveLess(rv uint64)                       {}
 func (f *fakeSnapshotter) Len() int {
 	return 0
 }
+func (f *fakeSnapshotter) Latest() (store.OrderedLister, bool) {
+	return nil, false
+}
 
 // --- Sharding unit tests for filterWithAttrsAndPrefixFunction ---
 
