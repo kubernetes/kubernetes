@@ -288,7 +288,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	context.Order = orderer.OrderUniverse(context.Universe)
 
 	// Initialize all validator plugins exactly once.
-	validator := validators.InitGlobalValidator(context)
+	validator := validators.InitGlobalValidator(context, inputToPkg)
 
 	// Create a type discoverer for all types of all inputs.
 	td := NewTypeDiscoverer(validator, inputToPkg)

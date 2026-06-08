@@ -70,6 +70,13 @@ type Config struct {
 	// This field MUST NOT be used during init, since other validators may not
 	// be initialized yet.
 	TagValidator TagValidationExtractor
+
+	// InputToPkg maps each input (API types) package to the package into which
+	// validation code is generated for it.  This is the same mapping the
+	// generator uses to locate generated Validate_<Type> functions, and lets
+	// validators reference hand-written functions that live alongside the
+	// generated code (e.g. +k8s:customValidation).
+	InputToPkg map[string]string
 }
 
 // Scope describes where a validation (or potential validation) is located.
