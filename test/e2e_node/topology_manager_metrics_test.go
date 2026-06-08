@@ -88,6 +88,9 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				"kubelet_topology_manager_admission_duration_seconds": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": timelessSample(0),
 				}),
+				"kubelet_topology_manager_admission_duration_ms": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": timelessSample(0),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
@@ -119,6 +122,9 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				"kubelet_topology_manager_admission_duration_seconds": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": checkMetricValueGreaterThan(0),
 				}),
+				"kubelet_topology_manager_admission_duration_ms": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": checkMetricValueGreaterThan(0),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
@@ -148,6 +154,9 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 					"pod::numa_node":       timelessSample(0),
 				}),
 				"kubelet_topology_manager_admission_duration_seconds": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": checkMetricValueGreaterThan(0),
+				}),
+				"kubelet_topology_manager_admission_duration_ms": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": checkMetricValueGreaterThan(0),
 				}),
 			})
