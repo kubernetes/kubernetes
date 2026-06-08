@@ -307,7 +307,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	if csiRPCError != nil {
 		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(csiRPCError) {
+		// Skip on remount (e.g. CSIDriver.spec.requiresRepublish=true): the volume
+		// was already published and the pod is observing the existing bind mount,
+		// so removing the mount dir here would leave the pod with stale contents
+		// that a subsequent successful republish cannot repair (#121271).
+		if volumetypes.IsOperationFinishedError(csiRPCError) && !mounterArgs.IsRemount {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 			}

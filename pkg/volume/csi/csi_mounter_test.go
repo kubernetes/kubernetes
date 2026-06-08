@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -1165,6 +1167,86 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		if pubs[csiMounter.volumeID].VolumeMountGroup != tc.expectedFSGroupInNodePublish {
 			t.Errorf("expected VolumeMountGroup parameter in NodePublishVolumeRequest to be %q, got: %q", tc.expectedFSGroupInNodePublish, pubs[csiMounter.volumeID].VolumeMountGroup)
 		}
+	}
+}
+
+func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		podUID               types.UID
+		options              []string
+		spec                 func(string, []string) *volume.Spec
+		isRemount            bool
+		expectDataFileExists bool
+	}{
+		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/121271:
+			// when NodePublishVolume fails on a remount (e.g. a republish
+			// triggered by CSIDriver.spec.requiresRepublish=true), the
+			// mount directory and vol_data.json must be preserved so the
+			// pod continues to see the previously-published contents and
+			// a subsequent successful republish can refresh them in place.
+			name:   "setup with remount preserves mount dir on final error",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			spec: func(fsType string, options []string) *volume.Spec {
+				pvSrc := makeTestPV("pv1", 20, testDriver, "vol1")
+				pvSrc.Spec.CSI.FSType = fsType
+				pvSrc.Spec.MountOptions = options
+				return volume.NewSpecFromPersistentVolume(pvSrc, false)
+			},
+			isRemount:            true,
+			expectDataFileExists: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		volumeLifecycleModes := []storage.VolumeLifecycleMode{
+			storage.VolumeLifecyclePersistent,
+		}
+		driver := getTestCSIDriver(testDriver, nil, nil, volumeLifecycleModes)
+		fakeClient := fakeclient.NewClientset(driver)
+		plug, tmpDir := newTestPlugin(t, fakeClient)
+		defer func() {
+			_ = os.RemoveAll(tmpDir)
+		}()
+		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		t.Run(tc.name, func(t *testing.T) {
+			mounter, err := plug.NewMounter(
+				tc.spec("zfs", tc.options),
+				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
+			)
+			if mounter == nil || err != nil {
+				t.Fatal("failed to create CSI mounter")
+			}
+
+			csiMounter := mounter.(*csiMountMgr)
+			csiMounter.csiClient = setupClient(t, true)
+
+			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
+			if err != nil {
+				t.Fatalf("failed to setup VolumeAttachment: %v", err)
+			}
+
+			csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.SetNextError(status.Errorf(codes.InvalidArgument, "mount failed"))
+
+			// Mounter.SetUp()
+			if err := csiMounter.SetUp(volume.MounterArgs{
+				IsRemount: tc.isRemount,
+			}); err == nil {
+				t.Fatalf("mounter.Setup expected err but succeed")
+			}
+
+			mountPath := csiMounter.GetPath()
+			volPath := filepath.Dir(mountPath)
+			dataFile := filepath.Join(volPath, volDataFileName)
+			_, statErr := os.Stat(dataFile)
+			exists := statErr == nil
+			if exists != tc.expectDataFileExists {
+				t.Errorf("volume file [%s]: exists=%v, want=%v (statErr=%v)", dataFile, exists, tc.expectDataFileExists, statErr)
+			}
+		})
 	}
 }
 

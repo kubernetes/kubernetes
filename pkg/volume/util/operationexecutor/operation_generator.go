@@ -586,6 +586,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FSGroupChangePolicy: fsGroupChangePolicy,
 			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
+			IsRemount:           isRemount,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
