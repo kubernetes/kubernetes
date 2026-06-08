@@ -54,6 +54,21 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type Job
+	scheme.AddValidationFunc(
+		(*batchv1.Job)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_Job(
+					ctx, op, nil, /* fldPath */
+					obj.(*batchv1.Job),
+					safe.Cast[*batchv1.Job](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -131,8 +146,167 @@ func Validate_CronJobSpec(
 	// field batchv1.CronJobSpec.StartingDeadlineSeconds has no validation
 	// field batchv1.CronJobSpec.ConcurrencyPolicy has no validation
 	// field batchv1.CronJobSpec.Suspend has no validation
-	// field batchv1.CronJobSpec.JobTemplate has no validation
+
+	{ // field batchv1.CronJobSpec.JobTemplate
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.CronJobSpec) *batchv1.JobTemplateSpec {
+				return &oldObj.JobTemplate
+			})
+		errs = append(errs, fn(fldPath.Child("jobTemplate"), &obj.JobTemplate, oldVal, oldObj != nil)...)
+	}
+
 	// field batchv1.CronJobSpec.SuccessfulJobsHistoryLimit has no validation
 	// field batchv1.CronJobSpec.FailedJobsHistoryLimit has no validation
+	return errs
+}
+
+// Validate_Job validates an instance of Job according
+// to declarative validation rules in the API schema.
+func Validate_Job(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.Job) (errs field.ErrorList) {
+
+	// field batchv1.Job.TypeMeta has no validation
+	// field batchv1.Job.ObjectMeta has no validation
+
+	{ // field batchv1.Job.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.Job) *batchv1.JobSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	// field batchv1.Job.Status has no validation
+	return errs
+}
+
+// Validate_JobSpec validates an instance of JobSpec according
+// to declarative validation rules in the API schema.
+func Validate_JobSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.JobSpec) (errs field.ErrorList) {
+
+	if e := validate.DependentRequired(ctx, op, fldPath, obj, oldObj, "maxFailedIndexes",
+		func(obj *batchv1.JobSpec) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.MaxFailedIndexes != nil
+		}, "backoffLimitPerIndex",
+		func(obj *batchv1.JobSpec) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.BackoffLimitPerIndex != nil
+		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	// field batchv1.JobSpec.Parallelism has no validation
+	// field batchv1.JobSpec.Completions has no validation
+	// field batchv1.JobSpec.ActiveDeadlineSeconds has no validation
+	// field batchv1.JobSpec.PodFailurePolicy has no validation
+	// field batchv1.JobSpec.SuccessPolicy has no validation
+	// field batchv1.JobSpec.BackoffLimit has no validation
+	// field batchv1.JobSpec.BackoffLimitPerIndex has no validation
+
+	{ // field batchv1.JobSpec.MaxFailedIndexes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.MaxFailedIndexes
+			})
+		errs = append(errs, fn(fldPath.Child("maxFailedIndexes"), obj.MaxFailedIndexes, oldVal, oldObj != nil)...)
+	}
+
+	// field batchv1.JobSpec.Selector has no validation
+	// field batchv1.JobSpec.ManualSelector has no validation
+	// field batchv1.JobSpec.Template has no validation
+	// field batchv1.JobSpec.TTLSecondsAfterFinished has no validation
+	// field batchv1.JobSpec.CompletionMode has no validation
+	// field batchv1.JobSpec.Suspend has no validation
+	// field batchv1.JobSpec.PodReplacementPolicy has no validation
+	// field batchv1.JobSpec.ManagedBy has no validation
+	return errs
+}
+
+// Validate_JobTemplateSpec validates an instance of JobTemplateSpec according
+// to declarative validation rules in the API schema.
+func Validate_JobTemplateSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.JobTemplateSpec) (errs field.ErrorList) {
+
+	// field batchv1.JobTemplateSpec.ObjectMeta has no validation
+
+	{ // field batchv1.JobTemplateSpec.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobTemplateSpec) *batchv1.JobSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }

@@ -253,6 +253,8 @@ message JobSpec {
   // It can be null or up to completions. It is required and must be
   // less than or equal to 10^4 when is completions greater than 10^5.
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
   optional int32 maxFailedIndexes = 13;
 
   // A label query over pods that should match the pod count.

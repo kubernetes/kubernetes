@@ -30,6 +30,9 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "CronJob"},
 		coverage.FieldRules{
+			"spec.jobTemplate.spec.backoffLimitPerIndex": {
+				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
 			"spec.schedule": {
 				{ErrorType: "FieldValueRequired"},
 			},
