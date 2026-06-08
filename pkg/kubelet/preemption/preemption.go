@@ -121,8 +121,10 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(ctx context.Contex
 		}
 		if len(insufficientResources) > 0 {
 			metrics.Preemptions.WithLabelValues(insufficientResources[0].resourceName.String()).Inc()
+			metrics.PreemptionsTotal.WithLabelValues(insufficientResources[0].resourceName.String()).Inc()
 		} else {
 			metrics.Preemptions.WithLabelValues("").Inc()
+			metrics.PreemptionsTotal.WithLabelValues("").Inc()
 		}
 		logger.Info("Pod evicted successfully", "pod", klog.KObj(pod))
 	}

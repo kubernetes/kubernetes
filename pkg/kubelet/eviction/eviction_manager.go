@@ -446,6 +446,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		}
 		if m.evictPod(logger, pod, gracePeriodOverride, message, annotations, condition) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
+			metrics.EvictionsTotal.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}, nil
 		}
 	}
@@ -553,6 +554,7 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 				// the emptyDir usage exceeds the size limit, evict the pod
 				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
+					metrics.EvictionsTotal.WithLabelValues(signalEmptyDirFsLimit).Inc()
 					return true
 				}
 				return false
@@ -581,6 +583,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podSt
 		message := fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String())
 		if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, message, nil, nil) {
 			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
+			metrics.EvictionsTotal.WithLabelValues(signalEphemeralPodFsLimit).Inc()
 			return true
 		}
 		return false
@@ -616,6 +619,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
 				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
+					metrics.EvictionsTotal.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
 					return true
 				}
 				return false

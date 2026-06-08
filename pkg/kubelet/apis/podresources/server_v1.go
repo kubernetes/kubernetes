@@ -61,6 +61,7 @@ func NewV1PodResourcesServer(ctx context.Context, providers PodResourcesProvider
 func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.ListPodResourcesRequest) (*podresourcesv1.ListPodResourcesResponse, error) {
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsListCount.WithLabelValues("v1").Inc()
+	metrics.PodResourcesEndpointRequestsListCountTotal.WithLabelValues("v1").Inc()
 
 	var pods []*v1.Pod
 	if p.useActivePods {
@@ -105,6 +106,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req *podresourcesv1.AllocatableResourcesRequest) (*podresourcesv1.AllocatableResourcesResponse, error) {
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsGetAllocatableCount.WithLabelValues("v1").Inc()
+	metrics.PodResourcesEndpointRequestsGetAllocatableCountTotal.WithLabelValues("v1").Inc()
 
 	response := &podresourcesv1.AllocatableResourcesResponse{
 		Devices: p.devicesProvider.GetAllocatableDevices(),
@@ -119,10 +121,12 @@ func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req 
 func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetPodResourcesRequest) (*podresourcesv1.GetPodResourcesResponse, error) {
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsGetCount.WithLabelValues("v1").Inc()
+	metrics.PodResourcesEndpointRequestsGetCountTotal.WithLabelValues("v1").Inc()
 
 	pod, exist := p.podsProvider.GetPodByName(req.PodNamespace, req.PodName)
 	if !exist {
 		metrics.PodResourcesEndpointErrorsGetCount.WithLabelValues("v1").Inc()
+		metrics.PodResourcesEndpointErrorsGetCountTotal.WithLabelValues("v1").Inc()
 		return nil, fmt.Errorf("pod %s in namespace %s not found", req.PodName, req.PodNamespace)
 	}
 

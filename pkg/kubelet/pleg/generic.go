@@ -393,6 +393,7 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 		case g.eventChannel <- events[i]:
 		default:
 			metrics.PLEGDiscardEvents.Inc()
+			metrics.PLEGDiscardEventsTotal.Inc()
 			logger.Error(nil, "Event channel is full, discard this relist() cycle event")
 		}
 		// Log exit code of containers when they finished in a particular event

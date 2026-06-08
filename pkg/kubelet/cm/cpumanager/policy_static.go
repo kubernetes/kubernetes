@@ -581,6 +581,7 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
 			if p.options.FullPhysicalCPUsOnly {
 				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+				metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 			}
 			return
 		}
@@ -588,6 +589,7 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 		if p.options.FullPhysicalCPUsOnly {
 			// increment only if we know we allocate aligned resources
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+			metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 		}
 	}()
 
@@ -1057,20 +1059,26 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 
 func (p *staticPolicy) initializeMetrics(logger logr.Logger, s state.State) {
 	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
-	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
-	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
-	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)      // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)             // ensure the value exists
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)             // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
 	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalAssignedCPUs.Size()))
+	metrics.CPUManagerExclusiveCPUsAllocation.Set(float64(totalAssignedCPUs.Size()))
 	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs)
 }
 
 func (p *staticPolicy) updateMetricsOnAllocate(logger logr.Logger, s state.State, cpuAlloc topology.Allocation) {
 	ncpus := cpuAlloc.CPUs.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(ncpus))
+	metrics.CPUManagerExclusiveCPUsAllocation.Add(float64(ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
 	if cpuAlloc.Aligned.UncoreCache {
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+		metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
 	}
 	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
 	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs)
@@ -1079,6 +1087,7 @@ func (p *staticPolicy) updateMetricsOnAllocate(logger logr.Logger, s state.State
 func (p *staticPolicy) updateMetricsOnRelease(logger logr.Logger, s state.State, cset cpuset.CPUSet) {
 	ncpus := cset.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(-ncpus))
+	metrics.CPUManagerExclusiveCPUsAllocation.Add(float64(-ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(ncpus * 1000))
 	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
 	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs.Difference(cset))
