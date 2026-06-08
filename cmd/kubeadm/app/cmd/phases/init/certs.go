@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -216,20 +217,25 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 
 		if cert, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			certsphase.CheckCertificatePeriodValidity(ca.BaseName, cert)
+			srcCertPath, srcKeyPath := pkiutil.PathsForCertAndKey(data.CertificateDir(), ca.BaseName)
+			dryRunCertPath, dryRunKeyPath := pkiutil.PathsForCertAndKey(data.CertificateWriteDir(), ca.BaseName)
 
 			// If CA Cert existed while dryrun, copy CA Cert to dryrun dir for later use
 			if data.DryRun() {
-				err := kubeadmutil.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CACertName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CACertName))
+				if err := os.MkdirAll(filepath.Dir(dryRunCertPath), os.FileMode(0700)); err != nil {
+					return errors.Wrapf(err, "failed to create directory %s", filepath.Dir(dryRunCertPath))
+				}
+				err := kubeadmutil.CopyFile(srcCertPath, dryRunCertPath)
 				if err != nil {
-					return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CACertName, data.CertificateWriteDir())
+					return errors.Wrapf(err, "could not copy %s to dry run directory %s", fmt.Sprintf("%s.crt", ca.BaseName), data.CertificateWriteDir())
 				}
 			}
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 				// If CA Key existed while dryrun, copy CA Key to dryrun dir for later use
 				if data.DryRun() {
-					err := kubeadmutil.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CAKeyName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CAKeyName))
+					err := kubeadmutil.CopyFile(srcKeyPath, dryRunKeyPath)
 					if err != nil {
-						return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CAKeyName, data.CertificateWriteDir())
+						return errors.Wrapf(err, "could not copy %s to dry run directory %s", fmt.Sprintf("%s.key", ca.BaseName), data.CertificateWriteDir())
 					}
 				}
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
