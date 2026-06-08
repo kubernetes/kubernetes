@@ -3313,9 +3313,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
 	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
 	t.Cleanup(func() {
-		ContainerLogsDir = containerLogsDir
-		err := os.RemoveAll(tempDir)
-		require.NoError(t, err)
+		cleanUpTempDir(t, tempDir, containerLogsDir)
 	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
@@ -3474,9 +3472,7 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
 	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
 	t.Cleanup(func() {
-		ContainerLogsDir = containerLogsDir
-		err := os.RemoveAll(tempDir)
-		require.NoError(t, err)
+		cleanUpTempDir(t, tempDir, containerLogsDir)
 	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
@@ -5217,4 +5213,20 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 	// We expect SyncPod to be called once by us, and once recursively via UpdatePod -> fakePodWorkers.syncPodFn
 	// because the SyncResults contained a successful RemoveContainer action.
 	require.Equal(t, 1, callCount)
+}
+
+func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {
+	t.Helper()
+	ContainerLogsDir = originalLogsDir
+	// On Windows, we might need to retry RemoveAll because concurrent goroutines
+	// (like the garbage collector) might take a moment to exit and release file/dir handles.
+	var err error
+	for range 10 {
+		err = os.RemoveAll(tempDir)
+		if err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	require.NoError(t, err)
 }
