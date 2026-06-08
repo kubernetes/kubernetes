@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
 type mockEncoder struct {
@@ -187,5 +189,58 @@ func TestCachingObjectLazyDeepCopy(t *testing.T) {
 	object.SetResourceVersion("234")
 	if object.deepCopied != true {
 		t.Errorf("object not deep-copied on change")
+	}
+}
+
+// TestCachingObjectExcludeManagedFields verifies that the full and
+// managedFields-stripped JSON serializers, which carry distinct Identifiers,
+// produce the two expected forms and are cached as separate entries on a single
+// cachingObject. Mixed opt-in/opt-out watchers therefore serialize each event at
+// most once per form.
+func TestCachingObjectExcludeManagedFields(t *testing.T) {
+	pod := loadExemplarPod(t)
+	if len(pod.ManagedFields) == 0 {
+		t.Fatalf("exemplar pod fixture has no managedFields to strip")
+	}
+	object, err := newCachingObject(pod)
+	if err != nil {
+		t.Fatalf("couldn't create cachingObject: %v", err)
+	}
+
+	full := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+	stripped := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{ExcludeManagedFields: true})
+	if full.Identifier() == stripped.Identifier() {
+		t.Fatalf("expected distinct identifiers")
+	}
+
+	encode := func(s runtime.Serializer) string {
+		var buf bytes.Buffer
+		if err := s.Encode(object, &buf); err != nil {
+			t.Fatalf("encode: %v", err)
+		}
+		return buf.String()
+	}
+	if out := encode(full); !strings.Contains(out, "managedFields") {
+		t.Errorf("full serializer should retain managedFields, got: %s", out)
+	}
+	if out := encode(stripped); strings.Contains(out, "managedFields") {
+		t.Errorf("stripped serializer should omit managedFields, got: %s", out)
+	}
+
+	// Both forms are cached as separate entries keyed by their distinct Identifiers.
+	cache := object.serializations.Load().(serializationsCache)
+	if _, ok := cache[full.Identifier()]; !ok {
+		t.Errorf("full form not cached")
+	}
+	if _, ok := cache[stripped.Identifier()]; !ok {
+		t.Errorf("stripped form not cached")
+	}
+	if len(cache) != 2 {
+		t.Errorf("expected 2 cached serializations, got %d", len(cache))
+	}
+
+	// The wrapped object must not have been mutated by stripping.
+	if len(pod.ManagedFields) == 0 {
+		t.Errorf("cached object was mutated by the stripped serializer")
 	}
 }

@@ -88,15 +88,15 @@ func BenchmarkCacherInit(b *testing.B) {
 	}
 }
 
-func loadExemplarPod(b *testing.B) *corev1.Pod {
+func loadExemplarPod(tb testing.TB) *corev1.Pod {
 	const path = "testdata/exemplar_pod.yaml"
 	data, err := os.ReadFile(path)
 	if err != nil {
-		b.Fatalf("read %q: %v", path, err)
+		tb.Fatalf("read %q: %v", path, err)
 	}
 	var pod corev1.Pod
 	if err := yaml.Unmarshal(data, &pod); err != nil {
-		b.Fatalf("decode %q: %v", path, err)
+		tb.Fatalf("decode %q: %v", path, err)
 	}
 	return &pod
 }
