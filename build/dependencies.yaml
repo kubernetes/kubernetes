@@ -72,8 +72,6 @@ dependencies:
       match: ETCD_IMAGE|ETCD_VERSION
     - path: cmd/kubeadm/app/constants/constants.go
       match: DefaultEtcdVersion =
-    - path: hack/lib/etcd.sh
-      match: ETCD_VERSION=
     - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
       match: registry.k8s.io/etcd
     - path: test/utils/image/manifest.go
