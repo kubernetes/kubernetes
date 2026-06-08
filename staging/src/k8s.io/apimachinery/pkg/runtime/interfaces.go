@@ -159,6 +159,12 @@ type SerializerInfo struct {
 	// StrictSerializer, if set, deserializes this object strictly,
 	// erring on unknown fields.
 	StrictSerializer Serializer
+	// ExcludeManagedFieldsSerializer, if set, encodes objects with
+	// metadata.managedFields omitted. It is selected during content negotiation
+	// when the client requests the "drop=metadata.managedFields" Accept parameter.
+	// Its Identifier differs from Serializer's so that runtime.CacheableObject
+	// implementations cache the stripped form separately. It only affects encoding.
+	ExcludeManagedFieldsSerializer Serializer
 	// StreamSerializer, if set, describes the streaming serialization format
 	// for this media type.
 	StreamSerializer *StreamSerializerInfo

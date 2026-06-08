@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -1087,5 +1088,100 @@ func TestRoundtripUnstructuredFractionlessFloat64(t *testing.T) {
 
 	if diff := cmp.Diff(expected, final); diff != "" {
 		t.Fatalf("unexpected diff:\n%s", diff)
+	}
+}
+
+func carpWithManagedFields() *testapigroupv1.Carp {
+	return &testapigroupv1.Carp{
+		TypeMeta: metav1.TypeMeta{APIVersion: "testapigroup.apimachinery.k8s.io/v1", Kind: "Carp"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+			ManagedFields: []metav1.ManagedFieldsEntry{{
+				Manager:    "test",
+				Operation:  metav1.ManagedFieldsOperationApply,
+				APIVersion: "v1",
+			}},
+		},
+	}
+}
+
+func TestExcludeManagedFields(t *testing.T) {
+	// Distinct identifier so cachingObject caches the stripped form separately,
+	// and the default identifier stays unchanged so existing cache entries remain valid.
+	def := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+	excl := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{ExcludeManagedFields: true})
+	if def.Identifier() == excl.Identifier() {
+		t.Errorf("expected distinct identifiers, both are %q", def.Identifier())
+	}
+	if strings.Contains(string(def.Identifier()), "excludeManagedFields") {
+		t.Errorf("default identifier changed unexpectedly: %q", def.Identifier())
+	}
+
+	// Encoding strips managedFields only when the option is set, across object
+	// shapes and encode paths, and never mutates the caller's object. The list
+	// cases cover the most common request shape on both the standard and the
+	// streaming-collections paths.
+	single := carpWithManagedFields()
+	list := &testapigroupv1.CarpList{
+		TypeMeta: metav1.TypeMeta{APIVersion: "testapigroup.apimachinery.k8s.io/v1", Kind: "CarpList"},
+		Items:    []testapigroupv1.Carp{*carpWithManagedFields(), *carpWithManagedFields()},
+	}
+	for _, tc := range []struct {
+		name              string
+		obj               runtime.Object
+		exclude           bool
+		streaming         bool
+		wantManagedFields bool
+		notMutated        func() bool
+	}{
+		{
+			name:              "default retains",
+			obj:               single,
+			exclude:           false,
+			wantManagedFields: true,
+			notMutated:        func() bool { return len(single.ManagedFields) > 0 },
+		},
+		{
+			name:              "single",
+			obj:               single,
+			exclude:           true,
+			wantManagedFields: false,
+			notMutated:        func() bool { return len(single.ManagedFields) > 0 },
+		},
+		{
+			name:              "list",
+			obj:               list,
+			exclude:           true,
+			wantManagedFields: false,
+			notMutated:        func() bool { return len(list.Items[0].ManagedFields) > 0 },
+		},
+		{
+			name:              "list streaming",
+			obj:               list,
+			exclude:           true,
+			streaming:         true,
+			wantManagedFields: false,
+			notMutated:        func() bool { return len(list.Items[0].ManagedFields) > 0 },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{
+				ExcludeManagedFields:         tc.exclude,
+				StreamingCollectionsEncoding: tc.streaming,
+			})
+			var buf bytes.Buffer
+			if err := s.Encode(tc.obj, &buf); err != nil {
+				t.Fatalf("encode: %v", err)
+			}
+			if got := strings.Contains(buf.String(), "managedFields"); got != tc.wantManagedFields {
+				t.Errorf("managedFields present=%v, want %v; output: %s", got, tc.wantManagedFields, buf.String())
+			}
+			if !strings.Contains(buf.String(), `"name":"foo"`) {
+				t.Errorf("rest of object not preserved: %s", buf.String())
+			}
+			if !tc.notMutated() {
+				t.Errorf("input was mutated by encode")
+			}
+		})
 	}
 }

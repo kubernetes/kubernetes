@@ -40,6 +40,12 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			mf, scheme, scheme,
 			json.SerializerOptions{Yaml: false, Pretty: false, Strict: true, StreamingCollectionsEncoding: options.StreamingCollectionsEncodingToJSON},
 		),
+		// Selected via the "drop=metadata.managedFields" Accept parameter. Its
+		// distinct Identifier lets the watch cache cache the stripped form separately.
+		ExcludeManagedFieldsSerializer: json.NewSerializerWithOptions(
+			mf, scheme, scheme,
+			json.SerializerOptions{Yaml: false, Pretty: false, Strict: options.Strict, StreamingCollectionsEncoding: options.StreamingCollectionsEncodingToJSON, ExcludeManagedFields: true},
+		),
 		StreamSerializer: &runtime.StreamSerializerInfo{
 			EncodesAsText: true,
 			Serializer:    jsonSerializer,
@@ -66,6 +72,20 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 	})
 	protoRawSerializer := protobuf.NewRawSerializer(scheme, scheme)
 
+	protoSerializerType := runtime.SerializerInfo{
+		MediaType:        runtime.ContentTypeProtobuf,
+		MediaTypeType:    "application",
+		MediaTypeSubType: "vnd.kubernetes.protobuf",
+		Serializer:       protoSerializer,
+		// note, strict decoding is unsupported for protobuf,
+		// fall back to regular serializing
+		StrictSerializer: protoSerializer,
+		StreamSerializer: &runtime.StreamSerializerInfo{
+			Serializer: protoRawSerializer,
+			Framer:     protobuf.LengthDelimitedFramer,
+		},
+	}
+
 	serializers := []runtime.SerializerInfo{
 		jsonSerializerType,
 		{
@@ -76,19 +96,7 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			Serializer:       yamlSerializer,
 			StrictSerializer: strictYAMLSerializer,
 		},
-		{
-			MediaType:        runtime.ContentTypeProtobuf,
-			MediaTypeType:    "application",
-			MediaTypeSubType: "vnd.kubernetes.protobuf",
-			Serializer:       protoSerializer,
-			// note, strict decoding is unsupported for protobuf,
-			// fall back to regular serializing
-			StrictSerializer: protoSerializer,
-			StreamSerializer: &runtime.StreamSerializerInfo{
-				Serializer: protoRawSerializer,
-				Framer:     protobuf.LengthDelimitedFramer,
-			},
-		},
+		protoSerializerType,
 	}
 
 	for _, f := range options.serializers {
