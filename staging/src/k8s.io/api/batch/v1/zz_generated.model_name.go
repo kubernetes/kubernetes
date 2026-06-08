@@ -57,6 +57,11 @@ func (in JobList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in JobSchedulingConfiguration) OpenAPIModelName() string {
+	return "io.k8s.api.batch.v1.JobSchedulingConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in JobSpec) OpenAPIModelName() string {
 	return "io.k8s.api.batch.v1.JobSpec"
 }

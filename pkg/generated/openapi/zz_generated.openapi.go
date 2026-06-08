@@ -420,6 +420,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		batchv1.Job{}.OpenAPIModelName():                                                                                schema_k8sio_api_batch_v1_Job(ref),
 		batchv1.JobCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_batch_v1_JobCondition(ref),
 		batchv1.JobList{}.OpenAPIModelName():                                                                            schema_k8sio_api_batch_v1_JobList(ref),
+		batchv1.JobSchedulingConfiguration{}.OpenAPIModelName():                                                         schema_k8sio_api_batch_v1_JobSchedulingConfiguration(ref),
 		batchv1.JobSpec{}.OpenAPIModelName():                                                                            schema_k8sio_api_batch_v1_JobSpec(ref),
 		batchv1.JobStatus{}.OpenAPIModelName():                                                                          schema_k8sio_api_batch_v1_JobStatus(ref),
 		batchv1.JobTemplateSpec{}.OpenAPIModelName():                                                                    schema_k8sio_api_batch_v1_JobTemplateSpec(ref),
@@ -16707,6 +16708,62 @@ func schema_k8sio_api_batch_v1_JobList(ref common.ReferenceCallback) common.Open
 	}
 }
 
+func schema_k8sio_api_batch_v1_JobSchedulingConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JobSchedulingConfiguration composes the reusable workload-aware scheduling building blocks.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"policy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Policy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set.",
+							Ref:         ref(schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"constraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Constraints defines scheduling constraints (e.g. topology) for the Job's pods.",
+							Ref:         ref(schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All.",
+							Ref:         ref(schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -16825,12 +16882,18 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 							Format:      "",
 						},
 					},
+					"scheduling": {
+						SchemaProps: spec.SchemaProps{
+							Description: "scheduling defines the Workload-aware Scheduling configuration for this Job. When omitted, the Job defaults to basic (standard pod-by-pod) scheduling. This field is alpha-level and requires the WorkloadWithJob feature gate. Once set, this field is immutable except for the Gang.MinCount.",
+							Ref:         ref(batchv1.JobSchedulingConfiguration{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
-			batchv1.PodFailurePolicy{}.OpenAPIModelName(), batchv1.SuccessPolicy{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
+			batchv1.JobSchedulingConfiguration{}.OpenAPIModelName(), batchv1.PodFailurePolicy{}.OpenAPIModelName(), batchv1.SuccessPolicy{}.OpenAPIModelName(), corev1.PodTemplateSpec{}.OpenAPIModelName(), metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 

@@ -510,6 +510,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobCondition"):
 		return &applyconfigurationsbatchv1.JobConditionApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("JobSchedulingConfiguration"):
+		return &applyconfigurationsbatchv1.JobSchedulingConfigurationApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobSpec"):
 		return &applyconfigurationsbatchv1.JobSpecApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobStatus"):

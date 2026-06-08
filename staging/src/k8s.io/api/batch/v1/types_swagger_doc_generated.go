@@ -110,6 +110,18 @@ func (JobList) SwaggerDoc() map[string]string {
 	return map_JobList
 }
 
+var map_JobSchedulingConfiguration = map[string]string{
+	"":               "JobSchedulingConfiguration composes the reusable workload-aware scheduling building blocks.",
+	"policy":         "Policy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set.",
+	"constraints":    "Constraints defines scheduling constraints (e.g. topology) for the Job's pods.",
+	"disruptionMode": "DisruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All.",
+	"resourceClaims": "ResourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.",
+}
+
+func (JobSchedulingConfiguration) SwaggerDoc() map[string]string {
+	return map_JobSchedulingConfiguration
+}
+
 var map_JobSpec = map[string]string{
 	"":                        "JobSpec describes how the job execution will look like.",
 	"parallelism":             "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
@@ -128,6 +140,7 @@ var map_JobSpec = map[string]string{
 	"suspend":                 "suspend specifies whether the Job controller should create Pods or not. If a Job is created with suspend set to true, no Pods are created by the Job controller. If a Job is suspended after creation (i.e. the flag goes from false to true), the Job controller will delete all active Pods associated with this Job. Users must design their workload to gracefully handle this. Suspending a Job will reset the StartTime field of the Job, effectively resetting the ActiveDeadlineSeconds timer too. Defaults to false.",
 	"podReplacementPolicy":    "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.",
 	"managedBy":               "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. This field is immutable.",
+	"scheduling":              "scheduling defines the Workload-aware Scheduling configuration for this Job. When omitted, the Job defaults to basic (standard pod-by-pod) scheduling. This field is alpha-level and requires the WorkloadWithJob feature gate. Once set, this field is immutable except for the Gang.MinCount.",
 }
 
 func (JobSpec) SwaggerDoc() map[string]string {

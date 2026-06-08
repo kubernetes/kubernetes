@@ -1891,7 +1891,33 @@
     "completionMode": "completionModeValue",
     "suspend": true,
     "podReplacementPolicy": "podReplacementPolicyValue",
-    "managedBy": "managedByValue"
+    "managedBy": "managedByValue",
+    "scheduling": {
+      "policy": {
+        "basic": {},
+        "gang": {
+          "minCount": 1
+        }
+      },
+      "constraints": {
+        "topology": [
+          {
+            "key": "keyValue"
+          }
+        ]
+      },
+      "disruptionMode": {
+        "single": {},
+        "all": {}
+      },
+      "resourceClaims": [
+        {
+          "name": "nameValue",
+          "resourceClaimName": "resourceClaimNameValue",
+          "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+        }
+      ]
+    }
   },
   "status": {
     "conditions": [

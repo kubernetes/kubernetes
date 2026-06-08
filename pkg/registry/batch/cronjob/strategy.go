@@ -30,11 +30,13 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/job"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
@@ -113,6 +115,16 @@ func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	cronJob := obj.(*batch.CronJob)
 	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 	return batchvalidation.ValidateCronJobCreate(cronJob, opts)
+}
+
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (cronJobStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	opts := []string{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
+		opts = append(opts, string(features.WorkloadWithJob))
+	}
+	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

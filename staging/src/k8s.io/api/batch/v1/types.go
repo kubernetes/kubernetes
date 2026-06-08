@@ -18,6 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -474,6 +475,58 @@ type JobSpec struct {
 	// This field is immutable.
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty" protobuf:"bytes,15,opt,name=managedBy"`
+
+	// scheduling defines the Workload-aware Scheduling configuration for this Job.
+	// When omitted, the Job defaults to basic (standard pod-by-pod) scheduling.
+	// This field is alpha-level and requires the WorkloadWithJob feature gate.
+	// Once set, this field is immutable except for the Gang.MinCount.
+	//
+	// +featureGate=WorkloadWithJob
+	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:ifDisabled(WorkloadWithJob)=+k8s:forbidden
+	// +k8s:ifEnabled(WorkloadWithJob)=+k8s:optional
+	Scheduling *JobSchedulingConfiguration `json:"scheduling,omitempty" protobuf:"bytes,17,opt,name=scheduling"`
+}
+
+// JobSchedulingConfiguration composes the reusable workload-aware
+// scheduling building blocks.
+type JobSchedulingConfiguration struct {
+	// Policy defines the scheduling policy for this Job.
+	// Exactly one of Basic or Gang must be set.
+	// +optional
+	// +k8s:optional
+	Policy *schedulingv1alpha3.PodGroupSchedulingPolicy `json:"policy,omitempty" protobuf:"bytes,1,opt,name=policy"`
+
+	// Constraints defines scheduling constraints (e.g. topology)
+	// for the Job's pods.
+	//
+	// +optional
+	// +k8s:optional
+	Constraints *schedulingv1alpha3.PodGroupSchedulingConstraints `json:"constraints,omitempty" protobuf:"bytes,2,opt,name=constraints"`
+
+	// DisruptionMode defines the mode in which the Job's pods can be disrupted.
+	// One of Single, All.
+	//
+	// +optional
+	// +k8s:optional
+	DisruptionMode *schedulingv1alpha3.DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
+
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the Job. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	ResourceClaims []schedulingv1alpha3.PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 }
 
 // JobStatus represents the current state of a Job.

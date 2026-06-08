@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/utils/ptr"
 )
 
@@ -2564,6 +2565,101 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.template.spec",
 			},
 		},
+		"unchanged scheduling is valid": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:   validGeneratedSelector,
+					Template:   validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}},
+				},
+			},
+			update: func(job *batch.Job) {},
+		},
+		"gang minCount change is allowed": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:   validGeneratedSelector,
+					Template:   validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}}},
+				},
+			},
+			update: func(job *batch.Job) { job.Spec.Scheduling.Policy.Gang.MinCount = 8 },
+		},
+		"adding scheduling after creation is allowed": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling = &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}}
+			},
+		},
+		"removing scheduling is immutable": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:   validGeneratedSelector,
+					Template:   validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}},
+				},
+			},
+			update: func(job *batch.Job) { job.Spec.Scheduling = nil },
+			err:    field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
+		},
+		"immutable scheduling: switch basic to gang": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:   validGeneratedSelector,
+					Template:   validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.Policy = &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}}
+			},
+			err: field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
+		},
+		"immutable scheduling: change constraints": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{
+						Policy:      &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}},
+						Constraints: &scheduling.PodGroupSchedulingConstraints{Topology: []scheduling.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}}},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.Constraints = &scheduling.PodGroupSchedulingConstraints{Topology: []scheduling.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}}}
+			},
+			err: field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
+		},
+		"immutable scheduling: change disruptionMode while changing minCount": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{
+						Policy:         &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 4}},
+						DisruptionMode: &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.Policy.Gang.MinCount = 8
+				job.Spec.Scheduling.DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
+			},
+			err: field.Invalid(field.NewPath("spec", "scheduling"), nil, ""),
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
@@ -3314,6 +3410,75 @@ func TestValidateCronJob(t *testing.T) {
 				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 					t.Errorf("unexpected error: %v, expected: %s", err, k)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateCronJobSchedulingUpdate(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+	mkCronJob := func(sched *batch.JobSchedulingConfiguration) batch.CronJob {
+		cj := batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate:       batch.JobTemplateSpec{Spec: batch.JobSpec{Template: validPodTemplateSpec}},
+			},
+		}
+		cj.Spec.JobTemplate.Spec.Scheduling = sched
+		return cj
+	}
+	basic := func() *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}}}
+	}
+	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: minCount}}}
+	}
+
+	cases := map[string]struct {
+		old    *batch.JobSchedulingConfiguration
+		update *batch.JobSchedulingConfiguration
+		err    *field.Error
+	}{
+		"unchanged is valid": {
+			old:    basic(),
+			update: basic(),
+		},
+		"gang minCount change is allowed": {
+			old:    gang(4),
+			update: gang(8),
+		},
+		"adding scheduling after creation is allowed": {
+			old:    nil,
+			update: basic(),
+		},
+		"removing scheduling is immutable": {
+			old:    basic(),
+			update: nil,
+			err:    field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "scheduling"), nil, ""),
+		},
+		"immutable policy: switch basic to gang": {
+			old:    basic(),
+			update: gang(4),
+			err:    field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "scheduling"), nil, ""),
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for k, tc := range cases {
+		t.Run(k, func(t *testing.T) {
+			old := mkCronJob(tc.old)
+			old.ResourceVersion = "1"
+			update := mkCronJob(tc.update)
+			update.ResourceVersion = "2"
+			errs := ValidateCronJobUpdate(&update, &old, corevalidation.PodValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
 	}
