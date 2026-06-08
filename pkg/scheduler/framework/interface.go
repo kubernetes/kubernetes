@@ -159,8 +159,8 @@ func NewPodsToActivate() *PodsToActivate {
 type SortedScoredNodes interface {
 	Pop() fwk.NodePluginScores
 	Len() int
-	// List returns all nodes in heap-internal order (not sorted by score).
-	List() []fwk.NodePluginScores
+	// UnorderedList returns all nodes in heap-internal order (not sorted by score).
+	UnorderedList() []fwk.NodePluginScores
 }
 
 // PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group

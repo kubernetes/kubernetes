@@ -180,7 +180,7 @@ func (t *testSortedScoredNodes) Len() int {
 	return len(t.Nodes)
 }
 
-func (t *testSortedScoredNodes) List() []fwk.NodePluginScores {
+func (t *testSortedScoredNodes) UnorderedList() []fwk.NodePluginScores {
 	result := make([]fwk.NodePluginScores, len(t.Nodes))
 	for i, name := range t.Nodes {
 		result[i] = fwk.NodePluginScores{Name: name}

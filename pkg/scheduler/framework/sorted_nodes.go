@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,8 +43,8 @@ func (s *sortedNodeScores) Len() int {
 	return s.nodes.Len()
 }
 
-// List returns a snapshot of all nodes. The ordering is heap-internal and not sorted.
-func (s *sortedNodeScores) List() []fwk.NodePluginScores {
+// UnorderedList returns all nodes in heap-internal order (not sorted by score).
+func (s *sortedNodeScores) UnorderedList() []fwk.NodePluginScores {
 	result := make([]fwk.NodePluginScores, len(s.nodes))
 	copy(result, s.nodes)
 	return result

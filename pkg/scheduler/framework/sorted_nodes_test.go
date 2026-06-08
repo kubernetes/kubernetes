@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -177,7 +177,7 @@ func TestSortedScoredNodes_List(t *testing.T) {
 			for range tc.popCount {
 				s.Pop()
 			}
-			got := s.List()
+			got := s.UnorderedList()
 			if diff := cmp.Diff(tc.expected, got, sortByName, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("List() mismatch (-want +got):\n%s", diff)
 			}
