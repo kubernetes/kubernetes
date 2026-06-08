@@ -109,6 +109,14 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		ctx:             ctx,
 	}
 
+	// Reuse a pooled buffer for this encode instead of allocating fresh memory per
+	// item, releasing it once the encode finishes. Parity with the watch path (watch.go).
+	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
+		memoryAllocator := runtime.AllocatorPool.Get().(*runtime.Allocator)
+		defer runtime.AllocatorPool.Put(memoryAllocator)
+		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+	}
+
 	err := encoder.Encode(object, w)
 	if err == nil {
 		err = w.Close()
