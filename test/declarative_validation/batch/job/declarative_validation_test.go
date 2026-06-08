@@ -17,7 +17,6 @@ limitations under the License.
 package job
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,33 +35,20 @@ import (
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "batch",
-				APIVersion: apiVersion,
-				Resource:   "jobs",
-			})
-			job := mkJob()
-			meta.RunObjectMetaTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
-			testDeclarativeValidate(t, ctx, apiVersion)
+			testDeclarativeValidate(t, apiVersion)
 		})
 	}
 }
 
-func TestDeclarativeValidateUpdate(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "batch",
-				APIVersion: apiVersion,
-				Resource:   "jobs",
-			})
-			job := mkJob()
-			meta.RunObjectMetaUpdateTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
-		})
-	}
-}
+func testDeclarativeValidate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "batch",
+		APIVersion:        apiVersion,
+		Resource:          "jobs",
+		IsResourceRequest: true,
+		Verb:              "create",
+	})
 
-func testDeclarativeValidate(t *testing.T, ctx context.Context, apiVersion string) {
 	testCases := map[string]struct {
 		input        batch.Job
 		expectedErrs field.ErrorList
@@ -99,6 +85,66 @@ func testDeclarativeValidate(t *testing.T, ctx context.Context, apiVersion strin
 		t.Run(k, func(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
+		job := mkJob()
+		meta.RunObjectMetaTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "batch",
+		APIVersion:        apiVersion,
+		Resource:          "jobs",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+
+	testCases := map[string]struct {
+		input        batch.Job
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkJob(),
+		},
+		"maxFailedIndexes and backoffLimitPerIndex both set": {
+			input: mkJob(
+				tweakMaxFailedIndexes(ptr.To[int32](5)),
+				tweakBackoffLimitPerIndex(ptr.To[int32](1)),
+			),
+		},
+		"maxFailedIndexes set without backoffLimitPerIndex": {
+			input: mkJob(tweakMaxFailedIndexes(ptr.To[int32](5))),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+			},
+		},
+		"valid toleration key": {
+			input: mkJob(tweakTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
+		},
+		"valid toleration key without prefix": {
+			input: mkJob(tweakTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
+		},
+		"invalid toleration key format": {
+			input: mkJob(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+		job := mkJob()
+		meta.RunObjectMetaTestCases(t, ctx, &job, registry.Strategy, meta.WithStringentFinalizerValidation())
 	}
 }
 
