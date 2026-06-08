@@ -62,15 +62,14 @@ var exceptionMetrics = []string{
 	"endpoint_slice_mirroring_controller_changes",                      // counter metrics should have "_total" suffix
 
 	// kubelet
-	"kubelet_pod_resize_duration_milliseconds",                   // use base unit "seconds" instead of "milliseconds"
-	"resource_manager_container_assignments",                     // counter metrics should have "_total" suffix
-	"kubelet_container_aligned_compute_resources_count",          // counter metrics should have "_total" suffix
-	"kubelet_container_aligned_compute_resources_failure_count",  // counter metrics should have "_total" suffix
-	"kubelet_cpu_manager_exclusive_cpu_allocation_count",         // non-histogram and non-summary metrics should not have "_count" suffix
-	"kubelet_credential_provider_plugin_errors",                  // counter metrics should have "_total" suffix
-	"kubelet_evented_pleg_connection_error_count",                // counter metrics should have "_total" suffix
-	"kubelet_evented_pleg_connection_success_count",              // counter metrics should have "_total" suffix
-	"kubelet_evictions",                                          //counter metrics should have "_total" suffix
+	"kubelet_pod_resize_duration_milliseconds",                  // use base unit "seconds" instead of "milliseconds"
+	"resource_manager_container_assignments",                    // counter metrics should have "_total" suffix
+	"kubelet_container_aligned_compute_resources_count",         // counter metrics should have "_total" suffix
+	"kubelet_container_aligned_compute_resources_failure_count", // counter metrics should have "_total" suffix
+	"kubelet_cpu_manager_exclusive_cpu_allocation_count",        // non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_evented_pleg_connection_error_count",               // counter metrics should have "_total" suffix
+	"kubelet_evented_pleg_connection_success_count",             // counter metrics should have "_total" suffix
+	"kubelet_evictions",                                          // counter metrics should have "_total" suffix
 	"kubelet_pleg_discard_events",                                // counter metrics should have "_total" suffix
 	"kubelet_pod_resources_endpoint_errors_get",                  // counter metrics should have "_total" suffix
 	"kubelet_pod_resources_endpoint_errors_get_allocatable",      // counter metrics should have "_total" suffix
