@@ -54,6 +54,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "schedule"), "").MarkAlpha(),
 			},
 		},
+		"jobTemplate.spec.maxFailedIndexes set without backoffLimitPerIndex": {
+			input: mkCronJob(tweakJobTemplateMaxFailedIndexes(ptr.To[int32](5))),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "jobTemplate", "spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.maxFailedIndexes and backoffLimitPerIndex both set": {
+			input: mkCronJob(
+				tweakJobTemplateMaxFailedIndexes(ptr.To[int32](5)),
+				tweakJobTemplateBackoffLimitPerIndex(ptr.To[int32](1)),
+			),
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -119,6 +131,18 @@ func mkCronJob(mutators ...func(*batch.CronJob)) batch.CronJob {
 func tweakSchedule(schedule string) func(*batch.CronJob) {
 	return func(job *batch.CronJob) {
 		job.Spec.Schedule = schedule
+	}
+}
+
+func tweakJobTemplateMaxFailedIndexes(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.MaxFailedIndexes = v
+	}
+}
+
+func tweakJobTemplateBackoffLimitPerIndex(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.BackoffLimitPerIndex = v
 	}
 }
 
