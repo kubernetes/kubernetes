@@ -2207,7 +2207,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
 		if errors.As(err, &volumeAttachLimitErr) {
 			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
-			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
+			observeAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
 			return true, nil, nil
 		}
 		if !wait.Interrupted(err) {
@@ -2599,14 +2599,14 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
 	logger := klog.FromContext(ctx)
 	kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, reason, "%s", message)
-	kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+	kl.statusManager.SetPodRejected(logger, pod, v1.PodStatus{
 		QOSClass: v1qos.GetPodQOS(pod), // keep it as is
 		Phase:    v1.PodFailed,
 		Reason:   reason,
 		Message:  "Pod was rejected: " + message})
 }
 
-func recordAdmissionRejection(reason string) {
+func observeAdmissionRejection(reason string) {
 	// It is possible that the "reason" label can have high cardinality.
 	// To avoid this metric from exploding, we create an allowlist of known
 	// reasons, and only record reasons from this list. Use "Other" reason
@@ -2885,7 +2885,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				// repeatedly during a resize, which would inflate the metric.
 				// Instead, we record the metric here in HandlePodAdditions for new pods
 				// and capture resize events separately.
-				recordAdmissionRejection(reason)
+				observeAdmissionRejection(reason)
 				continue
 			}
 
@@ -2899,6 +2899,15 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				}
 			}
 		}
+
+		// Skip pods rejected during this kubelet session.
+		// After restart, previously rejected pods may enter pod_workers, but they
+		// will be immediately marked as terminated because their pod cache is empty
+		// (no containers were ever created), so they won't affect resource accounting.
+		if kl.statusManager.IsPodRejected(pod.UID) {
+			continue
+		}
+
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
@@ -2969,6 +2978,18 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
 				}
 			}
+		}
+
+		// Skip rejected pods during UPDATE operations.
+		// Pods always arrive as ADD before UPDATE (enforced by the config layer).
+		// If a pod failed admission in HandlePodAdditions, it was rejected and
+		// never sent to pod_workers. UPDATE operations for such pods should be
+		// ignored because:
+		// 1. No containers exist - nothing to sync or clean up
+		// 2. The pod is already in terminal Failed state
+		// 3. REMOVE operation will eventually clean up podManager
+		if kl.statusManager.IsPodRejected(pod.UID) {
+			continue
 		}
 
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
