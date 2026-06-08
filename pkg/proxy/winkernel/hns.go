@@ -59,7 +59,15 @@ var (
 )
 
 const (
-	errorCodeHnsNotRunning     = "0x6b5"
+
+	// 0x6b5 is a standard Win32 RPC error (RPC_S_UNKNOWN_IF).
+	// It is returned by the RPC runtime when the target service's
+	// RPC interface is not registered. In this context, it typically
+	// indicates that the HNS service is not running or not yet initialized.
+	errorCodeHnsNotRunning = "0x6b5"
+
+	// 0xb7 (ERROR_ALREADY_EXISTS): Object already exists.
+	// Returned when attempting to create a resource that already exists.
 	errorCodeFileAlreadyExists = "0xb7"
 )
 
@@ -418,7 +426,7 @@ func (hns hns) createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalanc
 		}
 		existingLbID := findExistingLBIdByFrontend(proposedLB, existingLBs)
 		if existingLbID != "" {
-			klog.V(1).InfoS("Retrying create load balancer again", "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+			klog.V(1).InfoS("Deleting matching load balancer and retrying create load balancer again", "existingLBID", existingLbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
 			err = hns.deleteLoadBalancer(existingLbID)
 			if err != nil {
 				klog.V(1).InfoS("Failed to delete existing load balancer", "lbID", existingLbID, "error", err)
