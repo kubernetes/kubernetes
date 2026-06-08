@@ -588,6 +588,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
 			ReconstructedVolume: actualStateOfWorld.IsVolumeReconstructed(volumeToMount.VolumeName, volumeToMount.PodName),
+			IsRemount:           isRemount,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
