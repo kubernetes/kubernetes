@@ -138,12 +138,7 @@ var (
 )
 
 // NewCmdAnnotate creates the `annotate` command
-func NewCmdAnnotate(
-	parent string,
-	f cmdutil.Factory,
-	restClientGetter genericclioptions.RESTClientGetter,
-	streams genericiooptions.IOStreams,
-) *cobra.Command {
+func NewCmdAnnotate(parent string, f cmdutil.Factory, restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewAnnotateFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
@@ -173,11 +168,9 @@ func (flags *AnnotateFlags) AddFlags(cmd *cobra.Command, ioStreams genericioopti
 
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.FieldManager, "kubectl-annotate")
-	cmd.Flags().
-		BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&flags.List, "list", flags.List, "If true, display the annotations for a given resource.")
-	cmd.Flags().
-		StringVar(&flags.ResourceVersion, "resource-version", flags.ResourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().StringVar(&flags.ResourceVersion, "resource-version", flags.ResourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 }
 
 // ToOptions converts from CLI inputs to runtime inputs.
@@ -248,9 +241,7 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 			return nil, fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 		}
 		if len(resources) > 0 {
-			return nil, fmt.Errorf(
-				"can only use local files by -f rsrc.yaml or --filename=rsrc.json when --local=true is set",
-			)
+			return nil, fmt.Errorf("can only use local files by -f rsrc.yaml or --filename=rsrc.json when --local=true is set")
 		}
 		if cmdutil.IsFilenameSliceEmpty(filenameOptions.Filenames, filenameOptions.Kustomize) {
 			return nil, fmt.Errorf("one or more files must be specified as -f rsrc.yaml or --filename=rsrc.json")
@@ -386,10 +377,7 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 		}
 	}
 	if modifyRemoveBuf.Len() > 0 {
-		return fmt.Errorf(
-			"can not both modify and remove the following annotation(s) in the same command: %s",
-			modifyRemoveBuf.String(),
-		)
+		return fmt.Errorf("can not both modify and remove the following annotation(s) in the same command: %s", modifyRemoveBuf.String())
 	}
 
 	return nil
