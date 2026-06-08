@@ -34,20 +34,22 @@ func init() {
 }
 
 type subfieldTagValidator struct {
-	validator TagValidationExtractor
+	validator              TagValidationExtractor
+	processedShortCircuits map[string]bool
 }
 
 func (stv *subfieldTagValidator) Init(cfg Config) {
 	stv.validator = cfg.TagValidator
+	stv.processedShortCircuits = make(map[string]bool)
 }
 
-func (subfieldTagValidator) TagName() string {
+func (*subfieldTagValidator) TagName() string {
 	return subfieldTagName
 }
 
 var subfieldTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
-func (subfieldTagValidator) ValidScopes() sets.Set[Scope] {
+func (*subfieldTagValidator) ValidScopes() sets.Set[Scope] {
 	return subfieldTagValidScopes
 }
 
@@ -55,7 +57,7 @@ var (
 	validateSubfield = types.Name{Package: libValidationPkg, Name: "Subfield"}
 )
 
-func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
@@ -116,12 +118,58 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 		equivArg = Identifier(validateSemanticDeepEqual)
 	}
 
+	var combinedValidations Validations
+	key := subContext.Path.String()
+	// Extract and copy the subfield's own short-circuit validations (e.g. required
+	// or immutable) once per subfield path. Since multiple subfield validations can
+	// target the same field, doing this for all tags would emit duplicate validations.
+	if !stv.processedShortCircuits[key] {
+		stv.processedShortCircuits[key] = true
+		isOpaque := false
+		if ve, ok := stv.validator.(ValidationExtractor); ok {
+			var err error
+			checkOpaque := func(comments []string) (bool, error) {
+				tags, err := ve.ExtractTags(context, comments)
+				if err != nil {
+					return false, err
+				}
+				return util.HasTag(tags, opaqueTypeTagName), nil
+			}
+
+			if context.Member != nil {
+				isOpaque, err = checkOpaque(context.Member.CommentLines)
+				if err != nil {
+					return Validations{}, err
+				}
+			}
+			if !isOpaque && context.Type != nil {
+				isOpaque, err = checkOpaque(context.Type.CommentLines)
+				if err != nil {
+					return Validations{}, err
+				}
+			}
+
+			if !isOpaque {
+				tags, err := ve.ExtractTags(subContext, submemb.CommentLines)
+				if err != nil {
+					return Validations{}, err
+				}
+				memberValidations, err := ve.ExtractValidations(subContext, tags...)
+				if err != nil {
+					return Validations{}, err
+				}
+				combinedValidations.Add(copyShortCircuitsAsNonError(memberValidations))
+			}
+		}
+	}
+
 	validations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}
+	combinedValidations.Add(validations)
 
-	mapped := WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
+	mapped := WrapFunctions(combinedValidations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
 		// This functions will be emitted without cohort, like Union validations.
 		if scope == ParentContext {
 			return fn
@@ -142,7 +190,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	return mapped, nil
 }
 
-func (stv subfieldTagValidator) Docs() TagDoc {
+func (stv *subfieldTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            stv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
@@ -161,4 +209,27 @@ func (stv subfieldTagValidator) Docs() TagDoc {
 		PayloadsType:     codetags.ValueTypeTag,
 		PayloadsRequired: true,
 	}
+}
+
+// copyShortCircuitsAsNonError recursively traverses the validations (and deferred ones)
+// and returns a new Validations object containing only the functions that have
+// ShortCircuit flag set. The returned functions are also marked as NonError.
+func copyShortCircuitsAsNonError(v Validations) Validations {
+	res := Validations{}
+	for _, fn := range v.Functions {
+		if fn.Flags.IsSet(ShortCircuit) {
+			fn.Flags |= NonError
+			res.AddFunction(fn)
+		}
+	}
+	for _, d := range v.Deferred {
+		res.AddDeferred(Deferred(d.Scope, func() (Validations, error) {
+			inner, err := d.Callback()
+			if err != nil {
+				return Validations{}, err
+			}
+			return copyShortCircuitsAsNonError(inner), nil
+		}))
+	}
+	return res
 }
