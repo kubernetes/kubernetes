@@ -44,7 +44,7 @@ function git_find() {
 # We need to find right gofmt, otherwise the one in PATH will be used.
 gofmt="$(go env GOROOT)/bin/gofmt"
 if [[ ! -x "${gofmt}" ]]; then
-kube::log::error 'Failed to find gofmt under GOTOOLCHAIN'
+  echo "Failed to find $gofmt" >&2
   exit 1
 fi
 
