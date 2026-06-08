@@ -666,6 +666,126 @@ func TestNewFrameworkErrors(t *testing.T) {
 	}
 }
 
+func TestNewFramework_PlacementFeasible(t *testing.T) {
+	tests := []struct {
+		name                       string
+		genericWorkloadEnabled     bool
+		registerGangScheduling     bool
+		placementFeasibleFulfilled bool
+		wantErr                    string
+		wantPlacementFeasible      bool
+	}{
+		{
+			name:                       "GenericWorkload enabled, GangScheduling does not fulfill PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     true,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: false,
+			wantErr:                    "GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface",
+		},
+		{
+			name:                       "GenericWorkload disabled, GangScheduling does not fulfill PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     false,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: false,
+			wantPlacementFeasible:      false,
+		},
+		{
+			name:                   "GenericWorkload enabled, GangScheduling plugin not present",
+			genericWorkloadEnabled: true,
+			registerGangScheduling: false,
+			wantPlacementFeasible:  false,
+		},
+		{
+			name:                       "GenericWorkload enabled, GangScheduling fulfills PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     true,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: true,
+			wantPlacementFeasible:      true,
+		},
+		{
+			name:                       "GenericWorkload disabled, GangScheduling fulfills PlacementFeasiblePlugin interface",
+			genericWorkloadEnabled:     false,
+			registerGangScheduling:     true,
+			placementFeasibleFulfilled: true,
+			wantPlacementFeasible:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.genericWorkloadEnabled,
+			})
+
+			_, ctx := ktesting.NewTestContext(t)
+
+			registry := Registry{}
+			profile := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{},
+			}
+
+			if tc.registerGangScheduling {
+				err := registry.Register(names.GangScheduling, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					if tc.placementFeasibleFulfilled {
+						return &mockGangSchedulingWithPlacementFeasible{}, nil
+					}
+					return &mockGangScheduling{}, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to register GangScheduling plugin: %v", err)
+				}
+				profile.Plugins.MultiPoint = config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: names.GangScheduling},
+					},
+				}
+			}
+
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+
+			if len(tc.wantErr) > 0 {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			placementFeasiblePlugins := f.(*frameworkImpl).placementFeasiblePlugins
+			if tc.wantPlacementFeasible {
+				if len(placementFeasiblePlugins) != 1 || placementFeasiblePlugins[0].Name() != names.GangScheduling {
+					t.Errorf("Expected GangScheduling plugin in placementFeasiblePlugins, got: %v", placementFeasiblePlugins)
+				}
+			} else {
+				if len(placementFeasiblePlugins) != 0 {
+					t.Errorf("Expected empty placementFeasiblePlugins, got: %v", placementFeasiblePlugins)
+				}
+			}
+		})
+	}
+}
+
+type mockGangScheduling struct{}
+
+func (m *mockGangScheduling) Name() string {
+	return names.GangScheduling
+}
+
+var _ fwk.Plugin = &mockGangScheduling{}
+
+type mockGangSchedulingWithPlacementFeasible struct {
+	mockGangScheduling
+}
+
+func (p *mockGangSchedulingWithPlacementFeasible) PlacementFeasible(_ context.Context, _ fwk.PlacementCycleState, _ fwk.PodGroupInfo) *fwk.Status {
+	return nil
+}
+
+var _ framework.PlacementFeasiblePlugin = &mockGangSchedulingWithPlacementFeasible{}
+
 func TestPodGroupPostFilterPlugins(t *testing.T) {
 	tests := []struct {
 		name                   string
