@@ -1,0 +1,26 @@
+linters:
+  enable:
+    - errcheck
+    - errorlint
+    - gocritic
+    - gosec
+    - gosimple
+    - govet
+    - gci
+    - misspell
+    - nonamedreturns
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/vishvananda)
+
+run:
+  timeout: 5m

@@ -1,0 +1,805 @@
+/*
+Copyright 2015 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cacher
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/api/apitesting"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
+	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
+)
+
+func init() {
+	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
+	utilruntime.Must(example.AddToScheme(scheme))
+	utilruntime.Must(examplev1.AddToScheme(scheme))
+}
+
+// GetPodAttrs returns labels and fields of a given object for filtering purposes.
+func GetPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod, ok := obj.(*example.Pod)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a pod")
+	}
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+}
+
+// PodToSelectableFields returns a field set that represents the object
+// TODO: fields are not labels, and the validation rules for them do not apply.
+func PodToSelectableFields(pod *example.Pod) fields.Set {
+	// The purpose of allocation with a given number of elements is to reduce
+	// amount of allocations needed to create the fields.Set. If you add any
+	// field here or the number of object-meta related fields changes, this should
+	// be adjusted.
+	podSpecificFieldsSet := make(fields.Set, 5)
+	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
+	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
+	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
+	return AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
+}
+
+func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, hasNamespaceField bool) fields.Set {
+	source["metadata.name"] = objectMeta.Name
+	if hasNamespaceField {
+		source["metadata.namespace"] = objectMeta.Namespace
+	}
+	return source
+}
+
+func checkStorageInvariants(ctx context.Context, t *testing.T, key string) {
+	// No-op function since cacher simply passes object creation to the underlying storage.
+}
+
+func TestCreate(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCreate(ctx, t, cacher, checkStorageInvariants)
+}
+
+func TestCreateWithTTL(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCreateWithTTL(ctx, t, cacher)
+}
+
+func TestCreateWithKeyExist(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCreateWithKeyExist(ctx, t, cacher)
+}
+
+func TestGet(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGet(ctx, t, cacher)
+}
+
+func TestUnconditionalDelete(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestUnconditionalDelete(ctx, t, cacher)
+}
+
+func TestConditionalDelete(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestConditionalDelete(ctx, t, cacher)
+}
+
+func TestDeleteWithSuggestion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestion(ctx, t, cacher)
+}
+
+func TestDeleteWithSuggestionAndConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, cacher)
+}
+
+func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, cacher)
+}
+
+func TestValidateDeletionWithSuggestion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
+}
+
+func TestValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
+}
+
+func TestDeleteWithConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
+}
+
+type testTransformer struct {
+	value.Transformer
+	fail atomic.Bool
+}
+
+func (tt *testTransformer) setFailing(c bool) {
+	tt.fail.Store(c)
+}
+
+func (tt *testTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	if tt.fail.Load() {
+		return nil, false, errors.New("synthetic error")
+	}
+	return tt.Transformer.TransformFromStorage(ctx, data, dataCtx)
+}
+
+type testCodec struct {
+	runtime.Codec
+	fail atomic.Bool
+}
+
+func (tc *testCodec) setFailing(c bool) {
+	tc.fail.Store(c)
+}
+
+func (tc *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	if tc.fail.Load() {
+		return nil, nil, errors.New("synthetic error")
+	}
+	return tc.Codec.Decode(data, defaults, into)
+}
+
+func TestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
+	ctx, s, _ := testSetup(t, withTransformer(transformer))
+
+	storagetesting.RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx, t, s, transformer.setFailing)
+}
+
+func TestDeleteWithConflictAndExpectedTransformError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
+	ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
+	t.Cleanup(terminate)
+
+	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, cacher, transformer.setFailing)
+}
+
+func TestDeleteWithConflictAndExpectedDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	// Decode errors cause a panic when they occur during tests. Disable for this particular
+	// test since it is deliberately exercising a case where the stored bytes cannot be decoded.
+	etcd3.TestOnlySetFatalOnDecodeError(t, false)
+
+	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	ctx, cacher, terminate := testSetup(t, withCodec(codec))
+	t.Cleanup(terminate)
+
+	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, cacher, codec.setFailing)
+}
+
+func TestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx, t, cacher)
+}
+
+func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
+}
+
+func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
+}
+
+func TestListPaging(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListPaging(ctx, t, cacher)
+}
+
+func TestLists(t *testing.T) {
+	for _, listFromCacheSnapshot := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
+			t.Run("List", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestList(ctx, t, cacher, compactStore(cacher, server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
+			})
+
+			t.Run("ConsistentList", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), true, true, listFromCacheSnapshot)
+			})
+
+			t.Run("GetListNonRecursive", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
+			})
+		})
+	}
+}
+
+func TestCompactRevision(t *testing.T) {
+	// Test requires store to observe extenal changes to compaction revision, requiring dedicated watch on compact key which is enabled by ListFromCacheSnapshot.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
+}
+
+func TestMarkConsistent(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+
+	t.Log("New cache collects snapshots, list skips etcd")
+	resourceVersion1 := createObject(t, ctx, cacher)
+	etcdRequests := etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 2 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 2, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Inconsistent cache clears old snapshots, list hits etcd")
+	cacher.cacher.MarkConsistent(false)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 0 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Inconsistent cache doesn't collect new snapshot, list hits etcd")
+	resourceVersion2 := createObject(t, ctx, cacher)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion2,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 0 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Marking cache consistent allows it to collect new snapshots, list skips etcd")
+	cacher.cacher.MarkConsistent(true)
+	resourceVersion3 := createObject(t, ctx, cacher)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion3,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 1 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 1, cacher.cacher.watchCache.snapshots.Len())
+	}
+}
+
+func createObject(t *testing.T, ctx context.Context, store storage.Interface) string {
+	var out example.Pod
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: rand.String(10)}}
+	err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out.ResourceVersion
+}
+
+func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface, recorder *storagetesting.KubernetesRecorder, opts storage.ListOptions) []storagetesting.RecordedList {
+	key := rand.String(10)
+	listCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, key)
+	listOut := &example.PodList{}
+	if err := store.GetList(listCtx, "/pods/", opts, listOut); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	return recorder.ListRequestForKey(key)
+}
+
+func TestGetListRecursivePrefix(t *testing.T) {
+	ctx, store, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
+}
+
+func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
+	// No-op function for now, since cacher passes pagination calls to underlying storage.
+}
+
+func TestListContinuation(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListContinuation(ctx, t, cacher, checkStorageCalls)
+}
+
+func TestListPaginationRareObject(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListPaginationRareObject(ctx, t, cacher, checkStorageCalls)
+}
+
+func TestListContinuationWithFilter(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestListContinuationWithFilter(ctx, t, cacher, checkStorageCalls)
+}
+
+func TestListInconsistentContinuation(t *testing.T) {
+	// TODO(#109831): Enable use of this by setting compaction.
+}
+
+func TestListResourceVersionMatch(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestNamespaceScopedList(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
+	t.Cleanup(terminate)
+	storagetesting.RunTestNamespaceScopedList(ctx, t, cacher)
+}
+
+func TestGuaranteedUpdate(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestGuaranteedUpdateWithTTL(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
+}
+
+func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestGuaranteedUpdateWithConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, cacher)
+}
+
+func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, cacher)
+}
+
+func TestTransformationFailure(t *testing.T) {
+	// TODO(#109831): Enable use of this test and run it.
+}
+
+func TestStats(t *testing.T) {
+	for _, sizeBasedListCostEstimate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v", sizeBasedListCostEstimate), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedListCostEstimate)
+			ctx, cacher, terminate := testSetup(t)
+			t.Cleanup(terminate)
+			storagetesting.RunTestStats(ctx, t, cacher, examplev1ProtoCodec, identity.NewEncryptCheckTransformer(), sizeBasedListCostEstimate)
+		})
+	}
+}
+func TestKeySchema(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestKeySchema(ctx, t, cacher)
+}
+
+func TestWatch(t *testing.T) {
+	t.Run("Watch", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatch(ctx, t, cacher)
+	})
+	t.Run("WatchFromZero", func(t *testing.T) {
+		ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatch(cacher, server.V3Client.Client))
+	})
+	t.Run("DeleteTriggerWatch", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
+	})
+	t.Run("WatchFromNonZero", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
+	})
+	t.Run("DelayedWatchDelivery", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
+	})
+	t.Run("WatchError", func(t *testing.T) {
+		// TODO(#109831): Enable use of this test and run it.
+	})
+	t.Run("WatchContextCancel", func(t *testing.T) {
+		// TODO(#109831): Enable use of this test and run it.
+	})
+	t.Run("WatcherTimeout", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
+	})
+	t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
+	})
+	t.Run("WatchInitializationSignal", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
+	})
+	t.Run("ClusterScopedWatch", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
+		t.Cleanup(terminate)
+		storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
+	})
+	t.Run("NamespaceScopedWatch", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
+		t.Cleanup(terminate)
+		storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
+	})
+	t.Run("WatchDispatchBookmarkEvents", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
+	})
+	t.Run("WatchBookmarksWithCorrectResourceVersion", func(t *testing.T) {
+		ctx, cacher, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
+	})
+	t.Run("SendInitialEventsBackwardCompatibility", func(t *testing.T) {
+		ctx, store, terminate := testSetup(t)
+		t.Cleanup(terminate)
+		storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+	})
+	t.Run("WatchSemantics", func(t *testing.T) {
+		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+		t.Cleanup(terminate)
+		storagetesting.RunWatchSemantics(context.TODO(), t, store)
+	})
+	t.Run("WatchSemanticInitialEventsExtended", func(t *testing.T) {
+		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+		t.Cleanup(terminate)
+		storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
+	})
+	t.Run("WatchListMatchSingle", func(t *testing.T) {
+		store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+		t.Cleanup(terminate)
+		storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)
+	})
+}
+
+// ===================================================
+// Test-setup related function are following.
+// ===================================================
+
+type tearDownFunc func()
+
+type setupOptions struct {
+	resourcePrefix string
+	keyFunc        func(runtime.Object) (string, error)
+	indexerFuncs   map[string]storage.IndexerFunc
+	indexers       cache.Indexers
+	clock          clock.WithTicker
+	codec          runtime.Codec
+	transformer    value.Transformer
+}
+
+type setupOption func(*setupOptions)
+
+func withDefaults(options *setupOptions) {
+	prefix := "/pods/"
+
+	options.resourcePrefix = prefix
+	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
+	options.clock = clock.RealClock{}
+	options.codec = examplev1ProtoCodec
+	options.transformer = identity.NewEncryptCheckTransformer()
+}
+
+func withClusterScopedKeyFunc(options *setupOptions) {
+	options.keyFunc = func(obj runtime.Object) (string, error) {
+		return storage.NoNamespaceKeyFunc(options.resourcePrefix, obj)
+	}
+}
+
+// mirror indexer configuration from pkg/registry/core/pod/strategy.go
+func withNodeNameAndNamespaceIndex(options *setupOptions) {
+	options.indexerFuncs = map[string]storage.IndexerFunc{
+		"spec.nodeName": func(obj runtime.Object) string {
+			pod, ok := obj.(*example.Pod)
+			if !ok {
+				return ""
+			}
+			return pod.Spec.NodeName
+		},
+	}
+	options.indexers = map[string]cache.IndexFunc{
+		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.Spec.NodeName}, nil
+		},
+		"f:metadata.namespace": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.ObjectMeta.Namespace}, nil
+		},
+	}
+}
+
+func withCodec(codec runtime.Codec) setupOption {
+	return func(options *setupOptions) {
+		options.codec = codec
+	}
+}
+
+func withTransformer(transformer value.Transformer) setupOption {
+	return func(options *setupOptions) {
+		options.transformer = transformer
+	}
+}
+
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *CacheDelegator, tearDownFunc) {
+	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
+	return ctx, cacher, tearDown
+}
+
+func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context, *CacheDelegator, *etcd3testing.EtcdTestServer, tearDownFunc) {
+	setupOpts := setupOptions{}
+	opts = append([]setupOption{withDefaults}, opts...)
+	for _, opt := range opts {
+		opt(&setupOpts)
+	}
+
+	server, etcdStorage := newEtcdTestStorageWithOptions(t, etcd3testing.PathPrefix(), setupOpts.codec, setupOpts.transformer)
+	// Inject one list error to make sure we test the relist case.
+	listErrors := 1
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) {
+		// The WatchListClient feature changes the reflector to use WATCH
+		// instead of LIST, therefore we don't expect any errors
+		listErrors = 0
+	}
+	wrappedStorage := &storagetesting.StorageInjectingListErrors{
+		Interface: etcdStorage,
+		Errors:    listErrors,
+	}
+
+	config := Config{
+		Storage:             wrappedStorage,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       schema.GroupResource{Resource: "pods"},
+		EventsHistoryWindow: DefaultEventFreshDuration,
+		ResourcePrefix:      setupOpts.resourcePrefix,
+		KeyFunc:             setupOpts.keyFunc,
+		GetAttrsFunc:        GetPodAttrs,
+		NewFunc:             newPod,
+		NewListFunc:         newPodList,
+		IndexerFuncs:        setupOpts.indexerFuncs,
+		Indexers:            &setupOpts.indexers,
+		Codec:               setupOpts.codec,
+		Clock:               setupOpts.clock,
+	}
+	cacher, err := NewCacherFromConfig(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize cacher: %v", err)
+	}
+	ctx := context.Background()
+
+	// Since some tests depend on the fact that GetList shouldn't fail,
+	// we wait until the error from the underlying storage is consumed.
+	if err := wait.PollInfinite(100*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
+		t.Fatalf("Failed to inject list errors: %v", err)
+	}
+
+	// The tests assume that Get/GetList/Watch calls shouldn't fail.
+	// However, 429 error can now be returned if watchcache is under initialization.
+	// To avoid rewriting all tests, we wait for watchcache to initialize.
+	if err := cacher.Wait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	delegator := NewCacheDelegator(cacher, wrappedStorage)
+	terminate := func() {
+		delegator.Stop()
+		cacher.Stop()
+		server.Terminate(t)
+	}
+
+	return ctx, delegator, server, terminate
+}
+
+func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
+	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
+
+	return &createWrapper{CacheDelegator: cacher}, tearDown
+}
+
+type createWrapper struct {
+	*CacheDelegator
+}
+
+func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	if err := c.CacheDelegator.Create(ctx, key, obj, out, ttl); err != nil {
+		return err
+	}
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		currentObj := c.CacheDelegator.cacher.newFunc()
+		err := c.CacheDelegator.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
+		if err != nil {
+			if storage.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		if !apiequality.Semantic.DeepEqual(currentObj, out) {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+func BenchmarkStoreWriteThroughput(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			opts := []setupOption{withNodeNameAndNamespaceIndex}
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
+			b.Cleanup(terminate)
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			b.ResetTimer()
+			storagetesting.RunBenchmarkWriteThroughput(ctx, b, cacher, data, true)
+		})
+	}
+}
+
+func BenchmarkStoreList(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	// Based on https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       10_000,
+			podPerNamespaceCount: 15,
+			nodeCount:            5_000,
+		},
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+		{
+			namespaceCount:       100,
+			podPerNamespaceCount: 1_100,
+			nodeCount:            1000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
+			b.Cleanup(terminate)
+			require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, cacher, data))
+			for _, useIndex := range []bool{true, false} {
+				b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
+					storagetesting.RunBenchmarkStoreList(ctx, b, cacher, data, useIndex)
+				})
+			}
+		})
+	}
+}
+
+func BenchmarkStoreStats(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
+	b.Cleanup(terminate)
+	var out example.Pod
+	for _, pod := range data.Pods {
+		err := cacher.Create(ctx, computePodKey(pod), pod, &out, 0)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	storagetesting.RunBenchmarkStoreStats(ctx, b, cacher)
+}

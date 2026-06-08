@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: tlsconfig-tcp
+spec:
+  gatewayClassName: acme-lb
+  listeners:
+  - name: example
+    protocol: TCP
+    port: 443
+    tls:
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: bar-example-com-cert
+

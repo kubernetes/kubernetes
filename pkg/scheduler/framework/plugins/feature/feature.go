@@ -1,0 +1,90 @@
+/*
+Copyright 2021 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package feature
+
+import (
+	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+// Features carries feature gate values used by various plugins.
+// This struct allows us to break the dependency of the plugins on
+// the internal k8s features pkg.
+type Features struct {
+	EnableDRAExtendedResource                     bool
+	EnableDRAPrioritizedList                      bool
+	EnableDRAAdminAccess                          bool
+	EnableDRAConsumableCapacity                   bool
+	EnableDRADeviceTaints                         bool
+	EnableDRADeviceBindingConditions              bool
+	EnableDRAListTypeAttributes                   bool
+	EnableDRANodeAllocatableResources             bool
+	EnableDRAPartitionableDevices                 bool
+	EnableDRAResourceClaimDeviceStatus            bool
+	EnableDRASchedulerFilterTimeout               bool
+	EnableDRAWorkloadResourceClaims               bool
+	EnableDynamicResourceAllocation               bool
+	EnableVolumeAttributesClass                   bool
+	EnableVolumeLimitScaling                      bool
+	EnableNodeInclusionPolicyInPodTopologySpread  bool
+	EnableMatchLabelKeysInPodTopologySpread       bool
+	EnableInPlacePodVerticalScaling               bool
+	EnableAsyncPreemption                         bool
+	EnablePodLevelResources                       bool
+	EnableStorageCapacityScoring                  bool
+	EnableNodeDeclaredFeatures                    bool
+	EnableGangScheduling                          bool
+	EnableGenericWorkload                         bool
+	EnableTaintTolerationComparisonOperators      bool
+	EnableInPlacePodLevelResourcesVerticalScaling bool
+	EnableTopologyAwareWorkloadScheduling         bool
+	EnableWorkloadAwarePreemption                 bool
+}
+
+// NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
+func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features {
+	return Features{
+		EnableDRAExtendedResource:                     featureGate.Enabled(features.DRAExtendedResource),
+		EnableDRAPrioritizedList:                      featureGate.Enabled(features.DRAPrioritizedList),
+		EnableDRAAdminAccess:                          featureGate.Enabled(features.DRAAdminAccess),
+		EnableDRAConsumableCapacity:                   featureGate.Enabled(features.DRAConsumableCapacity),
+		EnableDRADeviceTaints:                         featureGate.Enabled(features.DRADeviceTaints),
+		EnableDRAListTypeAttributes:                   featureGate.Enabled(features.DRAListTypeAttributes),
+		EnableDRASchedulerFilterTimeout:               featureGate.Enabled(features.DRASchedulerFilterTimeout),
+		EnableDRAResourceClaimDeviceStatus:            featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
+		EnableDRADeviceBindingConditions:              featureGate.Enabled(features.DRADeviceBindingConditions),
+		EnableDRAWorkloadResourceClaims:               featureGate.Enabled(features.DRAWorkloadResourceClaims),
+		EnableDynamicResourceAllocation:               featureGate.Enabled(features.DynamicResourceAllocation),
+		EnableVolumeAttributesClass:                   featureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeLimitScaling:                      featureGate.Enabled(features.VolumeLimitScaling),
+		EnableNodeInclusionPolicyInPodTopologySpread:  featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
+		EnableMatchLabelKeysInPodTopologySpread:       featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		EnableInPlacePodVerticalScaling:               featureGate.Enabled(features.InPlacePodVerticalScaling),
+		EnableAsyncPreemption:                         featureGate.Enabled(features.SchedulerAsyncPreemption),
+		EnablePodLevelResources:                       featureGate.Enabled(features.PodLevelResources),
+		EnableDRAPartitionableDevices:                 featureGate.Enabled(features.DRAPartitionableDevices),
+		EnableStorageCapacityScoring:                  featureGate.Enabled(features.StorageCapacityScoring),
+		EnableNodeDeclaredFeatures:                    featureGate.Enabled(features.NodeDeclaredFeatures),
+		EnableGangScheduling:                          featureGate.Enabled(features.GangScheduling),
+		EnableGenericWorkload:                         featureGate.Enabled(features.GenericWorkload),
+		EnableTaintTolerationComparisonOperators:      featureGate.Enabled(features.TaintTolerationComparisonOperators),
+		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		EnableTopologyAwareWorkloadScheduling:         featureGate.Enabled(features.TopologyAwareWorkloadScheduling),
+		EnableDRANodeAllocatableResources:             featureGate.Enabled(features.DRANodeAllocatableResources),
+		EnableWorkloadAwarePreemption:                 featureGate.Enabled(features.WorkloadAwarePreemption),
+	}
+}

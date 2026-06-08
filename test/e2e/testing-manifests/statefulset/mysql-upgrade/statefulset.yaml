@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: mysql
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      initContainers:
+      - name: init-mysql
+        image: mysql:5.7
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          echo [mysqld] > /mnt/conf.d/server-id.cnf
+          echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+          if [[ $ordinal -eq 0 ]]; then
+            cp /mnt/config-map/master.cnf /mnt/conf.d/
+          else
+            cp /mnt/config-map/slave.cnf /mnt/conf.d/
+          fi
+        volumeMounts:
+        - name: conf
+          mountPath: /mnt/conf.d
+        - name: config-map
+          mountPath: /mnt/config-map
+      - name: clone-mysql
+        image: gcr.io/google-samples/xtrabackup:1.0
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          [[ -d /var/lib/mysql/mysql ]] && exit 0
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          [[ $ordinal -eq 0 ]] && exit 0
+          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+          xtrabackup --prepare --target-dir=/var/lib/mysql
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+      containers:
+      - name: mysql
+        image: mysql:5.7.15
+        env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "1"
+        ports:
+        - name: mysql
+          containerPort: 3306
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 1
+            memory: 1Gi
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+      - name: xtrabackup
+        image: gcr.io/google-samples/xtrabackup:1.0
+        ports:
+        - name: xtrabackup
+          containerPort: 3307
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          cd /var/lib/mysql
+
+          if [[ -f xtrabackup_slave_info ]]; then
+            mv xtrabackup_slave_info change_master_to.sql.in
+            rm -f xtrabackup_binlog_info
+          elif [[ -f xtrabackup_binlog_info ]]; then
+            [[ `cat xtrabackup_binlog_info` =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
+            rm xtrabackup_binlog_info
+            echo "CHANGE MASTER TO MASTER_LOG_FILE='${BASH_REMATCH[1]}',\
+                  MASTER_LOG_POS=${BASH_REMATCH[2]}" > change_master_to.sql.in
+          fi
+
+          if [[ -f change_master_to.sql.in ]]; then
+            echo "Waiting for mysqld to be ready (accepting connections)"
+            until mysql -h 127.0.0.1 -e "SELECT 1"; do sleep 1; done
+
+            echo "Initializing replication from clone position"
+            mv change_master_to.sql.in change_master_to.sql.orig
+            mysql -h 127.0.0.1 <<EOF
+          $(<change_master_to.sql.orig),
+            MASTER_HOST='mysql-0.mysql',
+            MASTER_USER='root',
+            MASTER_PASSWORD='',
+            MASTER_CONNECT_RETRY=10;
+          START SLAVE;
+          EOF
+          fi
+
+          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
+            "xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      volumes:
+      - name: conf
+        emptyDir: {}
+      - name: config-map
+        configMap:
+          name: mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: default
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+ name: mysql-pdb
+ labels:
+   pdb: mysql
+spec:
+ minAvailable: 2
+ selector:
+   matchLabels:
+     app: mysql

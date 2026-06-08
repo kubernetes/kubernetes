@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo "I am plugin baz"
+echo "KUBECTL_PATH=${KUBECTL_PATH:-<UNSET>}"
+echo "CUSTOM_ENV_VAR=${CUSTOM_ENV_VAR:-<UNSET>}"

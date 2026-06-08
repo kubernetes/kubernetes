@@ -1,0 +1,13 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: duplicate-listeners
+spec:
+  gatewayClassName: acme-lb
+  listeners:
+  - name: same
+    protocol: HTTP
+    port: 80
+  - name: same
+    protocol: HTTP
+    port: 443

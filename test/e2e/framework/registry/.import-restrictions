@@ -1,0 +1,14 @@
+rules:
+  # Using k8s packages, other framework helpers and the public API should be good enough.
+  #
+  # public API
+  - selectorRegexp: ^k8s[.]io/(api|apimachinery|client-go|component-base|klog|pod-security-admission|utils)
+    allowedPrefixes: [ "" ]
+
+  # test helpers
+  - selectorRegexp: ^k8s[.]io/kubernetes/test
+    allowedPrefixes: [ "" ]
+
+  # stdlib
+  - selectorRegexp: ^[a-z]+(/|$)
+    allowedPrefixes: [ "" ]

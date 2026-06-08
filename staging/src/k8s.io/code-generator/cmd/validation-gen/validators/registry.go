@@ -1,0 +1,268 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package validators
+
+import (
+	"cmp"
+	"fmt"
+	"slices"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+
+	"k8s.io/gengo/v2/codetags"
+	"k8s.io/gengo/v2/generator"
+)
+
+// This is the global registry of tag validators. For simplicity this is in
+// the same package as the implementations, but it should not be used directly.
+var globalRegistry = &registry{
+	tagValidators: map[string]TagValidator{},
+}
+
+// registry holds a list of registered tags.
+type registry struct {
+	lock        sync.Mutex
+	initialized atomic.Bool // init() was called
+
+	tagValidators map[string]TagValidator // keyed by tagname
+	tagIndex      []string                // all tag names
+}
+
+func (reg *registry) addTagValidator(tv TagValidator) {
+	if reg.initialized.Load() {
+		panic("registry was modified after init")
+	}
+
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+
+	name := tv.TagName()
+	if _, exists := globalRegistry.tagValidators[name]; exists {
+		panic(fmt.Sprintf("tag %q was registered twice", name))
+	}
+	switch level := tv.Docs().StabilityLevel; level {
+	case TagStabilityLevelAlpha, TagStabilityLevelBeta, TagStabilityLevelStable:
+		// valid
+	case "":
+		panic(fmt.Sprintf("tag %q is missing stability level", name))
+	default:
+		panic(fmt.Sprintf("tag %q has invalid stability level %q", name, level))
+	}
+	globalRegistry.tagValidators[name] = tv
+}
+
+func (reg *registry) init(c *generator.Context) {
+	if reg.initialized.Load() {
+		panic("registry.init() was called twice")
+	}
+
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+
+	cfg := Config{
+		GengoContext: c,
+		TagValidator: reg,
+	}
+
+	for _, tv := range globalRegistry.tagValidators {
+		reg.tagIndex = append(reg.tagIndex, tv.TagName())
+		tv.Init(cfg)
+	}
+	sort.Strings(reg.tagIndex)
+
+	reg.initialized.Store(true)
+}
+
+func (reg *registry) ExtractTags(_ Context, comments []string) ([]codetags.Tag, error) {
+	extracted := codetags.Extract("+", comments)
+	var tags []codetags.Tag
+	for tagName, lines := range extracted {
+		if !slices.Contains(reg.tagIndex, tagName) {
+			continue
+		}
+		t, err := codetags.ParseAll(lines)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse tags: %w: %s", err, lines)
+		}
+		tags = append(tags, t...)
+	}
+	return tags, nil
+}
+
+// ExtractValidations considers the given context (e.g. a type definition) and
+// evaluates registered validators.  This includes type validators (which run
+// against all types) and tag validators which run only if a specific tag is
+// found in the associated comment block.  Any matching validators produce zero
+// or more validations, which will later be rendered by the code-generation
+// logic.
+func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
+
+	validations, err := reg.ExtractTagValidations(context, tags...)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	return validations, nil
+}
+
+func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
+	accumulatedValidations := Validations{}
+	tags = reg.sortTags(tags)
+	for _, tag := range tags {
+		tv := reg.tagValidators[tag.Name]
+		// At this point we know tv exists and is not nil due to the upfront check
+		if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
+			return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
+		}
+		if err := typeCheck(tag, tv.Docs()); err != nil {
+			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+		}
+		if theseValidations, err := tv.GetValidations(context, tag); err != nil {
+			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+		} else {
+			accumulatedValidations.Add(theseValidations)
+		}
+	}
+	return accumulatedValidations, nil
+}
+
+func (reg *registry) sortTags(tags []codetags.Tag) []codetags.Tag {
+	// First sort all tags by their name, so the final output is deterministic.
+	// It is important to do this before validations are generated.
+	//
+	// Some tags are "meta" tags which wrap other tags. For example:
+	//
+	//   // +k8s:validateFalse="111"
+	//   // +k8s:validateFalse="222"
+	//   // +k8s:ifEnabled(Foo)=+k8s:validateFalse="333"
+	//
+	// Tag extraction will group these by tag name. The first two are
+	// instances of "k8s:validateFalse", while the third is an instance of
+	// "k8s:ifEnabled".
+	//
+	// Without sorting, the order in which tag validators are called is not defined
+	// (map iteration). This can lead to non-deterministic order of the generated
+	// validations. By sorting the tags by name first, we ensure that "k8s:ifEnabled"
+	// is processed before or after "k8s:validateFalse" consistently, allowing the
+	// "k8s:validateFalse" tags to remain grouped together. The tags for each name
+	// are processed in order of appearance, so relative ordering is preserved.
+	sortedTags := make([]codetags.Tag, len(tags))
+	copy(sortedTags, tags)
+
+	slices.SortFunc(sortedTags, func(a, b codetags.Tag) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
+	return sortedTags
+}
+
+// Docs returns documentation for each tag in this registry.
+func (reg *registry) Docs() []TagDoc {
+	var result []TagDoc
+	for _, k := range reg.tagIndex {
+		v := reg.tagValidators[k]
+		result = append(result, v.Docs())
+	}
+	return result
+}
+
+// RegisterTagValidator must be called for TagValidator to be used by
+// validation-gen. See TagValidator for more information.
+func RegisterTagValidator(tv TagValidator) {
+	globalRegistry.addTagValidator(tv)
+}
+
+// TagValidationExtractor represents an aggregation of validator plugins.
+type TagValidationExtractor interface {
+	// ExtractTagValidations extracts all validations associated with the given tags.
+	// Some tag validators may update internal state and then return deferred
+	// validations.
+	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+}
+
+// ValidationExtractor represents an aggregation of validator plugins.
+type ValidationExtractor interface {
+
+	// ExtractTags extracts Tags from comment lines.
+	ExtractTags(context Context, comments []string) ([]codetags.Tag, error)
+
+	// ExtractValidations considers the given context (e.g. a type definition) and
+	// evaluates registered validators.  This includes type validators (which run
+	// against all types) and tag validators which run only if a specific tag is
+	// found in the associated comment block.  Any matching validators produce zero
+	// or more validations, which will later be rendered by the code-generation
+	// logic.
+	ExtractValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// A ValidationExtractor is also a TagValidationExtractor.
+	TagValidationExtractor
+
+	// Docs returns documentation for each known tag.
+	Docs() []TagDoc
+
+	// Stability returns the stability level for a given tag.
+	Stability(tag string) (TagStabilityLevel, error)
+
+	// IsKnownTag returns true if the tag is a registered validation tag.
+	IsKnownTag(tag string) bool
+}
+
+// Stability returns the stability level for a given tag.
+func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
+	tagName := strings.TrimPrefix(tag, "+")
+	tv, ok := reg.tagValidators[tagName]
+	if !ok {
+		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
+	}
+
+	if tv.Docs().StabilityLevel == "" {
+		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
+	}
+	return tv.Docs().StabilityLevel, nil
+}
+
+// GetStability returns the stability level for a given tag from the global registry.
+func GetStability(tag string) (TagStabilityLevel, error) {
+	return globalRegistry.Stability(tag)
+}
+
+// IsKnownTag returns true if the tag has been registered as a validation tag.
+func (reg *registry) IsKnownTag(tag string) bool {
+	_, err := reg.Stability(tag)
+	return err == nil
+}
+
+// IsKnownTag returns true if the given tag is a registered validation tag.
+func IsKnownTag(tag string) bool {
+	return globalRegistry.IsKnownTag(tag)
+}
+
+// InitGlobalValidator must be called exactly once by the main application to
+// initialize and safely access the global tag registry.  Once this is called,
+// no more validators may be registered.
+func InitGlobalValidator(c *generator.Context) ValidationExtractor {
+	globalRegistry.init(c)
+	return globalRegistry
+}

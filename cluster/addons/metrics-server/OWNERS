@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - serathius
+  - sig-instrumentation-approvers
+reviewers:
+  - sig-instrumentation-reviewers
+labels:
+  - sig/instrumentation
+emeritus_approvers:
+  - kawych
