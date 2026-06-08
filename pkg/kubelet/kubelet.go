@@ -649,6 +649,7 @@ func NewMainKubelet(ctx context.Context,
 		podStartupLatencyTracker:     kubeDeps.PodStartupLatencyTracker,
 		healthChecker:                kubeDeps.HealthChecker,
 		flagz:                        kubeDeps.Flagz,
+		gcDoneCh:                     make(chan struct{}),
 	}
 
 	var secretManager secret.Manager
@@ -1591,6 +1592,9 @@ type Kubelet struct {
 
 	// podsServer is the server that provides the pods gRPC service.
 	podsServer *pods.PodsServer
+
+	// gcDoneCh is closed once all garbage collection goroutines have finished.
+	gcDoneCh chan struct{}
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1694,21 +1698,31 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	loggedContainerGCFailure := false
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := kl.containerGC.GarbageCollect(ctx); err != nil {
-			logger.Error(err, "Container garbage collection failed")
-			kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
-			loggedContainerGCFailure = true
-		} else {
-			var vLevel klog.Level = 4
-			if loggedContainerGCFailure {
-				vLevel = 1
-				loggedContainerGCFailure = false
-			}
 
-			logger.V(int(vLevel)).Info("Container garbage collection succeeded")
-		}
-	}, ContainerGCPeriod)
+	var wg sync.WaitGroup
+
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, func(ctx context.Context) {
+			if err := kl.containerGC.GarbageCollect(ctx); err != nil {
+				logger.Error(err, "Container garbage collection failed")
+				kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
+				loggedContainerGCFailure = true
+			} else {
+				var vLevel klog.Level = 4
+				if loggedContainerGCFailure {
+					vLevel = 1
+					loggedContainerGCFailure = false
+				}
+
+				logger.V(int(vLevel)).Info("Container garbage collection succeeded")
+			}
+		}, ContainerGCPeriod)
+	})
+
+	go func() {
+		wg.Wait()
+		close(kl.gcDoneCh)
+	}()
 
 	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
 	// stub the image GC manager
@@ -1719,26 +1733,33 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 	prevImageGCFailed := false
 	beganGC := time.Now()
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := kl.imageManager.GarbageCollect(ctx, beganGC); err != nil {
-			if prevImageGCFailed {
-				logger.Error(err, "Image garbage collection failed multiple times in a row")
-				// Only create an event for repeated failures
-				kl.recorder.WithLogger(logger).Event(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, func(ctx context.Context) {
+			if err := kl.imageManager.GarbageCollect(ctx, beganGC); err != nil {
+				if prevImageGCFailed {
+					logger.Error(err, "Image garbage collection failed multiple times in a row")
+					// Only create an event for repeated failures
+					kl.recorder.WithLogger(logger).Event(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+				} else {
+					logger.Error(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
+				}
+				prevImageGCFailed = true
 			} else {
-				logger.Error(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
-			}
-			prevImageGCFailed = true
-		} else {
-			var vLevel klog.Level = 4
-			if prevImageGCFailed {
-				vLevel = 1
-				prevImageGCFailed = false
-			}
+				var vLevel klog.Level = 4
+				if prevImageGCFailed {
+					vLevel = 1
+					prevImageGCFailed = false
+				}
 
-			logger.V(int(vLevel)).Info("Image garbage collection succeeded")
-		}
-	}, ImageGCPeriod)
+				logger.V(int(vLevel)).Info("Image garbage collection succeeded")
+			}
+		}, ImageGCPeriod)
+	})
+}
+
+// waitForGarbageCollectionDone waits for all garbage collection goroutines to finish.
+func (kl *Kubelet) waitForGarbageCollectionDone() {
+	<-kl.gcDoneCh
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
