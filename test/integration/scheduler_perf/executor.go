@@ -72,7 +72,7 @@ type WorkloadExecutor struct {
 	nextNodeIndex                int
 	opts                         *schedulerPerfOptions
 	cpuProfileFile               *os.File
-	churnCancels                 []context.CancelFunc
+	churnCancels                 map[string]context.CancelFunc
 }
 
 func (e *WorkloadExecutor) wait() {
@@ -92,6 +92,8 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runDeletePodsOp(tCtx, opIndex, concreteOp)
 	case *churnOp:
 		return e.runChurnOp(tCtx, opIndex, concreteOp)
+	case *stopChurnOp:
+		return e.runStopChurnOp(tCtx, concreteOp)
 	case *barrierOp:
 		return e.runBarrierOp(tCtx, opIndex, concreteOp)
 	case *sleepOp:
@@ -358,7 +360,17 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 
 	// Create a cancellable child context for background churn loop
 	churnCtx, churnCancel := context.WithCancel(tCtx)
-	e.churnCancels = append(e.churnCancels, churnCancel)
+	if e.churnCancels == nil {
+		e.churnCancels = make(map[string]context.CancelFunc)
+	}
+	name := op.Name
+	if name == "" {
+		name = "default"
+	}
+	if cancel, ok := e.churnCancels[name]; ok {
+		cancel()
+	}
+	e.churnCancels[name] = churnCancel
 
 	var churnFns []func(name string) string
 
@@ -450,6 +462,22 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 			}
 		}()
 	}
+	return nil
+}
+
+func (e *WorkloadExecutor) runStopChurnOp(tCtx ktesting.TContext, op *stopChurnOp) error {
+	if op.Name != "" {
+		cancel, ok := e.churnCancels[op.Name]
+		if !ok {
+			return fmt.Errorf("no active churn generator with name %q", op.Name)
+		}
+		tCtx.Logf("Stopping background churn generator: %q", op.Name)
+		cancel()
+		delete(e.churnCancels, op.Name)
+		return nil
+	}
+
+	e.stopAllBackgroundChurns(tCtx)
 	return nil
 }
 
