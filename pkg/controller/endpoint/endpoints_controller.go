@@ -220,8 +220,22 @@ func (e *Controller) addPod(obj interface{}) {
 
 func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointAddress, error) {
 	var endpointIP string
+	ipFamily := v1.IPv4Protocol
 
-	wantIPv6 := svc.Spec.IPFamilies[0] == v1.IPv6Protocol
+	// IPFamilies is expected to be populated by apiserver defaulting, but
+	// some services may reach this controller with an empty IPFamilies via
+	// watch events. Infer the family from ClusterIP or
+	// pod IP so we never panic on IPFamilies[0].
+	if len(svc.Spec.IPFamilies) > 0 {
+		ipFamily = svc.Spec.IPFamilies[0]
+	} else if len(svc.Spec.ClusterIP) > 0 && svc.Spec.ClusterIP != v1.ClusterIPNone {
+		if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
+			ipFamily = v1.IPv6Protocol
+		}
+	} else if utilnet.IsIPv6String(pod.Status.PodIP) {
+		ipFamily = v1.IPv6Protocol
+	}
+	wantIPv6 := ipFamily == v1.IPv6Protocol
 
 	// Find an IP that matches the family. We parse and restringify the IP in case the
 	// value on the Pod is in an irregular format.
