@@ -122,7 +122,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store store.OrderedIndexer
+	store store.Indexer
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -598,7 +598,7 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	}, "", nil
 }
 
-func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store store.OrderedLister, err error) {
+func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store store.Snapshot, err error) {
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
 	defer w.RUnlock()
@@ -650,7 +650,7 @@ func (w *watchCache) listLatestRVLocked(key, continueKey string, matchValues []s
 			}, matchValue.IndexName, err
 		}
 	}
-	var store store.OrderedLister = w.store
+	var store store.Snapshot = w.store
 	if w.snapshots != nil {
 		snap, ok := w.snapshots.Latest()
 		if ok {

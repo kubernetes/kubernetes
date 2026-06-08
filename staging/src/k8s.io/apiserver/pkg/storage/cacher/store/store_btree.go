@@ -43,7 +43,7 @@ type threadedStoreIndexer struct {
 	indexer indexer
 }
 
-var _ OrderedLister = (*threadedStoreIndexer)(nil)
+var _ Snapshot = (*threadedStoreIndexer)(nil)
 
 func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 	si.lock.RLock()
@@ -51,7 +51,7 @@ func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 	return si.store.Count(prefix, continueKey)
 }
 
-func (si *threadedStoreIndexer) Clone() OrderedLister {
+func (si *threadedStoreIndexer) Clone() Snapshot {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
 	return si.store.Clone()
@@ -151,7 +151,7 @@ type btreeStore struct {
 	tree *btree.BTree[*Element]
 }
 
-func (s *btreeStore) Clone() OrderedLister {
+func (s *btreeStore) Clone() Snapshot {
 	return &btreeStore{
 		tree: s.tree.Clone(),
 	}
@@ -439,9 +439,9 @@ var _ Snapshotter = (*storeSnapshotter)(nil)
 
 type Snapshotter interface {
 	Reset()
-	GetLessOrEqual(rv uint64) (OrderedLister, bool)
-	Latest() (OrderedLister, bool)
-	Add(rv uint64, indexer OrderedLister)
+	GetLessOrEqual(rv uint64) (Snapshot, bool)
+	Latest() (Snapshot, bool)
+	Add(rv uint64, indexer Indexer)
 	RemoveLess(rv uint64)
 	Len() int
 }
@@ -453,7 +453,7 @@ type storeSnapshotter struct {
 
 type rvSnapshot struct {
 	resourceVersion uint64
-	snapshot        OrderedLister
+	snapshot        Snapshot
 }
 
 func (s *storeSnapshotter) Reset() {
@@ -462,7 +462,7 @@ func (s *storeSnapshotter) Reset() {
 	s.snapshots.Clear(false)
 }
 
-func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (OrderedLister, bool) {
+func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
@@ -477,7 +477,7 @@ func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (OrderedLister, bool) {
 	return result.snapshot, true
 }
 
-func (s *storeSnapshotter) Latest() (OrderedLister, bool) {
+func (s *storeSnapshotter) Latest() (Snapshot, bool) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
@@ -488,7 +488,7 @@ func (s *storeSnapshotter) Latest() (OrderedLister, bool) {
 	return max.snapshot, true
 }
 
-func (s *storeSnapshotter) Add(rv uint64, indexer OrderedLister) {
+func (s *storeSnapshotter) Add(rv uint64, indexer Indexer) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer.Clone()})
