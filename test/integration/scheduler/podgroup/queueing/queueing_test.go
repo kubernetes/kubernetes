@@ -74,7 +74,7 @@ func (p *podInjectorPlugin) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 			for _, p := range p.schedulingQueue.PendingPodGroupPods() {
-				if p.Name == pod.Name {
+				if p.Name == p3.Name {
 					return true, nil
 				}
 			}
@@ -995,6 +995,260 @@ func TestPodGroupSequentialQueueing(t *testing.T) {
 				{
 					Name:        "Create initial node",
 					CreateNodes: []*v1.Node{node},
+				},
+			}, tt.steps...)
+
+			if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
+	type podInjector struct {
+		watchPod    string
+		podToInject *v1.Pod
+	}
+
+	node1 := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	node2 := st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+	node3 := st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+
+	pg := st.MakePodGroup().Name("pg").BasicPolicy().Obj()
+	pgP1 := st.MakePod().Name("pg-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(0).PodGroupName("pg").Obj()
+	pgP2 := st.MakePod().Name("pg-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(0).PodGroupName("pg").Obj()
+	pgP3 := st.MakePod().Name("pg-p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(0).PodGroupName("pg").Obj()
+
+	highPriorityPod := st.MakePod().Name("high-priority-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(1000).Obj()
+	normalPriorityPod := st.MakePod().Name("normal-priority-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(0).Obj()
+
+	tests := []struct {
+		name        string
+		podInjector *podInjector
+		steps       []stepsframework.Step
+	}{
+		{
+			name: "After successfully scheduling a podgroup and requeuing a remaining unscheduled pod, the next scheduling attempt prioritizes the higher priority pod",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create PodGroup pg",
+					CreatePodGroup: pg,
+				},
+				{
+					Name:       "Create member pods pg-p1, pg-p2 and pg-p3",
+					CreatePods: []*v1.Pod{pgP1, pgP2, pgP3},
+				},
+				{
+					Name:                 "Verify member pods are in active queue",
+					WaitForPodsInActiveQ: []string{"pg-p1", "pg-p2", "pg-p3"},
+				},
+				{
+					Name:           "Run scheduling attempt",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                 "Verify pg-p1 and pg-p2 are scheduled",
+					WaitForPodsScheduled: []string{"pg-p1", "pg-p2"},
+				},
+				{
+					Name:                     "Verify pg-p3 is unschedulable",
+					WaitForPodsUnschedulable: []string{"pg-p3"},
+				},
+				{
+					Name:                 "Verify pg-p3 is back in active queue",
+					WaitForPodsInActiveQ: []string{"pg-p3"},
+				},
+				{
+					Name:       "Create individual pod with higher priority",
+					CreatePods: []*v1.Pod{highPriorityPod},
+				},
+				{
+					Name:                 "Verify high priority pod is in active queue",
+					WaitForPodsInActiveQ: []string{"high-priority-pod"},
+				},
+				{
+					Name:        "Add node2 to expand capacity",
+					CreateNodes: []*v1.Node{node2},
+				},
+				{
+					Name:           "Run scheduling attempt",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                 "Verify high priority pod is scheduled",
+					WaitForPodsScheduled: []string{"high-priority-pod"},
+				},
+				{
+					Name:                 "Verify pg-p3 is still in active queue",
+					WaitForPodsInActiveQ: []string{"pg-p3"},
+				},
+			},
+		},
+		{
+			name: "After successfully scheduling a podgroup and requeuing a remaining unscheduled pod, the next scheduling attempt prioritizes the old pod if priorities are equal",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create PodGroup pg",
+					CreatePodGroup: pg,
+				},
+				{
+					Name:       "Create member pods pg-p1, pg-p2 and pg-p3",
+					CreatePods: []*v1.Pod{pgP1, pgP2, pgP3},
+				},
+				{
+					Name:                 "Verify member pods are in active queue",
+					WaitForPodsInActiveQ: []string{"pg-p1", "pg-p2", "pg-p3"},
+				},
+				{
+					Name:       "Create an individual pod with the same priority",
+					CreatePods: []*v1.Pod{normalPriorityPod},
+				},
+				{
+					Name:                 "Verify normal-priority-pod is in active queue",
+					WaitForPodsInActiveQ: []string{"normal-priority-pod"},
+				},
+				{
+					Name:           "Run scheduling attempt",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                 "Verify pg-p1 and pg-p2 are scheduled",
+					WaitForPodsScheduled: []string{"pg-p1", "pg-p2"},
+				},
+				{
+					Name:                     "Verify pg-p3 is unschedulable",
+					WaitForPodsUnschedulable: []string{"pg-p3"},
+				},
+				{
+					Name:                 "Verify pg-p3 is back in active queue with preserved older timestamp",
+					WaitForPodsInActiveQ: []string{"pg-p3"},
+				},
+				{
+					Name:        "Add node3 to expand capacity",
+					CreateNodes: []*v1.Node{node3},
+				},
+				{
+					Name:           "Run scheduling attempt",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                 "Verify pg-p3 is scheduled",
+					WaitForPodsScheduled: []string{"pg-p3"},
+				},
+				{
+					Name:           "Run scheduling attempt",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                     "Verify normal-priority-pod remains unschedulable",
+					WaitForPodsUnschedulable: []string{"normal-priority-pod"},
+				},
+			},
+		},
+		{
+			name: "After successfully scheduling a podgroup with a new pending pod added mid-cycle, an older individual pod in queue is prioritized if priorities are equal",
+			podInjector: &podInjector{
+				watchPod:    "pg-p1",
+				podToInject: pgP3,
+			},
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create PodGroup pg",
+					CreatePodGroup: pg,
+				},
+				{
+					Name:       "Create member pods pg-p1 and pg-p2",
+					CreatePods: []*v1.Pod{pgP1, pgP2},
+				},
+				{
+					Name:                 "Verify member pods are in active queue",
+					WaitForPodsInActiveQ: []string{"pg-p1", "pg-p2"},
+				},
+				{
+					Name:       "Create an individual pod with the same priority",
+					CreatePods: []*v1.Pod{normalPriorityPod},
+				},
+				{
+					Name:                 "Verify normal-priority-pod is in active queue",
+					WaitForPodsInActiveQ: []string{"normal-priority-pod"},
+				},
+				{
+					Name:           "Run scheduling attempt for podgroup (injects pg-p3 mid-cycle)",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                 "Verify pg-p1 and pg-p2 are scheduled",
+					WaitForPodsScheduled: []string{"pg-p1", "pg-p2"},
+				},
+				{
+					Name:                 "Verify pg-p3 is in active queue with new timestamp",
+					WaitForPodsInActiveQ: []string{"pg-p3"},
+				},
+				{
+					Name:        "Add node3 to expand capacity",
+					CreateNodes: []*v1.Node{node3},
+				},
+				{
+					Name:           "Run scheduling attempt",
+					RunScheduleOne: true,
+				},
+				{
+					Name:                 "Verify normal-priority-pod is scheduled before pg-p3 due to older timestamp",
+					WaitForPodsScheduled: []string{"normal-priority-pod"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			var piPlugin *podInjectorPlugin
+			var opts []scheduler.Option
+			if tt.podInjector != nil {
+				registry := frameworkruntime.Registry{
+					"PodInjectorPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+						piPlugin = newPodInjectorPlugin(handle, tt.podInjector.watchPod, tt.podInjector.podToInject)
+						return piPlugin, nil
+					},
+				}
+				plugins := configv1.Plugins{
+					PreFilter: configv1.PluginSet{
+						Enabled: []configv1.Plugin{{Name: "PodInjectorPlugin"}},
+					},
+				}
+				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+					Profiles: []configv1.KubeSchedulerProfile{{
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
+						Plugins:       &plugins,
+					}},
+				})
+				opts = append(opts,
+					scheduler.WithFrameworkOutOfTreeRegistry(registry),
+					scheduler.WithProfiles(cfg.Profiles...),
+				)
+			}
+			opts = append(opts,
+				scheduler.WithPodInitialBackoffSeconds(10),
+				scheduler.WithPodMaxBackoffSeconds(20),
+			)
+			testCtx := testutils.InitTestSchedulerWithOptions(
+				t,
+				testutils.InitTestAPIServer(t, "podgroup-ordering", nil),
+				0,
+				opts...,
+			)
+			if piPlugin != nil {
+				piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
+			}
+			testutils.SyncSchedulerInformerFactory(testCtx)
+			ns := testCtx.NS.Name
+
+			steps := append([]stepsframework.Step{
+				{
+					Name:        "Create initial node",
+					CreateNodes: []*v1.Node{node1},
 				},
 			}, tt.steps...)
 
