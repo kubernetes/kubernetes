@@ -55,13 +55,14 @@ var (
 )
 
 const (
-	loadNone            = "None"
-	loadWatcher         = "Watcher"
-	loadLister          = "Lister"
-	loadListerExactRV   = "ListerExactRV"
-	loadWatchList       = "WatchList"
-	trafficDeleteCreate = "DeleteCreate"
-	trafficPatch        = "Patch"
+	loadNone               = "None"
+	loadWatcher            = "Watcher"
+	loadLister             = "Lister"
+	loadListerExactRV      = "ListerExactRV"
+	loadListerNotOlderThan = "ListerNotOlderThan"
+	loadWatchList          = "WatchList"
+	trafficDeleteCreate    = "DeleteCreate"
+	trafficPatch           = "Patch"
 )
 
 func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, hasIndex bool, tracker *WatchLatencyTracker) {
@@ -72,7 +73,7 @@ func RunBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 		b.Run(fmt.Sprintf("Traffic=%s", trafficType), func(b *testing.B) {
 			for _, parallelism := range []int{25} {
 				b.Run(fmt.Sprintf("Parallelism=%d", parallelism), func(b *testing.B) {
-					for _, loadType := range []string{loadNone, loadWatcher, loadLister, loadListerExactRV, loadWatchList} {
+					for _, loadType := range []string{loadNone, loadWatcher, loadLister, loadListerExactRV, loadListerNotOlderThan, loadWatchList} {
 						useIndexOptions := []bool{false}
 						if hasIndex && loadType != loadNone {
 							useIndexOptions = []bool{false, true}
@@ -122,6 +123,8 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects, "", &latestRV)
 	case loadListerExactRV:
 		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects, metav1.ResourceVersionMatchExact, &latestRV)
+	case loadListerNotOlderThan:
+		startBackgroundListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects, metav1.ResourceVersionMatchNotOlderThan, &latestRV)
 	case loadWatchList:
 		startBackgroundWatchListers(ctx, store, data, 1, readIndexed, &workersWg, stopBackgroundLoadCh, &listCalls, &listObjects)
 	default:
@@ -147,7 +150,7 @@ func runBenchmarkWriteThroughput(ctx context.Context, b *testing.B, store storag
 	switch loadType {
 	case loadWatcher:
 		b.ReportMetric(float64(watchEvents.Load())/elapsedSeconds, "watch-events/s")
-	case loadLister, loadListerExactRV, loadWatchList:
+	case loadLister, loadListerExactRV, loadListerNotOlderThan, loadWatchList:
 		b.ReportMetric(float64(listCalls.Load())/elapsedSeconds, "list-calls/s")
 		b.ReportMetric(float64(listObjects.Load())/elapsedSeconds, "list-objs/s")
 	}
