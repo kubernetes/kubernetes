@@ -587,26 +587,34 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
 }
 
 func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
-	consistentReadSupported := delegator.ConsistentReadSupported()
-	w.RLock()
-	defer w.RUnlock()
-	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	store, err := w.waitAndGetExactSnapshot(ctx, resourceVersion)
 	if err != nil {
 		return listResp{}, "", err
-	}
-
-	if w.snapshots == nil {
-		return listResp{}, "", errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
-	}
-	store, ok := w.snapshots.GetLessOrEqual(resourceVersion)
-	if !ok {
-		return listResp{}, "", errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
 	}
 	items := store.OrderedListPrefix(key, continueKey)
 	return listResp{
 		Items:           items,
 		ResourceVersion: resourceVersion,
 	}, "", nil
+}
+
+func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store store.OrderedLister, err error) {
+	consistentReadSupported := delegator.ConsistentReadSupported()
+	w.RLock()
+	defer w.RUnlock()
+	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	if w.snapshots == nil {
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+	}
+	store, ok := w.snapshots.GetLessOrEqual(resourceVersion)
+	if !ok {
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+	}
+	return store, nil
 }
 
 func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
