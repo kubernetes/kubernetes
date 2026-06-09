@@ -77,6 +77,37 @@ func Test(t *testing.T) {
 		"mapOfStringToOpaqueStructField[b]": {"field Struct.MapOfStringToOpaqueStructField vals"},
 	})
 
+	st.Value(&Struct{
+		ListMapOfStructField:       []OtherStruct{{"foo"}, {"foo"}},
+		ListMapOfOpaqueStructField: []OtherStruct{{"foo"}, {"foo"}},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"structField":                         {"field Struct.StructField", "type OtherStruct"},
+		"structField.stringField":             {"field OtherStruct.StringField"},
+		"opaqueStructField":                   {"field Struct.OpaqueStructField"},
+		"listMapOfStructField":                {"field Struct.ListMapOfStructField"},
+		"listMapOfStructField[0]":             {"field Struct.ListMapOfStructField vals", "type OtherStruct"},
+		"listMapOfStructField[0].stringField": {"field OtherStruct.StringField"},
+		"listMapOfStructField[1]":             {"field Struct.ListMapOfStructField vals", "type OtherStruct"},
+		"listMapOfStructField[1].stringField": {"field OtherStruct.StringField"},
+		"listMapOfOpaqueStructField":          {"field Struct.ListMapOfOpaqueStructField"},
+		"listMapOfOpaqueStructField[0]":       {"field Struct.ListMapOfOpaqueStructField vals"},
+		"listMapOfOpaqueStructField[1]":       {"field Struct.ListMapOfOpaqueStructField vals"},
+		"mapOfStringToOpaqueStructField":      {"field Struct.MapOfStringToOpaqueStructField"},
+		"mapOfStringToStructField":            {"field Struct.MapOfStringToStructField"},
+		"sliceOfOpaqueStructField":            {"field Struct.SliceOfOpaqueStructField"},
+		"sliceOfStructField":                  {"field Struct.SliceOfStructField"},
+	})
+
+	str := OtherString("foo")
+	st.Value(&str).ExpectValidateFalseByPath(map[string][]string{
+		"": {"type OtherString"},
+	})
+
+	st.Value(&OtherStruct{}).ExpectValidateFalseByPath(map[string][]string{
+		"":            {"type OtherStruct"},
+		"stringField": {"field OtherStruct.StringField"},
+	})
+
 	st.Value(&OpaqueFieldsStruct{
 		OtherStruct:               OtherStruct{"foo"},
 		OpaqueSliceField:          []OtherStruct{{"foo"}},
