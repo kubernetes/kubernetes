@@ -3756,6 +3756,29 @@ type PodSpec struct {
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	// +optional
 	NodeName string
+	// Use the host's network namespace.  If this option is set, the ports that will be
+	// used must be specified.
+	// Optional: Default to false
+	// +optional
+	HostNetwork bool
+	// Use the host's pid namespace.
+	// Optional: Default to false.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	HostPID bool
+	// Use the host's ipc namespace.
+	// Optional: Default to false.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	HostIPC bool
+	// Share a single process namespace between all of the containers in a pod.
+	// When this is set containers will be able to view and signal processes from other containers
+	// in the same pod, and the first process in each container will not be assigned PID 1.
+	// HostPID and ShareProcessNamespace cannot both be set.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// Optional: Default to false.
+	// +optional
+	ShareProcessNamespace *bool
 	// SecurityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
@@ -3885,6 +3908,18 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
 	OS *PodOS
+
+	// Use the host's user namespace.
+	// Optional: Default to true.
+	// If set to true or not present, the pod will be run in the host user namespace, useful
+	// for when the pod needs a feature only available to the host user namespace, such as
+	// loading a kernel module with CAP_SYS_MODULE.
+	// When set to false, a new user namespace is created for the pod. Setting false is useful
+	// for mitigating container breakout vulnerabilities even allowing users to run their
+	// containers as root without actually having root privileges on the host.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	HostUsers *bool
 
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
 	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
@@ -4155,45 +4190,6 @@ const (
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
 type PodSecurityContext struct {
-	// Use the host's network namespace.  If this option is set, the ports that will be
-	// used must be specified.
-	// Optional: Default to false
-	// +k8s:conversion-gen=false
-	// +optional
-	HostNetwork bool
-	// Use the host's pid namespace.
-	// Optional: Default to false.
-	// Note that this field cannot be set when spec.os.name is windows.
-	// +k8s:conversion-gen=false
-	// +optional
-	HostPID bool
-	// Use the host's ipc namespace.
-	// Optional: Default to false.
-	// Note that this field cannot be set when spec.os.name is windows.
-	// +k8s:conversion-gen=false
-	// +optional
-	HostIPC bool
-	// Share a single process namespace between all of the containers in a pod.
-	// When this is set containers will be able to view and signal processes from other containers
-	// in the same pod, and the first process in each container will not be assigned PID 1.
-	// HostPID and ShareProcessNamespace cannot both be set.
-	// Note that this field cannot be set when spec.os.name is windows.
-	// Optional: Default to false.
-	// +k8s:conversion-gen=false
-	// +optional
-	ShareProcessNamespace *bool
-	// Use the host's user namespace.
-	// Optional: Default to true.
-	// If set to true or not present, the pod will be run in the host user namespace, useful
-	// for when the pod needs a feature only available to the host user namespace, such as
-	// loading a kernel module with CAP_SYS_MODULE.
-	// When set to false, a new user namespace is created for the pod. Setting false is useful
-	// for mitigating container breakout vulnerabilities even allowing users to run their
-	// containers as root without actually having root privileges on the host.
-	// Note that this field cannot be set when spec.os.name is windows.
-	// +k8s:conversion-gen=false
-	// +optional
-	HostUsers *bool
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in

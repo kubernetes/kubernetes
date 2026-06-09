@@ -6994,11 +6994,6 @@ func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *corev1.PodSecu
 }
 
 func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *corev1.PodSecurityContext, s conversion.Scope) error {
-	// INFO: in.HostNetwork opted out of conversion generation
-	// INFO: in.HostPID opted out of conversion generation
-	// INFO: in.HostIPC opted out of conversion generation
-	// INFO: in.ShareProcessNamespace opted out of conversion generation
-	// INFO: in.HostUsers opted out of conversion generation
 	out.SELinuxOptions = (*corev1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	out.WindowsOptions = (*corev1.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
@@ -7054,10 +7049,10 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 	// INFO: in.DeprecatedServiceAccount opted out of conversion generation
 	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	out.NodeName = in.NodeName
-	// INFO: in.HostNetwork opted out of conversion generation
-	// INFO: in.HostPID opted out of conversion generation
-	// INFO: in.HostIPC opted out of conversion generation
-	// INFO: in.ShareProcessNamespace opted out of conversion generation
+	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
+	out.ShareProcessNamespace = (*bool)(unsafe.Pointer(in.ShareProcessNamespace))
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(core.PodSecurityContext)
@@ -7085,7 +7080,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 	out.TopologySpreadConstraints = *(*[]core.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	out.SetHostnameAsFQDN = (*bool)(unsafe.Pointer(in.SetHostnameAsFQDN))
 	out.OS = (*core.PodOS)(unsafe.Pointer(in.OS))
-	// INFO: in.HostUsers opted out of conversion generation
+	out.HostUsers = (*bool)(unsafe.Pointer(in.HostUsers))
 	out.SchedulingGates = *(*[]core.PodSchedulingGate)(unsafe.Pointer(&in.SchedulingGates))
 	out.ResourceClaims = *(*[]core.PodResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
 	out.Resources = (*core.ResourceRequirements)(unsafe.Pointer(in.Resources))
@@ -7107,6 +7102,10 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 	out.ServiceAccountName = in.ServiceAccountName
 	out.AutomountServiceAccountToken = (*bool)(unsafe.Pointer(in.AutomountServiceAccountToken))
 	out.NodeName = in.NodeName
+	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
+	out.ShareProcessNamespace = (*bool)(unsafe.Pointer(in.ShareProcessNamespace))
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(corev1.PodSecurityContext)
@@ -7134,6 +7133,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	out.TopologySpreadConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	out.OS = (*corev1.PodOS)(unsafe.Pointer(in.OS))
+	out.HostUsers = (*bool)(unsafe.Pointer(in.HostUsers))
 	out.SchedulingGates = *(*[]corev1.PodSchedulingGate)(unsafe.Pointer(&in.SchedulingGates))
 	out.ResourceClaims = *(*[]corev1.PodResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
 	out.Resources = (*corev1.ResourceRequirements)(unsafe.Pointer(in.Resources))

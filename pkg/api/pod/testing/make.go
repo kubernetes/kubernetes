@@ -136,6 +136,36 @@ func SetSecurityContext(ctx *api.PodSecurityContext) Tweak {
 	}
 }
 
+func SetHostNetwork(b bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostNetwork = b
+	}
+}
+
+func SetHostPID(b bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostPID = b
+	}
+}
+
+func SetHostIPC(b bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostIPC = b
+	}
+}
+
+func SetShareProcessNamespace(b *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.ShareProcessNamespace = b
+	}
+}
+
+func SetHostUsers(b *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.HostUsers = b
+	}
+}
+
 func SetAffinity(affinity *api.Affinity) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.Affinity = affinity

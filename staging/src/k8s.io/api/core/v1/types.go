@@ -4245,17 +4245,14 @@ type PodSpec struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
-	// +k8s:conversion-gen=false
 	// +optional
 	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,11,opt,name=hostNetwork"`
 	// Use the host's pid namespace.
 	// Optional: Default to false.
-	// +k8s:conversion-gen=false
 	// +optional
 	HostPID bool `json:"hostPID,omitempty" protobuf:"varint,12,opt,name=hostPID"`
 	// Use the host's ipc namespace.
 	// Optional: Default to false.
-	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,13,opt,name=hostIPC"`
 	// Share a single process namespace between all of the containers in a pod.
@@ -4263,7 +4260,6 @@ type PodSpec struct {
 	// in the same pod, and the first process in each container will not be assigned PID 1.
 	// HostPID and ShareProcessNamespace cannot both be set.
 	// Optional: Default to false.
-	// +k8s:conversion-gen=false
 	// +optional
 	ShareProcessNamespace *bool `json:"shareProcessNamespace,omitempty" protobuf:"varint,27,opt,name=shareProcessNamespace"`
 	// SecurityContext holds pod-level security attributes and common container settings.
@@ -4422,7 +4418,6 @@ type PodSpec struct {
 	// When set to false, a new userns is created for the pod. Setting false is useful for
 	// mitigating container breakout vulnerabilities even allowing users to run their
 	// containers as root without actually having root privileges on the host.
-	// +k8s:conversion-gen=false
 	// +optional
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
 
