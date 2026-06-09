@@ -904,7 +904,7 @@ func TestFindExistingLBIdByFrontend(t *testing.T) {
 	}
 }
 
-func TestCreateLoadbalancerWithRetry_Success(t *testing.T) {
+func TestCreateOrReplaceLoadbalancer_Success(t *testing.T) {
 	hcnMock := getHcnMock("L2Bridge")
 	hns := hns{hcn: hcnMock}
 
@@ -917,13 +917,13 @@ func TestCreateLoadbalancerWithRetry_Success(t *testing.T) {
 	}
 	existingLBs := map[loadBalancerIdentifier]*loadBalancerInfo{}
 
-	lb, err := hns.createLoadbalancerWithRetry(proposedLB, existingLBs)
+	lb, err := hns.createOrReplaceLoadbalancer(proposedLB, existingLBs)
 	assert.NoError(t, err)
 	assert.NotNil(t, lb)
 	assert.NotEmpty(t, lb.Id)
 }
 
-func TestCreateLoadbalancerWithRetry_FileAlreadyExistsAndRetrySucceeds(t *testing.T) {
+func TestCreateOrReplaceLoadbalancer_FileAlreadyExistsAndRetrySucceeds(t *testing.T) {
 	hcnMock := getHcnMock("L2Bridge")
 	hns := hns{hcn: hcnMock}
 
@@ -952,13 +952,13 @@ func TestCreateLoadbalancerWithRetry_FileAlreadyExistsAndRetrySucceeds(t *testin
 		Flags: hcn.LoadBalancerFlagsNone,
 	}
 
-	lb, err := hns.createLoadbalancerWithRetry(proposedLB, existingLBs)
+	lb, err := hns.createOrReplaceLoadbalancer(proposedLB, existingLBs)
 	assert.NoError(t, err)
 	assert.NotNil(t, lb)
 	assert.NotEqual(t, createdLB.Id, lb.Id, "should have created a new LB after deleting the old one")
 }
 
-func TestCreateLoadbalancerWithRetry_FileAlreadyExistsNoMatchingLB(t *testing.T) {
+func TestCreateOrReplaceLoadbalancer_FileAlreadyExistsNoMatchingLB(t *testing.T) {
 	hcnMock := getHcnMock("L2Bridge")
 	hns := hns{hcn: hcnMock}
 
@@ -984,7 +984,7 @@ func TestCreateLoadbalancerWithRetry_FileAlreadyExistsNoMatchingLB(t *testing.T)
 		Flags: hcn.LoadBalancerFlagsNone,
 	}
 
-	lb, err := hns.createLoadbalancerWithRetry(proposedLB, existingLBs)
+	lb, err := hns.createOrReplaceLoadbalancer(proposedLB, existingLBs)
 	assert.Error(t, err, "should return the original 0xb7 error since no matching LB was found to delete")
 	assert.Nil(t, lb)
 }

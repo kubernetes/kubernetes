@@ -42,7 +42,7 @@ type HostNetworkService interface {
 	deleteEndpoint(hnsID string) error
 	getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error)
-	createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error)
+	createOrReplaceLoadbalancer(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error)
 	updateLoadBalancer(hnsID string, sourceVip, vip string, endpoints []endpointInfo, flags loadBalancerFlags, protocol, internalPort, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
 }
@@ -71,8 +71,8 @@ const (
 	errorCodeFileAlreadyExists = "0xb7"
 )
 
-// isHnsNotRunningError checks if the error is due to HNS service not running by looking for the specific error code in the error message.
-func isHnsNotRunningError(err error) bool {
+// IsHnsNotRunningError checks if the error is due to HNS service not running by looking for the specific error code in the error message.
+func IsHnsNotRunningError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), errorCodeHnsNotRunning)
 }
 
@@ -91,23 +91,23 @@ func findExistingLBIdByFrontend(proposedLB *hcn.HostComputeLoadBalancer, existin
 	if len(proposedLB.PortMappings) == 0 {
 		return ""
 	}
-	lbID, matchingLbIDsCount := "", 0
+	lbID := ""
 	frontEndVIP, isProposedLbIPv6 := "", (proposedLB.Flags&LoadBalancerFlagsIPv6) == LoadBalancerFlagsIPv6
 	if len(proposedLB.FrontendVIPs) != 0 {
 		frontEndVIP = proposedLB.FrontendVIPs[0]
 	}
 	for id, lbInfo := range existingLBs {
 		if id.vip == frontEndVIP && id.protocol == uint16(proposedLB.PortMappings[0].Protocol) && id.internalPort == proposedLB.PortMappings[0].InternalPort && id.externalPort == proposedLB.PortMappings[0].ExternalPort && id.isIPv6 == isProposedLbIPv6 {
+			if lbID != "" {
+				// More than 1 existing LB has the same frontend configuration, return no match to avoid deleting any of them
+				klog.Warning("More than 1 existing lb has matching frontend, will not delete any existing lbs", "existingLBID1", lbID, "existingLBID2", lbInfo.hnsID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
+				return ""
+			}
 			lbID = lbInfo.hnsID
-			matchingLbIDsCount++
 		}
 	}
-	if matchingLbIDsCount == 1 {
-		klog.V(1).InfoS("Found existing load balancer with matching frontend configuration", "lbID", lbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
-		return lbID
-	}
-	klog.V(1).InfoS("Did not find a unique existing load balancer with matching frontend configuration", "matchingLbIDsCount", matchingLbIDsCount, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
-	return ""
+	klog.V(4).InfoS("Search for existing lb with matching frontend completed", "lbID", lbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort, "isIPv6", isProposedLbIPv6)
+	return lbID
 }
 
 func getLoadBalancerPolicyFlags(flags loadBalancerFlags) (lbPortMappingFlags hcn.LoadBalancerPortMappingFlags, lbFlags hcn.LoadBalancerFlags) {
@@ -422,7 +422,7 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	return loadBalancers, nil
 }
 
-func (hns hns) createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error) {
+func (hns hns) createOrReplaceLoadbalancer(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error) {
 	lb, err := hns.hcn.CreateLoadBalancer(proposedLB)
 	if IsPolicyAlreadyExists(err) && len(proposedLB.PortMappings) > 0 {
 		frontEndVIP := ""
@@ -431,7 +431,7 @@ func (hns hns) createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalanc
 		}
 		existingLbID := findExistingLBIdByFrontend(proposedLB, existingLBs)
 		if existingLbID != "" {
-			klog.V(1).InfoS("Deleting matching load balancer and retrying create load balancer again", "existingLBID", existingLbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+			klog.V(4).InfoS("Deleting matching load balancer and retrying create load balancer again", "existingLBID", existingLbID, "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
 			err = hns.deleteLoadBalancer(existingLbID)
 			if err != nil {
 				klog.V(1).InfoS("Failed to delete existing load balancer", "lbID", existingLbID, "error", err)
@@ -439,7 +439,7 @@ func (hns hns) createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalanc
 			}
 			lb, err = hns.hcn.CreateLoadBalancer(proposedLB)
 		} else {
-			klog.V(1).InfoS("Did not find a unique existing load balancer with matching frontend configuration", "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
+			klog.V(4).InfoS("Did not find a unique existing load balancer with matching frontend configuration", "frontendVIP", frontEndVIP, "protocol", proposedLB.PortMappings[0].Protocol, "internalPort", proposedLB.PortMappings[0].InternalPort, "externalPort", proposedLB.PortMappings[0].ExternalPort)
 		}
 	}
 	return lb, err
@@ -526,7 +526,7 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, ep.hnsID)
 	}
 
-	lb, err := hns.createLoadbalancerWithRetry(loadBalancer, previousLoadBalancers)
+	lb, err := hns.createOrReplaceLoadbalancer(loadBalancer, previousLoadBalancers)
 
 	if err != nil {
 		klog.V(2).ErrorS(err, "Error creating Hns loadbalancer policy resource", "error", err, "endpoints", endpoints)
@@ -628,7 +628,7 @@ func (hns hns) deleteLoadBalancer(hnsID string) error {
 			// Return silently
 			return nil
 		}
-		if isHnsNotRunningError(err) {
+		if IsHnsNotRunningError(err) {
 			klog.V(1).ErrorS(err, "HNS is not running, skipping delete loadbalancer", "lbID", hnsID)
 			return err
 		}
