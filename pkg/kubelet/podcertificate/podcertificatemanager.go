@@ -32,17 +32,17 @@ import (
 	"sync"
 	"time"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
+	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
 	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
+	certlistersv1 "k8s.io/client-go/listers/certificates/v1"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -115,7 +115,7 @@ type IssuingManager struct {
 	projectionQueue workqueue.TypedRateLimitingInterface[projectionKey]
 
 	pcrInformer cache.SharedIndexInformer
-	pcrLister   certlistersv1beta1.PodCertificateRequestLister
+	pcrLister   certlistersv1.PodCertificateRequestLister
 
 	nodeInformer cache.SharedIndexInformer
 	nodeLister   corelistersv1.NodeLister
@@ -266,7 +266,7 @@ func (c *credStateWaitRefresh) metricsState(now time.Time) string {
 
 var _ Manager = (*IssuingManager)(nil)
 
-func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1beta1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
 	m := &IssuingManager{
 		kc: kc,
 
@@ -291,15 +291,15 @@ func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder 
 	// for us to notice immediately once the certificate is issued.
 	m.pcrInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
-			pcr := obj.(*certificatesv1beta1.PodCertificateRequest)
+			pcr := obj.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
 		UpdateFunc: func(old, new any) {
-			pcr := new.(*certificatesv1beta1.PodCertificateRequest)
+			pcr := new.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
 		DeleteFunc: func(obj any) {
-			pcr := obj.(*certificatesv1beta1.PodCertificateRequest)
+			pcr := obj.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
 	})
@@ -492,25 +492,25 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// our state machine accordingly.
 		for _, cond := range pcr.Status.Conditions {
 			switch cond.Type {
-			case certificatesv1beta1.PodCertificateRequestConditionTypeDenied:
+			case certificatesv1.PodCertificateRequestConditionTypeDenied:
 				rec.curState = &credStateDenied{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
 				return nil
-			case certificatesv1beta1.PodCertificateRequestConditionTypeFailed:
+			case certificatesv1.PodCertificateRequestConditionTypeFailed:
 				rec.curState = &credStateFailed{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
 				return nil
-			case certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
+			case certificatesv1.PodCertificateRequestConditionTypeIssued:
 				rec.curState = &credStateFresh{
 					privateKey:     state.privateKey,
 					certChain:      cleanCertificateChain([]byte(pcr.Status.CertificateChain)),
@@ -637,25 +637,25 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// our state machine accordingly.
 		for _, cond := range pcr.Status.Conditions {
 			switch cond.Type {
-			case certificatesv1beta1.PodCertificateRequestConditionTypeDenied:
+			case certificatesv1.PodCertificateRequestConditionTypeDenied:
 				rec.curState = &credStateDenied{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
 				return nil
-			case certificatesv1beta1.PodCertificateRequestConditionTypeFailed:
+			case certificatesv1.PodCertificateRequestConditionTypeFailed:
 				rec.curState = &credStateFailed{
 					Reason:  cond.Reason,
 					Message: cond.Message,
 				}
 				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
 				return nil
-			case certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
+			case certificatesv1.PodCertificateRequestConditionTypeIssued:
 				rec.curState = &credStateFresh{
 					privateKey:     state.refreshPrivateKey,
 					certChain:      cleanCertificateChain([]byte(pcr.Status.CertificateChain)),
@@ -743,7 +743,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 	nodeName types.NodeName, nodeUID types.UID,
 	signerName, keyType string, maxExpirationSeconds *int32,
 	userAnnotations map[string]string,
-) ([]byte, *certificatesv1beta1.PodCertificateRequest, error) {
+) ([]byte, *certificatesv1.PodCertificateRequest, error) {
 	privateKey, pkcs10Req, err := generateKeyAndProof(keyType)
 	if err != nil {
 		return nil, nil, fmt.Errorf("while generating keypair: %w", err)
@@ -754,7 +754,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 		return nil, nil, fmt.Errorf("while PEM-encoding private key: %w", err)
 	}
 
-	req := &certificatesv1beta1.PodCertificateRequest{
+	req := &certificatesv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: "req-",
@@ -767,7 +767,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 				},
 			},
 		},
-		Spec: certificatesv1beta1.PodCertificateRequestSpec{
+		Spec: certificatesv1.PodCertificateRequestSpec{
 			SignerName:                signerName,
 			PodName:                   podName,
 			PodUID:                    podUID,
@@ -781,7 +781,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 		},
 	}
 
-	req, err = m.kc.CertificatesV1beta1().PodCertificateRequests(namespace).Create(ctx, req, metav1.CreateOptions{})
+	req, err = m.kc.CertificatesV1().PodCertificateRequests(namespace).Create(ctx, req, metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("while creating on API: %w", err)
 	}

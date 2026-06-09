@@ -1422,6 +1422,77 @@
     resource must support get, update, patch.'
   release: v1.19
   file: test/e2e/auth/certificates.go
+- testname: PodCertificateRequest API operations
+  codename: '[sig-auth] PodCertificateRequest API [Privileged:ClusterAdmin] should
+    support PodCertificateRequest API operations [Conformance]'
+  description: ' The certificates.k8s.io API group MUST exist in the /apis discovery
+    document. The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io
+    discovery document. The podcertificaterequests and podcertificaterequests/status
+    resources MUST exist in the /apis/certificates.k8s.io/v1 discovery document. The
+    podcertificaterequests resource must support namespaced create, read, update,
+    patch, and delete. The podcertificaterequests/status resource must support get,
+    update, patch.'
+  release: v1.37
+  file: test/e2e/auth/podcertificaterequest.go
+- testname: Projected PodCertificate Default Expiration
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should issue certificate with default life time (24h) when MaxExpirationSeconds
+    is not set [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' If MaxExpirationSeconds is omitted from the projected volume spec,
+    the issued certificate MUST have a default lifetime of 24 hours.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate Custom Expiration
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should issue certificate with specified duration (1h) when MaxExpirationSeconds
+    is set [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' If MaxExpirationSeconds is specified in the projected volume spec
+    (e.g. 1 hour), the issued certificate MUST have a lifetime matching that duration.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate Expiration Maximum Validation
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should reject pod creation when MaxExpirationSeconds exceeds maximum
+    (91d) [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' Creating a pod with a projected podCertificate volume requesting
+    a MaxExpirationSeconds exceeding the maximum of 91 days MUST be rejected by the
+    API server during admission.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate Expiration Minimum Validation
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should reject pod creation when MaxExpirationSeconds is less than
+    minimum (1h) [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' Creating a pod with a projected podCertificate volume requesting
+    a MaxExpirationSeconds less than the minimum of 1 hour MUST be rejected by the
+    API server during admission.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate mTLS Connection
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] should
+    allow server and client pods to establish an mTLS connection [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: ' A pod configured with a projected podCertificate volume and an associated
+    ClusterTrustBundle MUST project a valid leaf certificate chain and key. Two pods
+    configured with such certificates and keys under the same CA MUST be able to establish
+    a mutually authenticated TLS (mTLS) connection.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate UserAnnotations
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] should
+    honor UserAnnotations for SPIFFE URI path [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' The podCertificate volume projection MUST support passing unverified
+    user annotations from the pod spec to the signer. The signer MUST be able to receive
+    and process these annotations (e.g. to override the SPIFFE URI path in the generated
+    certificate SANs).'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
 - testname: OIDC Discovery (ServiceAccountIssuerDiscovery)
   codename: '[sig-auth] ServiceAccounts ServiceAccountIssuerDiscovery should support
     OIDC discovery of service account issuer [Conformance]'

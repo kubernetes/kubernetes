@@ -60,16 +60,6 @@ func (s *Strategy) NamespaceScoped() bool {
 	return true
 }
 
-// GetResetFields returns the set of fields that get reset by the strategy
-// and should not be modified by the user.
-func (s *Strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
-	return map[fieldpath.APIVersion]*fieldpath.Set{
-		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
-	}
-}
-
 func (s *Strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	req := obj.(*certificates.PodCertificateRequest)
 	req.Status = certificates.PodCertificateRequestStatus{}
@@ -110,6 +100,20 @@ func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (s *Strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"certificates.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+	return fields
+}
+
 // StatusStrategy is the strategy for the status subresource.
 type StatusStrategy struct {
 	*Strategy
@@ -130,6 +134,10 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAu
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"certificates.k8s.io/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
