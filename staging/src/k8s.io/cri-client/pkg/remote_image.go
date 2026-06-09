@@ -119,6 +119,12 @@ func NewRemoteImageService(ctx context.Context, endpoint string, connectionTimeo
 
 }
 
+// StreamingEnabled returns whether streaming RPCs are currently active
+// for list operations.
+func (r *remoteImageService) StreamingEnabled() bool {
+	return r.useStreaming.Load()
+}
+
 // Close will shutdown the internal gRPC client connection.
 func (r *remoteImageService) Close(ctx context.Context) error {
 	logger := klog.FromContext(ctx)

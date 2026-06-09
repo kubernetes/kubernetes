@@ -81,6 +81,7 @@ const (
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
 	RuntimeOperationsErrorsKey   = "runtime_operations_errors_total"
+	CRIStreamingEnabledKey       = "cri_streaming_enabled"
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
@@ -491,6 +492,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
+	)
+	// CRIStreamingEnabled is a Gauge that reports whether CRI list streaming RPCs are active.
+	// 1 means streaming is active, 0 means the kubelet fell back to unary RPCs.
+	CRIStreamingEnabled = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CRIStreamingEnabledKey,
+			Help:           "Whether CRI list streaming RPCs are active (1) or fell back to unary (0).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"service"},
 	)
 	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
 	// Broken down by eviction signal.
@@ -1339,6 +1351,9 @@ func Register() {
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming) {
+			legacyregistry.MustRegister(CRIStreamingEnabled)
+		}
 		legacyregistry.MustRegister(Evictions)
 		legacyregistry.MustRegister(EvictionStatsAge)
 		legacyregistry.MustRegister(Preemptions)
