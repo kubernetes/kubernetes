@@ -365,15 +365,15 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 	f.It("should remount stale subpath bind mount after network filesystem disruption [LinuxOnly]",
 		f.WithDisruptive(), f.WithSlow(), func(ctx context.Context) {
-		init(ctx)
-		ginkgo.DeferCleanup(cleanup)
+			init(ctx)
+			ginkgo.DeferCleanup(cleanup)
 
-		if strings.HasPrefix(driverName, "hostPath") {
-			e2eskipper.Skipf("Driver %s uses a local hostPath volume; stale-mount scenario requires a network filesystem, skipping", driverName)
-		}
+			if strings.HasPrefix(driverName, "hostPath") {
+				e2eskipper.Skipf("Driver %s uses a local hostPath volume; stale-mount scenario requires a network filesystem, skipping", driverName)
+			}
 
-		testSubpathStaleBindMountRemount(ctx, f, l.pod)
-	})
+			testSubpathStaleBindMountRemount(ctx, f, l.pod)
+		})
 
 	ginkgo.It("should support readOnly directory specified in the volumeMount", func(ctx context.Context) {
 		init(ctx)

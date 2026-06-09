@@ -34,6 +34,13 @@ import (
 	"k8s.io/mount-utils"
 )
 
+func removeAll(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.RemoveAll(dir); err != nil {
+		t.Errorf("failed to remove %q: %v", dir, err)
+	}
+}
+
 func TestSafeMakeDir(t *testing.T) {
 	defaultPerm := os.FileMode(0750) + os.ModeDir
 	maxPerm := os.FileMode(0777) + os.ModeDir
@@ -261,7 +268,7 @@ func TestSafeMakeDir(t *testing.T) {
 			if err != nil {
 				t.Fatal(err.Error())
 			}
-			defer os.RemoveAll(base)
+			defer removeAll(t, base)
 			test.prepare(base)
 			pathToCreate := filepath.Join(base, test.path)
 			err = doSafeMakeDir(pathToCreate, base, test.perm)
@@ -826,7 +833,11 @@ func TestBindSubPath(t *testing.T) {
 			name: "subpath-mount-already-exists",
 			prepare: func(base string) ([]string, string, string, error) {
 				volpath, subpathMount := getTestPaths(base)
-				mounts := []string{subpathMount}
+				// Do NOT list subpathMount as a mount point: the intent of this
+				// test is that the bind target directory already exists on disk,
+				// not that a mismatching mount is present.  Listing it as mounted
+				// would trigger the lazyUnmountFn path which fails on a plain dir.
+				mounts := []string{}
 				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
@@ -946,8 +957,17 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 				subpath := filepath.Join(volpath, "dir0")
 				return mounts, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
 			},
+			// lazyUnmountFn is injected via modifyMounter below; mounter.Unmount
+			// is no longer called for the mismatching-mount path.
+			modifyMounter: func(fm *mount.FakeMounter, bindPathTarget string) {
+				origLazyUnmountFn := lazyUnmountFn
+				lazyUnmountFn = func(path string) error {
+					lazyUnmountFn = origLazyUnmountFn
+					return nil
+				}
+			},
 			expectError:  false,
-			expectAction: []mount.FakeAction{{Action: "unmount"}},
+			expectAction: []mount.FakeAction{},
 			mountExists:  false,
 		},
 		{
@@ -988,7 +1008,7 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		defer os.RemoveAll(base)
+		defer removeAll(t, base)
 
 		mounts, volPath, subPath, err := test.prepare(base)
 		if err != nil {
@@ -1065,7 +1085,7 @@ func TestPrepareSubpathTargetDifferentDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(base)
+	defer removeAll(t, base)
 
 	volPath, subpathMount := getTestPaths(base)
 	if err := os.MkdirAll(filepath.Dir(subpathMount), defaultPerm); err != nil {
@@ -1155,7 +1175,7 @@ func TestSubpathStaleBindMountRemount(t *testing.T) {
 
 	t.Run("lazyUnmount-error-propagated", func(t *testing.T) {
 		base, volPath, subpathMount, sourceFile := setup(t)
-		defer os.RemoveAll(base)
+		defer removeAll(t, base)
 
 		fm := setupFakeMounter([]string{subpathMount})
 		subpath := Subpath{
@@ -1184,7 +1204,7 @@ func TestSubpathStaleBindMountRemount(t *testing.T) {
 
 	t.Run("lazyUnmount-success-bind-mount-recreated", func(t *testing.T) {
 		base, volPath, subpathMount, sourceFile := setup(t)
-		defer os.RemoveAll(base)
+		defer removeAll(t, base)
 
 		fm := setupFakeMounter([]string{subpathMount})
 		subpath := Subpath{
