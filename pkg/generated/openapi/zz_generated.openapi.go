@@ -28457,7 +28457,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"preemptionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. Defaults to PreemptLowerPriority if unset.\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
