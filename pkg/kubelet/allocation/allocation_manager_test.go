@@ -54,6 +54,7 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -3480,10 +3481,22 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		}, nil
 	}
 
-	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources, allocatedPodsNodeInfoProvider{allocationManager.(*manager)})
 	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
+}
+
+// allocatedPodsNodeInfoProvider stands in for the kubelet's NodeInfo cache and
+// holds the same set it does: pods with an allocation. A pod is added to the
+// production cache once admission succeeds, which is also when its allocation
+// is written, so pods still awaiting admission are absent from both.
+type allocatedPodsNodeInfoProvider struct {
+	manager *manager
+}
+
+func (p allocatedPodsNodeInfoProvider) Snapshot() *schedulerframework.NodeInfo {
+	return schedulerframework.NewNodeInfo(p.manager.GetAllocatedPods()...)
 }
 
 func setContainerStatus(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
