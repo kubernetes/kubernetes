@@ -150,7 +150,6 @@
         "github.com/containerd/containerd/api",
         "github.com/containerd/errdefs/pkg",
         "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl/v2",
         "github.com/google/cadvisor",
         "k8s.io/code-generator"
       ],
