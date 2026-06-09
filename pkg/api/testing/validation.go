@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/test/coverage"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -55,6 +56,12 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 	// Accumulate errors from all versioned validation, per version.
 	all := map[string]field.ErrorList{}
 	accumulate := func(t *testing.T, gv string, errs field.ErrorList) {
+		// Skip versions explicitly excluded from the equivalence sweep (e.g. a
+		// deprecated, unserved group whose types are intentionally not validated
+		// declaratively).
+		if opts.SkipGroupVersions.Has(gv) {
+			return
+		}
 		// If normalization rules are provided, apply them to the field paths of generated errors.
 		// This allows comparing errors between API versions that have structural differences
 		// (e.g. flattened vs nested fields).
@@ -222,6 +229,13 @@ type validationOption struct {
 
 	// Fuzzer is the fuzzer to use for generating test objects.
 	Fuzzer *randfill.Filler
+
+	// SkipGroupVersions lists "group/version" strings to exclude from the
+	// versioned validation equivalence sweep. This is for kinds whose internal
+	// type is registered under a deprecated, unserved group (e.g. a workload
+	// type that also exists in extensions/v1beta1) for which declarative
+	// validation is intentionally not generated.
+	SkipGroupVersions sets.Set[string]
 }
 
 func WithSubResources(subResources ...string) ValidationTestConfig {
@@ -245,6 +259,16 @@ func WithIgnoreObjectConversionErrors() ValidationTestConfig {
 func WithFuzzer(fuzzer *randfill.Filler) ValidationTestConfig {
 	return func(o *validationOption) {
 		o.Fuzzer = fuzzer
+	}
+}
+
+// WithSkipGroupVersions excludes the given "group/version" strings from the
+// versioned validation equivalence sweep. Use it for kinds whose internal type
+// is also registered under a deprecated, unserved group (e.g. extensions/v1beta1)
+// for which declarative validation is intentionally not generated.
+func WithSkipGroupVersions(groupVersions ...string) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.SkipGroupVersions = sets.New(groupVersions...)
 	}
 }
 
