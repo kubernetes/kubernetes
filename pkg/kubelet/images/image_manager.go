@@ -18,7 +18,10 @@ package images
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"hash/fnv"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -67,6 +71,14 @@ type imageManager struct {
 	nodeKeyring credentialprovider.DockerKeyring
 
 	podPullingTimeRecorder ImagePodPullingTimeRecorder
+
+	// pullCoalescers coalesces concurrent EnsureImageExists calls for the
+	// same ImageSpec: the first arrival becomes the leader and runs the
+	// pull; the rest wait on the chan, then re-run the precheck so they
+	// honor their own credentials (KEP-2535) instead of piggy-backing on
+	// the leader's authorization.
+	pullCoalescersLock sync.Mutex
+	pullCoalescers     map[uint64]chan struct{}
 }
 
 var _ ImageManager = &imageManager{}
@@ -101,6 +113,7 @@ func NewImageManager(
 		backOff:                imageBackOff,
 		puller:                 puller,
 		podPullingTimeRecorder: podPullingTimeRecorder,
+		pullCoalescers:         make(map[uint64]chan struct{}),
 	}
 }
 
@@ -167,7 +180,29 @@ func (m *imageManager) imageNotPresentOnNeverPolicyError(logger klog.Logger, log
 
 // EnsureImageExists pulls the image for the specified pod and requestedImage, and returns
 // (imageRef, error message, error).
+//
+// Concurrent same-image arrivals are coalesced: only the first caller (the
+// leader) runs the full pull path; the rest wait for the leader to finish
+// and then re-enter, where imagePullPrecheck and (when KEP-2535 is on)
+// MustAttemptImagePull short-circuit them past PullImage. PullAlways opts
+// out — its contract is "always pull", not "share whoever is pulling".
 func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, requestedImage string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
+	if pullPolicy != v1.PullAlways {
+		if key, ok := pullCoalesceKey(requestedImage, pod, podRuntimeHandler); ok {
+			done, leader := m.joinPullCoalesce(key)
+			if leader {
+				defer m.endPullCoalesce(key, done)
+			} else {
+				<-done
+			}
+		}
+	}
+	return m.ensureImageExistsLocked(ctx, objRef, pod, requestedImage, pullSecrets, podSandboxConfig, podRuntimeHandler, pullPolicy)
+}
+
+// ensureImageExistsLocked carries the original EnsureImageExists body,
+// unaware of pull coalescing.
+func (m *imageManager) ensureImageExistsLocked(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, requestedImage string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
 	logger := klog.FromContext(ctx)
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, requestedImage)
 
@@ -436,6 +471,70 @@ func applyDefaultImageTag(image string) (string, error) {
 		image = image + ":" + tag
 	}
 	return image, nil
+}
+
+// pullCoalesceKey returns the hash key under which concurrent
+// EnsureImageExists calls for the same image should coalesce. Returns
+// ok=false when we can't form a stable key — in that case the wrapper
+// skips coalescing and lets the inner path report the original error.
+func pullCoalesceKey(requestedImage string, pod *v1.Pod, podRuntimeHandler string) (uint64, bool) {
+	image, err := applyDefaultImageTag(requestedImage)
+	if err != nil {
+		return 0, false
+	}
+	var podAnnotations []kubecontainer.Annotation
+	for k, v := range pod.GetAnnotations() {
+		podAnnotations = append(podAnnotations, kubecontainer.Annotation{Name: k, Value: v})
+	}
+	return imageSpecKey(kubecontainer.ImageSpec{
+		Image:          image,
+		Annotations:    podAnnotations,
+		RuntimeHandler: podRuntimeHandler,
+	}), true
+}
+
+// imageSpecKey hashes the full ImageSpec so two requests coalesce iff they
+// pull the same image — the kubelet cannot assume which fields the runtime
+// treats as identity-significant (e.g. containerd uses annotations for
+// snapshotter selection). Annotations come from a Go map range and must be
+// sorted for a stable hash. Collisions only cause an unrelated coalesce
+// (followers re-validate via precheck), not incorrect behavior.
+func imageSpecKey(spec kubecontainer.ImageSpec) uint64 {
+	if len(spec.Annotations) > 1 {
+		sorted := make([]kubecontainer.Annotation, len(spec.Annotations))
+		copy(sorted, spec.Annotations)
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+		spec.Annotations = sorted
+	}
+	hash := fnv.New32a()
+	specJson, _ := json.Marshal(spec)
+	hashutil.DeepHashObject(hash, specJson)
+	return uint64(hash.Sum32())
+}
+
+// joinPullCoalesce registers the caller as leader if no pull is in flight
+// for key, otherwise returns the existing leader's done chan. Followers
+// must <-done before calling imagePullPrecheck so they observe the
+// leader's outcome.
+func (m *imageManager) joinPullCoalesce(key uint64) (done chan struct{}, leader bool) {
+	m.pullCoalescersLock.Lock()
+	defer m.pullCoalescersLock.Unlock()
+	if existing, ok := m.pullCoalescers[key]; ok {
+		return existing, false
+	}
+	done = make(chan struct{})
+	m.pullCoalescers[key] = done
+	return done, true
+}
+
+// endPullCoalesce removes the leader's entry and wakes all waiters,
+// regardless of whether the pull succeeded — followers re-validate via
+// precheck and fall through if the image is still missing.
+func (m *imageManager) endPullCoalesce(key uint64, done chan struct{}) {
+	m.pullCoalescersLock.Lock()
+	delete(m.pullCoalescers, key)
+	m.pullCoalescersLock.Unlock()
+	close(done)
 }
 
 func trackedToImagePullCreds(trackedCreds *credentialprovider.TrackedAuthConfig) *kubeletconfiginternal.ImagePullCredentials {

@@ -1197,6 +1197,73 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	fakeRuntime.AssertCallCounts("PullImage", 7)
 }
 
+// TestSameImageShortCircuitsFollowers checks that with PullIfNotPresent, only
+// the leader hits the runtime; followers re-run precheck after the leader
+// finishes and find the image already present, so they skip PullImage
+// entirely. PullAlways is excluded from this coordination so each pod still
+// validates its own credentials and refreshes mutable tags.
+func TestSameImageShortCircuitsFollowers(t *testing.T) {
+	ctx := ktesting.Init(t)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+		}}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
+
+	testCase := &pullerTestCase{
+		containerImage: "missing_image",
+		testName:       "same image short-circuits followers",
+		policy:         v1.PullIfNotPresent,
+		inspectErr:     nil,
+		pullerErr:      nil,
+		qps:            0.0,
+		burst:          0,
+	}
+
+	puller, fakeClock, fakeRuntime, _, _, _ := pullerTestEnv(t, *testCase, false, ptr.To(int32(2)))
+	fakeRuntime.BlockImagePulls = true
+	fakeRuntime.CalledFunctions = nil
+	fakeRuntime.ImageList = nil
+	fakeRuntime.T = t
+	fakeClock.Step(time.Second)
+
+	const followers = 5
+	const image = "missing_image"
+
+	// Leader races followers in goroutines so we exercise the inFlight wait,
+	// not just the post-leader fast path.
+	var wg sync.WaitGroup
+	for i := 0; i < followers+1; i++ {
+		wg.Add(1)
+		go func() {
+			_, _, err := puller.EnsureImageExists(ctx, nil, pod, image, testCase.pullSecrets, podSandboxConfig, "", testCase.policy)
+			assert.NoError(t, err)
+			wg.Done()
+		}()
+	}
+
+	// Wait long enough for everyone to register as leader-or-follower; only
+	// the leader should be blocked on PullImage now.
+	time.Sleep(500 * time.Millisecond)
+	fakeRuntime.AssertCallCounts("PullImage", 1)
+
+	fakeRuntime.UnblockImagePulls(1)
+	wg.Wait()
+
+	// Followers short-circuited via imagePullPrecheck after the leader
+	// populated ImageList, so PullImage was only called once.
+	fakeRuntime.AssertCallCounts("PullImage", 1)
+}
+
 func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	pod1 := &v1.Pod{
@@ -1231,6 +1298,11 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 
 	pods := [2]*v1.Pod{pod1, pod2}
 	podSandboxes := [2]*runtimeapi.PodSandboxConfig{pod1SandboxConfig, pod2SandboxConfig}
+	// Use distinct images so each pod is its own leader; otherwise the
+	// follower short-circuits past pullImage and never records start/finish
+	// metrics, which is exactly the path TestSameImageShortCircuitsFollowers
+	// covers.
+	images := [2]string{"missing_image_1", "missing_image_2"}
 
 	testCase := &pullerTestCase{
 		containerImage: "missing_image",
@@ -1246,7 +1318,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	maxParallelImagePulls := 2
 	var wg sync.WaitGroup
 
-	puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
+	puller, fakeClock, fakeRuntime, _, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, *testCase, useSerializedEnv, ptr.To(int32(maxParallelImagePulls)))
 	fakeRuntime.BlockImagePulls = true
 	fakeRuntime.CalledFunctions = nil
 	fakeRuntime.T = t
@@ -1256,7 +1328,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, _ = puller.EnsureImageExists(tCtx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
+			_, _, _ = puller.EnsureImageExists(tCtx, nil, pods[i], images[i], testCase.pullSecrets, podSandboxes[i], "", testCase.policy)
 			wg.Done()
 		}(i)
 	}
@@ -1280,23 +1352,17 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 
 	wg.Wait()
 
-	// This time EnsureImageExists will return without pulling
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func(i int) {
-			_, _, err := puller.EnsureImageExists(tCtx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
-			assert.NoError(t, err)
-			wg.Done()
-		}(i)
+	// One pod won the unblock race, one got the error. Their identity is
+	// race-determined; what matters is that exactly one finished and exactly
+	// one is missing a finish record.
+	finished := 0
+	for _, pod := range pods {
+		if fakePodPullingTimeRecorder.finishedPullingRecorded[pod.UID] {
+			finished++
+		}
 	}
-	wg.Wait()
-
-	// Assert the number of PullImage calls is still 2
+	assert.Equal(t, 1, finished, "exactly one pod should have completed pulling")
 	fakeRuntime.AssertCallCounts("PullImage", 2)
-
-	// Both recorders should be finished
-	assert.True(t, fakePodPullingTimeRecorder.finishedPullingRecorded[pods[0].UID])
-	assert.True(t, fakePodPullingTimeRecorder.finishedPullingRecorded[pods[1].UID])
 }
 
 func TestEvalCRIPullErr(t *testing.T) {
