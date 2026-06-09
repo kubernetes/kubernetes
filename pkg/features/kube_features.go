@@ -770,12 +770,6 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
-	// owner: @Huang-Wei
-	// kep: https://kep.k8s.io/3521
-	//
-	// Enable users to specify when a Pod is ready for scheduling.
-	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
-
 	// owner: @munnerz
 	// kep: https://kep.k8s.io/4742
 	// alpha: v1.33
@@ -1733,12 +1727,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	PodSchedulingReadiness: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
-	},
-
 	PodTopologyLabelsAdmission: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2465,8 +2453,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodObservedGenerationTracking: {},
 
 	PodReadyToStartContainersCondition: {},
-
-	PodSchedulingReadiness: {},
 
 	PodTopologyLabelsAdmission: {},
 
