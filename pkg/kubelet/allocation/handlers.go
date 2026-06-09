@@ -39,12 +39,11 @@ import (
 
 // NewPodResizesAdmitHandler returns a PodAdmitHandler which is used to evaluate
 // if a pod resize can be allocated by the kubelet.
-func NewPodResizesAdmitHandler(containerManager cm.ContainerManager, containerRuntime kubecontainer.Runtime, allocationManager Manager, logger klog.Logger) lifecycle.PodAdmitHandler {
+func NewPodResizesAdmitHandler(containerManager cm.ContainerManager, containerRuntime kubecontainer.Runtime, allocationManager Manager) lifecycle.PodAdmitHandler {
 	return &podResizesAdmitHandler{
 		containerManager:  containerManager,
 		containerRuntime:  containerRuntime,
 		allocationManager: allocationManager,
-		logger:            logger,
 	}
 }
 
@@ -52,14 +51,14 @@ type podResizesAdmitHandler struct {
 	containerManager  cm.ContainerManager
 	containerRuntime  kubecontainer.Runtime
 	allocationManager Manager
-	logger            klog.Logger
 }
 
-func (h *podResizesAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	if attrs.Operation != lifecycle.ResizeOperation {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
+	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
 	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
@@ -85,7 +84,7 @@ func (h *podResizesAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAd
 			h.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
 			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
-			h.logger.V(3).Info(msg, "pod", format.Pod(pod))
+			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 		}
@@ -93,7 +92,7 @@ func (h *podResizesAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAd
 			h.containerManager.GetNodeConfig().MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) &&
 			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside Memory Manager policy \"%s\"", string(memorymanager.PolicyTypeStatic))
-			h.logger.V(3).Info(msg, "pod", format.Pod(pod))
+			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_memory_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 		}

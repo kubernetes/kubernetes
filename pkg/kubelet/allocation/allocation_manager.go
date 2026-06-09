@@ -85,7 +85,7 @@ type Manager interface {
 	// the pod cannot be admitted.
 	// allocatedPods should represent the pods that have already been admitted, along with their
 	// admitted (allocated) resources.
-	AddPod(activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
+	AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
 
 	// RemovePod removes any stored state for the given pod UID.
 	RemovePod(uid types.UID)
@@ -506,10 +506,7 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	}
 }
 
-func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
+func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()

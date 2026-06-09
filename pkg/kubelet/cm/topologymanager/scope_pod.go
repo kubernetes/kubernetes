@@ -62,7 +62,7 @@ func (s *podScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitRes
 func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
-	bestHint, admit := s.checkAffinity(logger, pod)
+	bestHint, admit := s.checkAffinity(ctx, pod)
 	if !admit {
 		return admission.GetPodAdmitResult(NewTopologyAffinityError())
 	}
@@ -71,21 +71,21 @@ func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(pod, &container)
+		err := s.allocateAlignedResources(ctx, pod, &container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			return admission.GetPodAdmitResult(err)
 		}
 	}
 
-	s.updateSuccessMetrics(logger, pod)
+	s.updateSuccessMetrics(ctx, pod)
 	return admission.GetPodAdmitResult(nil)
 }
 
 func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
-	bestHint, admit := s.checkAffinity(logger, pod)
+	bestHint, admit := s.checkAffinity(ctx, pod)
 	if !admit {
 		return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission under pod-scope topology manager"))
 	}
@@ -101,20 +101,21 @@ func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod) life
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 	}
 
-	err := s.allocatePodAlignedResources(pod)
+	err := s.allocatePodAlignedResources(ctx, pod)
 	if err != nil {
 		logger.Error(err, "Pod-level allocation failed", "pod", klog.KObj(pod))
 		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 		return admission.GetPodAdmitResult(err)
 	}
 
-	s.updateSuccessMetrics(logger, pod)
+	s.updateSuccessMetrics(ctx, pod)
 	return admission.GetPodAdmitResult(nil)
 }
 
-func (s *podScope) checkAffinity(logger klog.Logger, pod *v1.Pod) (TopologyHint, bool) {
+func (s *podScope) checkAffinity(ctx context.Context, pod *v1.Pod) (TopologyHint, bool) {
+	logger := klog.FromContext(ctx)
 	// Calculate the best NUMA affinity for the pod as a whole.
-	bestHint, admit := s.calculateAffinity(logger, pod)
+	bestHint, admit := s.calculateAffinity(ctx, pod)
 	logger.Info("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	if !admit {
 		if IsAlignmentGuaranteed(s.policy) {
@@ -128,7 +129,8 @@ func (s *podScope) checkAffinity(logger klog.Logger, pod *v1.Pod) (TopologyHint,
 	return bestHint, true
 }
 
-func (s *podScope) updateSuccessMetrics(logger klog.Logger, pod *v1.Pod) {
+func (s *podScope) updateSuccessMetrics(ctx context.Context, pod *v1.Pod) {
+	logger := klog.FromContext(ctx)
 	if IsAlignmentGuaranteed(s.policy) {
 		// Increment success metric only if alignment was guaranteed.
 		logger.V(4).Info("Resource alignment at pod scope guaranteed", "pod", klog.KObj(pod))
@@ -136,20 +138,22 @@ func (s *podScope) updateSuccessMetrics(logger klog.Logger, pod *v1.Pod) {
 	}
 }
 
-func (s *podScope) accumulateProvidersHints(logger klog.Logger, pod *v1.Pod) []map[string][]TopologyHint {
+func (s *podScope) accumulateProvidersHints(ctx context.Context, pod *v1.Pod) []map[string][]TopologyHint {
+	logger := klog.FromContext(ctx)
 	var providersHints []map[string][]TopologyHint
 
 	for _, provider := range s.hintProviders {
 		// Get the TopologyHints for a Pod from a provider.
-		hints := provider.GetPodTopologyHints(pod)
+		hints := provider.GetPodTopologyHints(ctx, pod)
 		providersHints = append(providersHints, hints)
 		logger.Info("TopologyHints", "hints", hints, "pod", klog.KObj(pod))
 	}
 	return providersHints
 }
 
-func (s *podScope) calculateAffinity(logger klog.Logger, pod *v1.Pod) (TopologyHint, bool) {
-	providersHints := s.accumulateProvidersHints(logger, pod)
+func (s *podScope) calculateAffinity(ctx context.Context, pod *v1.Pod) (TopologyHint, bool) {
+	logger := klog.FromContext(ctx)
+	providersHints := s.accumulateProvidersHints(ctx, pod)
 	bestHint, admit := s.policy.Merge(logger, providersHints)
 	logger.Info("PodTopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	return bestHint, admit

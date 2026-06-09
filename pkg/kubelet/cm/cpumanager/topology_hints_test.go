@@ -231,7 +231,7 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
@@ -270,7 +270,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(ctx, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
@@ -287,7 +287,7 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestGetPodTopologyHints(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
@@ -326,7 +326,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+		podHints := m.GetPodTopologyHints(ctx, &tc.pod)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
@@ -480,6 +480,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerPolicyAlphaOptions, true)
+			_, ctx := ktesting.NewTestContext(t)
 
 			var activePods []*v1.Pod
 			for p := range testCase.assignments {
@@ -508,7 +509,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				sourcesReady:      &sourcesReadyStub{},
 			}
 
-			podHints := m.GetPodTopologyHints(&testCase.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(ctx, &testCase.pod)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
@@ -523,7 +524,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 }
 
 func TestTopologyHintsPodLevelResources(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	testPodGuaranteedOverridePLR := makePodWithPodLevelResources("guaranteedPod", "3", "3", "c1", "1", "2")
 	testContainerGuaranteedOverridePLR := &testPodGuaranteedOverridePLR.Spec.Containers[0]
@@ -633,7 +634,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetPodTopologyHints
-			podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(ctx, &tc.pod)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
@@ -645,7 +646,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetTopologyHints
-			containerHints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+			containerHints := m.GetTopologyHints(ctx, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
 			sort.SliceStable(containerHints, func(i, j int) bool {
 				return containerHints[i].LessThan(containerHints[j])
 			})
