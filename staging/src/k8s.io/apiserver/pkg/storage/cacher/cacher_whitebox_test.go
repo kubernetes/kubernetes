@@ -263,7 +263,11 @@ func TestShouldDelegateList(t *testing.T) {
 			}
 			defer cacher.Stop()
 			if snapshotAvailable {
+				// Reset and re-add snapshots in monotonically increasing RV order
+				// to satisfy the ring buffer's ordering invariant.
+				cacher.watchCache.snapshots.Reset()
 				cacher.watchCache.snapshots.Add(uint64(mustAtoi(oldRV)), fakeOrderedLister{})
+				cacher.watchCache.snapshots.Add(uint64(mustAtoi(cacheRV)), fakeOrderedLister{})
 			}
 			result, err := delegator.ShouldDelegateList(toStorageOpts(opt), cacher)
 			if err != nil {
