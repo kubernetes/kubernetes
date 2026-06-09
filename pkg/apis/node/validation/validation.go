@@ -26,12 +26,18 @@ import (
 	"regexp"
 )
 
-// Define normalization rules to handle field name differences across API versions
-// v1alpha1 uses "spec.runtimeHandler" while v1/v1beta1 use "handler"
+// Define normalization rules to handle field name differences across API versions.
+// v1alpha1 nests fields under "spec" (e.g. "spec.runtimeHandler", "spec.scheduling")
+// while v1/v1beta1 expose them at the top level ("handler", "scheduling"), matching
+// the internal type used by handwritten validation.
 var NodeNormalizationRules = []field.NormalizationRule{
 	{
 		Regexp:      regexp.MustCompile(`^spec\.runtimeHandler(.*)$`),
 		Replacement: "handler$1",
+	},
+	{
+		Regexp:      regexp.MustCompile(`^spec\.scheduling(.*)$`),
+		Replacement: "scheduling$1",
 	},
 }
 
@@ -81,7 +87,7 @@ func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList
 }
 
 func validateTolerations(tolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
-	allErrs := corevalidation.ValidateTolerations(tolerations, fldPath, corevalidation.PodValidationOptions{})
+	allErrs := corevalidation.ValidateTolerations(tolerations, fldPath, corevalidation.PodValidationOptions{}, corevalidation.KeyFormatCovered)
 	// Ensure uniquenes of tolerations.
 	tolerationSet := map[core.Toleration]bool{}
 	for i, t := range tolerations {
