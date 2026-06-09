@@ -76,6 +76,7 @@ message RuntimeClass {
   // If scheduling is nil, this RuntimeClass is assumed to be supported by all
   // nodes.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   optional Scheduling scheduling = 4;
 }
 
@@ -107,6 +108,7 @@ message Scheduling {
   // tolerated by the pod and the RuntimeClass.
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   repeated .k8s.io.api.core.v1.Toleration tolerations = 2;
 }
 

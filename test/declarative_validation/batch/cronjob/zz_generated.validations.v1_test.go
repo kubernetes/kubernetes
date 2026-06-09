@@ -33,6 +33,9 @@ func init() {
 			"spec.jobTemplate.spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
+			"spec.jobTemplate.spec.template.spec.tolerations[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
 			"spec.schedule": {
 				{ErrorType: "FieldValueRequired"},
 			},

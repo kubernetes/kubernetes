@@ -35,6 +35,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"scheduling.tolerations[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
 		},
 	)
 }

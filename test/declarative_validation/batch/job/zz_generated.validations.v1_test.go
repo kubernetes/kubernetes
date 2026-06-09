@@ -33,6 +33,9 @@ func init() {
 			"spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
+			"spec.template.spec.tolerations[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
 		},
 	)
 }

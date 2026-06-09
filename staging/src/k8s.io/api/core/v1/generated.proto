@@ -3686,6 +3686,8 @@ message PhotonPersistentDiskVolumeSource {
 // by clients and scheduled onto hosts.
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/ephemeralcontainers"
+// +k8s:supportsSubresource="/resize"
+// +k8s:supportsSubresource="/eviction"
 message Pod {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -4604,6 +4606,7 @@ message PodSpec {
   // If specified, the pod's tolerations.
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   repeated Toleration tolerations = 22;
 
   // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
@@ -5452,6 +5455,7 @@ message ReplicationControllerSpec {
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   optional PodTemplateSpec template = 3;
 }
 
@@ -6638,6 +6642,8 @@ message Toleration {
   // Key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
