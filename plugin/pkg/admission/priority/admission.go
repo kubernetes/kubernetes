@@ -91,12 +91,14 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 }
 
 var (
-	podResource           = core.Resource("pods")
-	podGroupResource      = scheduling.Resource("podgroups")
-	priorityClassResource = scheduling.Resource("priorityclasses")
+	podResource               = core.Resource("pods")
+	podGroupResource          = scheduling.Resource("podgroups")
+	compositePodGroupResource = scheduling.Resource("compositepodgroups")
+	priorityClassResource     = scheduling.Resource("priorityclasses")
 )
 
-// Admit checks Pods and PodGroups and admits or rejects them. It also resolves the priority of pods and pod groups based on their PriorityClass.
+// Admit checks Pods, PodGroups and CompositePodGroups and admits or rejects them.
+// It also resolves the priority of Pods, PodGroups and CompositePodGroups based on their PriorityClass.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
@@ -112,6 +114,11 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	case podGroupResource:
 		if operation == admission.Create {
 			return p.admitPodGroup(a)
+		}
+		return nil
+	case compositePodGroupResource:
+		if operation == admission.Create {
+			return p.admitCompositePodGroup(a)
 		}
 		return nil
 	default:
@@ -229,6 +236,32 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 		}
 		pg.Spec.PreemptionPolicy = &schedulingPreemptionPolicy
 	}
+	return nil
+}
+
+// admitCompositePodGroup makes sure a new composite pod group does not set spec.Priority field.
+// It also makes sure that the PriorityClassName exists if it is provided and resolves
+// the composite pod group priority from the PriorityClassName.
+func (p *Plugin) admitCompositePodGroup(attributes admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		return nil
+	}
+
+	cpg, ok := attributes.GetObject().(*scheduling.CompositePodGroup)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind CompositePodGroup but was unable to be converted")
+	}
+
+	priorityClassName, priority, _, err := p.establishPriority(attributes, &cpg.Spec.PriorityClassName)
+	if err != nil {
+		return err
+	}
+	// Reject if the composite pod group already contained a priority that differs from the one computed from the priority class.
+	if cpg.Spec.Priority != nil && *cpg.Spec.Priority != priority {
+		return admission.NewForbidden(attributes, fmt.Errorf("priority set in the composite pod group (%d) must match the priority computed (%d) based on the priority class set in the spec", *cpg.Spec.Priority, priority))
+	}
+	cpg.Spec.Priority = &priority
+	cpg.Spec.PriorityClassName = priorityClassName
 	return nil
 }
 

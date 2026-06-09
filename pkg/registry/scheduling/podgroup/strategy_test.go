@@ -335,7 +335,7 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"updating pod group template ref not allowed": {
+		"updating pod group workload ref not allowed": {
 			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
 				newPodGroup := podGroup.DeepCopy()
@@ -838,4 +838,104 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestDropPodGroupParentCompositePodGroupNameField(t *testing.T) {
+	var noPodGroup *scheduling.PodGroup
+	podGroupWithoutParent := podGroup
+
+	podGroupWithParent := func() *scheduling.PodGroup {
+		w := podGroupWithoutParent.DeepCopy()
+		w.Spec.ParentCompositePodGroupName = new("parent1")
+		return w
+	}()
+
+	podGroupWithParentDropped := func() *scheduling.PodGroup {
+		w := podGroupWithParent.DeepCopy()
+		w.Spec.ParentCompositePodGroupName = nil
+		return w
+	}()
+
+	tests := []struct {
+		description  string
+		enabled      bool
+		oldPodGroup  *scheduling.PodGroup
+		newPodGroup  *scheduling.PodGroup
+		wantPodGroup *scheduling.PodGroup
+	}{
+		{
+			description:  "old with parent / new with parent / disabled",
+			enabled:      false,
+			oldPodGroup:  podGroupWithParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+		{
+			description:  "old with parent / new with parent / enabled",
+			enabled:      true,
+			oldPodGroup:  podGroupWithParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+		{
+			description:  "old without parent / new with parent / disabled",
+			enabled:      false,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParentDropped,
+		},
+		{
+			description:  "old without parent / new with parent / enabled",
+			enabled:      true,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+		{
+			description:  "old without parent / new without parent / disabled",
+			enabled:      false,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithoutParent,
+			wantPodGroup: podGroupWithoutParent,
+		},
+		{
+			description:  "old without parent / new without parent / enabled",
+			enabled:      true,
+			oldPodGroup:  podGroupWithoutParent,
+			newPodGroup:  podGroupWithoutParent,
+			wantPodGroup: podGroupWithoutParent,
+		},
+		{
+			description:  "nil old / new with parent / disabled",
+			enabled:      false,
+			oldPodGroup:  noPodGroup,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParentDropped,
+		},
+		{
+			description:  "nil old / new with parent / enabled",
+			enabled:      true,
+			oldPodGroup:  noPodGroup,
+			newPodGroup:  podGroupWithParent,
+			wantPodGroup: podGroupWithParent,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               tc.enabled,
+			})
+			var oldSpec *scheduling.PodGroupSpec
+			if tc.oldPodGroup != nil {
+				oldSpec = &tc.oldPodGroup.Spec
+			}
+			dropDisabledPodGroupSpecFields(&tc.newPodGroup.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantPodGroup, tc.newPodGroup); diff != "" {
+				t.Errorf("new PodGroup changed (- want, + got): %s", diff)
+			}
+		})
+	}
 }

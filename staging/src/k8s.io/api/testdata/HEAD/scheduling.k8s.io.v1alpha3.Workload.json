@@ -80,6 +80,51 @@
         "priority": 7,
         "preemptionPolicy": "preemptionPolicyValue"
       }
+    ],
+    "compositePodGroupTemplates": [
+      {
+        "name": "nameValue",
+        "schedulingPolicy": {
+          "basic": {},
+          "gang": {
+            "minGroupCount": 1
+          }
+        },
+        "priorityClassName": "priorityClassNameValue",
+        "priority": 4,
+        "podGroupTemplates": [
+          {
+            "name": "nameValue",
+            "schedulingPolicy": {
+              "basic": {},
+              "gang": {
+                "minCount": 1
+              }
+            },
+            "schedulingConstraints": {
+              "topology": [
+                {
+                  "key": "keyValue"
+                }
+              ]
+            },
+            "resourceClaims": [
+              {
+                "name": "nameValue",
+                "resourceClaimName": "resourceClaimNameValue",
+                "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+              }
+            ],
+            "disruptionMode": {
+              "single": {},
+              "all": {}
+            },
+            "priorityClassName": "priorityClassNameValue",
+            "priority": 7,
+            "preemptionPolicy": "preemptionPolicyValue"
+          }
+        ]
+      }
     ]
   }
 }

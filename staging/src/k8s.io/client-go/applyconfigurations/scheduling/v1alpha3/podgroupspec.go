@@ -27,6 +27,12 @@ import (
 //
 // PodGroupSpec defines the desired state of a PodGroup.
 type PodGroupSpecApplyConfiguration struct {
+	// ParentCompositePodGroupName contains the name of the parent composite pod group
+	// within the same namespace as this pod group.
+	// If it's nil, then this pod group is a root of a workload's hierarchy.
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	// This field is immutable.
+	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty"`
 	// WorkloadRef references an optional PodGroup template within the Workload
 	// object that was used to create the PodGroup.
 	// This field is immutable.
@@ -82,6 +88,14 @@ type PodGroupSpecApplyConfiguration struct {
 // apply.
 func PodGroupSpec() *PodGroupSpecApplyConfiguration {
 	return &PodGroupSpecApplyConfiguration{}
+}
+
+// WithParentCompositePodGroupName sets the ParentCompositePodGroupName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ParentCompositePodGroupName field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithParentCompositePodGroupName(value string) *PodGroupSpecApplyConfiguration {
+	b.ParentCompositePodGroupName = &value
+	return b
 }
 
 // WithWorkloadRef sets the WorkloadRef field in the declarative configuration to the given value
