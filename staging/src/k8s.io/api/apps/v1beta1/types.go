@@ -98,6 +98,7 @@ type Scale struct {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
 type StatefulSet struct {
 	metav1.TypeMeta `json:""`
@@ -416,6 +417,7 @@ type StatefulSetList struct {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:""`
