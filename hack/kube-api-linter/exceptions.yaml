@@ -119,7 +119,13 @@
 
 # NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
 
-# The (PodGroupSpec|PodGroupTemplate).SchedulingPolicy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
+# The (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate).SchedulingPolicy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
 # Validation makes this require at least one of the fields within to be set.
-- text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
-  path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
+- text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate)\\.SchedulingPolicy is a non-pointer struct with no required fields\\..*"
+  path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+
+# Workload.Spec no longer has any strictly required fields due to the introduction of the
+# CompositePodGroup API. The template fields have been refactored into a union where either
+# podGroupTemplates or compositePodGroupTemplates must be provided (enforced via validation).
+- text: "nonpointerstructs: field Workload\\.Spec is a non-pointer struct with no required fields\\..*"
+  path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"

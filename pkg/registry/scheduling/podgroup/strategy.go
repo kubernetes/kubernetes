@@ -86,6 +86,9 @@ func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, o
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
 		opts = append(opts, string(features.PodGroupPreemptionPolicy))
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		opts = append(opts, string(features.CompositePodGroup))
+	}
 	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
@@ -177,6 +180,7 @@ func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.Po
 	dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec)
 	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
 	dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec)
+	dropDisabledParentCompositePodGroupNameField(podGroupSpec, oldPodGroupSpec)
 }
 
 func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
@@ -232,4 +236,18 @@ func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool 
 
 func preemptionPolicyInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && podGroupSpec.PreemptionPolicy != nil
+}
+
+func parentCompositePodGroupNameInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.ParentCompositePodGroupName != nil
+}
+
+// dropDisabledParentCompositePodGroupNameField removes the ParentCompositePodGroupName field
+// unless it is already used in the old PodGroup spec.
+func dropDisabledParentCompositePodGroupNameField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) || parentCompositePodGroupNameInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.ParentCompositePodGroupName = nil
 }

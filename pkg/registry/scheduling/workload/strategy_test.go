@@ -660,3 +660,118 @@ func TestDropPodGroupTemplateResourceClaims(t *testing.T) {
 		})
 	}
 }
+
+func TestDropCompositePodGroupTemplates(t *testing.T) {
+	var noWorkload *scheduling.Workload
+	workloadWithoutCPG := workload.DeepCopy()
+
+	workloadWithCPG := func() *scheduling.Workload {
+		w := workloadWithoutCPG.DeepCopy()
+		w.Spec.PodGroupTemplates = nil
+		w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+			{
+				Name: "cpg-template",
+				CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "child-cpg-template",
+					},
+				},
+				PodGroupTemplates: []scheduling.PodGroupTemplate{
+					{
+						Name: "pg-template",
+					},
+				},
+			},
+		}
+		return w
+	}()
+
+	workloadWithCPGDropped := func() *scheduling.Workload {
+		w := workloadWithCPG.DeepCopy()
+		w.Spec.CompositePodGroupTemplates = nil
+		return w
+	}()
+
+	tests := []struct {
+		description  string
+		enabled      bool
+		oldWorkload  *scheduling.Workload
+		newWorkload  *scheduling.Workload
+		wantWorkload *scheduling.Workload
+	}{
+		{
+			description:  "old with cpg / new with cpg / disabled",
+			enabled:      false,
+			oldWorkload:  workloadWithCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+		{
+			description:  "old with cpg / new with cpg / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+		{
+			description:  "old without cpg / new with cpg / disabled",
+			enabled:      false,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPGDropped,
+		},
+		{
+			description:  "old without cpg / new with cpg / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+		{
+			description:  "old without cpg / new without cpg / disabled",
+			enabled:      false,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithoutCPG,
+			wantWorkload: workloadWithoutCPG,
+		},
+		{
+			description:  "old without cpg / new without cpg / enabled",
+			enabled:      true,
+			oldWorkload:  workloadWithoutCPG,
+			newWorkload:  workloadWithoutCPG,
+			wantWorkload: workloadWithoutCPG,
+		},
+		{
+			description:  "nil old / new with cpg / disabled",
+			enabled:      false,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPGDropped,
+		},
+		{
+			description:  "nil old / new with cpg / enabled",
+			enabled:      true,
+			oldWorkload:  noWorkload,
+			newWorkload:  workloadWithCPG,
+			wantWorkload: workloadWithCPG,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.CompositePodGroup:               tc.enabled,
+				features.TopologyAwareWorkloadScheduling: tc.enabled,
+			})
+			var oldSpec *scheduling.WorkloadSpec
+			if tc.oldWorkload != nil {
+				oldSpec = &tc.oldWorkload.Spec
+			}
+			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
+				t.Errorf("new Workload changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}

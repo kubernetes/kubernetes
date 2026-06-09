@@ -589,6 +589,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			IntroducedVersion: "1.36",
 			RemovedVersion:    "1.42",
 		},
+		gvr("scheduling.k8s.io", "v1alpha3", "compositepodgroups"): {
+			Stub:              `{"metadata": {"name": "cpg1"}, "spec": {"workloadRef": {"templateName": "t", "workloadName": "w"}, "schedulingPolicy": {"basic": {}}}}`,
+			ExpectedEtcdPath:  "/registry/compositepodgroups/" + namespace + "/cpg1",
+			IntroducedVersion: "1.37",
+			RemovedVersion:    "1.42",
+		},
 		// --
 
 		// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1

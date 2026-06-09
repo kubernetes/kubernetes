@@ -36,6 +36,7 @@ spec:
   disruptionMode:
     all: {}
     single: {}
+  parentCompositePodGroupName: parentCompositePodGroupNameValue
   preemptionPolicy: preemptionPolicyValue
   priority: 7
   priorityClassName: priorityClassNameValue

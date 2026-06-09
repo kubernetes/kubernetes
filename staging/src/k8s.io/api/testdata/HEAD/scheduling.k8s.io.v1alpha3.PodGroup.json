@@ -74,7 +74,8 @@
     },
     "priorityClassName": "priorityClassNameValue",
     "priority": 7,
-    "preemptionPolicy": "preemptionPolicyValue"
+    "preemptionPolicy": "preemptionPolicyValue",
+    "parentCompositePodGroupName": "parentCompositePodGroupNameValue"
   },
   "status": {
     "conditions": [
