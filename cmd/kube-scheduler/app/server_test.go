@@ -446,7 +446,8 @@ leaderElection:
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
 			componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
-			verKube := basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31")
+			// set binary version to v1.33+ since StorageCapacityScoring (Alpha in v1.33) panics on registration otherwise
+			verKube := basecompatibility.NewEffectiveVersionFromString("1.33", "1.31", "1.31")
 			fg := feature.DefaultFeatureGate.DeepCopy()
 			utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 				"kubeA": {
