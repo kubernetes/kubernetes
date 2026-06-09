@@ -4,6 +4,34 @@
   "kind": "APIResourceList",
   "resources": [
     {
+      "kind": "CompositePodGroup",
+      "name": "compositepodgroups",
+      "namespaced": true,
+      "singularName": "compositepodgroup",
+      "storageVersionHash": "L+dT284DGFE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "CompositePodGroup",
+      "name": "compositepodgroups/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
       "kind": "PodGroup",
       "name": "podgroups",
       "namespaced": true,

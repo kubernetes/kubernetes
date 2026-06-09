@@ -59,6 +59,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input                           scheduling.PodGroup
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
+		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid": {
@@ -77,36 +78,39 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:        mkValidPodGroup(setPodGroupMinCount(-1)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum")},
 		},
-		"no podGroupTemplateRef": {
-			input: mkValidPodGroup(unsetPodGroupTemplateRef()),
+		"no workloadRef": {
+			input: mkValidPodGroup(unsetWorkloadRef()),
 		},
-		"empty podGroupTemplateRef": {
-			input:        mkValidPodGroup(setEmptyPodGroupTemplateRef()),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("union")},
+		"empty workloadRef": {
+			input: mkValidPodGroup(setEmptyWorkloadRef()),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "workloadRef", "workloadName"), ""),
+				field.Required(field.NewPath("spec", "workloadRef", "templateName"), ""),
+			},
 		},
-		"podGroupTemplateRef with empty template name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("", "workload")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), "")},
+		"workloadRef with empty template name": {
+			input:        mkValidPodGroup(setWorkloadRef("", "workload")),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "workloadRef", "templateName"), "")},
 		},
-		"podGroupTemplateRef invalid template name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("temp/late", "workload")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), nil, "").WithOrigin("format=k8s-short-name")},
+		"workloadRef invalid template name": {
+			input:        mkValidPodGroup(setWorkloadRef("temp/late", "workload")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "workloadRef", "templateName"), nil, "").WithOrigin("format=k8s-short-name")},
 		},
-		"podGroupTemplateRef with empty workload name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("template", "")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplateRef", "workload", "workloadName"), "")},
+		"workloadRef with empty workload name": {
+			input:        mkValidPodGroup(setWorkloadRef("template", "")),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "workloadRef", "workloadName"), "")},
 		},
-		"podGroupTemplateRef invalid workload name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("template", "work/load")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
+		"workloadRef invalid workload name": {
+			input:        mkValidPodGroup(setWorkloadRef("template", "work/load")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "workloadRef", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
 		},
-		"podGroupTemplateRef too long workload name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("template", strings.Repeat("g", 254))),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
+		"workloadRef too long workload name": {
+			input:        mkValidPodGroup(setWorkloadRef("template", strings.Repeat("g", 254))),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "workloadRef", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
 		},
-		"podGroupTemplateRef too long template name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef(strings.Repeat("g", 254), "workload")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), nil, "").WithOrigin("format=k8s-short-name")},
+		"workloadRef too long template name": {
+			input:        mkValidPodGroup(setWorkloadRef(strings.Repeat("g", 254), "workload")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "workloadRef", "templateName"), nil, "").WithOrigin("format=k8s-short-name")},
 		},
 		"policy with neither basic nor gang": {
 			input:        mkValidPodGroup(clearPodGroupPolicy()),
@@ -291,6 +295,27 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "resourceClaims").Index(0).Child("name"), ""),
 			},
 		},
+		"correct parentCompositePodGroupName": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent")),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"forbidden parentCompositePodGroupName (feature disabled)": {
+			input:        mkValidPodGroup(setParentCompositePodGroupName("my-parent")),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "parentCompositePodGroupName"), "")},
+		},
+		"invalid parentCompositePodGroupName": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("invalid/name")),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), nil, "").WithOrigin("format=k8s-long-name")},
+		},
+		"dependentRequired missing workloadRef when parent is set": {
+			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent"), unsetWorkloadRef()),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired")},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -298,6 +323,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 		})
@@ -328,6 +354,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		updateObj                       scheduling.PodGroup
 		enableTopologyAwareScheduling   bool
 		enableDRAWorkloadResourceClaims bool
+		enableCompositePodGroup         bool
 		expectedErrs                    field.ErrorList
 	}{
 		"valid update": {
@@ -338,32 +365,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
 			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupMinCount(10)),
 		},
-		"invalid update empty podGroupTemplateRef": {
+		"invalid update change workloadRef template name": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), setEmptyPodGroupTemplateRef()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setWorkloadRef("other-template", "workload")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "workloadRef"), nil, "").WithOrigin("immutable"),
 			},
 		},
-		"invalid update unset podGroupTemplateRef": {
+		"invalid update change workloadRef workload name": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), unsetPodGroupTemplateRef()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setWorkloadRef("template", "other-workload")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
-			},
-		},
-		"invalid update change podGroupTemplateRef template name": {
-			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupTemplateRef("other-template", "workload")),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
-			},
-		},
-		"invalid update change podGroupTemplateRef workload name": {
-			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupTemplateRef("template", "other-workload")),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "workloadRef"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update with neither basic nor gang": {
@@ -503,6 +516,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj:    mkValidPodGroup(setResourceVersion("1"), setPriority(2000)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "priority"), nil, "").WithOrigin("immutable")},
 		},
+		"invalid update of parentCompositePodGroupName": {
+			oldObj:                        mkValidPodGroup(setResourceVersion("1")),
+			updateObj:                     mkValidPodGroup(setResourceVersion("1"), setParentCompositePodGroupName("new-parent")),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), "new-parent", "").WithOrigin("immutable")},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -510,6 +530,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
+				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			strategy := registry.NewStrategy()
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
@@ -654,11 +675,9 @@ func mkValidPodGroup(tweaks ...func(pg *scheduling.PodGroup)) scheduling.PodGrou
 	obj := scheduling.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "podgroup", Namespace: "ns"},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "workload",
-					PodGroupTemplateName: "template",
-				},
+			WorkloadRef: &scheduling.WorkloadReference{
+				TemplateName: "template",
+				WorkloadName: "workload",
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{
@@ -682,15 +701,15 @@ func setResourceVersion(v string) func(obj *scheduling.PodGroup) {
 	}
 }
 
-func unsetPodGroupTemplateRef() func(obj *scheduling.PodGroup) {
+func unsetWorkloadRef() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
-		obj.Spec.PodGroupTemplateRef = nil
+		obj.Spec.WorkloadRef = nil
 	}
 }
 
-func setEmptyPodGroupTemplateRef() func(obj *scheduling.PodGroup) {
+func setEmptyWorkloadRef() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
-		obj.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{}
+		obj.Spec.WorkloadRef = &scheduling.WorkloadReference{}
 	}
 }
 
@@ -723,13 +742,11 @@ func setBothPolicies() func(obj *scheduling.PodGroup) {
 	}
 }
 
-func setPodGroupTemplateRef(templateName, workloadName string) func(obj *scheduling.PodGroup) {
+func setWorkloadRef(templateName, workloadName string) func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
-		obj.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{
-			Workload: &scheduling.WorkloadPodGroupTemplateReference{
-				PodGroupTemplateName: templateName,
-				WorkloadName:         workloadName,
-			},
+		obj.Spec.WorkloadRef = &scheduling.WorkloadReference{
+			TemplateName: templateName,
+			WorkloadName: workloadName,
 		}
 	}
 }
@@ -833,5 +850,11 @@ func setPriority(priority int32) func(obj *scheduling.PodGroup) {
 func clearDisruptionMode() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
 		obj.Spec.DisruptionMode = nil
+	}
+}
+
+func setParentCompositePodGroupName(name string) func(obj *scheduling.PodGroup) {
+	return func(obj *scheduling.PodGroup) {
+		obj.Spec.ParentCompositePodGroupName = &name
 	}
 }
