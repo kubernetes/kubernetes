@@ -2328,7 +2328,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">reason</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_certificate_manager_client_expiration_renew_errors_total</div>
+	<div class="metric_name">kubelet_certificate_manager_client_expiration_renew_errors</div>
 	<div class="metric_help">Counter of certificate renewal errors.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2370,14 +2370,14 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_container_aligned_compute_resources_total</div>
+	<div class="metric_name">kubelet_container_aligned_compute_resources_count</div>
 	<div class="metric_help">Cumulative number of aligned compute resources allocated to containers by alignment type.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">boundary</span><span class="metric_label">scope</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_container_aligned_compute_resources_failure_total</div>
+	<div class="metric_name">kubelet_container_aligned_compute_resources_failure_count</div>
 	<div class="metric_help">Cumulative number of failures to allocate aligned compute resources to containers by alignment type.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2412,7 +2412,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">numa_node</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_cpu_manager_exclusive_cpu_allocated</div>
+	<div class="metric_name">kubelet_cpu_manager_exclusive_cpu_allocation_count</div>
 	<div class="metric_help">The total number of CPUs exclusively allocated to containers running on this node</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2489,7 +2489,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">resource_name</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_evented_pleg_connection_error_total</div>
+	<div class="metric_name">kubelet_evented_pleg_connection_error_count</div>
 	<div class="metric_help">The number of errors encountered during the establishment of streaming connection with the CRI runtime.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2503,7 +2503,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_evented_pleg_connection_success_total</div>
+	<div class="metric_name">kubelet_evented_pleg_connection_success_count</div>
 	<div class="metric_help">The number of times a streaming client was obtained to receive CRI Events.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2517,7 +2517,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">eviction_signal</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_evictions_total</div>
+	<div class="metric_name">kubelet_evictions</div>
 	<div class="metric_help">Cumulative number of pod evictions by eviction signal</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2734,7 +2734,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pleg_discard_events_total</div>
+	<div class="metric_name">kubelet_pleg_discard_events</div>
 	<div class="metric_help">The number of discard events in PLEG.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2804,42 +2804,42 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">success</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pod_resources_endpoint_errors_get_total</div>
+	<div class="metric_name">kubelet_pod_resources_endpoint_errors_get</div>
 	<div class="metric_help">Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">server_api_version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pod_resources_endpoint_errors_get_allocatable_total</div>
+	<div class="metric_name">kubelet_pod_resources_endpoint_errors_get_allocatable</div>
 	<div class="metric_help">Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">server_api_version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pod_resources_endpoint_errors_list_total</div>
+	<div class="metric_name">kubelet_pod_resources_endpoint_errors_list</div>
 	<div class="metric_help">Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">server_api_version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pod_resources_endpoint_requests_get_total</div>
+	<div class="metric_name">kubelet_pod_resources_endpoint_requests_get</div>
 	<div class="metric_help">Number of requests to the PodResource Get endpoint. Broken down by server api version.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">server_api_version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pod_resources_endpoint_requests_get_allocatable_total</div>
+	<div class="metric_name">kubelet_pod_resources_endpoint_requests_get_allocatable</div>
 	<div class="metric_help">Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">server_api_version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_pod_resources_endpoint_requests_list_total</div>
+	<div class="metric_name">kubelet_pod_resources_endpoint_requests_list</div>
 	<div class="metric_help">Number of requests to the PodResource List endpoint. Broken down by server api version.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2909,7 +2909,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">signer_name</span><span class="metric_label">state</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_preemptions_total</div>
+	<div class="metric_name">kubelet_preemptions</div>
 	<div class="metric_help">Cumulative number of pod preemptions by preemption resource</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -2972,7 +2972,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">operation_type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_server_expiration_renew_errors_total</div>
+	<div class="metric_name">kubelet_server_expiration_renew_errors</div>
 	<div class="metric_help">Counter of certificate renewal errors.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
@@ -3049,8 +3049,8 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">container_type</span><span class="metric_label">exit_code</span><span class="metric_label">reason</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_topology_manager_admission_duration_seconds</div>
-	<div class="metric_help">Duration in seconds to serve a pod admission request.</div>
+	<div class="metric_name">kubelet_topology_manager_admission_duration_ms</div>
+	<div class="metric_help">Duration in milliseconds to serve a pod admission request.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
