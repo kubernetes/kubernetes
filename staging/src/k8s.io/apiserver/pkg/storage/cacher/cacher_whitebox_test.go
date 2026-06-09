@@ -3178,8 +3178,8 @@ func (f fakeIndexer) ListKeys() []string {
 func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
-func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) []interface{} {
-	return nil
+func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
+	return nil, nil
 }
 func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
 

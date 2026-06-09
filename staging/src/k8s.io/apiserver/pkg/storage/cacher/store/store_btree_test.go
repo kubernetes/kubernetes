@@ -20,13 +20,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStoreListOrdered(t *testing.T) {
 	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
-	assert.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
-	assert.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
-	assert.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
+	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
+	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
+	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
@@ -36,35 +37,40 @@ func TestStoreListOrdered(t *testing.T) {
 
 func TestStoreListPrefix(t *testing.T) {
 	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
-	assert.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
-	assert.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
-	assert.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
-	assert.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
+	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
+	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
+	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
+	require.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
 
-	items := store.OrderedListPrefix("foo", "")
+	items, err := store.OrderedListPrefix("foo", "")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items = store.OrderedListPrefix("foo2", "")
+	items, err = store.OrderedListPrefix("foo2", "")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 	}, items)
 
-	items = store.OrderedListPrefix("foo", "foo1\x00")
+	items, err = store.OrderedListPrefix("foo", "foo1\x00")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items = store.OrderedListPrefix("foo", "foo2\x00")
+	items, err = store.OrderedListPrefix("foo", "foo2\x00")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items = store.OrderedListPrefix("bar", "")
+	items, err = store.OrderedListPrefix("bar", "")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
 	}, items)
@@ -133,8 +139,8 @@ func (f fakeIndexer) Add(obj interface{}) error    { return nil }
 func (f fakeIndexer) Update(obj interface{}) error { return nil }
 func (f fakeIndexer) Delete(obj interface{}) error { return nil }
 func (f fakeIndexer) Clone() Snapshot              { return f }
-func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) []interface{} {
-	return nil
+func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
+	return nil, nil
 }
 func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
 	return nil, nil

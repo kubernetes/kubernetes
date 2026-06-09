@@ -591,11 +591,11 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	if err != nil {
 		return listResp{}, "", err
 	}
-	items := store.OrderedListPrefix(key, continueKey)
+	items, err := store.OrderedListPrefix(key, continueKey)
 	return listResp{
 		Items:           items,
 		ResourceVersion: resourceVersion,
-	}, "", nil
+	}, "", err
 }
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store store.Snapshot, err error) {
@@ -657,11 +657,11 @@ func (w *watchCache) listLatestRVLocked(key, continueKey string, matchValues []s
 			store = snap
 		}
 	}
-	result := store.OrderedListPrefix(key, continueKey)
+	result, err := store.OrderedListPrefix(key, continueKey)
 	return listResp{
 		Items:           result,
 		ResourceVersion: w.resourceVersion,
-	}, "", nil
+	}, "", err
 }
 
 func filterPrefixAndOrder(prefix string, items []interface{}) ([]interface{}, error) {

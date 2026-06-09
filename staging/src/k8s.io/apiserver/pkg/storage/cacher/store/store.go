@@ -70,11 +70,11 @@ type Indexer interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	Count(prefix, continueKey string) (count int)
 	Clone() Snapshot
-	OrderedListPrefix(prefix, continueKey string) []interface{}
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
 type Snapshot interface {
-	OrderedListPrefix(prefix, continueKey string) []interface{}
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {
