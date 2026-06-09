@@ -21,7 +21,6 @@ syntax = "proto2";
 
 package k8s.io.api.scheduling.v1alpha3;
 
-import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -315,7 +314,7 @@ message PodGroupSpec {
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 7;
 
-  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
   // One of Never, PreemptLowerPriority.
   // Defaults to PreemptLowerPriority if unset.
   // This field is immutable.
@@ -461,7 +460,7 @@ message PodGroupTemplate {
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 7;
 
-  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
   // One of Never, PreemptLowerPriority.
   // Defaults to PreemptLowerPriority if unset.
   // This field is available only when the WorkloadAwarePreemption feature gate

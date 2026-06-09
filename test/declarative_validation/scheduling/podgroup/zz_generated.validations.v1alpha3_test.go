@@ -51,6 +51,7 @@ func init() {
 			"spec.preemptionPolicy": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.priority": {

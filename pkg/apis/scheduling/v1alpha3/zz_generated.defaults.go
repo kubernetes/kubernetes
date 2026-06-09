@@ -24,7 +24,6 @@ package v1alpha3
 import (
 	json "encoding/json"
 
-	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -45,7 +44,7 @@ func SetObjectDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
 		}
 	}
 	if in.Spec.PreemptionPolicy == nil {
-		var ptrVar1 v1.PreemptionPolicy = "PreemptLowerPriority"
+		var ptrVar1 schedulingv1alpha3.PreemptionPolicy = "PreemptLowerPriority"
 		in.Spec.PreemptionPolicy = &ptrVar1
 	}
 }

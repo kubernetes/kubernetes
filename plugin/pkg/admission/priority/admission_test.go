@@ -55,8 +55,10 @@ func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClas
 }
 
 var (
-	preemptNever         = api.PreemptNever
-	preemptLowerPriority = api.PreemptLowerPriority
+	preemptNever              = api.PreemptNever
+	preemptLowerPriority      = api.PreemptLowerPriority
+	apiv3PreemptNever         = scheduling.PreemptNever
+	apiv3PreemptLowerPriority = scheduling.PreemptLowerPriority
 )
 
 var defaultClass1 = &scheduling.PriorityClass{
@@ -789,7 +791,7 @@ func TestAdmitPodGroup(t *testing.T) {
 		return pg
 	}
 
-	podGroupWithPreemptionPolicy := func(priorityClassName string, policy *api.PreemptionPolicy) *scheduling.PodGroup {
+	podGroupWithPreemptionPolicy := func(priorityClassName string, policy *scheduling.PreemptionPolicy) *scheduling.PodGroup {
 		pg := podGroup(priorityClassName)
 		pg.Spec.PreemptionPolicy = policy
 		return pg
@@ -826,7 +828,7 @@ func TestAdmitPodGroup(t *testing.T) {
 		expectedPriority              int32
 		enableWorkloadAwarePreemption bool
 		expectError                   bool
-		expectedPreemptionPolicy      *api.PreemptionPolicy
+		expectedPreemptionPolicy      *scheduling.PreemptionPolicy
 	}{
 		{
 			name:                          "pod group with empty priorityClassName, accepted and set to global default",
@@ -901,22 +903,22 @@ func TestAdmitPodGroup(t *testing.T) {
 			expectedPriorityClass:         "nopreemptionpolicy",
 			expectedPriority:              preemptionPolicyClass.Value,
 			enableWorkloadAwarePreemption: true,
-			expectedPreemptionPolicy:      &preemptLowerPriority,
+			expectedPreemptionPolicy:      &apiv3PreemptLowerPriority,
 		},
 		{
 			name:                          "pod group with preemption policy that matches preemption policy resolved from priority class",
 			priorityClasses:               []*scheduling.PriorityClass{preemptionPolicyClass},
-			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &preemptLowerPriority),
+			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &apiv3PreemptLowerPriority),
 			operation:                     admission.Create,
 			expectedPriorityClass:         "nopreemptionpolicy",
 			expectedPriority:              preemptionPolicyClass.Value,
 			enableWorkloadAwarePreemption: true,
-			expectedPreemptionPolicy:      &preemptLowerPriority,
+			expectedPreemptionPolicy:      &apiv3PreemptLowerPriority,
 		},
 		{
 			name:                          "pod group with preemption policy that doesn't match preemption policy resolved from priority class",
 			priorityClasses:               []*scheduling.PriorityClass{preemptionPolicyClass},
-			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &preemptNever),
+			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &apiv3PreemptNever),
 			operation:                     admission.Create,
 			enableWorkloadAwarePreemption: true,
 			expectError:                   true,

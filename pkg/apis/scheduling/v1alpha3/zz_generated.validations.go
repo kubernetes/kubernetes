@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -34,6 +33,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -843,7 +843,7 @@ func Validate_PodGroupSpec(
 	{ // field schedulingv1alpha3.PodGroupSpec.PreemptionPolicy
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *v1.PreemptionPolicy,
+			obj, oldObj *schedulingv1alpha3.PreemptionPolicy,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -872,10 +872,12 @@ func Validate_PodGroupSpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			// call the type's validation function
+			errs = append(errs, Validate_PreemptionPolicy(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.PodGroupSpec) *v1.PreemptionPolicy {
+			func(oldObj *schedulingv1alpha3.PodGroupSpec) *schedulingv1alpha3.PreemptionPolicy {
 				return oldObj.PreemptionPolicy
 			})
 		errs = append(errs, fn(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, oldVal, oldObj != nil)...)
@@ -1239,7 +1241,7 @@ func Validate_PodGroupTemplate(
 	{ // field schedulingv1alpha3.PodGroupTemplate.PreemptionPolicy
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *v1.PreemptionPolicy,
+			obj, oldObj *schedulingv1alpha3.PreemptionPolicy,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1262,10 +1264,12 @@ func Validate_PodGroupTemplate(
 			if earlyReturn {
 				return // do not proceed
 			}
+			// call the type's validation function
+			errs = append(errs, Validate_PreemptionPolicy(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *schedulingv1alpha3.PodGroupTemplate) *v1.PreemptionPolicy {
+			func(oldObj *schedulingv1alpha3.PodGroupTemplate) *schedulingv1alpha3.PreemptionPolicy {
 				return oldObj.PreemptionPolicy
 			})
 		errs = append(errs, fn(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, oldVal, oldObj != nil)...)
@@ -1320,6 +1324,21 @@ func Validate_PodGroupTemplateReference(
 				return oldObj.Workload
 			})
 		errs = append(errs, fn(fldPath.Child("workload"), obj.Workload, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForPreemptionPolicy = sets.New(schedulingv1alpha3.PreemptLowerPriority, schedulingv1alpha3.PreemptNever)
+
+// Validate_PreemptionPolicy validates an instance of PreemptionPolicy according
+// to declarative validation rules in the API schema.
+func Validate_PreemptionPolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *schedulingv1alpha3.PreemptionPolicy) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForPreemptionPolicy, nil); len(e) != 0 {
+		errs = append(errs, e...)
 	}
 
 	return errs

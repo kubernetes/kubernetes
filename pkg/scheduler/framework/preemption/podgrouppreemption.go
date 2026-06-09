@@ -279,7 +279,7 @@ func (ev *PodGroupEvaluator) isPreemptionAllowed(victim *victim, preemptor *podG
 // indicates whether this preemptor should be considered for preempting other pods or
 // not. The string includes the reason if this preemptor isn't eligible.
 func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor, nameToNode map[string]fwk.NodeInfo) (bool, string) {
-	if preemptor.PreemptionPolicy() == v1.PreemptNever {
+	if preemptor.PreemptionPolicy() == schedulingapi.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 

@@ -24,7 +24,6 @@ import (
 
 	io "io"
 
-	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	math_bits "math/bits"
@@ -2955,7 +2954,7 @@ func (m *PodGroupSpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			s := k8s_io_api_core_v1.PreemptionPolicy(dAtA[iNdEx:postIndex])
+			s := PreemptionPolicy(dAtA[iNdEx:postIndex])
 			m.PreemptionPolicy = &s
 			iNdEx = postIndex
 		default:
@@ -3379,7 +3378,7 @@ func (m *PodGroupTemplate) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			s := k8s_io_api_core_v1.PreemptionPolicy(dAtA[iNdEx:postIndex])
+			s := PreemptionPolicy(dAtA[iNdEx:postIndex])
 			m.PreemptionPolicy = &s
 			iNdEx = postIndex
 		default:

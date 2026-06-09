@@ -272,12 +272,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), "")},
 		},
 		"preemption policy, workload aware preemption disabled": {
-			input:        mkValidWorkload(setPreemptionPolicy(0, core.PreemptNever)),
+			input:        mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptNever)),
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), "")},
 		},
 		"valid preemption policy (Never), workload aware preemption enabled": {
-			input:                         mkValidWorkload(setDisruptionModeSingle(0), setPreemptionPolicy(0, core.PreemptNever)),
+			input:                         mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptNever)),
 			enableWorkloadAwarePreemption: true,
+		},
+		"invalid preemption policy, workload aware preemption enabled": {
+			input:                         mkValidWorkload(setPreemptionPolicy(0, scheduling.PreemptionPolicy("Invalid"))),
+			enableWorkloadAwarePreemption: true,
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), core.PreemptionPolicy("Invalid"), []string{"Never", "PreemptLowerPriority"}),
+			},
 		},
 		"ok resourceClaimName reference": {
 			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "claim", ResourceClaimName: new("resource-claim")})),
@@ -609,14 +616,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
 		},
 		"invalid update of preemption policy, workload aware preemption enabled": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, core.PreemptNever)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, core.PreemptLowerPriority)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptNever)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
 			enableWorkloadAwarePreemption: true,
 			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
 		},
 		"invalid update of preemption policy, workload aware preemption disabled": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, core.PreemptNever)),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, core.PreemptLowerPriority)),
+			oldObj:       mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptNever)),
+			updateObj:    mkValidWorkload(setResourceVersion("1"), setPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
 		},
 	}
@@ -825,7 +832,7 @@ func setPriority(pgIdx int, priority int32) func(obj *scheduling.Workload) {
 	}
 }
 
-func setPreemptionPolicy(pgIdx int, policy core.PreemptionPolicy) func(obj *scheduling.Workload) {
+func setPreemptionPolicy(pgIdx int, policy scheduling.PreemptionPolicy) func(obj *scheduling.Workload) {
 	return func(obj *scheduling.Workload) {
 		obj.Spec.PodGroupTemplates[pgIdx].PreemptionPolicy = &policy
 	}

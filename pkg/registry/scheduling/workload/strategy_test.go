@@ -27,7 +27,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 
 	// Side-effect import: registers Workload with legacyscheme.Scheme so
@@ -56,15 +55,15 @@ var (
 		},
 	}
 
-	preemptNever         = core.PreemptNever
-	preemptLowerPriority = core.PreemptLowerPriority
+	preemptNever         = scheduling.PreemptNever
+	preemptLowerPriority = scheduling.PreemptLowerPriority
 
 	fieldImmutableError    = "field is immutable"
 	minCountError          = "must be greater than or equal to 1"
 	tooManyItemsError      = "must have at most 1 item"
 	requiredError          = "Required value"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-	supportedPoliciesError = `supported values: "PreemptLowerPriority", "Never"`
+	supportedPoliciesError = `supported values: "Never", "PreemptLowerPriority"`
 )
 
 func TestWorkloadStrategy(t *testing.T) {
@@ -274,7 +273,7 @@ func TestStrategyCreate(t *testing.T) {
 		"workload aware preemption enabled - invalid preemptionPolicy": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				invalidPolicy := core.PreemptionPolicy("Invalid")
+				invalidPolicy := scheduling.PreemptionPolicy("Invalid")
 				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &invalidPolicy
 				return w
 			}(),

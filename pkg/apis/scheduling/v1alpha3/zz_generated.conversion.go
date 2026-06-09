@@ -24,12 +24,10 @@ package v1alpha3
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -483,7 +481,7 @@ func autoConvert_v1alpha3_PodGroupSpec_To_scheduling_PodGroupSpec(in *scheduling
 	out.DisruptionMode = (*scheduling.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.PreemptionPolicy = (*scheduling.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 
@@ -502,7 +500,7 @@ func autoConvert_scheduling_PodGroupSpec_To_v1alpha3_PodGroupSpec(in *scheduling
 	out.DisruptionMode = (*schedulingv1alpha3.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*v1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.PreemptionPolicy = (*schedulingv1alpha3.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 
@@ -512,7 +510,7 @@ func Convert_scheduling_PodGroupSpec_To_v1alpha3_PodGroupSpec(in *scheduling.Pod
 }
 
 func autoConvert_v1alpha3_PodGroupStatus_To_scheduling_PodGroupStatus(in *schedulingv1alpha3.PodGroupStatus, out *scheduling.PodGroupStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ResourceClaimStatuses = *(*[]scheduling.PodGroupResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
 	return nil
 }
@@ -523,7 +521,7 @@ func Convert_v1alpha3_PodGroupStatus_To_scheduling_PodGroupStatus(in *scheduling
 }
 
 func autoConvert_scheduling_PodGroupStatus_To_v1alpha3_PodGroupStatus(in *scheduling.PodGroupStatus, out *schedulingv1alpha3.PodGroupStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ResourceClaimStatuses = *(*[]schedulingv1alpha3.PodGroupResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
 	return nil
 }
@@ -543,7 +541,7 @@ func autoConvert_v1alpha3_PodGroupTemplate_To_scheduling_PodGroupTemplate(in *sc
 	out.DisruptionMode = (*scheduling.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.PreemptionPolicy = (*scheduling.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 
@@ -562,7 +560,7 @@ func autoConvert_scheduling_PodGroupTemplate_To_v1alpha3_PodGroupTemplate(in *sc
 	out.DisruptionMode = (*schedulingv1alpha3.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*v1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.PreemptionPolicy = (*schedulingv1alpha3.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 

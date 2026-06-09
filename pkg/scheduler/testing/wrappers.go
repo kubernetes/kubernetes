@@ -1673,7 +1673,7 @@ func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
 }
 
 // PreemptionPolicy sets the preemption policy of the inner PodGroup.
-func (wrapper *PodGroupWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodGroupWrapper {
+func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingapi.PreemptionPolicy) *PodGroupWrapper {
 	wrapper.PodGroup.Spec.PreemptionPolicy = &policy
 	return wrapper
 }
@@ -1756,7 +1756,7 @@ func (wrapper *PodGroupTemplateWrapper) DisruptionModeSingle() *PodGroupTemplate
 }
 
 // PreemptionPolicy sets the preemption policy of the inner PodGroupTemplate.
-func (wrapper *PodGroupTemplateWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodGroupTemplateWrapper {
+func (wrapper *PodGroupTemplateWrapper) PreemptionPolicy(policy schedulingapi.PreemptionPolicy) *PodGroupTemplateWrapper {
 	wrapper.PodGroupTemplate.PreemptionPolicy = &policy
 	return wrapper
 }

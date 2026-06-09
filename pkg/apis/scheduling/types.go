@@ -45,6 +45,16 @@ const (
 	PodGroupProtectionFinalizer = GroupName + "/podgroup-protection"
 )
 
+// PreemptionPolicy describes a policy for if/when to preempt a pod/podgroup.
+type PreemptionPolicy string
+
+const (
+	// PreemptLowerPriority means that pod can preempt other pods with lower priority.
+	PreemptLowerPriority PreemptionPolicy = "PreemptLowerPriority"
+	// PreemptNever means that pod never preempts other pods with lower priority.
+	PreemptNever PreemptionPolicy = "Never"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PriorityClass defines the mapping from a priority class name to the priority
@@ -247,13 +257,15 @@ type PodGroupTemplate struct {
 
 	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
+	// When Priority Admission Controller is enabled, it prevents users from setting this field.
+	// The admission controller populates this field from PriorityClassName.
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	//
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	PreemptionPolicy *core.PreemptionPolicy
+	PreemptionPolicy *PreemptionPolicy
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -482,6 +494,8 @@ type PodGroupSpec struct {
 
 	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
+	// When Priority Admission Controller is enabled, it prevents users from setting this field.
+	// The admission controller populates this field from PriorityClassName.
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is immutable.
 	// This field is available only when the WorkloadAwarePreemption feature gate
@@ -489,7 +503,7 @@ type PodGroupSpec struct {
 	//
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	PreemptionPolicy *core.PreemptionPolicy
+	PreemptionPolicy *PreemptionPolicy
 }
 
 // PodGroupStatus represents information about the status of a pod group.

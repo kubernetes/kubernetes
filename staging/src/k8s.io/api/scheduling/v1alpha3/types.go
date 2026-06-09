@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha3
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -213,7 +212,7 @@ type PodGroupTemplate struct {
 	// +optional
 	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
+	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -340,6 +339,18 @@ type SingleDisruptionMode struct {
 type AllDisruptionMode struct {
 	// Intentionally empty now.
 }
+
+// PreemptionPolicy describes a policy for if/when to preempt a pod.
+// +enum
+// +k8s:enum
+type PreemptionPolicy string
+
+const (
+	// PreemptLowerPriority means that pod can preempt other pods with lower priority.
+	PreemptLowerPriority PreemptionPolicy = "PreemptLowerPriority"
+	// PreemptNever means that pod never preempts other pods with lower priority.
+	PreemptNever PreemptionPolicy = "Never"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -498,7 +509,7 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
 	// +default="PreemptLowerPriority"
-	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
+	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.

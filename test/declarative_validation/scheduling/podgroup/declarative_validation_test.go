@@ -254,12 +254,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "priority"), "")},
 		},
 		"preemption policy, workload aware preemption disabled": {
-			input:        mkValidPodGroup(setPreemptionPolicy(core.PreemptNever)),
+			input:        mkValidPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "preemptionPolicy"), "")},
 		},
 		"valid preemption policy (Never), workload aware preemption enabled": {
-			input:                         mkValidWAPPodGroup(setPreemptionPolicy(core.PreemptNever)),
+			input:                         mkValidWAPPodGroup(setPreemptionPolicy(scheduling.PreemptNever)),
 			enableWorkloadAwarePreemption: true,
+		},
+		"invalid preemption policy, workload aware preemption enabled": {
+			input:                         mkValidWAPPodGroup(setPreemptionPolicy(scheduling.PreemptionPolicy("Invalid"))),
+			enableWorkloadAwarePreemption: true,
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "preemptionPolicy"), core.PreemptionPolicy("Invalid"), []string{"Never", "PreemptLowerPriority"}),
+			},
 		},
 		"valid pod group without preemption policy, workload aware preemption enabled": {
 			input:                         mkValidWAPPodGroup(clearPreemptionPolicy()),
@@ -580,14 +587,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "priority"), "")},
 		},
 		"invalid update of preemption policy, workload aware preemption enabled": {
-			oldObj:                        mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(core.PreemptNever)),
-			updateObj:                     mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(core.PreemptLowerPriority)),
+			oldObj:                        mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
+			updateObj:                     mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
 			enableWorkloadAwarePreemption: true,
 			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "preemptionPolicy"), nil, "").WithOrigin("immutable")},
 		},
 		"invalid update of preemption policy, workload aware preemption disabled": {
-			oldObj:       mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(core.PreemptNever)),
-			updateObj:    mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(core.PreemptLowerPriority)),
+			oldObj:       mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptNever)),
+			updateObj:    mkValidPodGroup(setResourceVersion("1"), setPreemptionPolicy(scheduling.PreemptLowerPriority)),
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "preemptionPolicy"), "")},
 		},
 	}
@@ -764,7 +771,7 @@ func mkValidPodGroup(tweaks ...func(pg *scheduling.PodGroup)) scheduling.PodGrou
 
 // mkValidWAPPodGroup produces a PodGroup which passes validation with PreemptionPolicy and DisruptionMode set to defaults.
 func mkValidWAPPodGroup(tweaks ...func(pg *scheduling.PodGroup)) scheduling.PodGroup {
-	tweaksWithDefaults := []func(pg *scheduling.PodGroup){setPreemptionPolicy(core.PreemptLowerPriority), setDisruptionModeSingle()}
+	tweaksWithDefaults := []func(pg *scheduling.PodGroup){setPreemptionPolicy(scheduling.PreemptLowerPriority), setDisruptionModeSingle()}
 	tweaksWithDefaults = append(tweaksWithDefaults, tweaks...)
 	return mkValidPodGroup(tweaksWithDefaults...)
 }
@@ -937,7 +944,7 @@ func setPriority(priority int32) func(obj *scheduling.PodGroup) {
 	}
 }
 
-func setPreemptionPolicy(policy core.PreemptionPolicy) func(obj *scheduling.PodGroup) {
+func setPreemptionPolicy(policy scheduling.PreemptionPolicy) func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
 		obj.Spec.PreemptionPolicy = &policy
 	}

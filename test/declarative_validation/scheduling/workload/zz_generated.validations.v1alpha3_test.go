@@ -62,6 +62,7 @@ func init() {
 			},
 			"spec.podGroupTemplates[*].preemptionPolicy": {
 				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.podGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueForbidden"},

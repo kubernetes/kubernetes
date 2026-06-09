@@ -214,12 +214,13 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 	pg.Spec.Priority = &priority
 	pg.Spec.PriorityClassName = priorityClassName
 
+	var apiv3Policy scheduling.PreemptionPolicy
 	if preemptionPolicy != nil {
-		corePolicy := core.PreemptionPolicy(*preemptionPolicy)
-		if pg.Spec.PreemptionPolicy != nil && *pg.Spec.PreemptionPolicy != corePolicy {
-			return admission.NewForbidden(attributes, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in pod group spec; priority admission controller computed %s from the given PriorityClass name", *pg.Spec.PreemptionPolicy, corePolicy))
+		apiv3Policy = scheduling.PreemptionPolicy(*preemptionPolicy)
+		if pg.Spec.PreemptionPolicy != nil && *pg.Spec.PreemptionPolicy != apiv3Policy {
+			return admission.NewForbidden(attributes, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in pod group spec; priority admission controller computed %s from the given PriorityClass name", *pg.Spec.PreemptionPolicy, apiv3Policy))
 		}
-		pg.Spec.PreemptionPolicy = &corePolicy
+		pg.Spec.PreemptionPolicy = &apiv3Policy
 	}
 	return nil
 }

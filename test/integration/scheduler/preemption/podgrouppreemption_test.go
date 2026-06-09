@@ -739,7 +739,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
 			podGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).PreemptionPolicy(v1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).PreemptionPolicy(schedulingapi.PreemptNever).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),

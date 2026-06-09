@@ -20008,7 +20008,7 @@
           "description": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable."
         },
         "preemptionPolicy": {
-          "description": "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+          "description": "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
           "type": "string"
         },
         "priority": {
@@ -20091,7 +20091,7 @@
           "type": "string"
         },
         "preemptionPolicy": {
-          "description": "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+          "description": "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
           "type": "string"
         },
         "priority": {
