@@ -138,11 +138,10 @@ type Step struct {
 	// UpdatePodStatus is used to mutate the status subresource of the pod,
 	// such as NominatedNodeName, which UpdatePod cannot touch.
 	UpdatePodStatus *UpdatePod
-	// WaitForPodsNominated waits until the named pods, while pending for their
-	// pod group, carry the expected NominatedNodeName in the scheduling queue.
-	// Keyed by pod name -> expected NominatedNodeName. This is a queue-level
-	// barrier (not just informer cache) so a following step can rely on the
-	// scheduler reading the nominated node during the placement cycle.
+	// WaitForPodsNominated waits until the named pods carry the expected
+	// NominatedNodeName in the scheduling queue. Keyed by pod name. This is a
+	// queue-level barrier so a following step can rely on the scheduler reading
+	// the nominated node during the placement cycle.
 	WaitForPodsNominated map[string]string
 	// WaitForPodsInActiveQ is used to check if the pods are present in ActiveQ.
 	WaitForPodsInActiveQ []string

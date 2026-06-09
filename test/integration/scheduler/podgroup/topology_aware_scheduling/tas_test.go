@@ -1327,11 +1327,10 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	}
 }
 
-// TestTopologyAwareSchedulingRespectsNominatedNode verifies that when two
-// placements (racks) tie on PodGroupPodsCount, the gang lands on the rack that
-// matches the pods' NominatedNodeName. The core scheduler breaks the score tie in
-// favor of the placement honoring the most nominated nodes, so the nominated rack
-// wins; the random tiebreak only applies among equally-honored placements.
+// TestTopologyAwareSchedulingRespectsNominatedNode verifies that the gang lands on
+// the rack matching the pods' NominatedNodeName. The core scheduler evaluates the
+// nominated placement first and, when the gang is feasible there, uses it without
+// trying the other placements, mirroring pod-by-pod scheduling.
 func TestTopologyAwareSchedulingRespectsNominatedNode(t *testing.T) {
 	tt := scenario{
 		name: "gang prefers the rack matching the pods' nominated node",

@@ -22,114 +22,80 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-func proposedAssignment(name, nominated, node string) algorithmResult {
-	return algorithmResult{
-		pod: &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
-			Status:     v1.PodStatus{NominatedNodeName: nominated},
-		},
-		scheduleResult: ScheduleResult{SuggestedHost: node},
+func placementWithNodes(name string, nodeNames ...string) *fwk.Placement {
+	nodes := make([]fwk.NodeInfo, 0, len(nodeNames))
+	for _, n := range nodeNames {
+		ni := framework.NewNodeInfo()
+		ni.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: n}})
+		nodes = append(nodes, ni)
 	}
+	return &fwk.Placement{Name: name, Nodes: nodes}
 }
 
-func TestNominatedNodesHonored(t *testing.T) {
-	preempting := proposedAssignment("p1", "node1", "node1")
-	preempting.requiresPreemption = true
-
-	tests := []struct {
-		name    string
-		results []algorithmResult
-		want    int
-	}{
-		{
-			name: "no nominations",
-			results: []algorithmResult{
-				proposedAssignment("p1", "", "node1"),
-				proposedAssignment("p2", "", "node2"),
-			},
-			want: 0,
-		},
-		{
-			name: "all honored",
-			results: []algorithmResult{
-				proposedAssignment("p1", "node1", "node1"),
-				proposedAssignment("p2", "node2", "node2"),
-			},
-			want: 2,
-		},
-		{
-			name: "nominated but landed elsewhere does not count",
-			results: []algorithmResult{
-				proposedAssignment("p1", "node1", "node2"),
-				proposedAssignment("p2", "node2", "node2"),
-			},
-			want: 1,
-		},
-		{
-			name: "reaching the nominated node via preemption does not count",
-			results: []algorithmResult{
-				preempting,
-				proposedAssignment("p2", "node2", "node2"),
-			},
-			want: 1,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := nominatedNodesHonored(&podGroupAlgorithmResult{podResults: tt.results})
-			if got != tt.want {
-				t.Errorf("nominatedNodesHonored() = %d, want %d", got, tt.want)
-			}
+func podGroupWithNominations(nominated ...string) *framework.QueuedPodGroupInfo {
+	pgi := &framework.QueuedPodGroupInfo{PodGroupInfo: &framework.PodGroupInfo{}}
+	for i, nnn := range nominated {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: string(rune('a' + i))},
+			Status:     v1.PodStatus{NominatedNodeName: nnn},
+		}
+		pgi.QueuedPodInfos = append(pgi.QueuedPodInfos, &framework.QueuedPodInfo{
+			PodInfo: &framework.PodInfo{Pod: pod},
 		})
 	}
+	return pgi
 }
 
-func TestMorePreferredPlacement(t *testing.T) {
-	pa := &fwk.Placement{Name: "a"}
-	pb := &fwk.Placement{Name: "b"}
+func TestNominatedPlacement(t *testing.T) {
+	rack1 := placementWithNodes("rack-1", "node-1")
+	rack2 := placementWithNodes("rack-2", "node-2")
+	rack12 := placementWithNodes("rack-12", "node-1", "node-2")
+	rack23 := placementWithNodes("rack-23", "node-2", "node-3")
 
 	tests := []struct {
-		name      string
-		candidate fwk.PlacementPluginScores
-		current   fwk.PlacementPluginScores
-		honored   map[*fwk.Placement]int
-		want      bool
+		name       string
+		placements []*fwk.Placement
+		podGroup   *framework.QueuedPodGroupInfo
+		want       *fwk.Placement
 	}{
 		{
-			name:      "higher score wins despite fewer honored NNN",
-			candidate: fwk.PlacementPluginScores{Placement: pa, TotalScore: 100, Randomizer: 0},
-			current:   fwk.PlacementPluginScores{Placement: pb, TotalScore: 1, Randomizer: 100},
-			honored:   map[*fwk.Placement]int{pa: 0, pb: 1},
-			want:      true,
+			name:       "no nominations returns nil",
+			placements: []*fwk.Placement{rack1, rack2},
+			podGroup:   podGroupWithNominations("", ""),
+			want:       nil,
 		},
 		{
-			name:      "lower score loses despite more honored NNN",
-			candidate: fwk.PlacementPluginScores{Placement: pa, TotalScore: 1, Randomizer: 100},
-			current:   fwk.PlacementPluginScores{Placement: pb, TotalScore: 100, Randomizer: 0},
-			honored:   map[*fwk.Placement]int{pa: 1, pb: 0},
-			want:      false,
+			name:       "nominated node not in any placement returns nil",
+			placements: []*fwk.Placement{rack1, rack2},
+			podGroup:   podGroupWithNominations("node-3"),
+			want:       nil,
 		},
 		{
-			name:      "equal score breaks tie on honored NNN",
-			candidate: fwk.PlacementPluginScores{Placement: pa, TotalScore: 5, Randomizer: 0},
-			current:   fwk.PlacementPluginScores{Placement: pb, TotalScore: 5, Randomizer: 100},
-			honored:   map[*fwk.Placement]int{pa: 1, pb: 0},
-			want:      true,
+			name:       "single placement holds the nominated node",
+			placements: []*fwk.Placement{rack1, rack2},
+			podGroup:   podGroupWithNominations("node-2", ""),
+			want:       rack2,
 		},
 		{
-			name:      "equal score and honored falls back to randomizer",
-			candidate: fwk.PlacementPluginScores{Placement: pa, TotalScore: 5, Randomizer: 9},
-			current:   fwk.PlacementPluginScores{Placement: pb, TotalScore: 5, Randomizer: 1},
-			honored:   map[*fwk.Placement]int{pa: 0, pb: 0},
-			want:      true,
+			name:       "placement holding the most nominated nodes wins",
+			placements: []*fwk.Placement{rack1, rack12},
+			podGroup:   podGroupWithNominations("node-1", "node-2"),
+			want:       rack12,
+		},
+		{
+			name:       "placement honoring the most pods wins over one holding more nominated nodes",
+			placements: []*fwk.Placement{rack1, rack23},
+			podGroup:   podGroupWithNominations("node-1", "node-1", "node-1", "node-2", "node-3"),
+			want:       rack1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := morePreferredPlacement(tt.candidate, tt.current, tt.honored); got != tt.want {
-				t.Errorf("morePreferredPlacement() = %v, want %v", got, tt.want)
+			if got := nominatedPlacement(tt.placements, tt.podGroup); got != tt.want {
+				t.Errorf("nominatedPlacement() = %v, want %v", got, tt.want)
 			}
 		})
 	}
