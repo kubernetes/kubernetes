@@ -218,7 +218,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 }
 
 // configureContainerSwapResources configures the swap resources for a specified (linux) container.
-// Swap is only configured if a swap cgroup controller is available and the NodeSwap feature gate is enabled.
+// Swap is only configured if a swap cgroup controller is available.
 func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
 	if !m.getSwapControllerAvailable() {
 		return
@@ -242,7 +242,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.
 func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
 	c := types.SwapBehavior(m.memorySwapBehavior)
 	if c == types.LimitedSwap {
-		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) || !m.getSwapControllerAvailable() {
+		if !m.getSwapControllerAvailable() {
 			return types.NoSwap
 		}
 

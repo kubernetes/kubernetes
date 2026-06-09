@@ -668,7 +668,6 @@ type KubeletConfiguration struct {
 	// +optional
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
 	// memorySwap configures swap memory available to container workloads.
-	// +featureGate=NodeSwap
 	// +optional
 	MemorySwap MemorySwapConfiguration `json:"memorySwap,omitempty"`
 	// containerLogMaxSize is a quantity defining the maximum size of the container log
@@ -1064,7 +1063,6 @@ type MemorySwapConfiguration struct {
 	// swapBehavior configures swap memory available to container workloads. May be one of
 	// "", "NoSwap": workloads can not use swap, default option.
 	// "LimitedSwap": workload swap usage is limited. The swap limit is proportionate to the container's memory request.
-	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string `json:"swapBehavior,omitempty"`
 }

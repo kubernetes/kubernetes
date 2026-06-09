@@ -388,7 +388,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "invalid MemorySwap.SwapBehavior",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": true}
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},

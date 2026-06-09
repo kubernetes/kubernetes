@@ -1123,7 +1123,6 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.InPlacePodVerticalScaling: true,
-		features.NodeSwap:                  true,
 	})
 	tCtx := ktesting.Init(t)
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"

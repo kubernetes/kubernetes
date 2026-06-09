@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -451,8 +450,7 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 }
 
 func isSwapFeatureGateEnabled() bool {
-	ginkgo.By("figuring if NodeSwap feature gate is turned on")
-	return e2eskipper.IsFeatureGateEnabled(features.NodeSwap)
+	return true
 }
 
 func isPodCgroupV2(f *framework.Framework, pod *v1.Pod) bool {

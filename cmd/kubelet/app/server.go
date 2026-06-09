@@ -865,15 +865,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
-				// This feature is not supported for cgroupv1 so we are failing early.
-				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
-			}
-			if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
-				// This is just a log because we are using a default of NoSwap.
-				logger.Info("NoSwap is set due to memorySwapBehavior not specified", "memorySwapBehavior", s.MemorySwap.SwapBehavior, "FailSwapOn", s.FailSwapOn)
-			}
+		if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
+			// This feature is not supported for cgroupv1 so we are failing early.
+			return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
+		}
+		if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
+			// This is just a log because we are using a default of NoSwap.
+			logger.Info("NoSwap is set due to memorySwapBehavior not specified", "memorySwapBehavior", s.MemorySwap.SwapBehavior, "FailSwapOn", s.FailSwapOn)
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(

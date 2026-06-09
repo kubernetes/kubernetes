@@ -283,7 +283,7 @@ func MachineInfo(nodeName string,
 				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) && info.SwapCapacity != 0 {
+			if info.SwapCapacity != 0 {
 				node.Status.NodeInfo.Swap = &v1.NodeSwapStatus{
 					Capacity: ptr.To(int64(info.SwapCapacity)),
 				}
