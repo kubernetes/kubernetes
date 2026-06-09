@@ -7002,8 +7002,8 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	out.SupplementalGroupsPolicy = (*corev1.SupplementalGroupsPolicy)(unsafe.Pointer(in.SupplementalGroupsPolicy))
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
-	out.FSGroupChangePolicy = (*corev1.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.Sysctls = *(*[]corev1.Sysctl)(unsafe.Pointer(&in.Sysctls))
+	out.FSGroupChangePolicy = (*corev1.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.SeccompProfile = (*corev1.SeccompProfile)(unsafe.Pointer(in.SeccompProfile))
 	out.AppArmorProfile = (*corev1.AppArmorProfile)(unsafe.Pointer(in.AppArmorProfile))
 	out.SELinuxChangePolicy = (*corev1.PodSELinuxChangePolicy)(unsafe.Pointer(in.SELinuxChangePolicy))
@@ -7053,15 +7053,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	out.ShareProcessNamespace = (*bool)(unsafe.Pointer(in.ShareProcessNamespace))
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(core.PodSecurityContext)
-		if err := Convert_v1_PodSecurityContext_To_core_PodSecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*core.PodSecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.ImagePullSecrets = *(*[]core.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
@@ -7106,32 +7098,24 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	out.ShareProcessNamespace = (*bool)(unsafe.Pointer(in.ShareProcessNamespace))
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.PodSecurityContext)
-		if err := Convert_core_PodSecurityContext_To_v1_PodSecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*corev1.PodSecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.ImagePullSecrets = *(*[]corev1.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
-	out.SetHostnameAsFQDN = (*bool)(unsafe.Pointer(in.SetHostnameAsFQDN))
 	out.Affinity = (*corev1.Affinity)(unsafe.Pointer(in.Affinity))
 	out.SchedulerName = in.SchedulerName
 	out.Tolerations = *(*[]corev1.Toleration)(unsafe.Pointer(&in.Tolerations))
 	out.HostAliases = *(*[]corev1.HostAlias)(unsafe.Pointer(&in.HostAliases))
 	out.PriorityClassName = in.PriorityClassName
 	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*corev1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	out.DNSConfig = (*corev1.PodDNSConfig)(unsafe.Pointer(in.DNSConfig))
 	out.ReadinessGates = *(*[]corev1.PodReadinessGate)(unsafe.Pointer(&in.ReadinessGates))
 	out.RuntimeClassName = (*string)(unsafe.Pointer(in.RuntimeClassName))
-	out.Overhead = *(*corev1.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
+	out.PreemptionPolicy = (*corev1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	out.Overhead = *(*corev1.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.TopologySpreadConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
+	out.SetHostnameAsFQDN = (*bool)(unsafe.Pointer(in.SetHostnameAsFQDN))
 	out.OS = (*corev1.PodOS)(unsafe.Pointer(in.OS))
 	out.HostUsers = (*bool)(unsafe.Pointer(in.HostUsers))
 	out.SchedulingGates = *(*[]corev1.PodSchedulingGate)(unsafe.Pointer(&in.SchedulingGates))
@@ -7178,9 +7162,9 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *corev1.
 	out.HostIPs = *(*[]corev1.HostIP)(unsafe.Pointer(&in.HostIPs))
 	out.PodIPs = *(*[]corev1.PodIP)(unsafe.Pointer(&in.PodIPs))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
-	out.QOSClass = corev1.PodQOSClass(in.QOSClass)
 	out.InitContainerStatuses = *(*[]corev1.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]corev1.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.QOSClass = corev1.PodQOSClass(in.QOSClass)
 	out.EphemeralContainerStatuses = *(*[]corev1.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
 	out.Resize = corev1.PodResizeStatus(in.Resize)
 	out.ResourceClaimStatuses = *(*[]corev1.PodResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))

@@ -4410,15 +4410,15 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		*out = new(int64)
 		**out = **in
 	}
-	if in.FSGroupChangePolicy != nil {
-		in, out := &in.FSGroupChangePolicy, &out.FSGroupChangePolicy
-		*out = new(PodFSGroupChangePolicy)
-		**out = **in
-	}
 	if in.Sysctls != nil {
 		in, out := &in.Sysctls, &out.Sysctls
 		*out = make([]Sysctl, len(*in))
 		copy(*out, *in)
+	}
+	if in.FSGroupChangePolicy != nil {
+		in, out := &in.FSGroupChangePolicy, &out.FSGroupChangePolicy
+		*out = new(PodFSGroupChangePolicy)
+		**out = **in
 	}
 	if in.SeccompProfile != nil {
 		in, out := &in.SeccompProfile, &out.SeccompProfile
@@ -4537,11 +4537,6 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = make([]LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
-	if in.SetHostnameAsFQDN != nil {
-		in, out := &in.SetHostnameAsFQDN, &out.SetHostnameAsFQDN
-		*out = new(bool)
-		**out = **in
-	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(Affinity)
@@ -4566,11 +4561,6 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.PreemptionPolicy != nil {
-		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
-		*out = new(PreemptionPolicy)
-		**out = **in
-	}
 	if in.DNSConfig != nil {
 		in, out := &in.DNSConfig, &out.DNSConfig
 		*out = new(PodDNSConfig)
@@ -4586,6 +4576,16 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.EnableServiceLinks != nil {
+		in, out := &in.EnableServiceLinks, &out.EnableServiceLinks
+		*out = new(bool)
+		**out = **in
+	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(PreemptionPolicy)
+		**out = **in
+	}
 	if in.Overhead != nil {
 		in, out := &in.Overhead, &out.Overhead
 		*out = make(ResourceList, len(*in))
@@ -4593,17 +4593,17 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*out)[key] = val.DeepCopy()
 		}
 	}
-	if in.EnableServiceLinks != nil {
-		in, out := &in.EnableServiceLinks, &out.EnableServiceLinks
-		*out = new(bool)
-		**out = **in
-	}
 	if in.TopologySpreadConstraints != nil {
 		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
 		*out = make([]TopologySpreadConstraint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.SetHostnameAsFQDN != nil {
+		in, out := &in.SetHostnameAsFQDN, &out.SetHostnameAsFQDN
+		*out = new(bool)
+		**out = **in
 	}
 	if in.OS != nil {
 		in, out := &in.OS, &out.OS

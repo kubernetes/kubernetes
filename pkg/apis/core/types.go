@@ -3795,12 +3795,6 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string
-	// If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default).
-	// In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
-	// In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
-	// If a pod does not have FQDN, this has no effect.
-	// +optional
-	SetHostnameAsFQDN *bool
 	// If specified, the pod's scheduling constraints
 	// +optional
 	Affinity *Affinity
@@ -3830,13 +3824,6 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32
-	// PreemptionPolicy is the Policy for preempting pods with lower priority.
-	// One of Never, PreemptLowerPriority.
-	// When Priority Admission Controller is enabled, it prevents users from setting
-	// this field. The admission controller populates this field from PriorityClassName.
-	// Defaults to PreemptLowerPriority if unset.
-	// +optional
-	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
@@ -3855,6 +3842,18 @@ type PodSpec struct {
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 	// +optional
 	RuntimeClassName *string
+	// EnableServiceLinks indicates whether information about services should be injected into pod's
+	// environment variables, matching the syntax of Docker links.
+	// If not specified, the default is true.
+	// +optional
+	EnableServiceLinks *bool
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// When Priority Admission Controller is enabled, it prevents users from setting
+	// this field. The admission controller populates this field from PriorityClassName.
+	// Defaults to PreemptLowerPriority if unset.
+	// +optional
+	PreemptionPolicy *PreemptionPolicy
 	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
 	// This field will be autopopulated at admission time by the RuntimeClass admission controller. If
 	// the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests.
@@ -3864,16 +3863,17 @@ type PodSpec struct {
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead
 	// +optional
 	Overhead ResourceList
-	// EnableServiceLinks indicates whether information about services should be injected into pod's
-	// environment variables, matching the syntax of Docker links.
-	// If not specified, the default is true.
-	// +optional
-	EnableServiceLinks *bool
 	// TopologySpreadConstraints describes how a group of pods ought to spread across topology
 	// domains. Scheduler will schedule pods in a way which abides by the constraints.
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	TopologySpreadConstraints []TopologySpreadConstraint
+	// If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default).
+	// In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname).
+	// In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN.
+	// If a pod does not have FQDN, this has no effect.
+	// +optional
+	SetHostnameAsFQDN *bool
 	// Specifies the OS of the containers in the pod.
 	// Some pod and container fields are restricted if this is set.
 	//
@@ -4261,6 +4261,11 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	FSGroup *int64
+	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
+	// sysctls (by the container runtime) might fail to launch.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	Sysctls []Sysctl
 	// fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
 	// before being exposed inside Pod. This field will only apply to
 	// volume types which support fsGroup based ownership(and permissions).
@@ -4270,11 +4275,6 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy
-	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
-	// sysctls (by the container runtime) might fail to launch.
-	// Note that this field cannot be set when spec.os.name is windows.
-	// +optional
-	Sysctls []Sysctl
 	// The seccomp options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
@@ -4607,8 +4607,6 @@ type PodStatus struct {
 	// This is before the Kubelet pulled the container image(s) for the pod.
 	// +optional
 	StartTime *metav1.Time
-	// +optional
-	QOSClass PodQOSClass
 
 	// Statuses of init containers in this pod. The most recent successful non-restartable
 	// init container will have ready = true, the most recently started container will have
@@ -4632,6 +4630,8 @@ type PodStatus struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
 	// +optional
 	ContainerStatuses []ContainerStatus
+	// +optional
+	QOSClass PodQOSClass
 
 	// Statuses for any ephemeral containers that have run in this pod.
 	// Each ephemeral container in the pod should have at most one status in this list,
