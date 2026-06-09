@@ -108,11 +108,6 @@ type VolumeSource struct {
 	// +optional
 	RBD *RBDVolumeSource
 
-	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
-	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
-	// +optional
-	Quobyte *QuobyteVolumeSource
-
 	// flexVolume represents a generic volume resource that is
 	// provisioned/attached using an exec based plugin.
 	// Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
@@ -154,6 +149,11 @@ type VolumeSource struct {
 	// are redirected to the csi.vsphere.vmware.com CSI driver.
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
+	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+	//
+	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
+	// +optional
+	Quobyte *QuobyteVolumeSource
 	// azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
 	// are redirected to the disk.csi.azure.com CSI driver.

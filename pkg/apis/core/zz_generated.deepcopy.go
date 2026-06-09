@@ -6750,11 +6750,6 @@ func (in *VolumeSource) DeepCopyInto(out *VolumeSource) {
 		*out = new(RBDVolumeSource)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Quobyte != nil {
-		in, out := &in.Quobyte, &out.Quobyte
-		*out = new(QuobyteVolumeSource)
-		**out = **in
-	}
 	if in.FlexVolume != nil {
 		in, out := &in.FlexVolume, &out.FlexVolume
 		*out = new(FlexVolumeSource)
@@ -6798,6 +6793,11 @@ func (in *VolumeSource) DeepCopyInto(out *VolumeSource) {
 	if in.VsphereVolume != nil {
 		in, out := &in.VsphereVolume, &out.VsphereVolume
 		*out = new(VsphereVirtualDiskVolumeSource)
+		**out = **in
+	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(QuobyteVolumeSource)
 		**out = **in
 	}
 	if in.AzureDisk != nil {
