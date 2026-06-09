@@ -192,9 +192,7 @@ func TestMatchPod(t *testing.T) {
 		{
 			in: &api.Pod{
 				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: true,
-					},
+					HostNetwork: true,
 				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=true"),
@@ -203,9 +201,7 @@ func TestMatchPod(t *testing.T) {
 		{
 			in: &api.Pod{
 				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: true,
-					},
+					HostNetwork: true,
 				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
@@ -214,9 +210,7 @@ func TestMatchPod(t *testing.T) {
 		{
 			in: &api.Pod{
 				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: false,
-					},
+					HostNetwork: false,
 				},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),

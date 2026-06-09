@@ -833,7 +833,6 @@ func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
 			wantOut: &core.Pod{
 				Spec: core.PodSpec{
 					TerminationGracePeriodSeconds: ptr.To[int64](1),
-					SecurityContext:               &core.PodSecurityContext{},
 				},
 			},
 		},

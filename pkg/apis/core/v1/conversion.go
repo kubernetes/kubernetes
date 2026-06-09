@@ -303,16 +303,6 @@ func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s con
 	// DeprecatedServiceAccount is an alias for ServiceAccountName.
 	out.DeprecatedServiceAccount = in.ServiceAccountName
 
-	if in.SecurityContext != nil {
-		// the host namespace fields have to be handled here for backward compatibility
-		// with v1.0.0
-		out.HostPID = in.SecurityContext.HostPID
-		out.HostNetwork = in.SecurityContext.HostNetwork
-		out.HostIPC = in.SecurityContext.HostIPC
-		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
-		out.HostUsers = in.SecurityContext.HostUsers
-	}
-
 	return nil
 }
 
@@ -356,17 +346,6 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 	if in.ServiceAccountName == "" {
 		out.ServiceAccountName = in.DeprecatedServiceAccount
 	}
-
-	// the host namespace fields have to be handled specially for backward compatibility
-	// with v1.0.0
-	if out.SecurityContext == nil {
-		out.SecurityContext = new(core.PodSecurityContext)
-	}
-	out.SecurityContext.HostNetwork = in.HostNetwork
-	out.SecurityContext.HostPID = in.HostPID
-	out.SecurityContext.HostIPC = in.HostIPC
-	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
-	out.SecurityContext.HostUsers = in.HostUsers
 
 	return nil
 }
