@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -78,7 +78,6 @@ func TestNodeAuthorizer(t *testing.T) {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
 			features.KubeletServiceAccountTokenForCredentialProviders: false,
-			features.PodCertificateRequest:                            false,
 		})
 		return f
 	}
@@ -94,12 +93,6 @@ func TestNodeAuthorizer(t *testing.T) {
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
 			features.PodCertificateRequest: true,
 		})
-		return f
-	}
-
-	podCertificateProjectionDisabled := func(t testing.TB) featuregate.FeatureGate {
-		f := utilfeature.DefaultFeatureGate.DeepCopy()
-		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, false)
 		return f
 	}
 
@@ -243,13 +236,6 @@ func TestNodeAuthorizer(t *testing.T) {
 			features: serviceAccountTokenForCredentialProvidersEnabled,
 		},
 		{
-			name:         "disallowed get svcacct via pod - feature disabled",
-			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     serviceAccountTokenForCredentialProvidersDisabled,
-			expectReason: "not allowed to get service accounts",
-		},
-		{
 			name:         "disallowed list svcacct via pod - feature disabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
 			expect:       authorizer.DecisionNoOpinion,
@@ -276,34 +262,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			features: podCertificateProjectionEnabled,
 		},
 		{
-			name:     "disallowed pcr create when PodCertificateProjection is disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
-			features: podCertificateProjectionDisabled,
-		},
-		{
 			name:     "allowed pcr create when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
 			expect:   authorizer.DecisionAllow,
 			features: podCertificateProjectionEnabled,
 		},
 		{
-			name:     "disallowed pcr get when PodCertificateProjection is disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
-			features: podCertificateProjectionDisabled,
-		},
-		{
 			name:     "allowed pcr get when PodCertificateProjection is enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
 			expect:   authorizer.DecisionAllow,
 			features: podCertificateProjectionEnabled,
-		},
-		{
-			name:     "disallowed pcr list when PodCertificateProjection is disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
-			features: podCertificateProjectionDisabled,
 		},
 		{
 			name:         "disallowed pcr list (un-filtered) when PodCertificateProjection is enabled",
@@ -324,12 +292,6 @@ func TestNodeAuthorizer(t *testing.T) {
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0", FieldSelectorRequirements: fields.Requirements{{Field: "spec.nodeName", Operator: "=", Value: "node0"}}},
 			expect:   authorizer.DecisionAllow,
 			features: podCertificateProjectionEnabled,
-		},
-		{
-			name:     "disallowed pcr watch when PodCertificateProjection is disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", APIGroup: "certificates.k8s.io", Resource: "podcertificaterequests", Name: "pcr0-pod0-node0", Namespace: "ns0"},
-			expect:   authorizer.DecisionNoOpinion,
-			features: podCertificateProjectionDisabled,
 		},
 		{
 			name:         "disallowed pcr watch (un-filtered) when PodCertificateProjection is enabled",
@@ -1527,7 +1489,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1beta1.PodCertificateRequest) {
+func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1.PodCertificateRequest) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
@@ -1558,13 +1520,13 @@ func randomSubset(a, b int, randPerm func(int) []int) []int {
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1beta1.PodCertificateRequest) {
+func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1.PodCertificateRequest) {
 	nodes := make([]*corev1.Node, 0, opts.nodes)
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
-	pcrs := make([]*certsv1beta1.PodCertificateRequest, 0, opts.nodes*opts.podsPerNode*opts.podCertificateRequestsPerPod)
+	pcrs := make([]*certsv1.PodCertificateRequest, 0, opts.nodes*opts.podsPerNode*opts.podCertificateRequestsPerPod)
 
 	r := rand.New(rand.NewSource(12345))
 
@@ -1606,9 +1568,9 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	return nodes, pods, pvs, attachments, slices, pcrs
 }
 
-func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1beta1.PodCertificateRequest) {
+func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1.PodCertificateRequest) {
 	pvs := make([]*corev1.PersistentVolume, 0, opts.uniquePVCsPerPod+opts.sharedPVCsPerPod)
-	pcrs := make([]*certsv1beta1.PodCertificateRequest, 0, opts.podCertificateRequestsPerPod)
+	pcrs := make([]*certsv1.PodCertificateRequest, 0, opts.podCertificateRequestsPerPod)
 
 	pod := &corev1.Pod{}
 	pod.Name = name
@@ -1696,12 +1658,12 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 	}
 
 	for i := 0; i < opts.podCertificateRequestsPerPod; i++ {
-		pcr := &certsv1beta1.PodCertificateRequest{
+		pcr := &certsv1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: pod.ObjectMeta.Namespace,
 				Name:      fmt.Sprintf("pcr%d-%s", i, pod.ObjectMeta.Name),
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certsv1.PodCertificateRequestSpec{
 				PodName:            pod.ObjectMeta.Name,
 				PodUID:             pod.ObjectMeta.UID,
 				ServiceAccountName: pod.Spec.ServiceAccountName,

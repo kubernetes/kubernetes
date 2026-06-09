@@ -84,6 +84,7 @@ func (s *Strategy) PrepareForUpdate(ctx context.Context, new, old runtime.Object
 	newReq := new.(*certificates.PodCertificateRequest)
 	oldReq := old.(*certificates.PodCertificateRequest)
 	newReq.Status = oldReq.Status
+	newReq.Spec = oldReq.Spec
 }
 
 func (s *Strategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
@@ -120,6 +121,10 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAu
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"certificates.k8s.io/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

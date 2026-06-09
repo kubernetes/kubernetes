@@ -751,6 +751,7 @@ var gvrToStorageVersionHash = map[string]string{
 	"batch/v1/jobs":     "mudhfqk/qZY=",
 	"batch/v1/cronjobs": "sd5LIXh4Fjs=",
 	"certificates.k8s.io/v1/certificatesigningrequests":                 "95fRKMXA+00=",
+	"certificates.k8s.io/v1/podcertificaterequests":                     "wYA9yXQH8fg=",
 	"coordination.k8s.io/v1/leases":                                     "gqkMMb/YqFM=",
 	"discovery.k8s.io/v1/endpointslices":                                "qgS0xkrxYAI=",
 	"networking.k8s.io/v1/networkpolicies":                              "YpfwF18m1G8=",

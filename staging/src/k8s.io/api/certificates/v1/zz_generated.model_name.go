@@ -45,3 +45,23 @@ func (in CertificateSigningRequestSpec) OpenAPIModelName() string {
 func (in CertificateSigningRequestStatus) OpenAPIModelName() string {
 	return "io.k8s.api.certificates.v1.CertificateSigningRequestStatus"
 }
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCertificateRequest) OpenAPIModelName() string {
+	return "io.k8s.api.certificates.v1.PodCertificateRequest"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCertificateRequestList) OpenAPIModelName() string {
+	return "io.k8s.api.certificates.v1.PodCertificateRequestList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCertificateRequestSpec) OpenAPIModelName() string {
+	return "io.k8s.api.certificates.v1.PodCertificateRequestSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodCertificateRequestStatus) OpenAPIModelName() string {
+	return "io.k8s.api.certificates.v1.PodCertificateRequestStatus"
+}
