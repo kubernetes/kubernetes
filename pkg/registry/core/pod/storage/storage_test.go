@@ -713,6 +713,34 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	}
 }
 
+func TestEtcdCreateBindingInvalidTarget(t *testing.T) {
+	storage, bindingStorage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+	if _, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("create pod: %v", err)
+	}
+	tests := []struct {
+		name   string
+		target api.ObjectReference
+	}{
+		{"unsupported target.kind, missing target.name", api.ObjectReference{Kind: "foo"}},
+		{"missing target.name", api.ObjectReference{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
+				Target:     tc.target,
+			}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if !errors.IsInvalid(err) {
+				t.Errorf("expected Invalid (422), got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
