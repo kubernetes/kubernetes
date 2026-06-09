@@ -35,8 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	"go.opentelemetry.io/otel/trace/noop"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -298,7 +296,11 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
 	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
-	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
+	r, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(runtimeEndpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithUseStreaming(useStreaming).
+		Build(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -308,7 +310,11 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
+	i, err := remote.NewRemoteImageServiceBuilder().
+		WithEndpoint(imageManagerEndpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithUseStreaming(useStreaming).
+		Build(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
