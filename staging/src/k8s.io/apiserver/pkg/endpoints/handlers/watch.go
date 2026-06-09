@@ -225,6 +225,7 @@ type watchEventMetricsRecorder struct {
 	sizeMetric                 compbasemetrics.ObserverMetric
 	byteCount                  atomic.Int64
 	serializationLatencyMetric compbasemetrics.ObserverMetric
+	networkWriteLatencyMetric  compbasemetrics.ObserverMetric
 }
 
 // Write implements io.Writer.
@@ -235,10 +236,13 @@ func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
 }
 
 // Record reports the metrics and resets the byte count.
-func (c *watchEventMetricsRecorder) RecordEvent(serializationDuration time.Duration) {
+func (c *watchEventMetricsRecorder) RecordEvent(serializationDuration, networkWriteDuration time.Duration, didFlush bool) {
 	c.countMetric.Inc()
 	c.sizeMetric.Observe(float64(c.byteCount.Swap(0)))
 	c.serializationLatencyMetric.Observe(serializationDuration.Seconds())
+	if didFlush {
+		c.networkWriteLatencyMetric.Observe(networkWriteDuration.Seconds())
+	}
 }
 
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
@@ -293,6 +297,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		countMetric:                metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
 		sizeMetric:                 metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
 		serializationLatencyMetric: metrics.WatchEventSerializationDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		networkWriteLatencyMetric:  metrics.WatchEventNetworkWriteDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
 	}
 
 	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
@@ -331,10 +336,14 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
-			recorder.RecordEvent(time.Since(serializationStart))
-			if len(ch) == 0 {
+			var writeDuration time.Duration
+			didFlush := len(ch) == 0
+			if didFlush {
+				writeStart := time.Now()
 				flusher.Flush()
+				writeDuration = time.Since(writeStart)
 			}
+			recorder.RecordEvent(serializationDuration, writeDuration, didFlush)
 
 			total := time.Since(serializationStart)
 			if total > slowWatchSerializationThreshold {
@@ -346,7 +355,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					"resource", gvr.Resource,
 					"rv", rv,
 					"serializationMs", serializationDuration.Milliseconds(),
-					"flushMs", (total - serializationDuration).Milliseconds(),
+					"flushMs", writeDuration.Milliseconds(),
 				)
 			}
 			if isWatchListLatencyRecordingRequired {

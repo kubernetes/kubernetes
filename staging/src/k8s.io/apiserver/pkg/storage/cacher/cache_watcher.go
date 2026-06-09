@@ -53,10 +53,6 @@ const (
 	// dispatch latency above which a structured log line is emitted.
 	slowDispatchThreshold = 500 * time.Millisecond
 
-	// dispatchSamplingDenominator controls the head-sampling rate for
-	// per-stage timing capture in logs.
-	dispatchSamplingDenominator = 1000
-
 	// slowDispatchWatchLogInterval bounds the rate of per-event
 	// slow-dispatch log emission.
 	slowDispatchWatchLogInterval = time.Second
@@ -82,35 +78,32 @@ type inputEvent struct {
 	timing TimingInfo
 }
 
-// TimingInfo captures the full lifecycle timestamps of one eve nt delivered
+// TimingInfo captures the full lifecycle timestamps of one event delivered
 // to one watcher, from receipt by the watch cache to enqueue on the watcher's
-// result channel. The per-event prefux (ReceivedFromStorageAt, RingBufferedAt,
+// result channel. The per-event prefix (ReceivedFromStorageAt, RingBufferedAt,
 // DispatchedAt) is set during ingest/dispatch and copied by value into each
 // watcher's queue; the per-watcher tail (EnqueuedForWatcherAt, DequeuedByWatcherAt,
 // WatchEventBuiltAt, SentToResultChanAt) is filled in as the event flows through
 // that watcher.
 type TimingInfo struct {
-	// Sampled indicates that this timing info was sampled for which the per-stage slow-log
-	// may fire.
-	Sampled bool
-	// Per-event (shared across all watc hers receiving this event).
+	// Per-event (shared across all watchers receiving this event).
 	// The watch cache received the event from the storage layer.
 	ReceivedFromStorageAt time.Time
 	// The event was written to the watch cache's ring buffer.
 	RingBufferedAt time.Time
-	// The dispacther picked the event up from the incoming channel for
+	// The dispatcher picked the event up from the incoming channel for
 	// fan-out.
 	DispatchedAt time.Time
 
 	// Per-watcher (unique per delivery).
 	// The event was placed on this watcher's input channel.
 	EnqueuedForWatcherAt time.Time
-	// The watcher's process goroutine dequeeud the event from its
+	// The watcher's process goroutine dequeued the event from its
 	// input channel.
 	DequeuedByWatcherAt time.Time
 	// Filtering + conversion produced the outgoing watch.Event.
 	WatchEventBuiltAt time.Time
-	// The watch.Event was enqueued on this watcher;s result channel.
+	// The watch.Event was enqueued on this watcher's result channel.
 	SentToResultChanAt time.Time
 }
 
@@ -129,7 +122,7 @@ type cacheWatcher struct {
 	deadline            time.Time
 	allowWatchBookmarks bool
 	groupResource       schema.GroupResource
-	dispatchDuration    *metrics.DispatchDurationObservers
+	watcherMetrics      *metrics.WatcherMetricsObservers
 
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
@@ -175,7 +168,7 @@ func newCacheWatcher(
 		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
 		groupResource:       groupResource,
-		dispatchDuration:    metrics.NewDispatchDurationObservers(groupResource),
+		watcherMetrics:      metrics.NewWatcherMetricsObservers(groupResource),
 		identifier:          identifier,
 	}
 }
@@ -221,9 +214,7 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent, timing TimingInfo)
 	if event.Type == watch.Bookmark && event.ResourceVersion < c.bookmarkAfterResourceVersion {
 		return false
 	}
-	if timing.Sampled {
-		timing.EnqueuedForWatcherAt = time.Now()
-	}
+	timing.EnqueuedForWatcherAt = time.Now()
 	select {
 	case c.input <- inputEvent{event: event, timing: timing}:
 		c.markBookmarkAfterRvAsReceived(event)
@@ -274,7 +265,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timing TimingInfo, timer *tim
 		undeliveredMs := int64(-1)
 		if !timing.ReceivedFromStorageAt.IsZero() {
 			d := time.Since(timing.ReceivedFromStorageAt)
-			c.dispatchDuration.ObserveTerminated(d)
+			c.watcherMetrics.ObserveTerminated(d)
 			undeliveredMs = d.Milliseconds()
 		}
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. resourceversion = %v, undeliveredMs = %v, len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, event.ResourceVersion, undeliveredMs, len(c.input), len(c.result), graceful)
@@ -287,13 +278,14 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timing TimingInfo, timer *tim
 	}
 
 	// OK, block sending, but only until timer fires.
-	if timing.Sampled {
-		timing.EnqueuedForWatcherAt = time.Now()
-	}
+	timing.EnqueuedForWatcherAt = time.Now()
+	blockStart := time.Now()
 	select {
 	case c.input <- inputEvent{event: event, timing: timing}:
+		c.watcherMetrics.AddDispatchBlockedSeconds(time.Since(blockStart))
 		return true
 	case <-timer.C:
+		c.watcherMetrics.AddDispatchBlockedSeconds(time.Since(blockStart))
 		closeFunc()
 		return false
 	}
@@ -486,9 +478,7 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 // for downstream metric/log consumers.
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent, timing *TimingInfo) {
 	watchEvent := c.convertToWatchEvent(event)
-	if timing.Sampled {
-		timing.WatchEventBuiltAt = time.Now()
-	}
+	timing.WatchEventBuiltAt = time.Now()
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
 		return
@@ -511,19 +501,19 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent, timing *Timin
 		return
 	default:
 	}
+
+handoffStart := time.Now()
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
 		timing.SentToResultChanAt = time.Now()
+			c.watcherMetrics.AddHandoffBlockedSeconds(time.Since(handoffStart))
+		
 	case <-c.done:
 	}
 }
 
 func (c *cacheWatcher) logIfSlow(event *watchCacheEvent, timing TimingInfo) {
-	if !timing.Sampled {
-		return
-	}
-
 	if timing.SentToResultChanAt.IsZero() || timing.ReceivedFromStorageAt.IsZero() {
 		return
 	}
@@ -659,18 +649,23 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				if timing.Sampled {
 				timing.DequeuedByWatcherAt = time.Now()
-				}
 				c.sendWatchCacheEvent(event, &timing)
-				if !timing.SentToResultChanAt.IsZero() && !event.RecordTime.IsZero() {
-					c.dispatchDuration.ObserveDelivered(timing.SentToResultChanAt.Sub(timing.ReceivedFromStorageAt))
-				}
+				c.recordLifecycleMetrics(event, timing)
 				c.logIfSlow(event, timing)
 			}
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, timing TimingInfo) {
+	if !timing.EnqueuedForWatcherAt.IsZero() && !timing.DequeuedByWatcherAt.IsZero() {
+		c.watcherMetrics.ObserveQueueDuration(timing.DequeuedByWatcherAt.Sub(timing.EnqueuedForWatcherAt))
+	}
+	if !timing.SentToResultChanAt.IsZero() && !event.RecordTime.IsZero() {
+		c.watcherMetrics.ObserveDelivered(timing.SentToResultChanAt.Sub(timing.ReceivedFromStorageAt))
 	}
 }
 

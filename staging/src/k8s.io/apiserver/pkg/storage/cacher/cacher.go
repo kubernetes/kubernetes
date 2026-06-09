@@ -307,10 +307,6 @@ type Cacher struct {
 	// watchers is mapping from the value of trigger function that a
 	// watcher is interested into the watchers
 	watcherIdx int
-	// sampleCounter drives head-sampling of TimingInfo capture in dispatchEvent.
-	// dispatchEvent is called only from the dispatchEvents goroutine, so this
-	// counter needs no synchronization.
-	sampleCounter uint64
 	watchers      indexedWatchers
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
@@ -401,9 +397,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		newListFunc:    config.NewListFunc,
 		indexedTrigger: indexedTrigger,
 		watcherIdx:     0,
-		// randomize the sample counter to prevent multiple cachers from generating
-		// the same sample sequence.
-		sampleCounter: uint64(time.Now().UnixNano()),
 		watchers: indexedWatchers{
 			allWatchers:   make(map[namespacedName]watchersMap),
 			valueWatchers: make(map[string]watchersMap),
@@ -975,13 +968,13 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
 
-	c.sampleCounter++
-	sampled := c.sampleCounter%dispatchSamplingDenominator == 0
 	timing := TimingInfo{
-		Sampled:               sampled,
 		ReceivedFromStorageAt: event.RecordTime,
 		RingBufferedAt:        event.WatchCacheEnqueuedAt,
 		DispatchedAt:          c.clock.Now(),
+	}
+	if !timing.RingBufferedAt.IsZero() {
+		metrics.WatchCacheQueueDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(timing.DispatchedAt.Sub(timing.RingBufferedAt).Seconds())
 	}
 
 	// Since add() can block, we explicitly add when cacher is unlocked.
