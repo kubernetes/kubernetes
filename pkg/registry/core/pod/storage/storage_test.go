@@ -1011,7 +1011,7 @@ func TestEtcdCreateBinding(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{},
 			},
-			errOK: func(err error) bool { return err != nil },
+			errOK: errors.IsInvalid,
 		},
 		"badNameInURL": {
 			binding: api.Binding{
@@ -1019,14 +1019,14 @@ func TestEtcdCreateBinding(t *testing.T) {
 				Target:     api.ObjectReference{},
 			},
 			badNameInURL: true,
-			errOK:        func(err error) bool { return err != nil },
+			errOK:        errors.IsBadRequest,
 		},
 		"badKind": {
 			binding: api.Binding{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
 				Target:     api.ObjectReference{Name: "machine1", Kind: "unknown"},
 			},
-			errOK: func(err error) bool { return err != nil },
+			errOK: errors.IsInvalid,
 		},
 		"emptyKind": {
 			binding: api.Binding{
