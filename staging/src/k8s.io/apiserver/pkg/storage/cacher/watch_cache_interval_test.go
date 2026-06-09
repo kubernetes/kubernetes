@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
-
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	"k8s.io/client-go/tools/cache"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -395,7 +395,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		store.Add(elem)
 	}
 
-	wci, err := newCacheIntervalFromStore(rv, store, "", false)
+	wci, err := newCacheIntervalFromStore(rv, store, "", false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,7 +453,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 				}
 			}
 
-			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -470,5 +470,55 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 				t.Errorf("events not sorted by key: %v", got)
 			}
 		})
+	}
+}
+
+func TestNewCacheIntervalFromStoreWithMatchValues(t *testing.T) {
+	// Create a store with an index on spec.nodeName via the "f:spec.nodeName" index.
+	nodeNameIndexFunc := func(obj interface{}) ([]string, error) {
+		elem, ok := obj.(*store.Element)
+		if !ok {
+			return nil, fmt.Errorf("not a store element")
+		}
+		return []string{elem.Fields.Get("spec.nodeName")}, nil
+	}
+	storeIndexer := cache.NewIndexer(store.ElementKey, cache.Indexers{"f:spec.nodeName": nodeNameIndexFunc})
+
+	// Add 100 pods: 10 on target-node, 90 on other-node.
+	for i := 0; i < 100; i++ {
+		node := "other-node"
+		if i < 10 {
+			node = "target-node"
+		}
+		pod := makeTestPodDetails(fmt.Sprintf("pod%03d", i), uint64(i), node, nil)
+		storeIndexer.Add(makeTestStoreElement(pod))
+	}
+
+	var rv uint64 = 5
+	matchValues := []storage.MatchValue{{IndexName: "f:spec.nodeName", Value: "target-node"}}
+	wci, err := newCacheIntervalFromStore(rv, storeIndexer, "", false, matchValues)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 0
+	for {
+		event, err := wci.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if event == nil {
+			break
+		}
+		count++
+		if event.Type != watch.Added {
+			t.Errorf("expected Added event, got %v", event.Type)
+		}
+		if event.ResourceVersion != rv {
+			t.Errorf("expected rv %d, got %d", rv, event.ResourceVersion)
+		}
+	}
+	if count != 10 {
+		t.Fatalf("expected 10 events for target-node, got %d", count)
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
@@ -121,8 +122,10 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
-// The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
+// When matchValues map to an index, the matching items are served through that index
+// (readPrefilteredByIndex, shared with the list path); otherwise the full store is
+// listed. Items are ordered by Key.
+func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool, matchValues []storage.MatchValue) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 	if matchesSingle {
@@ -135,7 +138,15 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems = indexer.List()
+		items, _, matched, err := readPrefilteredByIndex(indexer, key, matchValues)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			allItems = items
+		} else {
+			allItems = indexer.List()
+		}
 	}
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
 	for i, item := range allItems {
