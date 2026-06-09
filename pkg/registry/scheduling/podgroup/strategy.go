@@ -86,6 +86,9 @@ func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, o
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
 		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		opts = append(opts, string(features.CompositePodGroup))
+	}
 	return rest.DeclarativeValidationConfig{Options: opts}
 }
 

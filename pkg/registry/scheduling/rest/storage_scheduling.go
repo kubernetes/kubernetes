@@ -38,6 +38,7 @@ import (
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	schedulingapiv1alpha3 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha3"
 	"k8s.io/kubernetes/pkg/features"
+	compositepodgroupstore "k8s.io/kubernetes/pkg/registry/scheduling/compositepodgroup/storage"
 	podgroupstore "k8s.io/kubernetes/pkg/registry/scheduling/podgroup/storage"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 	workloadstore "k8s.io/kubernetes/pkg/registry/scheduling/workload/storage"
@@ -107,6 +108,19 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 			storage[resource+"/status"] = podGroupStatusStorage
 		} else {
 			klog.Warning("PodGroup storage is disabled because the GenericWorkload feature gate is disabled")
+		}
+	}
+
+	if resource := "compositepodgroups"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1alpha3.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			cpgStorage, cpgStatusStorage, err := compositepodgroupstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = cpgStorage
+			storage[resource+"/status"] = cpgStatusStorage
+		} else {
+			klog.Warning("CompositePodGroup storage is disabled because the CompositePodGroup feature gate is disabled")
 		}
 	}
 

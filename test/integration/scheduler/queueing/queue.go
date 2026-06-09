@@ -2528,7 +2528,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
 		InitialPodGroups: []*schedulingapi.PodGroup{
-			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
+			st.MakePodGroup().Name("pg1").MinCount(2).WorkloadRef("t", "w").Obj(),
 		},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
@@ -2556,7 +2556,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			pg := st.MakePodGroup().Name("pg1").MinCount(1).TemplateRef("t", "w").Obj()
+			pg := st.MakePodGroup().Name("pg1").MinCount(1).WorkloadRef("t", "w").Obj()
 			if _, err := testCtx.ClientSet.SchedulingV1alpha3().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create PodGroup %q: %w", pg.Name, err)
 			}

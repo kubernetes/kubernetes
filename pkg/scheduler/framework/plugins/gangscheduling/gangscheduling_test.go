@@ -114,19 +114,19 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 		{
 			name:         "add a pod group which matches the pod's pod group name",
 			pod:          st.MakePod().Name("p").PodGroupName("pg").Obj(),
-			newPodGroup:  st.MakePodGroup().Name("pg").MinCount(1).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "add a pod group which doesn't match the pod's scheduling group name",
 			pod:          st.MakePod().Name("p").PodGroupName("pg1").Obj(),
-			newPodGroup:  st.MakePodGroup().Name("pg2").MinCount(1).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Name("pg2").MinCount(1).WorkloadRef("t", "w").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "add a pod group which doesn't match the pod's scheduling group namespace",
 			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
-			newPodGroup:  st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 	}
@@ -193,9 +193,9 @@ func (m *mockSharedLister) PodGroupStates() fwk.PodGroupStateLister {
 }
 
 func TestGangSchedulingFlow(t *testing.T) {
-	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").TemplateRef("t1", "gang-wl").MinCount(3).Obj()
-	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").TemplateRef("t2", "gang-wl").MinCount(4).Obj()
-	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").TemplateRef("1", "basic-wl").BasicPolicy().Obj()
+	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").WorkloadRef("t1", "gang-wl").MinCount(3).Obj()
+	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").WorkloadRef("t2", "gang-wl").MinCount(4).Obj()
+	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").WorkloadRef("1", "basic-wl").BasicPolicy().Obj()
 
 	p1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
 	p2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").PodGroupName("pg1").Obj()
