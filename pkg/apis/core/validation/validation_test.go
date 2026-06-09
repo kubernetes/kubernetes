@@ -11155,7 +11155,7 @@ func TestValidatePod(t *testing.T) {
 						Sources: []core.VolumeProjection{{
 							ServiceAccountToken: &core.ServiceAccountTokenProjection{
 								Audience:          "foo-audience",
-								ExpirationSeconds: 6000,
+								ExpirationSeconds: ptr.To[int64](6000),
 								Path:              "foo-path",
 							},
 						}},
@@ -12674,7 +12674,7 @@ func TestValidatePod(t *testing.T) {
 							Sources: []core.VolumeProjection{{
 								ServiceAccountToken: &core.ServiceAccountTokenProjection{
 									Audience:          "foo-audience",
-									ExpirationSeconds: 6000,
+									ExpirationSeconds: ptr.To[int64](6000),
 									Path:              "foo-path",
 								},
 							}},
@@ -12694,7 +12694,7 @@ func TestValidatePod(t *testing.T) {
 							Sources: []core.VolumeProjection{{
 								ServiceAccountToken: &core.ServiceAccountTokenProjection{
 									Audience:          "foo-audience",
-									ExpirationSeconds: 300,
+									ExpirationSeconds: ptr.To[int64](300),
 									Path:              "foo-path",
 								},
 							}},
@@ -12714,7 +12714,7 @@ func TestValidatePod(t *testing.T) {
 							Sources: []core.VolumeProjection{{
 								ServiceAccountToken: &core.ServiceAccountTokenProjection{
 									Audience:          "foo-audience",
-									ExpirationSeconds: 1 << 33,
+									ExpirationSeconds: ptr.To[int64](1 << 33),
 									Path:              "foo-path",
 								},
 							}},

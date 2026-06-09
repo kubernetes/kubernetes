@@ -1825,7 +1825,8 @@ type ServiceAccountTokenProjection struct {
 	// start trying to rotate the token if the token is older than 80 percent of
 	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
 	// and must be at least 10 minutes.
-	ExpirationSeconds int64
+	// +optional
+	ExpirationSeconds *int64
 	// Path is the path relative to the mount point of the file to project the
 	// token into.
 	Path string

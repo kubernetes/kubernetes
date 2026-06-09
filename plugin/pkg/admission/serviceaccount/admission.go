@@ -490,7 +490,7 @@ func TokenVolumeSource() *api.ProjectedVolumeSource {
 			{
 				ServiceAccountToken: &api.ServiceAccountTokenProjection{
 					Path:              "token",
-					ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
+					ExpirationSeconds: ptr.To[int64](serviceaccount.WarnOnlyBoundTokenExpirationSeconds),
 				},
 			},
 			{
