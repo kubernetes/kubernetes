@@ -36,8 +36,17 @@ func (e *EtcdTestServer) Terminate(t testing.TB) {
 
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t testing.TB) (*EtcdTestServer, *storagebackend.Config) {
+	return NewUnsecuredEtcd3TestClientServerWithOptions(t, false)
+}
+
+// NewUnsecuredEtcd3TestClientServerWithOptions creates a new client and server for testing with optional external etcd
+func NewUnsecuredEtcd3TestClientServerWithOptions(t testing.TB, useExternalEtcd bool) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{}
-	server.V3Client = testserver.RunEtcd(t, nil)
+	if useExternalEtcd {
+		server.V3Client = testserver.RunExternalEtcd(t)
+	} else {
+		server.V3Client = testserver.RunEtcd(t, nil)
+	}
 	config := &storagebackend.Config{
 		Type:   "etcd3",
 		Prefix: PathPrefix(),
