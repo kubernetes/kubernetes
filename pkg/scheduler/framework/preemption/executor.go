@@ -132,7 +132,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 			newStatus := victim.Status.DeepCopy()
 			updated := apipod.UpdatePodCondition(newStatus, condition)
 			if updated {
-				if err := util.PatchPodStatus(ctx, fh.ClientSet(), victim.Name, victim.Namespace, &victim.Status, newStatus); err != nil {
+				if err := util.PatchPodStatus(ctx, fh.ClientSet(), victim.Name, victim.Namespace, "", &victim.Status, newStatus); err != nil {
 					if !apierrors.IsNotFound(err) {
 						logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim))
 						return err
@@ -400,7 +400,7 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 			}
 			podStatusCopy := p.Status.DeepCopy()
 			podStatusCopy.NominatedNodeName = ""
-			if err := util.PatchPodStatus(ctx, cs, p.Name, p.Namespace, &p.Status, podStatusCopy); err != nil {
+			if err := util.PatchPodStatus(ctx, cs, p.Name, p.Namespace, "", &p.Status, podStatusCopy); err != nil {
 				errs = append(errs, err)
 			}
 		}

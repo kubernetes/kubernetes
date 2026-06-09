@@ -111,7 +111,7 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 	}
 
 	// It's safe to run PatchPodStatus even on outdated pod object.
-	err := util.PatchPodStatus(ctx, client, psuc.podRef.Name, psuc.podRef.Namespace, psuc.podStatus, podStatusCopy)
+	err := util.PatchPodStatus(ctx, client, psuc.podRef.Name, psuc.podRef.Namespace, "", psuc.podStatus, podStatusCopy)
 	if err != nil {
 		logger.Error(err, "Failed to patch pod status", "pod", psuc.podRef)
 		return err
