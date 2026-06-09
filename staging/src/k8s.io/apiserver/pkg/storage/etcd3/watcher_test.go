@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,10 +37,13 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/utils/ptr"
 )
 
@@ -419,6 +423,92 @@ func drainSync(t *testing.T, store *store, ctx context.Context, sync func(*watch
 	return out
 }
 
+func TestWatchChanSyncStreamCompactionError(t *testing.T) {
+	metrics.Register()
+	ctx, store, _ := testSetup(t)
+
+	r1, err := store.client.KV.Put(ctx, "/pods/a", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, err := store.client.KV.Put(ctx, "/pods/b", "v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Compacting at r2's revision removes r1's, so a read pinned to r1 fails.
+	if _, err := store.client.KV.Compact(ctx, r2.Header.Revision, clientv3.WithCompactPhysical()); err != nil {
+		t.Fatal(err)
+	}
+
+	kv := newEtcdClientKVWrapper(store.client.KV)
+	kv.streamRev = r1.Header.Revision
+	store.client.KV = kv
+
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+	if err := wc.syncStreamRecursive(); !apierrors.IsResourceExpired(err) {
+		t.Fatalf("expected ResourceExpired from a compacted revision, got %T %v", err, err)
+	}
+
+	expected := `# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type.
+# TYPE etcd_request_errors_total counter
+etcd_request_errors_total{group="",operation="listStream",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "etcd_request_errors_total"); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWatchChanSyncStreamMetrics(t *testing.T) {
+	metrics.Register()
+
+	t.Run("success records a listStream request", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-1"}}
+		if err := store.Create(ctx, "/pods/ns/pod-1", pod, &example.Pod{}, 0); err != nil {
+			t.Fatal(err)
+		}
+
+		legacyregistry.Reset()
+		t.Cleanup(legacyregistry.Reset)
+
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+		if err := wc.syncStreamRecursive(); err != nil {
+			t.Fatal(err)
+		}
+
+		expected := `# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+# TYPE etcd_requests_total counter
+etcd_requests_total{group="",operation="listStream",resource="pods"} 1
+`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "etcd_requests_total"); err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("unimplemented is not recorded", func(t *testing.T) {
+		ctx, store, _ := testSetup(t)
+		kv := newEtcdClientKVWrapper(store.client.KV)
+		kv.streamUnimplemented = true
+		store.client.KV = kv
+
+		legacyregistry.Reset()
+		t.Cleanup(legacyregistry.Reset)
+
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, storage.Everything)
+		err := wc.syncStreamRecursive()
+		if grpcstatus.Code(err) != grpccodes.Unimplemented {
+			t.Fatalf("expected Unimplemented error, got %v", err)
+		}
+
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(""), "etcd_requests_total", "etcd_request_errors_total"); err != nil {
+			t.Error(err)
+		}
+	})
+}
+
 // NOTE: it's not thread-safe
 type etcdClientKVWrapper struct {
 	clientv3.KV
@@ -428,6 +518,8 @@ type etcdClientKVWrapper struct {
 	getStreamCallCounter int
 	// when true, GetStream returns a gRPC Unimplemented error
 	streamUnimplemented bool
+	// when nonzero, GetStream pins the stream to this revision
+	streamRev int64
 	// getReactors is called after the etcd KV's get function is executed.
 	getReactors []func()
 }
@@ -443,6 +535,9 @@ func (ecw *etcdClientKVWrapper) GetStream(ctx context.Context, key string, opts 
 	ecw.getStreamCallCounter++
 	if ecw.streamUnimplemented {
 		return nil, grpcstatus.Error(grpccodes.Unimplemented, "RangeStream is unimplemented")
+	}
+	if ecw.streamRev != 0 {
+		opts = append(opts, clientv3.WithRev(ecw.streamRev))
 	}
 	return ecw.KV.GetStream(ctx, key, opts...)
 }

@@ -372,14 +372,16 @@ func (wc *watchChan) syncStreamRecursive() error {
 
 	startTime := time.Now()
 	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
-	metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
+	}()
 
 	var initialRev int64
 	for r := range streamResp {
-		if err := r.Err(); err != nil {
+		if err = r.Err(); err != nil {
 			// paging=false: a compaction mid-stream can't be resumed with a
 			// continue token, so surface it as ResourceExpired for a relist.
 			return interpretListError(err, false, wc.key, wc.key)
