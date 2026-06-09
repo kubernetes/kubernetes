@@ -7002,8 +7002,8 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.SupplementalGroups = *(*[]int64)(unsafe.Pointer(&in.SupplementalGroups))
 	out.SupplementalGroupsPolicy = (*corev1.SupplementalGroupsPolicy)(unsafe.Pointer(in.SupplementalGroupsPolicy))
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
-	out.FSGroupChangePolicy = (*corev1.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.Sysctls = *(*[]corev1.Sysctl)(unsafe.Pointer(&in.Sysctls))
+	out.FSGroupChangePolicy = (*corev1.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.SeccompProfile = (*corev1.SeccompProfile)(unsafe.Pointer(in.SeccompProfile))
 	out.AppArmorProfile = (*corev1.AppArmorProfile)(unsafe.Pointer(in.AppArmorProfile))
 	out.SELinuxChangePolicy = (*corev1.PodSELinuxChangePolicy)(unsafe.Pointer(in.SELinuxChangePolicy))
@@ -7053,15 +7053,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	out.ShareProcessNamespace = (*bool)(unsafe.Pointer(in.ShareProcessNamespace))
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(core.PodSecurityContext)
-		if err := Convert_v1_PodSecurityContext_To_core_PodSecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*core.PodSecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.ImagePullSecrets = *(*[]core.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
@@ -7106,15 +7098,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	out.ShareProcessNamespace = (*bool)(unsafe.Pointer(in.ShareProcessNamespace))
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(corev1.PodSecurityContext)
-		if err := Convert_core_PodSecurityContext_To_v1_PodSecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*corev1.PodSecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.ImagePullSecrets = *(*[]corev1.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
 	out.Hostname = in.Hostname
 	out.Subdomain = in.Subdomain
