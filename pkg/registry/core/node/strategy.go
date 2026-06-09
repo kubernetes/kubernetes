@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
@@ -252,6 +254,14 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 
 	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
 	if err != nil {
+		// A node that does not expose any usable address (e.g. an empty
+		// status.addresses) is not something we can proxy to, but it is also
+		// not an internal server error. Surface it as a 400 instead of a 500,
+		// matching how an unresolvable proxy hostname is handled below.
+		var noMatchErr *nodeutil.NoMatchError
+		if goerrors.As(err, &noMatchErr) {
+			return nil, nil, errors.NewBadRequest(err.Error())
+		}
 		return nil, nil, err
 	}
 
