@@ -33,6 +33,10 @@ import (
 // name for a Workload is valid.
 var validateWorkloadName = apimachineryvalidation.NameIsDNSSubdomain
 
+// validateCompositePodGroupName can be used to check whether the given
+// name for a CompositePodGroup is valid.
+var validateCompositePodGroupName = apimachineryvalidation.NameIsDNSSubdomain
+
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
 // set correctly.
 func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
@@ -80,12 +84,154 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.
 func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.ErrorList {
-	return apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateWorkloadSpec tests if the following conditions are satisfied:
+// - All template names are unique.
+// - Depth of the CompositePodGroupTemplates tree is not higher than 4.
+// - All templates in the hierarchy share the same priority and PriorityClassName.
+func ValidateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateWorkloadTemplateNamesUniqueness(spec, fldPath)...)
+	allErrs = append(allErrs, validateWorkloadTemplatesDepth(spec, fldPath.Child("compositePodGroupTemplates"))...)
+	allErrs = append(allErrs, validateWorkloadPriority(spec, fldPath)...)
+	return allErrs
+}
+
+func validateWorkloadTemplateNamesUniqueness(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	if len(spec.PodGroupTemplates) > 0 {
+		return nil
+	}
+
+	var allErrs field.ErrorList
+	names := make(map[string]string)
+	cpgListPath := fldPath.Child("compositePodGroupTemplates").String()
+	for i, cpg := range spec.CompositePodGroupTemplates {
+		cpgPath := fldPath.Child("compositePodGroupTemplates").Index(i)
+		allErrs = append(allErrs, validateCompositePodGroupTemplateNames(&cpg, cpgPath, cpgListPath, names)...)
+	}
+
+	return allErrs
+}
+
+func validateCompositePodGroupTemplateNames(cpg *scheduling.CompositePodGroupTemplate, fldPath *field.Path, parentListPath string, names map[string]string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	existingListPath, exists := names[cpg.Name]
+	if !exists || existingListPath == parentListPath {
+		names[cpg.Name] = parentListPath
+	} else {
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), cpg.Name))
+	}
+
+	childCpgListPath := fldPath.Child("compositePodGroupTemplates").String()
+	for i, child := range cpg.CompositePodGroupTemplates {
+		childPath := fldPath.Child("compositePodGroupTemplates").Index(i)
+		allErrs = append(allErrs, validateCompositePodGroupTemplateNames(&child, childPath, childCpgListPath, names)...)
+	}
+
+	childPgListPath := fldPath.Child("podGroupTemplates").String()
+	for i, child := range cpg.PodGroupTemplates {
+		childPath := fldPath.Child("podGroupTemplates").Index(i)
+		existingListPath, exists := names[child.Name]
+		if !exists || existingListPath == childPgListPath {
+			names[child.Name] = childPgListPath
+			continue
+		}
+		allErrs = append(allErrs, field.Duplicate(childPath.Child("name"), child.Name))
+	}
+
+	return allErrs
+}
+
+func validateWorkloadTemplatesDepth(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	var walk func(*scheduling.CompositePodGroupTemplate, int) bool
+	walk = func(cpg *scheduling.CompositePodGroupTemplate, depth int) bool {
+		if depth == scheduling.WorkloadMaxTemplateDepth {
+			return false
+		}
+		for _, child := range cpg.CompositePodGroupTemplates {
+			if !walk(&child, depth+1) {
+				return false
+			}
+		}
+		return true
+	}
+
+	var allErrs field.ErrorList
+	for i, cpg := range spec.CompositePodGroupTemplates {
+		if !walk(&cpg, 1) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), cpg.CompositePodGroupTemplates, fmt.Sprintf("maximum template hierarchy depth is %d", scheduling.WorkloadMaxTemplateDepth)))
+		}
+	}
+	return allErrs
+}
+
+func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+	var firstClassName *string
+	var firstPriority *int32
+	var hasFirst bool
+
+	checkPriority := func(className string, priority *int32) bool {
+		if !hasFirst {
+			firstClassName = &className
+			firstPriority = priority
+			hasFirst = true
+			return true
+		}
+		if *firstClassName != className {
+			return false
+		}
+		if (firstPriority == nil) != (priority == nil) {
+			return false
+		}
+		if firstPriority != nil && priority != nil && *firstPriority != *priority {
+			return false
+		}
+		return true
+	}
+
+	for _, pg := range spec.PodGroupTemplates {
+		if !checkPriority(pg.PriorityClassName, pg.Priority) {
+			return field.ErrorList{field.Invalid(fldPath, nil, "detected multiple priority configurations")}
+		}
+	}
+
+	var checkCpg func(cpg *scheduling.CompositePodGroupTemplate) bool
+	checkCpg = func(cpg *scheduling.CompositePodGroupTemplate) bool {
+		if !checkPriority(cpg.PriorityClassName, cpg.Priority) {
+			return false
+		}
+		for _, child := range cpg.CompositePodGroupTemplates {
+			if !checkCpg(&child) {
+				return false
+			}
+		}
+		for _, child := range cpg.PodGroupTemplates {
+			if !checkPriority(child.PriorityClassName, child.Priority) {
+				return false
+			}
+		}
+		return true
+	}
+
+	for _, cpg := range spec.CompositePodGroupTemplates {
+		if !checkCpg(&cpg) {
+			return field.ErrorList{field.Invalid(fldPath, nil, "detected multiple priority configurations")}
+		}
+	}
+
+	return nil
 }
 
 // ValidatePodGroupStatusUpdate tests if an update to the status of a PodGroup is valid.
@@ -116,4 +262,22 @@ func havePodGroupClaim(podGroupClaims []scheduling.PodGroupResourceClaim, name s
 	return slices.ContainsFunc(podGroupClaims, func(podGroupClaim scheduling.PodGroupResourceClaim) bool {
 		return podGroupClaim.Name == name
 	})
+}
+
+// ValidateCompositePodGroup tests if all fields in a CompositePodGroup are set correctly.
+func ValidateCompositePodGroup(compositePodGroup *scheduling.CompositePodGroup) field.ErrorList {
+	return apivalidation.ValidateObjectMeta(&compositePodGroup.ObjectMeta, true, validateCompositePodGroupName, field.NewPath("metadata"))
+}
+
+// ValidateCompositePodGroupUpdate tests if an update to CompositePodGroup is valid.
+func ValidateCompositePodGroupUpdate(compositePodGroup, oldCompositePodGroup *scheduling.CompositePodGroup) field.ErrorList {
+	return apivalidation.ValidateObjectMetaUpdate(&compositePodGroup.ObjectMeta, &oldCompositePodGroup.ObjectMeta, field.NewPath("metadata"))
+}
+
+// ValidateCompositePodGroupStatusUpdate tests if an update to the status of a CompositePodGroup is valid.
+func ValidateCompositePodGroupStatusUpdate(compositePodGroup, oldCompositePodGroup *scheduling.CompositePodGroup) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&compositePodGroup.ObjectMeta, &oldCompositePodGroup.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("status")
+	allErrs = append(allErrs, metav1validation.ValidateConditions(compositePodGroup.Status.Conditions, fldPath.Child("conditions"))...)
+	return allErrs
 }
