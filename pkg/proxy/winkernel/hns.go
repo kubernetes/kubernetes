@@ -76,9 +76,14 @@ func isHnsNotRunningError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), errorCodeHnsNotRunning)
 }
 
-// isFileAlreadyExistsError checks if the error is due to an entity already existing by looking for the specific error code in the error message.
-func isFileAlreadyExistsError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), errorCodeFileAlreadyExists)
+// IsPolicyAlreadyExists checks if the error is due to a load balancer policy already existing with
+// the same frontend configuration by checking for specific error conditions, including the presence
+// of a specific error code or message indicating a resource already exists.
+func IsPolicyAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	return hcn.IsPortAlreadyExistsError(err) || strings.Contains(err.Error(), errorCodeFileAlreadyExists)
 }
 
 // findExistingLBIdByFrontend finds the ID of an existing load balancer that matches the frontend configuration of the proposed load balancer.
@@ -419,7 +424,7 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 
 func (hns hns) createLoadbalancerWithRetry(proposedLB *hcn.HostComputeLoadBalancer, existingLBs map[loadBalancerIdentifier]*loadBalancerInfo) (*hcn.HostComputeLoadBalancer, error) {
 	lb, err := hns.hcn.CreateLoadBalancer(proposedLB)
-	if isFileAlreadyExistsError(err) && len(proposedLB.PortMappings) > 0 {
+	if IsPolicyAlreadyExists(err) && len(proposedLB.PortMappings) > 0 {
 		frontEndVIP := ""
 		if len(proposedLB.FrontendVIPs) != 0 {
 			frontEndVIP = proposedLB.FrontendVIPs[0]

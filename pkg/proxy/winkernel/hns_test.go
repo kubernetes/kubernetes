@@ -761,13 +761,13 @@ func TestIsHnsNotRunningError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isHnsNotRunningError(tt.err)
+			result := IsHnsNotRunningError(tt.err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestIsFileAlreadyExistsError(t *testing.T) {
+func TestIsPolicyAlreadyExists(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
@@ -797,7 +797,7 @@ func TestIsFileAlreadyExistsError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileAlreadyExistsError(tt.err)
+			result := IsPolicyAlreadyExists(tt.err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -1005,7 +1005,7 @@ func TestDeleteLoadBalancer_HnsNotRunning(t *testing.T) {
 
 	err := hns.deleteLoadBalancer("any-lb-id")
 	assert.Error(t, err, "deleteLoadBalancer should return error when HNS is not running")
-	assert.True(t, isHnsNotRunningError(err))
+	assert.True(t, IsHnsNotRunningError(err))
 }
 
 func TestDeleteLoadBalancer_Success(t *testing.T) {

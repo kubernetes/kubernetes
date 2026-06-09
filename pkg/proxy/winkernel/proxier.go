@@ -1212,7 +1212,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	prevNetworkID := proxier.network.id
 	updatedNetwork, err := hns.getNetworkByName(hnsNetworkName)
-	if isHnsNotRunningError(err) {
+	if IsHnsNotRunningError(err) {
 		klog.V(1).ErrorS(err, "HNS is not running. Unable to read network. Skipping sync", "hnsNetworkName", hnsNetworkName)
 		return
 	}
