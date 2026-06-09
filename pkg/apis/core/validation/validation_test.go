@@ -12683,6 +12683,46 @@ func TestValidatePod(t *testing.T) {
 				}),
 			),
 		},
+		"serviceaccount token projected volume with expiration too short": {
+			expectedError: "may not specify a duration less than 10 minutes",
+			spec: *podtest.MakePod("123",
+				podtest.SetServiceAccountName("default"),
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{{
+								ServiceAccountToken: &core.ServiceAccountTokenProjection{
+									Audience:          "foo-audience",
+									ExpirationSeconds: 300,
+									Path:              "foo-path",
+								},
+							}},
+						},
+					},
+				}),
+			),
+		},
+		"serviceaccount token projected volume with expiration too long": {
+			expectedError: "may not specify a duration larger than 2^32 seconds",
+			spec: *podtest.MakePod("123",
+				podtest.SetServiceAccountName("default"),
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{{
+								ServiceAccountToken: &core.ServiceAccountTokenProjection{
+									Audience:          "foo-audience",
+									ExpirationSeconds: 1 << 33,
+									Path:              "foo-path",
+								},
+							}},
+						},
+					},
+				}),
+			),
+		},
 		"ClusterTrustBundlePEM projected volume using both byName and bySigner": {
 			expectedError: "only one of name and signerName may be used",
 			spec: *podtest.MakePod("valid-extended",
