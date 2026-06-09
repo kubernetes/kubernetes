@@ -70,9 +70,16 @@ func main() {
 		Qualifiers: []string{withExcludedTestsFilter(`(name.contains('[Serial]') || labels.exists(l, l == '[Serial]')) && labels.exists(l, l == "Conformance")`)},
 	})
 
+	// AddGlobalSuite so the umbrella starts with zero qualifiers and inherits
+	// exclusively from its children via mergeParentQualifiers in origin.
+	kubeTestsExtension.AddGlobalSuite(e.Suite{
+		Name: "kubernetes/conformance",
+	})
+
 	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/parallel",
 		Parents: []string{
+			"kubernetes/conformance",
 			"openshift/conformance/parallel",
 		},
 		Qualifiers: []string{withExcludedTestsFilter(`(!name.contains('[Serial]') && !labels.exists(l, l == '[Serial]'))`)},
@@ -81,6 +88,7 @@ func main() {
 	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/serial",
 		Parents: []string{
+			"kubernetes/conformance",
 			"openshift/conformance/serial",
 		},
 		Qualifiers: []string{withExcludedTestsFilter(`(name.contains('[Serial]') || labels.exists(l, l == '[Serial]'))`)},
