@@ -235,7 +235,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	// After that, verifies the cacheWatcher.process goroutine works correctly.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
 		w = newCacheWatcher(2, filter, emptyFunc, storage.APIObjectVersioner{}, deadline, false, schema.GroupResource{Resource: "pods"}, "")
-		w.input <- inputEvent{event: &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}, addedAt: time.Now()}
+		w.input <- inputEvent{event: &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}, timing: TimingInfo{EnqueuedForWatcherAt: time.Now()}}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
 		go w.processInterval(ctx, intervalFromEvents(nil), 0)
@@ -317,7 +317,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 		Object:          makeTestPod(fmt.Sprintf("pod-%d", numObjects-1), uint64(numObjects-1)),
 		ResourceVersion: uint64(numObjects - 1),
 	}
-	if !w.add(event, time.NewTimer(time.Second)) {
+	if !w.add(event, TimingInfo{}, time.NewTimer(time.Second)) {
 		t.Fatalf("failed to add event")
 	}
 	w.stopLocked()
@@ -419,7 +419,7 @@ func TestCacheWatcherDraining(t *testing.T) {
 	}
 	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
 	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 1)
-	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
+	if !w.add(makeWatchCacheEvent(7), TimingInfo{}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 	forget(true) // drain the watcher
@@ -460,7 +460,7 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 	}
 	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
 	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 1)
-	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
+	if !w.add(makeWatchCacheEvent(7), TimingInfo{}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 	forget(true) // drain the watcher
@@ -510,7 +510,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	// now, once we know, the processInterval
 	// is waiting add another event that will time out
 	// and start the cleanup process
-	if w.add(&watchCacheEvent{Object: &v1.Pod{}}, time.NewTimer(10*time.Millisecond)) {
+	if w.add(&watchCacheEvent{Object: &v1.Pod{}}, TimingInfo{}, time.NewTimer(10*time.Millisecond)) {
 		t.Fatal("expected the add method to fail")
 	}
 	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
@@ -560,16 +560,16 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 
 	// note that we can add three events even though the chanSize is two because
 	// one event has been popped off from the input chan
-	if !w.add(&watchCacheEvent{Object: makePod(5), ResourceVersion: 5}, time.NewTimer(1*time.Second)) {
+	if !w.add(&watchCacheEvent{Object: makePod(5), ResourceVersion: 5}, TimingInfo{}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
-	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}) {
+	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}, TimingInfo{}) {
 		t.Fatal("failed adding an even to the watcher")
 	}
-	if !w.add(&watchCacheEvent{Object: makePod(15), ResourceVersion: 15}, time.NewTimer(1*time.Second)) {
+	if !w.add(&watchCacheEvent{Object: makePod(15), ResourceVersion: 15}, TimingInfo{}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
-	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
+	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, TimingInfo{}, time.NewTimer(1*time.Second)) {
 		t.Fatal("expected the add method to fail")
 	}
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {

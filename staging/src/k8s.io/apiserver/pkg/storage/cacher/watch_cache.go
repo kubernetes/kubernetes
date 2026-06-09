@@ -69,18 +69,23 @@ const (
 // the previous value of the object to enable proper filtering in the
 // upper layers.
 type watchCacheEvent struct {
-	Type                 watch.EventType
-	Object               runtime.Object
-	ObjLabels            labels.Set
-	ObjFields            fields.Set
-	PrevObject           runtime.Object
-	PrevObjLabels        labels.Set
-	PrevObjFields        fields.Set
-	Key                  string
-	ResourceVersion      uint64
-	RecordTime           time.Time
+	Type            watch.EventType
+	Object          runtime.Object
+	ObjLabels       labels.Set
+	ObjFields       fields.Set
+	PrevObject      runtime.Object
+	PrevObjLabels   labels.Set
+	PrevObjFields   fields.Set
+	Key             string
+	ResourceVersion uint64
+
+	// RecordTime represents when the watch cache first received the event
+	// from the storage layer (etcd)
+	RecordTime time.Time
+
+	// WatchCacheEnqueuedAt represents when the event was added to the watch
+	// cache's ring buffer
 	WatchCacheEnqueuedAt time.Time
-	DispatchedAt         time.Time
 }
 
 // watchCache implements a Store interface.
