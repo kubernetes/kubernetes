@@ -19,6 +19,8 @@ package dynamic
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,7 +30,6 @@ import (
 	"k8s.io/client-go/features"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/apply"
-	"net/http"
 )
 
 type DynamicClient struct {
@@ -211,6 +212,22 @@ func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts me
 		Body(&opts).
 		Do(ctx)
 	return result.Error()
+}
+
+func (c *dynamicResourceClient) DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions, subresources ...string) (metav1.APIResult, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
+	}
+
+	result := c.client.client.
+		Delete().
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(&opts).
+		Do(ctx)
+	return rest.RestResultWrapper{Result: result}, result.Error()
 }
 
 func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
