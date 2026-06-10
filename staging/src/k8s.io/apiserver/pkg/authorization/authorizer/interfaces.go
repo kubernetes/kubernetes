@@ -289,7 +289,21 @@ type Condition interface {
 
 	// DeepCopy returns a deep copy of the Condition.
 	DeepCopy() Condition
+
+	// Evaluate evaluates the condition to a boolean, returns an error, or returns "unevaluatable".
+	// If an authorizer already has a pre-compiled condition, this avoids one serialization roundtrip,
+	// with potentially expensive deserialization/parsing. However, if the condition underwent a
+	// serialize/deserialize roundtrip (e.g. when the caller is an aggregated API server), the authorizer
+	// might have to evaluate the condition from its serialized form using evaluateFunc in
+	// ConditionsMap.Evaluate.
+	Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult
 }
+
+// EvaluateConditionFunc is a function that is able to concretely evaluate a condition to a boolean or error.
+type EvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) (bool, error)
+
+// PartialEvaluateConditionFunc allows partially evaluating a condition, returning Unevaluatable if a truth value or error cannot be assigned.
+type PartialEvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) PartialConditionEvaluationResult
 
 // ConditionsData is an enum type for various evaluation targets conditions
 // can be written against.
