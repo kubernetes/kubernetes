@@ -78,6 +78,10 @@ func (c *shareListerContract) PodGroupStates() fwk.PodGroupStateLister {
 	return nil
 }
 
+func (c *shareListerContract) BackupState() (fwk.RestoreState, error) {
+	return func() {}, nil
+}
+
 type podGroupStateListerContract struct{}
 
 func (c *podGroupStateListerContract) Get(_ string, _ string) (fwk.PodGroupState, error) {

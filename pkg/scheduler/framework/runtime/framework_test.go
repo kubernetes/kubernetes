@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -287,7 +288,7 @@ func (pl *TestPlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 }
 
 func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	return nil, nil
+	return pl.inj.PodGroupPostFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PodGroupPostFilterStatus), injectReason)
 }
 
 func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
@@ -905,6 +906,259 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 		})
 	}
 
+}
+
+func TestRunPodGroupPostFilterPlugins(t *testing.T) {
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "p1"}}
+	tests := []struct {
+		name                string
+		podGroupInfo        *framework.QueuedPodGroupInfo
+		existingPodGroups   []*v1alpha3.PodGroup
+		plugins             []*TestPlugin
+		featureFlagEnabeled bool
+		expectedStatus      *fwk.Status
+		expectedResult      *framework.PodGroupPostFilterResult
+	}{
+		{
+			name: "no registered plugins",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			featureFlagEnabeled: true,
+			expectedStatus:      fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled"),
+		},
+		{
+			name: "generic workload feature is disabled",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			featureFlagEnabeled: false,
+			expectedStatus:      fwk.NewStatus(fwk.Unschedulable, "generic workload feature is disabled, cannot perform workload aware preemption"),
+		},
+		{
+			name: "error when pod group is not found in informer",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "missing-pg"},
+			},
+			plugins: []*TestPlugin{
+				{
+					name: "test-plugin-custom",
+				},
+			},
+			featureFlagEnabeled: true,
+			expectedStatus:      fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", errors.New("podgroup.scheduling.k8s.io \"missing-pg\" not found"))),
+		},
+		{
+			name: "first plugin returns success",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			existingPodGroups: []*v1alpha3.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+				},
+			},
+			plugins: []*TestPlugin{
+				{
+					name: "plugin1",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Success),
+						PodGroupPostFilterResult: &framework.PodGroupPostFilterResult{
+							NominatedNodeNames: map[*v1.Pod]*fwk.NominatingInfo{
+								pod1: {NominatedNodeName: "node1"},
+							},
+						},
+					},
+				},
+				{
+					name: "plugin2",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Unschedulable),
+					},
+				},
+			},
+			featureFlagEnabeled: true,
+			expectedStatus:      fwk.NewStatus(fwk.Success, injectReason),
+			expectedResult: &framework.PodGroupPostFilterResult{
+				NominatedNodeNames: map[*v1.Pod]*fwk.NominatingInfo{
+					pod1: {NominatedNodeName: "node1"},
+				},
+			},
+		},
+		{
+			name: "first plugin returns UnschedulableAndUnresolvable",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			existingPodGroups: []*v1alpha3.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+				},
+			},
+			plugins: []*TestPlugin{
+				{
+					name: "plugin1",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.UnschedulableAndUnresolvable),
+					},
+				},
+				{
+					name: "plugin2",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Success),
+					},
+				},
+			},
+			featureFlagEnabeled: true,
+			expectedStatus:      fwk.NewStatus(fwk.UnschedulableAndUnresolvable, injectReason).WithPlugin("plugin1"),
+		},
+		{
+			name: "first plugin returns Unschedulable, second returns success",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			existingPodGroups: []*v1alpha3.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+				},
+			},
+			plugins: []*TestPlugin{
+				{
+					name: "plugin1",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Unschedulable),
+					},
+				},
+				{
+					name: "plugin2",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Success),
+						PodGroupPostFilterResult: &framework.PodGroupPostFilterResult{
+							NominatedNodeNames: map[*v1.Pod]*fwk.NominatingInfo{
+								pod1: {NominatedNodeName: "node2"},
+							},
+						},
+					},
+				},
+			},
+			featureFlagEnabeled: true,
+			expectedStatus:      fwk.NewStatus(fwk.Success, injectReason),
+			expectedResult: &framework.PodGroupPostFilterResult{
+				NominatedNodeNames: map[*v1.Pod]*fwk.NominatingInfo{
+					pod1: {NominatedNodeName: "node2"},
+				},
+			},
+		},
+		{
+			name: "all plugins return Unschedulable, aggregate reasons",
+			podGroupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+			},
+			existingPodGroups: []*v1alpha3.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+				},
+			},
+			plugins: []*TestPlugin{
+				{
+					name: "plugin1",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Unschedulable),
+					},
+				},
+				{
+					name: "plugin2",
+					inj: injectedResult{
+						PodGroupPostFilterStatus: int(fwk.Unschedulable),
+					},
+				},
+			},
+			featureFlagEnabeled: true,
+			expectedStatus:      fwk.NewStatus(fwk.Unschedulable, injectReason, injectReason).WithPlugin("plugin1"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			reg := Registry{}
+			maps.Copy(reg, registry)
+			var enabledPlugins []config.Plugin
+			for _, pl := range tc.plugins {
+				name := pl.name
+				tmpPl := pl
+				reg[name] = func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return tmpPl, nil
+				}
+				enabledPlugins = append(enabledPlugins, config.Plugin{Name: name})
+			}
+
+			profileCfg := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					QueueSort: config.PluginSet{
+						Enabled: []config.Plugin{{Name: queueSortPlugin}},
+					},
+					Bind: config.PluginSet{
+						Enabled: []config.Plugin{{Name: bindPlugin}},
+					},
+					PostFilter: config.PluginSet{
+						Enabled: enabledPlugins,
+					},
+				},
+			}
+
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.WorkloadAwarePreemption: tc.featureFlagEnabeled,
+				features.GangScheduling:          tc.featureFlagEnabeled,
+				features.GenericWorkload:         tc.featureFlagEnabeled,
+			})
+
+			var objs []runtime.Object
+			for _, pg := range tc.existingPodGroups {
+				objs = append(objs, pg)
+			}
+			client := clientsetfake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			schedFwk, err := NewFramework(ctx, reg, &profileCfg,
+				WithInformerFactory(informerFactory),
+				WithClientSet(client),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			fwkImpl := schedFwk.(*frameworkImpl)
+			var postFilterPlugins []framework.PodGroupPostFilterPlugin
+			for _, pl := range tc.plugins {
+				postFilterPlugins = append(postFilterPlugins, pl)
+			}
+			fwkImpl.podGroupPostFilterPlugins = postFilterPlugins
+
+			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				return &fwk.PodGroupAssignments{}, fwk.NewStatus(fwk.Success)
+			}
+
+			res, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, tc.podGroupInfo, pgSchedulingFunc)
+
+			if status.Code() != tc.expectedStatus.Code() || status.Message() != tc.expectedStatus.Message() {
+				t.Errorf("Expected status %v, got %v", tc.expectedStatus, status)
+			}
+
+			if tc.expectedResult != nil {
+				if diff := cmp.Diff(tc.expectedResult, res, cmpopts.IgnoreUnexported(v1.Pod{})); diff != "" {
+					t.Errorf("Unexpected result (-want, +got):\n%s", diff)
+				}
+			}
+		})
+	}
 }
 
 type mockPlacementFeasiblePlugin struct {
@@ -4309,27 +4563,29 @@ func buildScoreConfigWithWeights(weights map[string]int32, ps ...string) *config
 }
 
 type injectedResult struct {
-	ScoreRes                 int64                `json:"scoreRes,omitempty"`
-	NormalizeRes             int64                `json:"normalizeRes,omitempty"`
-	ScoreStatus              int                  `json:"scoreStatus,omitempty"`
-	NormalizeStatus          int                  `json:"normalizeStatus,omitempty"`
-	PreFilterResult          *fwk.PreFilterResult `json:"preFilterResult,omitempty"`
-	PreFilterStatus          int                  `json:"preFilterStatus,omitempty"`
-	PreFilterAddPodStatus    int                  `json:"preFilterAddPodStatus,omitempty"`
-	PreFilterRemovePodStatus int                  `json:"preFilterRemovePodStatus,omitempty"`
-	FilterStatus             int                  `json:"filterStatus,omitempty"`
-	PostFilterStatus         int                  `json:"postFilterStatus,omitempty"`
-	PreScoreStatus           int                  `json:"preScoreStatus,omitempty"`
-	ReserveStatus            int                  `json:"reserveStatus,omitempty"`
-	PreBindPreFlightStatus   int                  `json:"preBindPreFlightStatus,omitempty"`
-	PreBindStatus            int                  `json:"preBindStatus,omitempty"`
-	BindStatus               int                  `json:"bindStatus,omitempty"`
-	PermitStatus             int                  `json:"permitStatus,omitempty"`
-	PermitTimeout            time.Duration        `json:"permitTimeout,omitempty"`
-	GeneratePlacementsResult []*fwk.Placement     `json:"generatePlacementsResult,omitempty"`
-	GeneratePlacementsStatus int                  `json:"generatePlacementsStatus,omitempty"`
-	PlacementScoreStatus     int                  `json:"placementScoreStatus,omitempty"`
-	PlacementFeasibleStatus  int                  `json:"placementFeasibleStatus,omitempty"`
+	ScoreRes                 int64                               `json:"scoreRes,omitempty"`
+	NormalizeRes             int64                               `json:"normalizeRes,omitempty"`
+	ScoreStatus              int                                 `json:"scoreStatus,omitempty"`
+	NormalizeStatus          int                                 `json:"normalizeStatus,omitempty"`
+	PreFilterResult          *fwk.PreFilterResult                `json:"preFilterResult,omitempty"`
+	PreFilterStatus          int                                 `json:"preFilterStatus,omitempty"`
+	PreFilterAddPodStatus    int                                 `json:"preFilterAddPodStatus,omitempty"`
+	PreFilterRemovePodStatus int                                 `json:"preFilterRemovePodStatus,omitempty"`
+	FilterStatus             int                                 `json:"filterStatus,omitempty"`
+	PostFilterStatus         int                                 `json:"postFilterStatus,omitempty"`
+	PreScoreStatus           int                                 `json:"preScoreStatus,omitempty"`
+	ReserveStatus            int                                 `json:"reserveStatus,omitempty"`
+	PreBindPreFlightStatus   int                                 `json:"preBindPreFlightStatus,omitempty"`
+	PreBindStatus            int                                 `json:"preBindStatus,omitempty"`
+	BindStatus               int                                 `json:"bindStatus,omitempty"`
+	PermitStatus             int                                 `json:"permitStatus,omitempty"`
+	PermitTimeout            time.Duration                       `json:"permitTimeout,omitempty"`
+	GeneratePlacementsResult []*fwk.Placement                    `json:"generatePlacementsResult,omitempty"`
+	GeneratePlacementsStatus int                                 `json:"generatePlacementsStatus,omitempty"`
+	PlacementScoreStatus     int                                 `json:"placementScoreStatus,omitempty"`
+	PlacementFeasibleStatus  int                                 `json:"placementFeasibleStatus,omitempty"`
+	PodGroupPostFilterStatus int                                 `json:"podGroupPostFilterStatus,omitempty"`
+	PodGroupPostFilterResult *framework.PodGroupPostFilterResult `json:"podGroupPostFilterResult,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *fwk.Status) {

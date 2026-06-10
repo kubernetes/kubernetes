@@ -2724,3 +2724,95 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		t.Errorf("Expected wrapped error message %q, got %q", expectedMsg, gotMsg)
 	}
 }
+
+func TestDefaultPreemption_PodGroupPostFilter_ConstraintsAndSnapshot(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
+	pod := st.MakePod().Name("pod1").Node("node1").Priority(lowPriority).Obj()
+
+	testPods := []*v1.Pod{pod}
+	nodes := []*v1.Node{node}
+
+	client := clientsetfake.NewClientset(pod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+	f, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	features := feature.Features{
+		EnableWorkloadAwarePreemption: true,
+	}
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Test when pg has scheduling constraints
+	pgWithConstraints := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()
+	pgWithConstraints.Spec.SchedulingConstraints = &v1alpha3.PodGroupSchedulingConstraints{
+		Topology: []v1alpha3.TopologyConstraint{{}},
+	}
+	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		return nil, fwk.NewStatus(fwk.Success)
+	}
+
+	_, gotStatus := pl.PodGroupPostFilter(ctx, pgWithConstraints, preemptorPods, mockSchedulingFunc)
+	if gotStatus == nil || gotStatus.Code() != fwk.Unschedulable {
+		t.Fatalf("Expected status code %v, got status: %v", fwk.Unschedulable, gotStatus)
+	}
+	expectedMsg := "workload aware preemption is not supported for pod groups with scheduling constraints"
+	if gotStatus.Message() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, gotStatus.Message())
+	}
+
+	// 2. Test when snapshot is not a concrete *cache.Snapshot
+	fFakeLister, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(&mockSharedLister{}), // not concrete *cache.Snapshot
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plFakeLister, err := New(ctx, getDefaultDefaultPreemptionArgs(), fFakeLister, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pgOk := st.MakePodGroup().Name("preemptor-pg-ok").Priority(highPriority).Obj()
+	_, gotStatusFakeLister := plFakeLister.PodGroupPostFilter(ctx, pgOk, preemptorPods, mockSchedulingFunc)
+	if gotStatusFakeLister == nil || gotStatusFakeLister.Code() != fwk.Error {
+		t.Fatalf("Expected status code %v, got status: %v", fwk.Error, gotStatusFakeLister)
+	}
+	expectedMsgFakeLister := "pod group preemption: failed to backup snapshot: failed to get concrete snapshot to backup"
+	if gotStatusFakeLister.Message() != expectedMsgFakeLister {
+		t.Errorf("Expected error message %q, got %q", expectedMsgFakeLister, gotStatusFakeLister.Message())
+	}
+}
+
+type mockSharedLister struct {
+	fwk.SharedLister
+}
+
+func (m *mockSharedLister) NodeInfos() fwk.NodeInfoLister {
+	return nil
+}
+
+func (m *mockSharedLister) BackupState() (fwk.RestoreState, error) {
+	return nil, errors.New("failed to get concrete snapshot to backup")
+}

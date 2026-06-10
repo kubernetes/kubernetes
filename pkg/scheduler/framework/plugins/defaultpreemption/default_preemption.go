@@ -453,6 +453,16 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 
 // PodGroupPostFilter runs a default preemption for the pod group.
 func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints")
+	}
+
+	restoreFn, err := pl.fh.SnapshotSharedLister().BackupState()
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("pod group preemption: failed to backup snapshot: %w", err))
+	}
+	defer restoreFn()
+
 	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pods, pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {

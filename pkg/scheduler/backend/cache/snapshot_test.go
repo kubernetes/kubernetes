@@ -867,7 +867,7 @@ func TestSnapshot_BackupRestore(t *testing.T) {
 			// Store original state for deep verification
 			origNodeInfoMap, origNodeInfoList, origAffinityList, origAntiAffinityList := simplifySnapshot(s)
 
-			restore, err := s.BackupSnapshot()
+			restore, err := s.BackupState()
 			if err != nil {
 				t.Fatalf("failed to prepare a backup")
 			}
@@ -919,12 +919,12 @@ func simplifySnapshot(s *Snapshot) (map[string][]string, []string, []string, []s
 func TestSnapshot_MultipleBackups(t *testing.T) {
 	s := NewSnapshot(nil, nil)
 
-	restore, err := s.BackupSnapshot()
+	restore, err := s.BackupState()
 	if err != nil {
 		t.Fatalf("failed to prepare a backup: %v", err)
 	}
 
-	_, err = s.BackupSnapshot()
+	_, err = s.BackupState()
 	if err == nil {
 		t.Fatalf("expected error when stacking backups, got nil")
 	}
@@ -937,7 +937,7 @@ func TestSnapshot_MultipleBackups(t *testing.T) {
 	// Restore the previous backup, and now it should work again
 	restore()
 
-	_, err = s.BackupSnapshot()
+	_, err = s.BackupState()
 	if err != nil {
 		t.Fatalf("failed to prepare a backup after restoring: %v", err)
 	}
