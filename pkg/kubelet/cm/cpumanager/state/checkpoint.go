@@ -51,6 +51,7 @@ type CPUManagerCheckpointData struct {
 // The Data string with DataChecksum is the authoritative V4 payload.
 type CPUManagerCheckpoint struct {
 	// Backward compatibility
+	// The embedded V2 checkpoint must not be enhanced and should be removed as soon as the oldest supported version understands V4.
 	CPUManagerCheckpointV2 `json:",inline"`
 
 	// Data is a serialized CPUManagerCheckpointData

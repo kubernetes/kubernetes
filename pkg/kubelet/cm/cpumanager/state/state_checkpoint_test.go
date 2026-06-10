@@ -123,7 +123,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			"failed to deserialize cpu manager checkpoint data: unexpected end of JSON input",
+			"could not load v4 checkpoint: failed to deserialize cpu manager checkpoint data: unexpected end of JSON input",
 			nil,
 		},
 		{
@@ -143,7 +143,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			`checkpoint is corrupted`,
+			"could not load v4 checkpoint: checkpoint is corrupted",
 			nil,
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
