@@ -809,6 +809,17 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		return false
 	}
 
+	switch {
+	case attribute.StringValue != nil:
+	case attribute.IntValue != nil:
+	case attribute.BoolValue != nil:
+	case attribute.VersionValue != nil:
+	default:
+		// Unknown value type, cannot match.
+		m.logger.V(7).Info("Match attribute type unknown")
+		return false
+	}
+
 	if m.numDevices == 0 {
 		// The first device can always get picked.
 		m.attribute = attribute
@@ -841,10 +852,6 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 			m.logger.V(7).Info("Version values different")
 			return false
 		}
-	default:
-		// Unknown value type, cannot match.
-		m.logger.V(7).Info("Match attribute type unknown")
-		return false
 	}
 
 	m.numDevices++

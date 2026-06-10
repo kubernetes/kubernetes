@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -287,40 +286,42 @@ func (c *compiler) getDeclType(t *cel.Type) *apiservercel.DeclType {
 }
 
 // getAttributeValue returns the native representation of the one value that
-// should be stored in the attribute, otherwise an error. An error is
-// also returned when there is no supported value.
-func (c CompilationResult) getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+// should be stored in the attribute for basic types, apiservercel.Semver for
+// versions, otherwise a *types.Err (implements ref.Val).
+// Such an error is also returned when there is no supported value.
+// In all of these cases the result can be used directly as input for CEL evaluation.
+func (c CompilationResult) getAttributeValue(name resourceapi.QualifiedName, attr resourceapi.DeviceAttribute) any {
 	switch {
 	case attr.IntValues != nil:
-		return attr.IntValues, nil
+		return attr.IntValues
 	case attr.BoolValues != nil:
-		return attr.BoolValues, nil
+		return attr.BoolValues
 	case attr.StringValues != nil:
-		return attr.StringValues, nil
+		return attr.StringValues
 	case attr.VersionValues != nil:
 		semVers := make([]apiservercel.Semver, len(attr.VersionValues))
 		for i, versionStr := range attr.VersionValues {
 			v, err := semver.Parse(versionStr)
 			if err != nil {
-				return nil, fmt.Errorf("parse semantic version: %w", err)
+				return types.NewErr("attribute %s: parse semantic version: %w", name, err)
 			}
 			semVers[i] = apiservercel.Semver{Version: v}
 		}
-		return semVers, nil
+		return semVers
 	case attr.IntValue != nil:
-		return *attr.IntValue, nil
+		return *attr.IntValue
 	case attr.BoolValue != nil:
-		return *attr.BoolValue, nil
+		return *attr.BoolValue
 	case attr.StringValue != nil:
-		return *attr.StringValue, nil
+		return *attr.StringValue
 	case attr.VersionValue != nil:
 		v, err := semver.Parse(*attr.VersionValue)
 		if err != nil {
-			return nil, fmt.Errorf("parse semantic version: %w", err)
+			return types.NewErr("attribute %s: parse semantic version: %w", name, err)
 		}
-		return apiservercel.Semver{Version: v}, nil
+		return apiservercel.Semver{Version: v}
 	default:
-		return nil, errors.New("unsupported attribute value")
+		return types.NewErr("attribute %s: unsupported attribute value", name)
 	}
 }
 
@@ -329,11 +330,16 @@ var boolType = reflect.TypeOf(true)
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
-	attributes, err := c.buildAttributes(input.Attributes, input.Driver)
-	if err != nil {
-		return false, nil, err
+	//
+	// This is a bit hard to do because e.g. the top-level Size already depends
+	// on parsing all attributes. For now we only delay building these maps
+	// until they really are needed.
+	attributes := func() map[string]any {
+		return c.buildAttributes(input.Attributes, input.Driver)
 	}
-	capacity := buildCapacity(input.Capacity, input.Driver)
+	capacity := func() map[string]any {
+		return buildCapacity(input.Capacity, input.Driver)
+	}
 
 	variables := map[string]any{
 		deviceVar: map[string]any{
@@ -367,12 +373,12 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 // EvaluateDerivedAttribute evaluates the compiled CEL expression as a derived attribute against a device,
 // returning the evaluated DeviceAttribute or an error.
 func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (*resourceapi.DeviceAttribute, *cel.EvalDetails, error) {
-	attributes, err := c.buildAttributes(input.Attributes, input.Driver)
-	if err != nil {
-		return nil, nil, err
+	attributes := func() map[string]any {
+		return c.buildAttributes(input.Attributes, input.Driver)
 	}
-	capacity := buildCapacity(input.Capacity, input.Driver)
-
+	capacity := func() map[string]any {
+		return buildCapacity(input.Capacity, input.Driver)
+	}
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
@@ -671,7 +677,7 @@ func parseQualifiedName(name resourceapi.QualifiedName, defaultDomain string) (s
 // would collide with one already recorded in the first pass. This mirrors
 // resolveDeviceCapacity in
 // staging/src/k8s.io/dynamic-resource-allocation/structured/internal/experimental/consumable_capacity.go.
-func (c CompilationResult) buildAttributes(rawAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, driver string) (map[string]any, error) {
+func (c CompilationResult) buildAttributes(rawAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, driver string) map[string]any {
 	attributes := make(map[string]any)
 	driverPrefix := driver + "/"
 	for name, attr := range rawAttributes {
@@ -679,10 +685,7 @@ func (c CompilationResult) buildAttributes(rawAttributes map[resourceapi.Qualifi
 		if !ok {
 			continue
 		}
-		value, err := c.getAttributeValue(attr)
-		if err != nil {
-			return nil, fmt.Errorf("attribute %s: %w", name, err)
-		}
+		value := c.getAttributeValue(name, attr)
 		if attributes[driver] == nil {
 			attributes[driver] = make(map[string]any)
 		}
@@ -702,16 +705,13 @@ func (c CompilationResult) buildAttributes(rawAttributes map[resourceapi.Qualifi
 				}
 			}
 		}
-		value, err := c.getAttributeValue(attr)
-		if err != nil {
-			return nil, fmt.Errorf("attribute %s: %w", name, err)
-		}
+		value := c.getAttributeValue(name, attr)
 		if attributes[domain] == nil {
 			attributes[domain] = make(map[string]any)
 		}
 		attributes[domain].(map[string]any)[id] = value
 	}
-	return attributes, nil
+	return attributes
 }
 
 // buildCapacity converts a device's raw, published Capacity map into the
@@ -755,28 +755,54 @@ func buildCapacity(rawCapacity map[resourceapi.QualifiedName]resourceapi.DeviceC
 // newStringInterfaceMapWithDefault is like
 // https://pkg.go.dev/github.com/google/cel-go@v0.20.1/common/types#NewStringInterfaceMap,
 // except that looking up an unknown key returns a default value.
-func newStringInterfaceMapWithDefault(adapter types.Adapter, value map[string]any, defaultValue ref.Val) traits.Mapper {
-	return mapper{
-		Mapper:       types.NewStringInterfaceMap(adapter, value),
+func newStringInterfaceMapWithDefault(adapter types.Adapter, genValue func() map[string]any, defaultValue ref.Val) traits.Mapper {
+	return &mapper{
+		adapter:      adapter,
+		genValue:     genValue,
 		defaultValue: defaultValue,
 	}
 }
 
 type mapper struct {
-	traits.Mapper
+	adapter      types.Adapter
+	genValue     func() map[string]any
 	defaultValue ref.Val
+	delegate     traits.Mapper
+}
+
+func (m *mapper) getDelegate() traits.Mapper {
+	if m.delegate != nil {
+		return m.delegate
+	}
+	value := m.genValue()
+	m.delegate = types.NewStringInterfaceMap(m.adapter, value)
+	return m.delegate
 }
 
 // Find wraps the mapper's Find so that a default empty map is returned when
 // the lookup did not find the entry.
-func (m mapper) Find(key ref.Val) (ref.Val, bool) {
-	value, found := m.Mapper.Find(key)
+func (m *mapper) Find(key ref.Val) (ref.Val, bool) {
+	value, found := m.getDelegate().Find(key)
 	if found {
 		return value, true
 	}
 
 	return m.defaultValue, true
 }
+
+func (m *mapper) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	return m.getDelegate().ConvertToNative(typeDesc)
+}
+func (m *mapper) ConvertToType(typeValue ref.Type) ref.Val {
+	return m.getDelegate().ConvertToType(typeValue)
+}
+func (m *mapper) Equal(other ref.Val) ref.Val    { return m.getDelegate().Equal(other) }
+func (m *mapper) Type() ref.Type                 { return m.getDelegate().Type() }
+func (m *mapper) Value() any                     { return m.getDelegate().Value() }
+func (m *mapper) Contains(value ref.Val) ref.Val { return m.getDelegate().Contains(value) }
+func (m *mapper) Get(index ref.Val) ref.Val      { return m.getDelegate().Get(index) }
+func (m *mapper) Iterator() traits.Iterator      { return m.getDelegate().Iterator() }
+func (m *mapper) Size() ref.Val                  { return m.getDelegate().Size() }
 
 // sizeEstimator tells the cost estimator the maximum size of maps, strings, or lists accessible through the `device` variable.
 // Without this, the maximum string size of e.g. `device.attributes["dra.example.com"].services` would be unknown.
