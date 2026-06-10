@@ -236,6 +236,17 @@ var sliceWithSkipNodeOperations = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithSharingAffinity = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	obj.Spec.Devices = nil
+	obj.Spec.SharingAffinity = []resource.SharingAffinityExtractor{{
+		CEL: map[string]string{
+			"subnet": `'subnet-a'`,
+		},
+	}}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -427,6 +438,25 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			obj:                     sliceWithListTypeAttributes,
 			featureOverrides:        featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: false},
 			expectedValidationError: true,
+		},
+		"drop-fields-sharing-affinity-disabled-feature": {
+			obj:              sliceWithSharingAffinity,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRASharingAffinity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-sharing-affinity": {
+			obj:              sliceWithSharingAffinity,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRASharingAffinity: true, features.DRAConsumableCapacity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
 		},
 		"keep-fields-partition-type-attribute": {
 			obj:              sliceWithPartitionTypeAttribute,
@@ -937,6 +967,73 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-fields-sharing-affinity": {
+			oldObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				return obj
+			}(),
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRASharingAffinity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-sharing-affinity": {
+			oldObj: sliceWithSharingAffinity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRASharingAffinity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-sharing-affinity-disabled-feature": {
+			oldObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				return obj
+			}(),
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRASharingAffinity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-sharing-affinity-disabled-feature": {
+			oldObj: sliceWithSharingAffinity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRASharingAffinity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
