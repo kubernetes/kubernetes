@@ -58,7 +58,8 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateSecret(obj.(*api.Secret))
+	newSecret := obj.(*api.Secret)
+	return validation.ValidateSecret(newSecret)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -86,7 +87,9 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
+	newSecret := obj.(*api.Secret)
+	oldSecret := old.(*api.Secret)
+	return validation.ValidateSecretUpdate(newSecret, oldSecret)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
