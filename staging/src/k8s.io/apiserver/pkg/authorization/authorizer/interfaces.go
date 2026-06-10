@@ -18,6 +18,7 @@ package authorizer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -122,6 +123,10 @@ type Authorizer interface {
 	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
 	AuthorizerName() string
 }
+
+// ErrorConditionEvaluationNotSupported is returned by authorizer implementations
+// that do not support condition evaluation.
+var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not supported")
 
 // AuthorizerFunc implements Authorizer
 var _ Authorizer = AuthorizerFunc(nil)
@@ -252,4 +257,10 @@ func (d Decision) String() string {
 	default:
 		return fmt.Sprintf("Unknown (%d)", int(d))
 	}
+}
+
+// ConditionsData is an enum type for various evaluation targets conditions
+// can be written against.
+// TODO(luxas): Implement this in the follow-up PR.
+type ConditionsData struct {
 }
