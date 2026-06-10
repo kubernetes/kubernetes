@@ -31,7 +31,6 @@ import (
 type mockAuthzHandler struct {
 	decision authorizer.Decision
 	err      error
-	name     string
 }
 
 func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -48,10 +47,7 @@ func (*mockAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.Cond
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
-func (mock *mockAuthzHandler) AuthorizerName() string {
-	if mock.name != "" {
-		return mock.name
-	}
+func (*mockAuthzHandler) AuthorizerName() string {
 	return "test-mockAuthzHandler"
 }
 
@@ -285,47 +281,708 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 	}
 }
 
-func TestAuthorizerName(t *testing.T) {
-	cs := []struct {
-		authorizers []authorizer.Authorizer
-		wantName    string
+type evalTestEffect string
+
+const (
+	effectNone      evalTestEffect = ""
+	effectAllow     evalTestEffect = "Allow"
+	effectDeny      evalTestEffect = "Deny"
+	effectNoOpinion evalTestEffect = "NoOpinion"
+)
+
+// evalTestAuthz is a configurable authorizer for testing the union evaluation flow.
+type evalTestAuthz struct {
+	// conditionEffect, if non-empty, makes AuthorizeConditionsAware return a ConditionsMap decision
+	// with a single condition of this effect. If empty, decision is returned instead.
+	conditionEffect evalTestEffect
+	// decision is returned from AuthorizeConditionsAware when conditionEffect is empty.
+	decision authorizer.Decision
+	// authorizeErr is returned as the error from AuthorizeConditionsAware.
+	authorizeErr error
+
+	// evalDecision is returned from EvaluateConditions.
+	evalDecision authorizer.Decision
+	// evalErr is returned as the error from EvaluateConditions.
+	evalErr error
+	// authorizerName is used to distinguish authorizers from each other
+	authorizerName string
+}
+
+func (a *evalTestAuthz) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if a.conditionEffect != effectNone {
+		return a.ConditionsAwareAuthorize(ctx, attrs).FailureDecision(), "failed closed", fmt.Errorf("wanted to return a condition, but the client doesn't support it")
+	}
+	return a.decision, "", a.authorizeErr
+}
+
+func (a *evalTestAuthz) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	if a.conditionEffect != effectNone {
+		cond := []authorizer.Condition{authorizer.GenericCondition{ID: "test-cond", Condition: "test"}}
+		var deny, noOpinion, allow []authorizer.Condition
+		switch a.conditionEffect {
+		case effectAllow:
+			allow = cond
+		case effectDeny:
+			deny = cond
+		case effectNoOpinion:
+			noOpinion = cond
+		}
+		return authorizer.ConditionsAwareDecisionConditionsMap(deny, noOpinion, allow)
+	}
+	return authorizer.ConditionsAwareDecisionFromParts(a.decision, "", a.authorizeErr)
+}
+
+func (a *evalTestAuthz) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	if !decision.IsConditionsMap() {
+		return decision.FailureDecision(), "failed closed", errors.New("evalTestAuthz.EvaluateConditions must be called on a ConditionsMap, which was returned previously")
+	}
+	return a.evalDecision, "", a.evalErr
+}
+
+func (a *evalTestAuthz) AuthorizerName() string {
+	return a.authorizerName
+}
+
+// TestUnionEvaluateConditions tests the full Authorize + EvaluateConditions flow
+// through a DAG of nested union authorizers:
+//
+//		union0 = [union1, union3, authz5]
+//		union1 = [union2, authz3]
+//		union2 = [authz1, authz2]
+//	    union3 = [authz4]
+func TestUnionEvaluateConditions(t *testing.T) {
+
+	noOpinion := func() *evalTestAuthz {
+		return &evalTestAuthz{decision: authorizer.DecisionNoOpinion}
+	}
+
+	tests := []struct {
+		name                                   string
+		authz1, authz2, authz3, authz4, authz5 *evalTestAuthz
+		wantAuthorizeDecision                  string
+		wantFinalDecision                      string
+		wantAuthorizeErr                       bool
+		wantFinalErr                           bool
 	}{
+		// === Concrete decisions (no conditions) ===
+
 		{
-			authorizers: []authorizer.Authorizer{},
-			wantName:    "authorizer.kubernetes.io/Union[]",
+			name:                  "all noopinion",
+			authz1:                noOpinion(),
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `NoOpinion`,
+			wantFinalDecision:     `NoOpinion`,
 		},
 		{
-			authorizers: []authorizer.Authorizer{
-				&mockAuthzHandler{name: "foo"},
-			},
-			wantName: "authorizer.kubernetes.io/Union[foo]",
+			name:                  "authz1 allow short-circuits everything",
+			authz1:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Allow`,
+			wantFinalDecision:     `Allow`,
 		},
 		{
-			authorizers: []authorizer.Authorizer{
-				&mockAuthzHandler{name: "foo"},
-				&mockAuthzHandler{name: "bar"},
-			},
-			wantName: "authorizer.kubernetes.io/Union[foo, bar]",
+			name:                  "authz1 deny short-circuits everything",
+			authz1:                &evalTestAuthz{decision: authorizer.DecisionDeny},
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Deny`,
+			wantFinalDecision:     `Deny`,
 		},
 		{
-			authorizers: []authorizer.Authorizer{
-				&mockAuthzHandler{name: "foo"},
-				New(
-					&mockAuthzHandler{name: "foo"},
-					&mockAuthzHandler{name: "bar"},
-				),
+			name:                  "authz1 noopinion authz2 allow",
+			authz1:                noOpinion(),
+			authz2:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Allow`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:                  "authz1 authz2 noopinion authz3 allow",
+			authz1:                noOpinion(),
+			authz2:                noOpinion(),
+			authz3:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Allow`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:                  "all inner noopinion authz5 allow",
+			authz1:                noOpinion(),
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			wantAuthorizeDecision: `Allow`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:                  "authz1 noopinion authz2 deny",
+			authz1:                noOpinion(),
+			authz2:                &evalTestAuthz{decision: authorizer.DecisionDeny},
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Deny`,
+			wantFinalDecision:     `Deny`,
+		},
+
+		// === Conditional decisions ===
+
+		{
+			name: "authz2 conditional allow evals to allow",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
 			},
-			wantName: "authorizer.kubernetes.io/Union[foo, authorizer.kubernetes.io/Union[foo, bar]]",
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], NoOpinion], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:   "authz2 conditional allow evals to noopinion",
+			authz1: noOpinion(),
+			authz2: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[NoOpinion, ConditionsMap(allows=1)], NoOpinion], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `NoOpinion`,
+		},
+		{
+			name:   "authz3 conditional deny evals to deny",
+			authz1: noOpinion(),
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[NoOpinion, ConditionsMap(denies=1)], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `Deny`,
+		},
+		{
+			name:   "authz4 conditional deny evals to noopinion",
+			authz1: noOpinion(),
+			authz2: noOpinion(),
+			authz3: noOpinion(),
+			authz4: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[NoOpinion, Union[ConditionsMap(denies=1)], NoOpinion]`,
+			wantFinalDecision:     `NoOpinion`,
+		},
+		{
+			name:   "authz5 conditional noopinion evals to noopinion",
+			authz1: noOpinion(),
+			authz2: noOpinion(),
+			authz3: noOpinion(),
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectNoOpinion,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			wantAuthorizeDecision: `NoOpinion`,
+			wantFinalDecision:     `NoOpinion`,
+		},
+
+		// === Conditional + concrete mixes ===
+
+		// conditional => noopinion, noopinion 	=== NoOpinion ok
+		// conditional => noopinion, allow		=== Allow ok
+		// conditional => noopinion, deny		=== Deny ok
+		// conditional => allow, noopinion		=== Allow ok
+		// conditional => allow, allow			=== Allow ok
+		// conditional => allow, deny			=== Allow ok
+		// conditional => deny, noopinion		=== Deny ok
+		// conditional => deny, allow			=== Deny ok
+		// conditional => deny, deny			=== Deny ok
+		//
+		// conditional => noopinion, conditional => noopinion	=== NoOpinion ok
+		// conditional => noopinion, conditional => allow		=== Allow ok
+		// conditional => noopinion, conditional => deny		=== Deny ok
+		// ==> summarized as conditional => noopinion, X		=== X
+		// conditional => allow, conditional => noopinion		=== Allow
+		// conditional => allow, conditional => allow			=== Allow
+		// conditional => allow, conditional => deny			=== Allow
+		// ==> summarized as conditional => allow, <anything> 	=== Allow
+		// conditional => deny, conditional => noopinion		=== Deny
+		// conditional => deny, conditional => allow			=== Deny
+		// conditional => deny, conditional => deny				=== Deny
+		// ==> summarized as conditional => deny, <anything> 	=== Deny
+
+		// Theorem: NoOpinion decisions can be inserted at any point
+		//		    === Final decision the same regardless of permutation
+		// Theorem: The final Decision is always the same, no matter if the
+		//			authorizer list is flat or chopped into a DAG
+		//
+		// Theorem: The suffix after a concrete Allow or Deny does not matter:
+		//
+		// allow, <anything>		=== Allow
+		// deny, <anything>			=== Deny
+
+		// TODO(luxas): Implement differential testing
+		// a) For a chain of length N, create all permutations of N^6 as test cases
+		//	  ==> or instead work through all the possible combinations, and then insert NoOpinions?
+		//	  ==> e.g. start with "I want an Allow response, what are all the ways I can get that?"
+		// b) Using the formal model, compute the final decision
+		// c) For each test case, create each possible DAG combination of that chain
+		// d) For each DAG combo, run Authorize + Evaluate, and assert the final decision
+
+		{
+			// PossibleDecisions of [CM(allow), Allow] is {Allow} (the CM either matches → Allow,
+			// or evaluates to NoOpinion → next leaf Allow), so each nested union eagerly
+			// simplifies to Allow.
+			name: "authz1 conditional => noopinion, authz2 allow (eagerly simplifies)",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz2:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Allow`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:   "authz3 conditional => noopinion, authz5 deny",
+			authz1: noOpinion(),
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz4:                noOpinion(),
+			authz5:                &evalTestAuthz{decision: authorizer.DecisionDeny},
+			wantAuthorizeDecision: `Union[Union[NoOpinion, ConditionsMap(allows=1)], NoOpinion, Deny]`,
+			wantFinalDecision:     `Deny`,
+		},
+		{
+			name: "authz1 conditional => allow, authz2 allow (eagerly simplifies)",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			authz2:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Allow`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:   "authz3 conditional => allow, authz5 deny",
+			authz1: noOpinion(),
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			authz4:                noOpinion(),
+			authz5:                &evalTestAuthz{decision: authorizer.DecisionDeny},
+			wantAuthorizeDecision: `Union[Union[NoOpinion, ConditionsMap(allows=1)], NoOpinion, Deny]`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:   "authz2 conditional => deny, authz3 allow",
+			authz1: noOpinion(),
+			authz2: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			authz3:                &evalTestAuthz{decision: authorizer.DecisionAllow},
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[NoOpinion, ConditionsMap(denies=1)], Allow]]`,
+			wantFinalDecision:     `Deny`,
+		},
+		{
+			// inner=[union1=NoOpinion, union3=Union[CM(deny)], authz5=Deny].
+			// PossibleDecisions: NoOpinion → {NoOpinion}; Union[CM(deny)] → {NoOpinion, Deny};
+			// Deny → {Deny} (short-circuits, NoOpinion deleted) ⇒ {Deny}. Eagerly simplifies.
+			name:   "authz4 conditional => deny, authz5 deny (eagerly simplifies to Deny)",
+			authz1: noOpinion(),
+			authz2: noOpinion(),
+			authz3: noOpinion(),
+			authz4: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			authz5:                &evalTestAuthz{decision: authorizer.DecisionDeny},
+			wantAuthorizeDecision: `Deny`,
+			wantFinalDecision:     `Deny`,
+		},
+
+		// === Multiple conditionals ===
+
+		{
+			name: "authz1 conditional => noopinion, authz3 conditional => allow",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name:   "authz1 conditional => noopinion, authz3 conditional => deny",
+			authz1: noOpinion(),
+			authz2: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz3: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[NoOpinion, ConditionsMap(allows=1)], ConditionsMap(denies=1)], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `Deny`,
+		},
+		{
+			name: "authz1 conditional => allow, authz5 conditional => allow",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name: "authz1 conditional => allow, authz5 conditional => deny",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(denies=1)]`,
+			wantFinalDecision:     `Allow`,
+		},
+		{
+			name: "all conditionals eval noopinion",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz2: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz3: &evalTestAuthz{
+				conditionEffect: effectNoOpinion,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), ConditionsMap(denies=1)], NoOpinion], NoOpinion, ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `NoOpinion`,
+		},
+
+		// === Conditional deny in the chain ===
+
+		{
+			name: "authz1 conditional => deny, authz5 conditional => allow",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(allows=1)]`,
+			wantFinalDecision:     `Deny`,
+		},
+		{
+			name: "authz1 conditional => deny, authz5 conditional => deny",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			authz2: noOpinion(),
+			authz3: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionNoOpinion,
+			},
+			authz4: noOpinion(),
+			authz5: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionDeny,
+			},
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], ConditionsMap(allows=1)], NoOpinion, ConditionsMap(denies=1)]`,
+			wantFinalDecision:     `Deny`,
+		},
+
+		// === Error handling ===
+
+		{
+			// authz1's error rides through three layers of union ToDecision (union2, union1, union0).
+			// Each layer prepends the source authorizer index "0:" when collecting deciding errors,
+			// so the final error string is "0: 0: 0: authz error".
+			name: "authorize error propagated",
+			authz1: &evalTestAuthz{
+				decision:     authorizer.DecisionAllow,
+				authorizeErr: errors.New("authz error"),
+			},
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Allow(err="0: 0: 0: authz error")`,
+			wantAuthorizeErr:      true,
+			wantFinalDecision:     `Allow(err="0: 0: 0: authz error")`,
+			wantFinalErr:          true,
+		},
+		{
+			name: "evaluate error propagated",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectAllow,
+				evalDecision:    authorizer.DecisionAllow,
+				evalErr:         errors.New("eval error"),
+			},
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(allows=1), NoOpinion], NoOpinion], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `Allow(err="eval error")`,
+			wantFinalErr:          true,
 		},
 	}
-	for i, c := range cs {
-		t.Run(fmt.Sprintf("case %v", i), func(t *testing.T) {
-			authzHandler := New(c.authorizers...)
 
-			gotName := authzHandler.AuthorizerName()
-			if gotName != c.wantName {
-				t.Errorf("Unexpected authhorizername: %v, expected: %v", gotName, c.wantName)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.authz1.authorizerName = "authz1"
+			tt.authz2.authorizerName = "authz2"
+			tt.authz3.authorizerName = "authz3"
+			tt.authz4.authorizerName = "authz4"
+			tt.authz5.authorizerName = "authz5"
+			union3 := New(tt.authz4)
+			union2 := New(tt.authz1, tt.authz2)
+			union1 := New(union2, tt.authz3)
+			union0 := New(union1, union3, tt.authz5)
+
+			attrs := authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "testuser"},
+				Verb: "get",
+			}
+
+			ctx := context.Background()
+			authzDecision := union0.ConditionsAwareAuthorize(ctx, attrs)
+
+			authzErr := authzDecision.Error()
+			if (authzErr != nil) != tt.wantAuthorizeErr {
+				t.Fatalf("ConditionsAwareAuthorize() error = %v, wantErr %v", authzErr, tt.wantAuthorizeErr)
+			}
+			if authzDecision.String() != tt.wantAuthorizeDecision {
+				t.Errorf("ConditionsAwareAuthorize() = %s, want %s", authzDecision.String(), tt.wantAuthorizeDecision)
+			}
+
+			// Wrap in a ConditionsAwareDecision just to get a unified string formatting for assertions.
+			finalDecision := authzDecision
+			if !authzDecision.IsUnconditional() {
+				finalDecision = authorizer.ConditionsAwareDecisionFromParts(union0.EvaluateConditions(ctx, authzDecision, authorizer.ConditionsData{}))
+			}
+			finalErr := finalDecision.Error()
+			if (finalErr != nil) != tt.wantFinalErr {
+				t.Fatalf("EvaluateConditions() error = %v, wantErr %v", finalErr, tt.wantFinalErr)
+			}
+			if finalDecision.String() != tt.wantFinalDecision {
+				t.Errorf("EvaluateConditions() = %s, want %s", finalDecision.String(), tt.wantFinalDecision)
 			}
 		})
+	}
+}
+
+// countingAuthz wraps another Authorizer and records how many times each method was invoked.
+type countingAuthz struct {
+	inner             authorizer.Authorizer
+	conditionsAware   int
+	evaluateCondCalls int
+}
+
+func (c *countingAuthz) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	return c.inner.Authorize(ctx, attrs)
+}
+
+func (c *countingAuthz) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	c.conditionsAware++
+	return c.inner.ConditionsAwareAuthorize(ctx, attrs)
+}
+
+func (c *countingAuthz) EvaluateConditions(ctx context.Context, d authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	c.evaluateCondCalls++
+	return c.inner.EvaluateConditions(ctx, d, data)
+}
+
+func (c *countingAuthz) AuthorizerName() string {
+	return c.inner.AuthorizerName()
+}
+
+// TestUnionConditionsAwareAuthorizeShortCircuit verifies that once an authorizer returns
+// an unconditional Allow or Deny, the union authorizer does not call any later authorizers
+// in the chain.
+func TestUnionConditionsAwareAuthorizeShortCircuit(t *testing.T) {
+	cases := []struct {
+		name       string
+		decisions  []authorizer.Decision // decisions returned by the first N authorizers
+		wantCalled []int                 // how many times each authorizer was called
+	}{
+		{
+			name:       "Allow short-circuits later authorizers",
+			decisions:  []authorizer.Decision{authorizer.DecisionNoOpinion, authorizer.DecisionAllow, authorizer.DecisionDeny, authorizer.DecisionAllow},
+			wantCalled: []int{1, 1, 0, 0},
+		},
+		{
+			name:       "Deny short-circuits later authorizers",
+			decisions:  []authorizer.Decision{authorizer.DecisionNoOpinion, authorizer.DecisionDeny, authorizer.DecisionAllow, authorizer.DecisionAllow},
+			wantCalled: []int{1, 1, 0, 0},
+		},
+		{
+			name:       "all NoOpinions exhausts the chain",
+			decisions:  []authorizer.Decision{authorizer.DecisionNoOpinion, authorizer.DecisionNoOpinion, authorizer.DecisionNoOpinion},
+			wantCalled: []int{1, 1, 1},
+		},
+		{
+			name:       "first authorizer Allow short-circuits everything",
+			decisions:  []authorizer.Decision{authorizer.DecisionAllow, authorizer.DecisionAllow, authorizer.DecisionAllow},
+			wantCalled: []int{1, 0, 0},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handlers := make([]authorizer.Authorizer, len(tc.decisions))
+			counters := make([]*countingAuthz, len(tc.decisions))
+			for i, d := range tc.decisions {
+				counters[i] = &countingAuthz{inner: &mockAuthzHandler{decision: d}}
+				handlers[i] = counters[i]
+			}
+
+			authz := New(handlers...)
+			condAware, ok := authz.(interface {
+				ConditionsAwareAuthorize(context.Context, authorizer.Attributes) authorizer.ConditionsAwareDecision
+			})
+			if !ok {
+				t.Fatalf("union authorizer does not implement ConditionsAwareAuthorize")
+			}
+			_ = condAware.ConditionsAwareAuthorize(context.Background(), nil)
+
+			for i, c := range counters {
+				if c.conditionsAware != tc.wantCalled[i] {
+					t.Errorf("authorizer[%d] ConditionsAwareAuthorize called %d times, want %d", i, c.conditionsAware, tc.wantCalled[i])
+				}
+			}
+		})
+	}
+}
+
+// TestUnionConditionsAwareAuthorizeEmptyChain verifies the union authorizer returns NoOpinion
+// when given zero sub-authorizers.
+func TestUnionConditionsAwareAuthorizeEmptyChain(t *testing.T) {
+	authz := New().(interface {
+		ConditionsAwareAuthorize(context.Context, authorizer.Attributes) authorizer.ConditionsAwareDecision
+	})
+	d := authz.ConditionsAwareAuthorize(context.Background(), nil)
+	if !d.IsNoOpinion() {
+		t.Errorf("expected NoOpinion from empty chain, got %s", d.String())
+	}
+}
+
+// TestUnionEvaluateConditionsRoutesByAuthorizerName verifies that EvaluateConditions uses the
+// authorizer index parsed from the authorizerName when dispatching ConditionsMap evaluation.
+func TestUnionEvaluateConditionsRoutesByAuthorizerName(t *testing.T) {
+	// First authorizer returns a ConditionsMap that, when evaluated, yields NoOpinion.
+	// Second authorizer returns a ConditionsMap that, when evaluated, yields Allow.
+	// We verify that EvaluateConditions correctly routes each unevaluated sub-decision back to
+	// its originating authorizer (matching by authorizerName / index).
+	first := &evalTestAuthz{conditionEffect: effectAllow, evalDecision: authorizer.DecisionNoOpinion, authorizerName: "first"}
+	second := &evalTestAuthz{conditionEffect: effectAllow, evalDecision: authorizer.DecisionAllow, authorizerName: "second"}
+	authz := New(first, second)
+
+	d := authz.ConditionsAwareAuthorize(context.Background(), nil)
+	if !d.IsUnion() {
+		t.Fatalf("expected Union, got %s", d.String())
+	}
+
+	gotDecision, _, err := authz.EvaluateConditions(context.Background(), d, authorizer.ConditionsData{})
+	if err != nil {
+		t.Fatalf("EvaluateConditions returned error: %v", err)
+	}
+	if gotDecision != authorizer.DecisionAllow {
+		t.Errorf("EvaluateConditions decision = %v, want Allow (routed via second authorizer)", gotDecision)
+	}
+}
+
+// TestUnionEvaluateConditionsUnconditionalShortCircuit verifies that EvaluateConditions
+// returns a wrapped unconditional decision immediately without descending into the chain.
+func TestUnionEvaluateConditionsUnconditionalShortCircuit(t *testing.T) {
+	a1 := &countingAuthz{inner: &evalTestAuthz{decision: authorizer.DecisionAllow}}
+	a2 := &countingAuthz{inner: &evalTestAuthz{decision: authorizer.DecisionNoOpinion}}
+	authz := New(a1, a2)
+
+	d := authz.ConditionsAwareAuthorize(context.Background(), nil)
+	// Should be unconditional Allow after short-circuit.
+	if !d.IsAllow() {
+		t.Fatalf("expected Allow, got %s", d.String())
+	}
+	if a1.conditionsAware != 1 || a2.conditionsAware != 0 {
+		t.Errorf("ConditionsAwareAuthorize should not have called sub-authorizer ConditionsAwareAuthorize (a1=%d, a2=%d)", a1.conditionsAware, a2.conditionsAware)
 	}
 }

@@ -18,6 +18,7 @@ package authorizer
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -59,6 +60,7 @@ type ConditionsAwareDecision struct {
 	decisionType conditionsAwareDecisionType
 
 	conditionsMap ConditionsMap
+	union         ConditionsAwareDecisionUnion
 
 	reason string
 	err    error
@@ -141,6 +143,12 @@ func (d ConditionsAwareDecision) ConditionsMap() ConditionsMap {
 	return d.conditionsMap
 }
 
+// IsUnion returns true if the decision consists of other sub-decisions
+// unioned together in a tree-like structure.
+func (d ConditionsAwareDecision) IsUnion() bool {
+	return d.decisionType == conditionsAwareDecisionTypeUnion
+}
+
 // IsUnconditional is true if d is Allow, Deny or NoOpinion.
 func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
@@ -184,6 +192,8 @@ func (d ConditionsAwareDecision) PossibleDecisions() sets.Set[Decision] {
 		return sets.New(DecisionNoOpinion)
 	case d.IsConditionsMap():
 		return d.ConditionsMap().PossibleDecisions()
+	case d.IsUnion():
+		return d.union.PossibleDecisions()
 	default:
 		return sets.New(DecisionDeny)
 	}
@@ -207,23 +217,76 @@ func (d ConditionsAwareDecision) ContainsAllowOrDeny() bool {
 	if d.IsAllow() || d.IsDeny() {
 		return true
 	}
-	return false // NoOpinion or ConditionsMap
+	if d.IsNoOpinion() || d.IsConditionsMap() {
+		return false
+	}
+	return d.union.ContainsAllowOrDeny()
+}
+
+// UnionedDecisions returns an iterator for unioned sub-decisions.
+// This iterator is non-empty if and only if IsUnion() == true.
+// The sub-decisions are iterated in their priority order.
+func (d ConditionsAwareDecision) UnionedDecisions() iter.Seq2[string, ConditionsAwareDecision] {
+	return func(yield func(string, ConditionsAwareDecision) bool) {
+		for _, subDecision := range d.union.inner {
+			if !yield(subDecision.authorizerName, subDecision.d) {
+				return
+			}
+		}
+	}
 }
 
 // Reason returns the reason supplied when constructing the decision
 // (if Allow/Deny/NoOpinion/ConditionsMap), or an aggregated reason (if Union).
 func (d ConditionsAwareDecision) Reason() string {
+	if d.IsUnion() {
+		b := strings.Builder{}
+		b.WriteByte('[')
+		for i, sub := range d.union.inner {
+			if i != 0 {
+				b.WriteString(", ")
+			}
+			reason := sub.d.Reason()
+			if len(reason) != 0 {
+				b.WriteString(reason)
+			} else {
+				b.WriteString(`""`)
+			}
+		}
+		b.WriteByte(']')
+		return b.String()
+	}
 	return d.reason
 }
 
 // Error returns the error supplied when constructing the decision
 // (if Allow/Deny/NoOpinion/ConditionsMap), or an aggregated error (if Union).
 func (d ConditionsAwareDecision) Error() error {
+	if d.IsUnion() {
+		errlist := make([]error, len(d.union.inner))
+		for i, sub := range d.union.inner {
+			errlist[i] = sub.d.Error()
+		}
+		return utilerrors.NewAggregate(errlist)
+	}
 	return d.err
 }
 
 // String returns a human-readable representation of the decision.
 func (d ConditionsAwareDecision) String() string {
+	if d.IsUnion() {
+		// No need to take d.reason or d.err into account, as they are always zero for the union.
+		b := strings.Builder{}
+		b.WriteString("Union[")
+		for i, sub := range d.union.inner {
+			if i != 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(sub.d.String())
+		}
+		b.WriteByte(']')
+		return b.String()
+	}
 	params := []string{}
 	if len(d.reason) != 0 {
 		params = append(params, fmt.Sprintf("reason=%q", d.reason))
