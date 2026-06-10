@@ -34,7 +34,6 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -65,7 +64,6 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
-	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
 	fakeremote "k8s.io/cri-client/pkg/fake"
@@ -3293,12 +3291,6 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 	return fakeRuntime, endpoint
 }
 
-func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing.T, tp oteltrace.TracerProvider) internalapi.RuntimeService {
-	runtimeService, err := remote.NewRemoteRuntimeService(ctx, endpoint, 15*time.Second, tp, false)
-	require.NoError(t, err)
-	return runtimeService
-}
-
 func TestNewMainKubeletStandAlone(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	tempDir, err := os.MkdirTemp("", "logs")
@@ -3367,7 +3359,11 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		fakeRuntime.Stop()
 	}()
 	fakeRecorder := &record.FakeRecorder{}
-	rtSvc := createRemoteRuntimeService(tCtx, endpoint, t, noopoteltrace.NewTracerProvider())
+	rtSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		Build(tCtx)
+	require.NoError(t, err)
 	kubeDep := &Dependencies{
 		Auth:                 nil,
 		CAdvisorInterface:    cadvisor,
@@ -3526,7 +3522,11 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 		fakeRuntime.Stop()
 	}()
 	fakeRecorder := &record.FakeRecorder{}
-	rtSvc := createRemoteRuntimeService(tCtx, endpoint, t, noopoteltrace.NewTracerProvider())
+	rtSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		Build(tCtx)
+	require.NoError(t, err)
 	kubeDep := &Dependencies{
 		Auth:                 nil,
 		CAdvisorInterface:    cadvisor,
@@ -3628,12 +3628,21 @@ func TestSyncPodSpans(t *testing.T) {
 	defer func() {
 		fakeRuntime.Stop()
 	}()
-	runtimeSvc := createRemoteRuntimeService(tCtx, endpoint, t, tp)
+	runtimeSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		WithTracerProvider(tp).
+		Build(tCtx)
+	require.NoError(t, err)
 	kubelet.runtimeService = runtimeSvc
 
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
-	imageSvc, err := remote.NewRemoteImageService(tCtx, endpoint, 15*time.Second, tp, false)
+	imageSvc, err := remote.NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		WithTracerProvider(tp).
+		Build(tCtx)
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
