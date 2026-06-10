@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"mime"
+	"net/http"
 	"testing"
 	"time"
 
@@ -27,7 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -104,7 +106,7 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 		trial := request.VersionedParams(&metav1.GetOptions{ResourceVersion: namespace.ResourceVersion}, scheme.ParameterCodec).Do(context.TODO())
 		var trialObject corev1.Namespace
 		if err := trial.Into(&trialObject); err != nil {
-			if errors.IsResourceExpired(err) {
+			if apierrors.IsResourceExpired(err) {
 				t.Logf("retrying: %v", err)
 				continue
 			}
@@ -200,7 +202,7 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 
 		event1, raw1, err := getRawEventAndRawObject()
 		if err != nil {
-			if errors.IsResourceExpired(err) {
+			if apierrors.IsResourceExpired(err) {
 				t.Logf("retrying: %v", err)
 				continue
 			}
@@ -213,7 +215,7 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 
 		event2, raw2, err := getRawEventAndRawObject()
 		if err != nil {
-			if errors.IsResourceExpired(err) {
+			if apierrors.IsResourceExpired(err) {
 				t.Logf("retrying: %v", err)
 				continue
 			}
@@ -257,4 +259,103 @@ type rawCapturingDecoder struct {
 func (d *rawCapturingDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	d.raw = append([]byte(nil), data...)
 	return d.delegate.Decode(data, defaults, into)
+}
+
+// TestCBORNonResourceEndpoints verifies that non-resource structured endpoints and structured error
+// responses support the CBOR encoding when the CBORServingAndStorage feature gate is enabled. This
+// covers the legacy and non-legacy discovery endpoints, statusz, flagz, and the error response
+// produced by the request deadline filter for a malformed timeout query parameter.
+func TestCBORNonResourceEndpoints(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	client, err := corev1client.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name       string
+		path       string
+		accept     string
+		params     map[string]string
+		wantStatus int
+	}{
+		{
+			name:       "legacy discovery",
+			path:       "/api",
+			accept:     "application/cbor",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "group discovery",
+			path:       "/apis",
+			accept:     "application/cbor",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "group version discovery",
+			path:       "/apis/apps",
+			accept:     "application/cbor",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "aggregated discovery",
+			path:       "/apis",
+			accept:     "application/cbor;v=v2;g=apidiscovery.k8s.io;as=APIGroupDiscoveryList",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "statusz",
+			path:       "/statusz",
+			accept:     "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "flagz",
+			path:       "/flagz",
+			accept:     "application/cbor;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "status error from filter",
+			path:       "/api/v1/namespaces",
+			accept:     "application/cbor",
+			params:     map[string]string{"timeout": "invalid"},
+			wantStatus: http.StatusBadRequest,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := client.RESTClient().Get().AbsPath(tc.path).SetHeader("Accept", tc.accept)
+			for k, v := range tc.params {
+				req.Param(k, v)
+			}
+
+			result := req.Do(t.Context())
+
+			var status int
+			result.StatusCode(&status)
+			if status != tc.wantStatus {
+				t.Errorf("expected response status %d, got %d", tc.wantStatus, status)
+			}
+
+			var contentType string
+			result.ContentType(&contentType)
+			mediaType, _, err := mime.ParseMediaType(contentType)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mediaType != "application/cbor" {
+				t.Errorf("expected Content-Type to be application/cbor, got %q", contentType)
+			}
+
+			raw, _ := result.Raw()
+			if !bytes.HasPrefix(raw, []byte{0xd9, 0xd9, 0xf7}) {
+				t.Errorf("response body does not begin with CBOR self-described tag (d9d9f7), got %x", raw[:min(len(raw), 16)])
+			}
+		})
+	}
 }

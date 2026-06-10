@@ -22,6 +22,7 @@ import (
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/emicklei/go-restful/v3"
@@ -92,6 +93,10 @@ func WrapAggregatedDiscoveryToHandler(handler, aggHandler, peerAggregatedHandler
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	codecs := serializer.NewCodecFactory(scheme)
+	var opts []serializer.CodecFactoryOptionsMutator
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+	codecs := serializer.NewCodecFactory(scheme, opts...)
 	return &WrappedHandler{codecs, handler, aggHandler, peerAggregatedHandler}
 }
