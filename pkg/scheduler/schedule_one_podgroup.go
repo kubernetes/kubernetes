@@ -221,7 +221,13 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	// Run workload aware preemption if required. If the preemption is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
 	if result.status.Code() == fwk.Unschedulable {
-		pgPostFilterResult, status := sched.runWorkloadAwarePreemption(ctx, schedFwk, podGroupCycleState, podGroupInfo)
+		var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
+			return &fwk.PodGroupAssignments{
+				ProposedAssignments: makeProposedAssignments(&res),
+			}, res.status
+		}
+		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, pgSchedulingFunc)
 		if status.IsSuccess() {
 			result.waitingOnPreemption = true
 			for i := range result.podResults {
@@ -237,41 +243,6 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	}
 
 	sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo, result, start)
-}
-
-// runWorkloadAwarePreemption runs workload-aware preemption for the given pod group.
-// It saves the current snapshot of node infos, runs a PodGroupPostFilter
-// which modifies the node infos to check feasibility of the
-// pod group scheduling with some pods removed and reverts the snapshot to the
-// original state.
-// The function used for evaluating feasibility of pod group scheduling is
-// scheduler.podGroupSchedulingAlgorithm run without any post filters.
-func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	// Default preemption should be the only pod group post filter registered plugin.
-	plugins := schedFwk.PodGroupPostFilterPlugins()
-	if len(plugins) == 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled")
-	}
-
-	pg := podGroupInfo.PodGroup
-	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints")
-	}
-
-	restoreFn, err := sched.nodeInfoSnapshot.BackupSnapshot()
-	if err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("failed to backup snapshot: %w", err))
-	}
-	defer restoreFn()
-
-	var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-		res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
-		return &fwk.PodGroupAssignments{
-			// We do not fill the Placement struct, because we do not need it.
-			ProposedAssignments: makeProposedAssignments(&res),
-		}, res.status
-	}
-	return plugins[0].PodGroupPostFilter(ctx, pg, podGroupInfo.UnscheduledPods, pgSchedulingFunc)
 }
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.

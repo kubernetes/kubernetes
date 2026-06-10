@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"maps"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -39,6 +40,36 @@ type placementNodes struct {
 	// nodeInfoSet contains the set of nodes in the placement.
 	// This is useful for quickly checking if a node belongs the the placement.
 	nodeInfoSet sets.Set[string]
+}
+
+// snapshotBackupData stores shallow copies of original snapshot data.
+type snapshotBackupData struct {
+	nodeInfoMap                                  map[string]*framework.NodeInfo
+	nodeInfoList                                 []fwk.NodeInfo
+	havePodsWithAffinityNodeInfoList             []fwk.NodeInfo
+	havePodsWithRequiredAntiAffinityNodeInfoList []fwk.NodeInfo
+	usedPVCRefCounts                             map[string]int
+}
+
+// newSnapshotBackupData is creating a snapshotBackupData struct and it is filling it with original data from snapshot.
+// NOTE: This is a shallow copy. When using this method we must make sure that the data in the snapshot is deep copied after creating the backup.
+func newSnapshotBackupData(s *Snapshot) *snapshotBackupData {
+	return &snapshotBackupData{
+		nodeInfoMap:                      s.nodeInfoMap,
+		nodeInfoList:                     s.nodeInfoList,
+		havePodsWithAffinityNodeInfoList: s.havePodsWithAffinityNodeInfoList,
+		havePodsWithRequiredAntiAffinityNodeInfoList: s.havePodsWithRequiredAntiAffinityNodeInfoList,
+		usedPVCRefCounts: s.usedPVCRefCounts,
+	}
+}
+
+// restore is restoring snapshot data from backupData struct.
+func (b *snapshotBackupData) restore(s *Snapshot) {
+	s.nodeInfoMap = b.nodeInfoMap
+	s.nodeInfoList = b.nodeInfoList
+	s.havePodsWithAffinityNodeInfoList = b.havePodsWithAffinityNodeInfoList
+	s.havePodsWithRequiredAntiAffinityNodeInfoList = b.havePodsWithRequiredAntiAffinityNodeInfoList
+	s.usedPVCRefCounts = b.usedPVCRefCounts
 }
 
 // Snapshot is a snapshot of cache NodeInfo and NodeTree order. The scheduler takes a
@@ -69,12 +100,14 @@ type Snapshot struct {
 	placementNodes *placementNodes
 	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
 	genericWorkloadEnabled bool
-	// hasBackup holds information whether backup was performed and
-	// restore was not performed yet.
-	hasBackup bool
+	// snapshotBackup is used for storing original
+	// snapshot info before mutations. It is only used during the mutation session.
+	// StartMutation will fill it and EndMutation will restore data from it.
+	snapshotBackup *snapshotBackupData
 }
 
 var _ fwk.SharedLister = &Snapshot{}
+var _ fwk.MutableSnapshotSharedLister = &Snapshot{}
 
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
@@ -151,59 +184,52 @@ func createPodGroupStates(pods []*v1.Pod) map[podGroupKey]*podGroupStateSnapshot
 	return podGroupStates
 }
 
-// RestoreSnapshot is a function that can be used to restore the snapshot to the state
-// before the backup was taken.
-type RestoreSnapshot func()
-
-// BackupSnapshot provides a way to temporarily backup the snapshot's state
-// and returns a restore function. This is primarily used in workload-aware
-// preemption to simulate pod group preemption by mutating deep copies of NodeInfos.
-// Backups cannot be stacked, i.e., only one backup can be made without restoring
-// the snapshot first.
-// Restoring backup when the placement is set is not supported and can lead to
-// undefined behavior.
-func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
-	if s.hasBackup {
-		return nil, fmt.Errorf("cannot stack backups")
+// StartMutations starts a mutation session by backing up the current snapshot state.
+// This function should be used for mutating the snapshot during a single pod group scheduling cycle.
+// This function does deep copies of the snapshot and saves the original objects to restore them when EndMutations is called.
+// StartMutations cannot be called when the previous mutation session has not ended.
+func (s *Snapshot) StartMutations() error {
+	if s.snapshotBackup != nil {
+		return fmt.Errorf("cannot stack mutations")
 	}
-	origNodeInfoMap := s.nodeInfoMap
-	origNodeInfoList := s.nodeInfoList
-	origHavePodsWithAffinityNodeInfoList := s.havePodsWithAffinityNodeInfoList
-	origHavePodsWithRequiredAntiAffinityNodeInfoList := s.havePodsWithRequiredAntiAffinityNodeInfoList
+	s.snapshotBackup = newSnapshotBackupData(s)
 
-	clonedNodeInfoMap := make(map[string]*framework.NodeInfo, len(s.nodeInfoMap))
-	for k, v := range s.nodeInfoMap {
-		clonedNodeInfoMap[k] = v.Snapshot().(*framework.NodeInfo)
+	s.nodeInfoMap = make(map[string]*framework.NodeInfo)
+	for k, v := range s.snapshotBackup.nodeInfoMap {
+		s.nodeInfoMap[k] = v.Snapshot().(*framework.NodeInfo)
 	}
 
-	clonedNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
-	clonedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
-	clonedHavePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(clonedNodeInfoMap))
+	s.nodeInfoList = make([]fwk.NodeInfo, 0, len(s.nodeInfoMap))
+	s.havePodsWithAffinityNodeInfoList = make([]fwk.NodeInfo, 0, len(s.nodeInfoMap))
+	s.havePodsWithRequiredAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, len(s.nodeInfoMap))
 
-	for _, v := range s.nodeInfoList {
-		clonedNode := clonedNodeInfoMap[v.Node().Name]
-		clonedNodeInfoList = append(clonedNodeInfoList, clonedNode)
+	for _, v := range s.snapshotBackup.nodeInfoList {
+		clonedNode := s.nodeInfoMap[v.Node().Name]
+		s.nodeInfoList = append(s.nodeInfoList, clonedNode)
 		if len(clonedNode.PodsWithAffinity) > 0 {
-			clonedHavePodsWithAffinityNodeInfoList = append(clonedHavePodsWithAffinityNodeInfoList, clonedNode)
+			s.havePodsWithAffinityNodeInfoList = append(s.havePodsWithAffinityNodeInfoList, clonedNode)
 		}
 		if len(clonedNode.PodsWithRequiredAntiAffinity) > 0 {
-			clonedHavePodsWithRequiredAntiAffinityNodeInfoList = append(clonedHavePodsWithRequiredAntiAffinityNodeInfoList, clonedNode)
+			s.havePodsWithRequiredAntiAffinityNodeInfoList = append(s.havePodsWithRequiredAntiAffinityNodeInfoList, clonedNode)
 		}
 	}
 
-	s.hasBackup = true
-	s.nodeInfoMap = clonedNodeInfoMap
-	s.nodeInfoList = clonedNodeInfoList
-	s.havePodsWithAffinityNodeInfoList = clonedHavePodsWithAffinityNodeInfoList
-	s.havePodsWithRequiredAntiAffinityNodeInfoList = clonedHavePodsWithRequiredAntiAffinityNodeInfoList
+	s.usedPVCRefCounts = make(map[string]int)
+	maps.Copy(s.usedPVCRefCounts, s.snapshotBackup.usedPVCRefCounts)
 
-	return func() {
-		s.hasBackup = false
-		s.nodeInfoMap = origNodeInfoMap
-		s.nodeInfoList = origNodeInfoList
-		s.havePodsWithAffinityNodeInfoList = origHavePodsWithAffinityNodeInfoList
-		s.havePodsWithRequiredAntiAffinityNodeInfoList = origHavePodsWithRequiredAntiAffinityNodeInfoList
-	}, nil
+	return nil
+}
+
+// EndMutations ends the mutation session and restores the snapshot state from before StartMutations.
+// If StartMutation was not called before EndMutation, EndMutation will do nothing.
+func (s *Snapshot) EndMutations() error {
+	if s.snapshotBackup == nil {
+		return fmt.Errorf("no mutation session started")
+	}
+
+	s.snapshotBackup.restore(s)
+	s.snapshotBackup = nil
+	return nil
 }
 
 // createNodeInfoMap obtains a list of pods and pivots that list into a map

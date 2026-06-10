@@ -60,6 +60,18 @@ type PodGroupLister interface {
 	Get(namespace, name string) (*schedulingapi.PodGroup, error)
 }
 
+// MutableSnapshotSharedLister interface represents a lister that allows mutating snapshot and restoring it afterwards.
+// Only PodGroupPostFilter extension point can use this.
+type MutableSnapshotSharedLister interface {
+	// StartMutations starts a mutation session.
+	// It is used for operations requiring modifying snapshot state for checking multiple scenarios.
+	// There can be only one mutation session at the moment.
+	// If StartMutations() is called, EndMutations() must be called in the same scheduling cycle.
+	StartMutations() error
+	// EndMutations ends the mutation session and restores the snapshot state to the one before StartMutations.
+	EndMutations() error
+}
+
 // PodGroupStateLister provides read access to pod group states.
 type PodGroupStateLister interface {
 	// Get returns the PodGroupState of the given pod group.
