@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1412,4 +1413,96 @@ func TestCacheSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
+}
+
+func TestWatchCacheListSnapshotRace(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+	store := newTestWatchCache(100, DefaultEventFreshDuration, &cache.Indexers{
+		"spec.nodeName": func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, fmt.Errorf("not a pod")
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+	defer store.Stop()
+
+	// Add initial pods
+	for i := 0; i < 50; i++ {
+		pod := makeTestPod(fmt.Sprintf("pod-%d", i), uint64(100+i))
+		pod.Spec.NodeName = "node-1"
+		require.NoError(t, store.Add(pod))
+	}
+
+	stopCh := make(chan struct{})
+	var wg sync.WaitGroup
+
+	// Start concurrent writers
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rv := uint64(200)
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				// Delete and recreate pod-0
+				pod := makeTestPod("pod-0", rv)
+				pod.Spec.NodeName = "node-1"
+				_ = store.Delete(pod)
+
+				rv++
+				pod = makeTestPod("pod-0", rv)
+				pod.Spec.NodeName = "node-1"
+				_ = store.Add(pod)
+				rv++
+			}
+		}
+	}()
+
+	// Start concurrent readers using index matching
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stopCh:
+					return
+				default:
+					pred := storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.OneTermEqualSelector("spec.nodeName", "node-1"),
+						GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+							pod, ok := obj.(*v1.Pod)
+							if !ok {
+								return nil, nil, fmt.Errorf("not a pod")
+							}
+							return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
+						},
+						IndexFields: []string{"spec.nodeName"},
+					}
+					opts := storage.ListOptions{
+						Recursive: true,
+						Predicate: pred,
+						// Use ResourceVersion "0" to exercise waitAndListLatestRV directly and
+						// avoid the test-only race in mock getCurrentRV used by waitAndListConsistent.
+						ResourceVersion: "0",
+					}
+					_, _, err := store.WaitUntilFreshAndGetList(context.Background(), "/prefix/default", opts)
+					if err != nil {
+						t.Errorf("unexpected error on list: %v", err)
+						return
+					}
+				}
+			}
+		}()
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	close(stopCh)
+	wg.Wait()
 }

@@ -626,13 +626,15 @@ func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey
 }
 
 func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, key, continueKey, matchValues)
+	snap, items, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, key, continueKey, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	items, err := snap.OrderedListPrefix(key, continueKey)
-	if err != nil {
-		return listResp{}, "", err
+	if snap != nil {
+		items, err = snap.OrderedListPrefix(key, continueKey)
+		if err != nil {
+			return listResp{}, "", err
+		}
 	}
 	return listResp{
 		Items:           items,
@@ -640,13 +642,13 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion
 	}, index, nil
 }
 
-func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
+func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (snap store.Snapshot, items []interface{}, resourceVersion uint64, index string, err error) {
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
 	defer w.RUnlock()
 	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, minResourceVersion)
 	if err != nil {
-		return nil, 0, "", err
+		return nil, nil, 0, "", err
 	}
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
@@ -654,16 +656,18 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
 		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return listSnapshot{Items: result}, w.resourceVersion, matchValue.IndexName, nil
+			items, err := listSnapshot{Items: result}.OrderedListPrefix(key, continueKey)
+			return nil, items, w.resourceVersion, matchValue.IndexName, err
 		}
 	}
 	if w.snapshots != nil {
 		snap, ok := w.snapshots.Latest()
 		if ok {
-			return snap, w.resourceVersion, "", nil
+			return snap, nil, w.resourceVersion, "", nil
 		}
 	}
-	return w.store, w.resourceVersion, "", nil
+	items, err = w.store.OrderedListPrefix(key, continueKey)
+	return nil, items, w.resourceVersion, "", err
 }
 
 type listSnapshot struct {
