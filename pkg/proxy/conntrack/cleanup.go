@@ -86,10 +86,15 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 			}
 		}
 
-		// a Service without endpoints does not require to clean the conntrack entries associated.
-		if endpoints.Len() == 0 {
-			continue
-		}
+		// Note: a Service without any serving endpoints is processed too, with an
+		// empty endpoints set, so that all the existing entries directed to its
+		// frontends are removed. The REJECT (iptables) / reject (nftables) rule
+		// installed for a Service with no endpoints does not cover the previously
+		// established flows: those are DNATed to the (deleted) endpoint IP before
+		// the reject rule, which matches on the Service IP, can be evaluated.
+		// One-way UDP flows (e.g. statsd) refresh the conntrack entry timeout with
+		// every packet, so without this cleanup they keep sending traffic to the
+		// deleted endpoint IP indefinitely.
 
 		// we need to filter entries that are directed to a Service IP:Port frontend
 		// that does not have an Endpoint IP:Port backend as part of the serving endpoints
@@ -105,8 +110,13 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 			serviceIPEndpoints[net.JoinHostPort(externalIP.String(), portStr)] = endpoints
 		}
 		// we need to filter entries that are directed to a *:NodePort that does not have
-		// an Endpoint IP:Port backend as part of the serving endpoints
-		if svc.NodePort() != 0 {
+		// an Endpoint IP:Port backend as part of the serving endpoints.
+		// NodePort entries are matched on the destination port only, so with an
+		// empty endpoints set every UDP flow towards that port number would be
+		// removed, including flows not owned by kube-proxy (e.g. traffic to an
+		// unrelated host on the same port). Skip NodePort cleanup for services
+		// without serving endpoints until the match can be restricted to node IPs.
+		if svc.NodePort() != 0 && endpoints.Len() > 0 {
 			// *:NodePort
 			serviceNodePortEndpoints[svc.NodePort()] = endpoints
 		}
