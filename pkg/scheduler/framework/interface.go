@@ -311,6 +311,9 @@ type Framework interface {
 	// Each PlacementCycleState is passed to ScorePlacement for the PodGroupAssignments at the same index.
 	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ns []fwk.PlacementPluginScores, status *fwk.Status)
 
+	// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
+	RunPodGroupPostFilterPlugins(ctx context.Context, podGroupInfo *QueuedPodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
+
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
 

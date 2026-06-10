@@ -45,11 +45,16 @@ type StorageInfoLister interface {
 	IsPVCUsedByPods(key string) bool
 }
 
+// RestoreSnapshot is a function that can be used to restore the snapshot to the state
+// before the backup was taken.
+type RestoreSnapshot func()
+
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
 	PodGroupStates() PodGroupStateLister
+	BackupSnapshot() (RestoreSnapshot, error)
 }
 
 // PodGroupStateLister provides read access to pod group states.

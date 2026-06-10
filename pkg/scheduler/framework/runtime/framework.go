@@ -1208,6 +1208,43 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 	return r, s
 }
 
+// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
+func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "generic workload feature is disabled, cannot perform workload aware preemption")
+	}
+
+	if len(f.podGroupPostFilterPlugins) == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled")
+	}
+
+	pg, err := f.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister().PodGroups(podGroupInfo.Namespace).Get(podGroupInfo.Name)
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", err))
+	}
+
+	var reasons []string
+	var rejectorPlugin string
+	for _, pl := range f.podGroupPostFilterPlugins {
+		res, status := pl.PodGroupPostFilter(ctx, pg, podGroupInfo.UnscheduledPods, pgSchedulingFunc)
+		if status.IsSuccess() {
+			return res, status
+		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
+			return res, status.WithPlugin(pl.Name())
+		} else if status.Code() == fwk.Unschedulable {
+			reasons = append(reasons, status.Reasons()...)
+			if rejectorPlugin == "" {
+				rejectorPlugin = pl.Name()
+			}
+		} else {
+			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
+			return nil, fwk.AsStatus(status.AsError()).WithPlugin(pl.Name())
+		}
+	}
+
+	return nil, fwk.NewStatus(fwk.Unschedulable, reasons...).WithPlugin(rejectorPlugin)
+}
+
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
 // for nominated pod on the given node.
 // This function is called from two different places: Schedule and Preempt.

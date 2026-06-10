@@ -97,6 +97,9 @@ func (mp *fakePodGroupPlugin) Permit(ctx context.Context, state fwk.CycleState, 
 
 func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, pg *schedulingv1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
 	mp.podGroupPostFilterCalled = true
+	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints")
+	}
 	if mp.podGroupPostFilterStatus == nil {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "default fake podgroup postfilter failure")
 	}
@@ -2942,25 +2945,21 @@ func TestRunWorkloadAwarePreemption(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
-
-			podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+			// Register PodGroup lister to ensure the informer is registered and started
+			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 
 			if tt.pluginsRegistered {
 				informerFactory.Start(ctx.Done())
 				informerFactory.WaitForCacheSync(ctx.Done())
 			}
 
-			cache := internalcache.New(ctx, nil, true)
-			sched := &Scheduler{
-				Cache:            cache,
-				nodeInfoSnapshot: internalcache.NewEmptySnapshot(), // Need empty snapshot to avoid nil pointer issues
-				podGroupLister:   podGroupLister,
-			}
-
 			// Just inject logger explicitly in context to avoid panic
 			ctx = klog.NewContext(ctx, logger)
 
-			res, status := sched.runWorkloadAwarePreemption(ctx, schedFwk, framework.NewCycleState(), tt.podGroupInfo)
+			var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				return &fwk.PodGroupAssignments{}, fwk.NewStatus(fwk.Success)
+			}
+			res, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, tt.podGroupInfo, pgSchedulingFunc)
 
 			if tt.expectedStatus.Code() != status.Code() || tt.expectedStatus.Message() != status.Message() {
 				t.Errorf("Unexpected status, want code %v message %q, got code %v message %q",
