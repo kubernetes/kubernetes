@@ -41,6 +41,7 @@ type ClusterTrustBundleInterface interface {
 	Create(ctx context.Context, clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, opts v1.CreateOptions) (*certificatesv1alpha1.ClusterTrustBundle, error)
 	Update(ctx context.Context, clusterTrustBundle *certificatesv1alpha1.ClusterTrustBundle, opts v1.UpdateOptions) (*certificatesv1alpha1.ClusterTrustBundle, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*certificatesv1alpha1.ClusterTrustBundle, error)
 	List(ctx context.Context, opts v1.ListOptions) (*certificatesv1alpha1.ClusterTrustBundleList, error)

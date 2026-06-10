@@ -41,6 +41,7 @@ type WorkloadInterface interface {
 	Create(ctx context.Context, workload *schedulingv1beta1.Workload, opts v1.CreateOptions) (*schedulingv1beta1.Workload, error)
 	Update(ctx context.Context, workload *schedulingv1beta1.Workload, opts v1.UpdateOptions) (*schedulingv1beta1.Workload, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*schedulingv1beta1.Workload, error)
 	List(ctx context.Context, opts v1.ListOptions) (*schedulingv1beta1.WorkloadList, error)

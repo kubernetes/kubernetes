@@ -41,6 +41,7 @@ type ControllerRevisionInterface interface {
 	Create(ctx context.Context, controllerRevision *appsv1.ControllerRevision, opts metav1.CreateOptions) (*appsv1.ControllerRevision, error)
 	Update(ctx context.Context, controllerRevision *appsv1.ControllerRevision, opts metav1.UpdateOptions) (*appsv1.ControllerRevision, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*appsv1.ControllerRevision, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*appsv1.ControllerRevisionList, error)

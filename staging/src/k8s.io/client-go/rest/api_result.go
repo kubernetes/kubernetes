@@ -42,4 +42,3 @@ func (a APIResultAdapter) StatusCode() (int, error) {
 func (a APIResultAdapter) Error() error {
 	return a.Result.Error()
 }
-
