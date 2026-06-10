@@ -167,6 +167,12 @@ func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
 	return PortMapKey(deepHashObjectToString(endpointPorts))
 }
 
+// NewAddrTypePortMapKey generates a PortMapKey from endpoint ports and address type.
+func NewAddrTypePortMapKey(portMapKey PortMapKey, addrType discovery.AddressType) PortMapKey {
+	pmk := fmt.Sprintf("%s-%s", addrType, portMapKey)
+	return PortMapKey(pmk)
+}
+
 // deepHashObjectToString creates a unique hash string from a go object.
 func deepHashObjectToString(objectToWrite interface{}) string {
 	hasher := fnv.New128a()

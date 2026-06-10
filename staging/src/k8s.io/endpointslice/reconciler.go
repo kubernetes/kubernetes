@@ -249,7 +249,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 		totalRemoved += removed
 
 		spMetrics.Set(
-			newAddrTypePortMapKey(portMap, addressType),
+			endpointsliceutil.NewAddrTypePortMapKey(portMap, addressType),
 			metrics.EfficiencyInfo{
 				Endpoints: numEndpoints,
 				Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
@@ -279,7 +279,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 			slicesToCreate = append(slicesToCreate, placeholderSlice)
 		}
 		spMetrics.Set(
-			newAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(placeholderSlice.Ports), addressType),
+			endpointsliceutil.NewAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(placeholderSlice.Ports), addressType),
 			metrics.EfficiencyInfo{
 				Endpoints: 0,
 				Slices:    1,
