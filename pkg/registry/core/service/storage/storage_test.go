@@ -27,7 +27,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,24 +41,53 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
+	"k8s.io/kubernetes/pkg/apis/discovery"
+	apisdiscoveryv1 "k8s.io/kubernetes/pkg/apis/discovery/v1"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	endpointslicestore "k8s.io/kubernetes/pkg/registry/discovery/endpointslice/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
+type cleanupFunc func()
+
+// storageEndpointSliceGetter wraps a discovery REST storage and converts its unversioned
+// EndpointSlices to discoveryv1.EndpointSlice.
+type storageEndpointSliceGetter struct {
+	rest *endpointslicestore.REST
+}
+
+func (sg *storageEndpointSliceGetter) GetEndpointSlices(namespaceName, serviceName string) ([]*discoveryv1.EndpointSlice, error) {
+	obj, err := sg.rest.List(context.TODO(), &metainternalversion.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set{discoveryv1.LabelServiceName: serviceName})})
+	if err != nil {
+		return nil, err
+	}
+	unversioned := obj.(*discovery.EndpointSliceList)
+
+	// (Using Convert_discovery_EndpointSliceList_To_v1_EndpointSliceList() would give
+	// us a []discoveryv1.EndpointSlice rather than a []*discoveryv1.EndpointSlice, so
+	// we'd still have to iterate over the result and build a new array anyway.)
+	v1Slices := make([]*discoveryv1.EndpointSlice, len(unversioned.Items))
+	for i := range unversioned.Items {
+		v1Slices[i] = new(discoveryv1.EndpointSlice)
+		if err := apisdiscoveryv1.Convert_discovery_EndpointSlice_To_v1_EndpointSlice(&unversioned.Items[i], v1Slices[i], nil); err != nil {
+			return nil, err
+		}
+	}
+	return v1Slices, nil
+}
+
 // Most tests will use this to create a registry to run tests against.
-func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*wrapperRESTForTests, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
 	return newStorageWithPods(t, ipFamilies, nil, nil)
 }
 
-func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpoints []*api.Endpoints) (*wrapperRESTForTests, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod, endpointSlices []*discovery.EndpointSlice) (*wrapperRESTForTests, *StatusREST, cleanupFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
@@ -100,29 +132,40 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		}
 	}
 
-	endpointsStorage, err := endpointstore.NewREST(generic.RESTOptions{
-		StorageConfig:  etcdStorage,
+	etcdDiscoveryStorage, discoveryServer := registrytest.NewEtcdStorage(t, discovery.GroupName)
+	endpointSliceStorage, err := endpointslicestore.NewREST(generic.RESTOptions{
+		StorageConfig:  etcdDiscoveryStorage,
 		Decorator:      generic.UndecoratedStorage,
-		ResourcePrefix: "endpoints",
+		ResourcePrefix: "endpointslices",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	if endpoints != nil && len(endpoints) > 0 {
-		ctx := genericregistrytest.NewNamespaceScopeContext(endpointsStorage.Store, metav1.NamespaceDefault)
-		for ix := range endpoints {
-			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
-			if err := endpointsStorage.Store.Storage.Create(ctx, key, endpoints[ix], nil, 0, false); err != nil {
-				t.Fatalf("Couldn't create endpoint: %v", err)
+	endpointSliceGetter := &storageEndpointSliceGetter{endpointSliceStorage}
+
+	if len(endpointSlices) > 0 {
+		ctx := genericregistrytest.NewNamespaceScopeContext(endpointSliceStorage.Store, metav1.NamespaceDefault)
+		for ix := range endpointSlices {
+			key, _ := endpointSliceStorage.KeyFunc(ctx, endpointSlices[ix].Name)
+			if err := endpointSliceStorage.Store.Storage.Create(ctx, key, endpointSlices[ix], nil, 0, false); err != nil {
+				t.Fatalf("Couldn't create endpointslice: %v", err)
 			}
 		}
 	}
 
-	serviceStorage, statusStorage, _, err := NewREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, endpointsStorage, podStorage.Pod, nil)
+	serviceStorage, statusStorage, _, err := NewREST(restOptions, ipFamilies[0], ipAllocs, portAlloc, endpointSliceGetter, podStorage.Pod, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	return &wrapperRESTForTests{serviceStorage}, statusStorage, server
+
+	cleanup := func() {
+		server.Terminate(t)
+		discoveryServer.Terminate(t)
+		serviceStorage.Destroy()
+		endpointSliceStorage.Store.Destroy()
+	}
+
+	return &wrapperRESTForTests{serviceStorage}, statusStorage, cleanup
 }
 
 func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
@@ -168,9 +211,8 @@ func validService() *api.Service {
 }
 
 func TestGenericCreate(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store)
 	svc := validService()
 	svc.ObjectMeta = metav1.ObjectMeta{} // because genericregistrytest
@@ -187,9 +229,8 @@ func TestGenericCreate(t *testing.T) {
 func TestGenericUpdate(t *testing.T) {
 	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
@@ -216,33 +257,29 @@ func TestGenericUpdate(t *testing.T) {
 }
 
 func TestGenericDelete(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate().ReturnDeletedObject()
 	test.TestDelete(validService())
 }
 
 func TestGenericGet(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestGet(validService())
 }
 
 func TestGenericList(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestList(validService())
 }
 
 func TestGenericWatch(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validService(),
@@ -264,17 +301,15 @@ func TestGenericWatch(t *testing.T) {
 }
 
 func TestGenericShortNames(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	expected := []string{"svc"}
 	registrytest.AssertShortNames(t, storage, expected)
 }
 
 func TestGenericCategories(t *testing.T) {
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	expected := []string{"all"}
 	registrytest.AssertCategories(t, storage, expected)
 }
@@ -702,9 +737,8 @@ func TestServiceDefaultOnRead(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+			defer cleanup()
 
 			tmp := tc.input.DeepCopyObject()
 			storage.defaultOnRead(tmp)
@@ -789,9 +823,8 @@ func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCas
 	// NOTE: do not call t.Helper() here.  It's more useful for errors to be
 	// attributed to lines in this function than the caller of it.
 
-	storage, _, server := newStorage(t, ipFamilies)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, ipFamilies)
+	defer cleanup()
 
 	for _, tc := range testCases {
 		name := tc.name
@@ -1388,9 +1421,8 @@ func TestCreateIgnoresIPsForExternalName(t *testing.T) {
 
 	for _, otc := range testCases {
 		t.Run(otc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, otc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, otc.clusterFamilies)
+			defer cleanup()
 
 			for _, itc := range otc.cases {
 				t.Run(itc.name, func(t *testing.T) {
@@ -1477,9 +1509,8 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -5934,9 +5965,8 @@ func TestCreateInitIPFields(t *testing.T) {
 		t.Run(otc.name, func(t *testing.T) {
 
 			// Do this in the outer loop for performance.
-			storage, _, server := newStorage(t, otc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, otc.clusterFamilies)
+			defer cleanup()
 
 			for _, itc := range otc.cases {
 				t.Run(itc.name+"__@L"+itc.line, func(t *testing.T) {
@@ -6086,9 +6116,8 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.families)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.families)
+			defer cleanup()
 
 			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6125,9 +6154,8 @@ func TestCreateDeleteReuse(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+			defer cleanup()
 
 			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
@@ -6378,9 +6406,8 @@ func TestCreateInitNodePorts(t *testing.T) {
 	}}
 
 	// Do this in the outer scope for performance.
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -6491,9 +6518,8 @@ func TestCreateSkipsAllocationsForHeadless(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			// This test is ONLY headless services.
 			tc.svc.Spec.ClusterIP = api.ClusterIPNone
@@ -6563,9 +6589,8 @@ func TestCreateDryRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
@@ -6596,9 +6621,8 @@ func TestCreateDryRun(t *testing.T) {
 func TestDeleteWithFinalizer(t *testing.T) {
 	svcName := "foo"
 
-	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
+	defer cleanup()
 
 	// This will allocate cluster IPs, NodePort, and HealthCheckNodePort.
 	svc := svctest.MakeService(svcName, svctest.SetTypeLoadBalancer,
@@ -6691,9 +6715,8 @@ func TestDeleteDryRun(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			storage, _, server := newStorage(t, tc.svc.Spec.IPFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.svc.Spec.IPFamilies)
+			defer cleanup()
 
 			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6788,9 +6811,8 @@ func TestUpdateDryRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, tc.clusterFamilies)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+			storage, _, cleanup := newStorage(t, tc.clusterFamilies)
+			defer cleanup()
 
 			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			obj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -11619,35 +11641,88 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		makePod("no-endpoints", "9.9.9.9"), // to prove this does not get chosen
 	}
 
-	endpoints := []*api.Endpoints{
-		epstest.MakeEndpoints("unnamed",
-			[]api.EndpointAddress{
-				epstest.MakeEndpointAddress("1.2.3.4", "unnamed"),
+	endpoints := []*discovery.EndpointSlice{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "unnamed-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "unnamed",
+				},
 			},
-			[]api.EndpointPort{
-				epstest.MakeEndpointPort("", 80),
-			}),
-		epstest.MakeEndpoints("unnamed2",
-			[]api.EndpointAddress{
-				epstest.MakeEndpointAddress("1.2.3.5", "unnamed"),
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{{
+				Addresses: []string{"1.2.3.4"},
+				TargetRef: &api.ObjectReference{
+					Name:      "unnamed",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}},
+			Ports: []discovery.EndpointPort{{
+				Name: ptr.To(""),
+				Port: ptr.To[int32](80),
+			}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "unnamed2-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "unnamed2",
+				},
 			},
-			[]api.EndpointPort{
-				epstest.MakeEndpointPort("", 80),
-			}),
-		epstest.MakeEndpoints("named",
-			[]api.EndpointAddress{
-				epstest.MakeEndpointAddress("1.2.3.6", "named"),
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{{
+				Addresses: []string{"1.2.3.5"},
+				TargetRef: &api.ObjectReference{
+					Name:      "unnamed",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}},
+			Ports: []discovery.EndpointPort{{
+				Name: ptr.To(""),
+				Port: ptr.To[int32](80),
+			}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "named-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "named",
+				},
 			},
-			[]api.EndpointPort{
-				epstest.MakeEndpointPort("p", 80),
-				epstest.MakeEndpointPort("q", 81),
-			}),
-		epstest.MakeEndpoints("no-endpoints", nil, nil), // to prove this does not get chosen
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{{
+				Addresses: []string{"1.2.3.6"},
+				TargetRef: &api.ObjectReference{
+					Name:      "named",
+					Namespace: metav1.NamespaceDefault,
+				},
+			}},
+			Ports: []discovery.EndpointPort{{
+				Name: ptr.To("p"),
+				Port: ptr.To[int32](80),
+			}, {
+				Name: ptr.To("q"),
+				Port: ptr.To[int32](81),
+			}},
+		},
+		// to prove this does not get chosen
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "no-endpoints-ep",
+				Namespace: metav1.NamespaceDefault,
+				Labels: map[string]string{
+					"kubernetes.io/service-name": "no-endpoints",
+				},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+		},
 	}
 
-	storage, _, server := newStorageWithPods(t, []api.IPFamily{api.IPv4Protocol}, pods, endpoints)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, _, cleanup := newStorageWithPods(t, []api.IPFamily{api.IPv4Protocol}, pods, endpoints)
+	defer cleanup()
 
 	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 	for _, name := range []string{"unnamed", "unnamed2", "no-endpoints"} {
@@ -11747,9 +11822,8 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 }
 
 func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
-	storage, statusStorage, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
+	storage, statusStorage, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
 	defer statusStorage.store.DestroyFunc()
 
 	ipModeVIP := api.LoadBalancerIPModeVIP
