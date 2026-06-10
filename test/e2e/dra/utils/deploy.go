@@ -19,7 +19,9 @@ package utils
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -268,6 +270,12 @@ const (
 	// is not managed by a driver. So any Pools and ResourceSlices will be published directly
 	// to the cluster, rather than through the driver.
 	multiHostDriverResources = "multi-host"
+
+	// LongRollingUpdateDriverName is a 30-character *.sigs.k8s.io-style driver name.
+	// With rolling updates, the legacy registration socket basename
+	// ({driver}-{pod UID}-reg.sock) exceeds common AF_UNIX path limits; see
+	// https://github.com/kubernetes/kubernetes/issues/139166.
+	LongRollingUpdateDriverName = "gpu.dra-example-driver.sigs.k8s.io"
 )
 
 // driverResourcesGenFunc defines the callback that will be invoked by the driver to generate the
@@ -407,6 +415,20 @@ func (d *Driver) SetNameSuffix(tCtx ktesting.TContext, suffix string) {
 	d.initName(tCtx)
 }
 
+// deploymentID returns an identifier for Kubernetes objects (ServiceAccount,
+// ClusterRole, etc.) derived from the driver name and instance suffix. The full
+// driver name is kept in d.Name for the API and kubelet plugin. When it is too
+// long for object name limits a short hashed form is used.
+func (d *Driver) deploymentID() string {
+	base := d.Name + d.InstanceSuffix
+	const maxLen = 40 // leaves room for "dra-kubelet-plugin-" and "-service-account"
+	if len(base) <= maxLen {
+		return base
+	}
+	sum := sha256.Sum256([]byte(base))
+	return "dra-" + hex.EncodeToString(sum[:8])
+}
+
 func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
 	tCtx.Logf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames)
 	d.Nodes = make(map[string]KubeletPlugin)
@@ -472,12 +494,13 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	}
 
 	// Create service account and corresponding RBAC rules.
-	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
+	deploymentID := d.deploymentID()
+	d.serviceAccountName = "dra-kubelet-plugin-" + deploymentID + "-service-account"
 	content := example.PluginPermissions
 
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", tCtx.Namespace())
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-driver-name", d.Name)
-	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+deploymentID)
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 
 	// Figure out which hostpathplugin to use: basically the latest one
