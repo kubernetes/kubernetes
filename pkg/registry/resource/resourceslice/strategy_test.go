@@ -858,6 +858,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
+				features.DRAListTypeAttributes:        tc.listTypeAttributes,
 			})
 
 			oldObj := tc.oldObj.DeepCopy()
