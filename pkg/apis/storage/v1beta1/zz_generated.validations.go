@@ -41,13 +41,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type CSIDriver
-	scheme.AddValidationFunc((*storagev1beta1.CSIDriver)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_CSIDriver(ctx, op, nil /* fldPath */, obj.(*storagev1beta1.CSIDriver), safe.Cast[*storagev1beta1.CSIDriver](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*storagev1beta1.CSIDriver)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_CSIDriver(
+					ctx, op, nil, /* fldPath */
+					obj.(*storagev1beta1.CSIDriver),
+					safe.Cast[*storagev1beta1.CSIDriver](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type StorageClass
 	scheme.AddValidationFunc(
 		(*storagev1beta1.StorageClass)(nil),
@@ -83,49 +90,75 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 
 // Validate_CSIDriver validates an instance of CSIDriver according
 // to declarative validation rules in the API schema.
-func Validate_CSIDriver(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1beta1.CSIDriver) (errs field.ErrorList) {
+func Validate_CSIDriver(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSIDriver) (errs field.ErrorList) {
+
 	// field storagev1beta1.CSIDriver.TypeMeta has no validation
 	// field storagev1beta1.CSIDriver.ObjectMeta has no validation
 
-	// field storagev1beta1.CSIDriver.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *storagev1beta1.CSIDriverSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field storagev1beta1.CSIDriver.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *storagev1beta1.CSIDriverSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_CSIDriverSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *storagev1beta1.CSIDriver) *storagev1beta1.CSIDriverSpec { return &oldObj.Spec }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIDriver) *storagev1beta1.CSIDriverSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_CSIDriverSpec validates an instance of CSIDriverSpec according
 // to declarative validation rules in the API schema.
-func Validate_CSIDriverSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1beta1.CSIDriverSpec) (errs field.ErrorList) {
-	// field storagev1beta1.CSIDriverSpec.AttachRequired
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_CSIDriverSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSIDriverSpec) (errs field.ErrorList) {
+
+	{ // field storagev1beta1.CSIDriverSpec.AttachRequired
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *bool,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("attachRequired"), obj.AttachRequired, safe.Field(oldObj, func(oldObj *storagev1beta1.CSIDriverSpec) *bool { return oldObj.AttachRequired }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIDriverSpec) *bool {
+				return oldObj.AttachRequired
+			})
+		errs = append(errs, fn(fldPath.Child("attachRequired"), obj.AttachRequired, oldVal, oldObj != nil)...)
+	}
 
 	// field storagev1beta1.CSIDriverSpec.PodInfoOnMount has no validation
 	// field storagev1beta1.CSIDriverSpec.VolumeLifecycleModes has no validation
@@ -136,6 +169,7 @@ func Validate_CSIDriverSpec(ctx context.Context, op operation.Operation, fldPath
 	// field storagev1beta1.CSIDriverSpec.SELinuxMount has no validation
 	// field storagev1beta1.CSIDriverSpec.NodeAllocatableUpdatePeriodSeconds has no validation
 	// field storagev1beta1.CSIDriverSpec.ServiceAccountTokenInSecrets has no validation
+	// field storagev1beta1.CSIDriverSpec.PreventPodSchedulingIfMissing has no validation
 	return errs
 }
 
