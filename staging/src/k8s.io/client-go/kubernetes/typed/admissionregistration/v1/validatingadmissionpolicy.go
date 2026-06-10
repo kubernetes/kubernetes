@@ -43,6 +43,7 @@ type ValidatingAdmissionPolicyInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1.ValidatingAdmissionPolicy, opts metav1.UpdateOptions) (*admissionregistrationv1.ValidatingAdmissionPolicy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*admissionregistrationv1.ValidatingAdmissionPolicy, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*admissionregistrationv1.ValidatingAdmissionPolicyList, error)

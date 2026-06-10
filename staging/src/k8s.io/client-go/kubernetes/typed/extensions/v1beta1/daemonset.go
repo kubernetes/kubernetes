@@ -43,6 +43,7 @@ type DaemonSetInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSet, opts v1.UpdateOptions) (*extensionsv1beta1.DaemonSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*extensionsv1beta1.DaemonSet, error)
 	List(ctx context.Context, opts v1.ListOptions) (*extensionsv1beta1.DaemonSetList, error)
