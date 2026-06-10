@@ -6117,7 +6117,7 @@ type fakeRVGetter struct {
 
 func (f *fakeRVGetter) LastStoreSyncResourceVersion() string { return f.rv }
 
-func newConsistencyTestController(hpaStore cache.Store, hpaLister autoscalinglisters.HorizontalPodAutoscalerLister, consistencyStore consistencyutil.ConsistencyStore) *HorizontalController {
+func newConsistencyTestController(hpaLister autoscalinglisters.HorizontalPodAutoscalerLister, consistencyStore consistencyutil.ConsistencyStore) *HorizontalController {
 	monitor.Register()
 	return &HorizontalController{
 		hpaLister:        hpaLister,
@@ -6156,7 +6156,7 @@ func TestUpdateStatusPopulatesConsistencyStore(t *testing.T) {
 		horizontalGroupResource: rvGetter,
 	})
 
-	ctrl := newConsistencyTestController(nil, nil, consistencyStore)
+	ctrl := newConsistencyTestController(nil, consistencyStore)
 	ctrl.hpaNamespacer = fakeClient.AutoscalingV2()
 	ctrl.eventRecorder = &record.FakeRecorder{}
 
@@ -6191,7 +6191,12 @@ func TestReconcileKeyEnsureReadyStaleCache(t *testing.T) {
 	owner := types.NamespacedName{Namespace: "test-ns", Name: "test-hpa"}
 	consistencyStore.WroteAt(owner, "hpa-uid", horizontalGroupResource, "5")
 
-	ctrl := newConsistencyTestController(indexer, hpaLister, consistencyStore)
+	ctrl := newConsistencyTestController(hpaLister, consistencyStore)
+
+	before, mErr := metricstestutil.GetCounterMetricValue(monitor.HPARequeueSkips.WithLabelValues(horizontalGroupResource.Group, horizontalGroupResource.Resource))
+	if mErr != nil {
+		t.Fatalf("error getting HPARequeueSkips metric: %v", mErr)
+	}
 
 	deleted, err := ctrl.reconcileKey(context.TODO(), "test-ns/test-hpa")
 	if err == nil {
@@ -6203,11 +6208,11 @@ func TestReconcileKeyEnsureReadyStaleCache(t *testing.T) {
 	}
 	assert.False(t, deleted, "expected deleted=false when returning early on consistency error")
 
-	v, mErr := metricstestutil.GetCounterMetricValue(monitor.HPARequeueSkips.WithLabelValues(horizontalGroupResource.Group, horizontalGroupResource.Resource))
+	after, mErr := metricstestutil.GetCounterMetricValue(monitor.HPARequeueSkips.WithLabelValues(horizontalGroupResource.Group, horizontalGroupResource.Resource))
 	if mErr != nil {
 		t.Fatalf("error getting HPARequeueSkips metric: %v", mErr)
 	}
-	assert.Equal(t, 1, int(v), "HPARequeueSkips should increment once per stale reconcile")
+	assert.Equal(t, 1, int(after-before), "HPARequeueSkips should increment once per stale reconcile")
 }
 
 // TestDeleteHPAClearsConsistencyStore verifies deleteHPA clears the per-owner
@@ -6255,7 +6260,7 @@ func TestDeleteHPAClearsConsistencyStore(t *testing.T) {
 				t.Fatal("expected consistency store to be stale before deleteHPA, got nil")
 			}
 
-			ctrl := newConsistencyTestController(nil, nil, consistencyStore)
+			ctrl := newConsistencyTestController(nil, consistencyStore)
 			ctrl.deleteHPA(tt.obj)
 
 			if err := consistencyStore.EnsureReady(owner); err != nil {
