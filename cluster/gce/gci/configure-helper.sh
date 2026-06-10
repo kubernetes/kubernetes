@@ -2966,16 +2966,6 @@ function start-kube-addons {
     update-event-exporter ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
   fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
-    setup-addon-manifests "addons" "node-problem-detector"
-  fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    # Setup role binding(s) for standalone node problem detector.
-    if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-      setup-addon-manifests "addons" "node-problem-detector/standalone"
-    fi
-    setup-addon-manifests "addons" "node-problem-detector/kubelet-user-standalone" "node-problem-detector"
-  fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range" "gce"
   fi
