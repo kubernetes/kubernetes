@@ -104,6 +104,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *core.PodStatus, c randfill.Continue) {
 			c.Fill(&s)
 			s.HostIPs = []core.HostIP{{IP: s.HostIP}}
+			// PodIP and PodIPs[0] are kept in sync by defaulting; valid
+			// objects always have them consistent.
+			s.PodIPs = []core.PodIP{{IP: s.PodIP}}
 		},
 		func(j *core.PodPhase, c randfill.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}

@@ -1269,6 +1269,8 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile
 		expected.Labels = podIn.Labels
 		expected.Status = podIn.Status
+		// the pod status registry strategy syncs podIP with podIPs[0].
+		expected.Status.PodIP = podIn.Status.PodIPs[0].IP
 
 		_, _, err = statusStorage.Update(statusCtx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 		if err != nil {
@@ -1302,4 +1304,38 @@ func TestCategories(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	expected := []string{"all"}
 	registrytest.AssertCategories(t, storage, expected)
+}
+
+// TestEtcdPodIPsReadCompatibility pins the read behavior for pods persisted
+// with only the singular status.podIP (written before podIPs existed):
+// storage-decode defaulting synthesizes podIPs[0] from podIP, the same
+// normalization the conversion layer historically applied, so podIPs
+// consumers (field selectors, pods/proxy, printers) keep working.
+func TestEtcdPodIPsReadCompatibility(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+
+	// Simulate an object persisted before dual-stack: write directly to the
+	// storage layer with only the singular field set.
+	stored := validNewPod()
+	stored.Status.PodIP = "10.0.0.1"
+	stored.Status.PodIPs = nil
+	key, _ := storage.KeyFunc(ctx, stored.Name)
+	if err := storage.Storage.Create(ctx, key, stored, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	obj, err := storage.Get(ctx, stored.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	served := obj.(*api.Pod)
+	if served.Status.PodIP != "10.0.0.1" {
+		t.Errorf("expected podIP 10.0.0.1, got %q", served.Status.PodIP)
+	}
+	if len(served.Status.PodIPs) != 1 || served.Status.PodIPs[0].IP != "10.0.0.1" {
+		t.Errorf("expected podIPs synthesized from podIP by storage-decode defaulting, got %#v", served.Status.PodIPs)
+	}
 }

@@ -435,202 +435,34 @@ func roundTripRS(t *testing.T, rs *apps.ReplicaSet) *apps.ReplicaSet {
 	return obj2.(*apps.ReplicaSet)
 }
 
-func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {
-	// core to v1
-	testInputs := []core.PodStatus{
-		{
-			// one IP
-			PodIPs: []core.PodIP{
-				{
-					IP: "1.1.1.1",
-				},
-			},
-		},
-		{
-			// no ips
-			PodIPs: nil,
-		},
-		{
-			// list of ips
-			PodIPs: []core.PodIP{
-				{
-					IP: "1.1.1.1",
-				},
-				{
-					IP: "2000::",
-				},
-			},
+// TestPodStatusConversion verifies PodIP and PodIPs convert verbatim in both
+// directions (keeping them in sync is handled by the pod registry strategy,
+// not conversion).
+func TestPodStatusConversion(t *testing.T) {
+	in := core.PodStatus{
+		PodIP: "1.1.2.1",
+		PodIPs: []core.PodIP{
+			{IP: "1.1.1.1"},
+			{IP: "2000::"},
 		},
 	}
-	for i, input := range testInputs {
-		v1PodStatus := v1.PodStatus{}
-		if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&input, &v1PodStatus, nil); nil != err {
-			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed with error %v", i, err.Error())
-		}
-
-		if len(input.PodIPs) == 0 {
-			// no more work needed
-			continue
-		}
-		// Primary IP was not set..
-		if len(v1PodStatus.PodIP) == 0 {
-			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed out.PodIP is empty, should be %v", i, v1PodStatus.PodIP)
-		}
-
-		// Primary should always == in.PodIPs[0].IP
-		if len(input.PodIPs) > 0 && v1PodStatus.PodIP != input.PodIPs[0].IP {
-			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed out.PodIP != in.PodIP[0].IP expected %v found %v", i, input.PodIPs[0].IP, v1PodStatus.PodIP)
-		}
-		// match v1.PodIPs to core.PodIPs
-		for idx := range input.PodIPs {
-			if v1PodStatus.PodIPs[idx].IP != input.PodIPs[idx].IP {
-				t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed. Expected v1.PodStatus[%v]=%v but found %v", i, idx, input.PodIPs[idx].IP, v1PodStatus.PodIPs[idx].IP)
-			}
-		}
+	v1Status := v1.PodStatus{}
+	if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&in, &v1Status, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-}
-func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
-	asymmetricInputs := []struct {
-		name string
-		in   v1.PodStatus
-		out  core.PodStatus
-	}{
-		{
-			name: "mismatched podIP",
-			in: v1.PodStatus{
-				PodIP: "1.1.2.1", // Older field takes precedence for compatibility with patch by older clients
-				PodIPs: []v1.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-			out: core.PodStatus{
-				PodIPs: []core.PodIP{
-					{IP: "1.1.2.1"},
-				},
-			},
-		},
-		{
-			name: "matching podIP",
-			in: v1.PodStatus{
-				PodIP: "1.1.1.1",
-				PodIPs: []v1.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-			out: core.PodStatus{
-				PodIPs: []core.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-		},
-		{
-			name: "empty podIP",
-			in: v1.PodStatus{
-				PodIP: "",
-				PodIPs: []v1.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-			out: core.PodStatus{
-				PodIPs: []core.PodIP{
-					{IP: "1.1.1.1"},
-					{IP: "2.2.2.2"},
-				},
-			},
-		},
+	if v1Status.PodIP != in.PodIP {
+		t.Errorf("expected v1 podIP %q, got %q", in.PodIP, v1Status.PodIP)
+	}
+	if len(v1Status.PodIPs) != len(in.PodIPs) || v1Status.PodIPs[0].IP != in.PodIPs[0].IP {
+		t.Errorf("expected v1 podIPs to match input, got %#v", v1Status.PodIPs)
 	}
 
-	// success
-	v1TestInputs := []v1.PodStatus{
-		// only Primary IP Provided
-		{
-			PodIP: "1.1.1.1",
-		},
-		{
-			// both are not provided
-			PodIP:  "",
-			PodIPs: nil,
-		},
-		// only list of IPs
-		{
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "2.2.2.2"},
-			},
-		},
-		// Both
-		{
-			PodIP: "1.1.1.1",
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "2.2.2.2"},
-			},
-		},
-		// v4 and v6
-		{
-			PodIP: "1.1.1.1",
-			PodIPs: []v1.PodIP{
-				{IP: "1.1.1.1"},
-				{IP: "::1"},
-			},
-		},
-		// v6 and v4
-		{
-			PodIP: "::1",
-			PodIPs: []v1.PodIP{
-				{IP: "::1"},
-				{IP: "1.1.1.1"},
-			},
-		},
+	roundTripped := core.PodStatus{}
+	if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&v1Status, &roundTripped, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// run asymmetric cases
-	for _, tc := range asymmetricInputs {
-		testInput := tc.in
-
-		corePodStatus := core.PodStatus{}
-		// convert..
-		if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&testInput, &corePodStatus, nil); err != nil {
-			t.Errorf("%s: Convert v1.PodStatus to core.PodStatus failed with error:%v for input %+v", tc.name, err.Error(), testInput)
-		}
-		if !reflect.DeepEqual(corePodStatus, tc.out) {
-			t.Errorf("%s: expected %#v, got %#v", tc.name, tc.out.PodIPs, corePodStatus.PodIPs)
-		}
-	}
-
-	// run ok cases
-	for i, testInput := range v1TestInputs {
-		corePodStatus := core.PodStatus{}
-		// convert..
-		if err := corev1.Convert_v1_PodStatus_To_core_PodStatus(&testInput, &corePodStatus, nil); err != nil {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed with error:%v for input %+v", i, err.Error(), testInput)
-		}
-
-		if len(testInput.PodIP) == 0 && len(testInput.PodIPs) == 0 {
-			continue //no more work needed
-		}
-
-		// List should have at least 1 IP == v1.PodIP || v1.PodIPs[0] (whichever provided)
-		if len(testInput.PodIP) > 0 && corePodStatus.PodIPs[0].IP != testInput.PodIP {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed. expected corePodStatus.PodIPs[0].ip=%v found %v", i, corePodStatus.PodIPs[0].IP, corePodStatus.PodIPs[0].IP)
-		}
-
-		// walk the list
-		for idx := range testInput.PodIPs {
-			if corePodStatus.PodIPs[idx].IP != testInput.PodIPs[idx].IP {
-				t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed core.PodIPs[%v]=%v expected %v", i, idx, corePodStatus.PodIPs[idx].IP, testInput.PodIPs[idx].IP)
-			}
-		}
-
-		// if input has a list of IPs
-		// then out put should have the same length
-		if len(testInput.PodIPs) > 0 && len(testInput.PodIPs) != len(corePodStatus.PodIPs) {
-			t.Errorf("%v: Convert v1.PodStatus to core.PodStatus failed len(core.PodIPs) != len(v1.PodStatus.PodIPs) [%v]=[%v]", i, len(corePodStatus.PodIPs), len(testInput.PodIPs))
-		}
+	if roundTripped.PodIP != in.PodIP || len(roundTripped.PodIPs) != len(in.PodIPs) {
+		t.Errorf("expected round-tripped status to match input, got %#v", roundTripped)
 	}
 }
 

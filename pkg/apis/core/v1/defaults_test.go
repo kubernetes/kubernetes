@@ -3400,3 +3400,32 @@ func setAllFeatures(t *testing.T, featuresEnabled bool) {
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, features)
 }
+
+func TestSetDefaultPodStatusPodIPs(t *testing.T) {
+	tests := []struct {
+		name      string
+		podIP     string
+		podIPs    []v1.PodIP
+		expectIP  string
+		expectIPs []v1.PodIP
+	}{
+		{name: "only podIP, podIPs synthesized", podIP: "10.0.0.1", expectIP: "10.0.0.1", expectIPs: []v1.PodIP{{IP: "10.0.0.1"}}},
+		{name: "mismatched, podIP authoritative", podIP: "10.0.0.2", podIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}, expectIP: "10.0.0.2", expectIPs: []v1.PodIP{{IP: "10.0.0.2"}}},
+		{name: "only podIPs, podIP filled", podIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}, expectIP: "10.0.0.1", expectIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}},
+		{name: "consistent dual-stack preserved", podIP: "10.0.0.1", podIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}, expectIP: "10.0.0.1", expectIPs: []v1.PodIP{{IP: "10.0.0.1"}, {IP: "2000::"}}},
+		{name: "neither set", expectIP: "", expectIPs: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Status: v1.PodStatus{PodIP: tc.podIP, PodIPs: tc.podIPs}}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if pod2.Status.PodIP != tc.expectIP {
+				t.Errorf("expected podIP %q, got %q", tc.expectIP, pod2.Status.PodIP)
+			}
+			if !reflect.DeepEqual(pod2.Status.PodIPs, tc.expectIPs) {
+				t.Errorf("expected podIPs %#v, got %#v", tc.expectIPs, pod2.Status.PodIPs)
+			}
+		})
+	}
+}
