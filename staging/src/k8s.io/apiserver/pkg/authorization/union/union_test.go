@@ -31,6 +31,7 @@ import (
 type mockAuthzHandler struct {
 	decision authorizer.Decision
 	err      error
+	name     string
 }
 
 func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -45,6 +46,13 @@ func (mock *mockAuthzHandler) ConditionsAwareAuthorize(ctx context.Context, a au
 // EvaluateConditions is not supported by this authorizer.
 func (*mockAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func (mock *mockAuthzHandler) AuthorizerName() string {
+	if mock.name != "" {
+		return mock.name
+	}
+	return "test-mockAuthzHandler"
 }
 
 func TestAuthorizationSecondPasses(t *testing.T) {
@@ -272,6 +280,51 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 			decision, _, _ := authzHandler.Authorize(context.Background(), nil)
 			if decision != c.decision {
 				t.Errorf("Unexpected authorization failure: %v, expected: %v", decision, c.decision)
+			}
+		})
+	}
+}
+
+func TestAuthorizerName(t *testing.T) {
+	cs := []struct {
+		authorizers []authorizer.Authorizer
+		wantName    string
+	}{
+		{
+			authorizers: []authorizer.Authorizer{},
+			wantName:    "authorizer.kubernetes.io/Union[]",
+		},
+		{
+			authorizers: []authorizer.Authorizer{
+				&mockAuthzHandler{name: "foo"},
+			},
+			wantName: "authorizer.kubernetes.io/Union[foo]",
+		},
+		{
+			authorizers: []authorizer.Authorizer{
+				&mockAuthzHandler{name: "foo"},
+				&mockAuthzHandler{name: "bar"},
+			},
+			wantName: "authorizer.kubernetes.io/Union[foo, bar]",
+		},
+		{
+			authorizers: []authorizer.Authorizer{
+				&mockAuthzHandler{name: "foo"},
+				New(
+					&mockAuthzHandler{name: "foo"},
+					&mockAuthzHandler{name: "bar"},
+				),
+			},
+			wantName: "authorizer.kubernetes.io/Union[foo, authorizer.kubernetes.io/Union[foo, bar]]",
+		},
+	}
+	for i, c := range cs {
+		t.Run(fmt.Sprintf("case %v", i), func(t *testing.T) {
+			authzHandler := New(c.authorizers...)
+
+			gotName := authzHandler.AuthorizerName()
+			if gotName != c.wantName {
+				t.Errorf("Unexpected authhorizername: %v, expected: %v", gotName, c.wantName)
 			}
 		})
 	}

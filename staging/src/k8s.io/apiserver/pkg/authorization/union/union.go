@@ -26,6 +26,7 @@ package union
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -115,4 +116,14 @@ func (authzHandler unionAuthzRulesHandler) RulesFor(ctx context.Context, user us
 	}
 
 	return resourceRulesList, nonResourceRulesList, incompleteStatus, utilerrors.NewAggregate(errList)
+}
+
+// AuthorizerName returns a name for the union authorizer itself. Sub-authorizers retain
+// their own names; this is just a label for the wrapping union.
+func (authzHandler unionAuthzHandler) AuthorizerName() string {
+	delegateNames := make([]string, 0, len(authzHandler))
+	for _, a := range authzHandler {
+		delegateNames = append(delegateNames, a.AuthorizerName())
+	}
+	return fmt.Sprintf("authorizer.kubernetes.io/Union[%s]", strings.Join(delegateNames, ", "))
 }

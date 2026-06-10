@@ -46,6 +46,10 @@ func (alwaysAllowAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+func (alwaysAllowAuthorizer) AuthorizerName() string {
+	return "authorizer.kubernetes.io/AlwaysAllow"
+}
+
 func (alwaysAllowAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return []authorizer.ResourceRuleInfo{
 			&authorizer.DefaultResourceRuleInfo{
@@ -87,6 +91,10 @@ func (alwaysDenyAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.C
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+func (alwaysDenyAuthorizer) AuthorizerName() string {
+	return "authorizer.kubernetes.io/AlwaysDeny"
+}
+
 func (alwaysDenyAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return []authorizer.ResourceRuleInfo{}, []authorizer.NonResourceRuleInfo{}, false, nil
 }
@@ -109,6 +117,10 @@ func (r *privilegedGroupAuthorizer) ConditionsAwareAuthorize(ctx context.Context
 // EvaluateConditions is not supported by this authorizer.
 func (r *privilegedGroupAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func (r *privilegedGroupAuthorizer) AuthorizerName() string {
+	return "authorizer.kubernetes.io/PrivilegedGroups"
 }
 
 func (r *privilegedGroupAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (authorizer.Decision, string, error) {

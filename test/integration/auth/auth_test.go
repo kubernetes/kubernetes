@@ -824,6 +824,10 @@ func (impersonateAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+func (impersonateAuthorizer) AuthorizerName() string {
+	return "test-impersonateAuthorizer"
+}
+
 func TestImpersonateIsForbidden(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -1850,6 +1854,10 @@ func (a *trackingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attri
 // EvaluateConditions is not supported by this authorizer.
 func (a *trackingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func (*trackingAuthorizer) AuthorizerName() string {
+	return "test-trackingAuthorizer"
 }
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly

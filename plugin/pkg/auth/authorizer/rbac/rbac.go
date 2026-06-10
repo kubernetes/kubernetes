@@ -139,6 +139,11 @@ func (*RBACAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Condit
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// AuthorizerName identifies the RBAC authorizer.
+func (*RBACAuthorizer) AuthorizerName() string {
+	return "authorizer.kubernetes.io/RBAC"
+}
+
 func (r *RBACAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo

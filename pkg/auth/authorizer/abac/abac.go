@@ -251,6 +251,11 @@ func (PolicyList) EvaluateConditions(_ context.Context, _ authorizer.ConditionsA
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// AuthorizerName identifies the ABAC authorizer.
+func (PolicyList) AuthorizerName() string {
+	return "authorizer.kubernetes.io/ABAC"
+}
+
 // RulesFor returns rules for the given user and namespace.
 func (pl PolicyList) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
