@@ -960,6 +960,10 @@ func (g *genValidations) hasValidationsImpl(n *typeNode, seen map[*typeNode]bool
 		return true
 	}
 
+	if n.typeValidations.OpaqueType {
+		return false
+	}
+
 	if n.underlying != nil {
 		if n.typeKeyIterations.HasEmitable() {
 			if keyNode := n.resolveKeyNode(); keyNode != nil && g.hasValidationsImpl(keyNode, seen) {
@@ -1182,6 +1186,10 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			sw.Do("\n", nil)
 			didSome = true
 		}
+	}
+
+	if thisNode.typeValidations.OpaqueType {
+		return
 	}
 
 	// Descend into the type.
