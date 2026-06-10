@@ -293,19 +293,6 @@ func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatu
 	return nil
 }
 
-// The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
-// as an alias for ServiceAccountName.
-func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_core_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// DeprecatedServiceAccount is an alias for ServiceAccountName.
-	out.DeprecatedServiceAccount = in.ServiceAccountName
-
-	return nil
-}
-
 func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
 	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
 		return err
@@ -333,20 +320,6 @@ func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s
 	if len(in.PodCIDR) > 0 && len(in.PodCIDRs) == 0 {
 		out.PodCIDRs = []string{in.PodCIDR}
 	}
-	return nil
-}
-
-func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_PodSpec_To_core_PodSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
-	// If both are specified, ServiceAccountName (the new field) wins.
-	if in.ServiceAccountName == "" {
-		out.ServiceAccountName = in.DeprecatedServiceAccount
-	}
-
 	return nil
 }
 

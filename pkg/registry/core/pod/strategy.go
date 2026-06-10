@@ -98,6 +98,10 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+
+	// Admission (e.g. the ServiceAccount plugin) may set ServiceAccountName
+	// after defaulting synced the deprecated alias; re-sync before persisting.
+	pod.Spec.DeprecatedServiceAccount = pod.Spec.ServiceAccountName
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

@@ -3745,6 +3745,11 @@ type PodSpec struct {
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount
 	ServiceAccountName string
+	// DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
+	//
+	// Deprecated: Use serviceAccountName instead.
+	// +optional
+	DeprecatedServiceAccount string
 	// AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
 	// +optional
 	AutomountServiceAccountToken *bool

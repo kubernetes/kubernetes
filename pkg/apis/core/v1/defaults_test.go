@@ -1777,6 +1777,38 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
+func TestSetDefaultServiceAccountAlias(t *testing.T) {
+	tests := []struct {
+		name                     string
+		serviceAccountName       string
+		deprecatedServiceAccount string
+		expected                 string
+	}{
+		{name: "only serviceAccountName", serviceAccountName: "a", expected: "a"},
+		{name: "only deprecated alias", deprecatedServiceAccount: "b", expected: "b"},
+		{name: "both set, serviceAccountName wins", serviceAccountName: "a", deprecatedServiceAccount: "b", expected: "a"},
+		{name: "neither set", expected: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					ServiceAccountName:       tc.serviceAccountName,
+					DeprecatedServiceAccount: tc.deprecatedServiceAccount,
+				},
+			}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if pod2.Spec.ServiceAccountName != tc.expected {
+				t.Errorf("expected serviceAccountName %q, got %q", tc.expected, pod2.Spec.ServiceAccountName)
+			}
+			if pod2.Spec.DeprecatedServiceAccount != tc.expected {
+				t.Errorf("expected deprecatedServiceAccount %q, got %q", tc.expected, pod2.Spec.DeprecatedServiceAccount)
+			}
+		})
+	}
+}
+
 func TestSetDefaultReplicationController(t *testing.T) {
 	tests := []struct {
 		rc             *v1.ReplicationController
