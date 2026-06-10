@@ -84,24 +84,30 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 }
 
 func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
-	for _, attr := range m.attributes {
-		switch {
-		case attribute.StringValue != nil:
+	switch {
+	case attribute.StringValue != nil:
+		for _, attr := range m.attributes {
 			if attr.StringValue != nil && *attribute.StringValue == *attr.StringValue {
 				m.logger.V(7).Info("String values duplicated")
 				return false
 			}
-		case attribute.IntValue != nil:
+		}
+	case attribute.IntValue != nil:
+		for _, attr := range m.attributes {
 			if attr.IntValue != nil && *attribute.IntValue == *attr.IntValue {
 				m.logger.V(7).Info("Int values duplicated")
 				return false
 			}
-		case attribute.BoolValue != nil:
+		}
+	case attribute.BoolValue != nil:
+		for _, attr := range m.attributes {
 			if attr.BoolValue != nil && *attribute.BoolValue == *attr.BoolValue {
 				m.logger.V(7).Info("Bool values duplicated")
 				return false
 			}
-		case attribute.VersionValue != nil:
+		}
+	case attribute.VersionValue != nil:
+		for _, attr := range m.attributes {
 			// semver 2.0.0 requires that version strings are in their
 			// minimal form (in particular, no leading zeros). Therefore a
 			// strict "exact equal" check can do a string comparison.
@@ -109,13 +115,11 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.Dev
 				m.logger.V(7).Info("Version values duplicated")
 				return false
 			}
-		default:
-			// Unknown value type, cannot match.
-			// This condition should not be reached
-			// as the unknown value type should be failed on CEL compile (getAttributeValue).
-			m.logger.V(7).Info("Distinct attribute type unknown")
-			return false
 		}
+	default:
+		// Unknown value type, cannot match.
+		m.logger.V(7).Info("Distinct attribute type unknown")
+		return false
 	}
 	// All distinct
 	return true
