@@ -55,7 +55,7 @@ type customValidationTagValidator struct {
 	gengoContext *generator.Context
 	inputToPkg   map[string]string
 	// claimed records every function a tag wired (directly or via a composing
-	// tag such as ifEnabled), so verifyNoOrphans can spot ValidateCustom_*
+	// tag such as ifEnabled), so verifyCustomFunctions can spot ValidateCustom_*
 	// functions defined without a tag.
 	claimed map[types.Name]bool
 }
@@ -117,38 +117,48 @@ func (v *customValidationTagValidator) GetValidations(context Context, _ codetag
 	return result, nil
 }
 
-// VerifyCustomValidationsHaveTags errors if a generated package defines a
-// ValidateCustom_* function that no tag wired (the author wrote the function but
-// forgot the tag). Call it after all inputs have been processed.
+// VerifyCustomValidationsHaveTags errors for any ValidateCustom_* function that
+// is untagged, or defined in an input package instead of the generated one.
+// Call it after all inputs have been processed.
 func VerifyCustomValidationsHaveTags() error {
-	return customValidationValidator.verifyNoOrphans()
+	return customValidationValidator.verifyCustomFunctions()
 }
 
-func (v *customValidationTagValidator) verifyNoOrphans() error {
+func (v *customValidationTagValidator) verifyCustomFunctions() error {
 	if v.gengoContext == nil {
 		return nil
 	}
+	var issues []string
 	scanned := map[string]bool{}
-	var orphans []string
-	for _, outPkg := range v.inputToPkg {
+	for inPkg, outPkg := range v.inputToPkg {
+		// A ValidateCustom_* function in the input package is misplaced; it must
+		// live in the generated package. (inPkg == outPkg for self-contained
+		// packages, e.g. test fixtures.)
+		if inPkg != outPkg {
+			if pkg := v.gengoContext.Universe[inPkg]; pkg != nil {
+				for name := range pkg.Functions {
+					if strings.HasPrefix(name, customValidationFuncPrefix) {
+						issues = append(issues, fmt.Sprintf("%s.%s: move to the generated package %s", inPkg, name, outPkg))
+					}
+				}
+			}
+		}
+		// A ValidateCustom_* function in the generated package with no tag.
 		if scanned[outPkg] {
 			continue
 		}
 		scanned[outPkg] = true
-		pkg := v.gengoContext.Universe[outPkg]
-		if pkg == nil {
-			continue
-		}
-		for name := range pkg.Functions {
-			if strings.HasPrefix(name, customValidationFuncPrefix) && !v.claimed[types.Name{Package: outPkg, Name: name}] {
-				orphans = append(orphans, outPkg+"."+name)
+		if pkg := v.gengoContext.Universe[outPkg]; pkg != nil {
+			for name := range pkg.Functions {
+				if strings.HasPrefix(name, customValidationFuncPrefix) && !v.claimed[types.Name{Package: outPkg, Name: name}] {
+					issues = append(issues, fmt.Sprintf("%s.%s: no matching tag (add +%s, or rename if not a custom validation)", outPkg, name, customValidationTagName))
+				}
 			}
 		}
 	}
-	if len(orphans) > 0 {
-		sort.Strings(orphans)
-		return fmt.Errorf("+%s: function(s) without a matching tag (add +%s, or rename if not a custom validation): %s",
-			customValidationTagName, customValidationTagName, strings.Join(orphans, ", "))
+	if len(issues) > 0 {
+		sort.Strings(issues)
+		return fmt.Errorf("+%s: %s", customValidationTagName, strings.Join(issues, "; "))
 	}
 	return nil
 }
@@ -178,7 +188,7 @@ func (v customValidationTagValidator) checkFunction(fn types.Name, valueType *ty
 // signatureMatches reports whether sig is the canonical custom-validation
 // signature for a value of the given type.
 func signatureMatches(sig *types.Signature, valueType *types.Type) bool {
-	if len(sig.Parameters) != 5 || len(sig.Results) != 1 {
+	if sig.Variadic || len(sig.Parameters) != 5 || len(sig.Results) != 1 {
 		return false
 	}
 	return isType(sig.Parameters[0].Type, contextType) &&
@@ -235,16 +245,19 @@ func renderType(t *types.Type) string {
 func (v customValidationTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            customValidationTagName,
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(customValidationTagValidScopes),
 		Description:    "Calls a hand-written validation function from the generated traversal code.",
-		Docs: "The function lives in the generated package with signature " +
-			"func(context.Context, operation.Operation, *field.Path, value, oldValue) field.ErrorList. " +
-			"Use field scope (ValidateCustom_<Type>_<Field>) to validate a single field; on update the " +
-			"framework skips the call when that field is unchanged. Use type scope (ValidateCustom_<Type>) " +
-			"for checks that span multiple fields; the framework does not skip it on update, so an " +
-			"expensive check should return early when value and oldValue are equal. " +
-			"For per-element checks, put the tag on the element type, or use field scope and loop inside " +
-			"the function.",
+		Docs: "The function lives in the generated package, with signature " +
+			"func(context.Context, operation.Operation, *field.Path, value, oldValue <ValueType>) field.ErrorList, " +
+			"where <ValueType> is the validated value's type made nilable: a pointer (e.g. *string), or the " +
+			"type itself if already nilable (slice, map, pointer). In the function name, <Type> and <Field> " +
+			"are Go identifiers (e.g. Replicas, not the JSON name replicas). " +
+			"Field scope (ValidateCustom_<Type>_<Field>) validates one field; on update the framework skips " +
+			"the call when that field is unchanged. Type scope (ValidateCustom_<Type>) is for checks across " +
+			"multiple fields; the framework does not skip it on update, so an expensive check should return " +
+			"early when value and oldValue are equal. " +
+			"For per-element checks, put the tag on the element type, or use field scope and loop inside the " +
+			"function.",
 	}
 }
