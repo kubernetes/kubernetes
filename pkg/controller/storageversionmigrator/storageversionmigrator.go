@@ -96,14 +96,15 @@ func NewSVMController(
 		rateLimiter: rateLimiter,
 	}
 
-	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svmController.addSVM(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			svmController.updateSVM(logger, oldObj, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return svmController
 }
