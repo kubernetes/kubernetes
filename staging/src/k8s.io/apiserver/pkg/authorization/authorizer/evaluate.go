@@ -240,3 +240,71 @@ func deepCopyConditions(originals []Condition) []Condition {
 	}
 	return copied
 }
+
+// PartiallyEvaluateConditionsAwareDecision evaluates the ConditionsAwareDecision primarily using any conditions' own Evaluate() function,
+// and secondarily using evaluateConditionFn, if set. If evaluateConditionFn is non-nil and never returns
+// ConditionsEvaluationResultUnevaluatable, the returned decision is guaranteed to be Allow/Deny/NoOpinion.
+// However, this method can also be used to evaluate a subset of the conditions (e.g. for builtin
+// conditions evaluators that support a certain conditions type), returning ConditionsEvaluationResultUnevaluatable
+// for conditions that the evaluator does not recognize. In the latter case, a partially evaluated, deep copied
+// ConditionsAwareDecision is returned.
+func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDecision ConditionsAwareDecision, data ConditionsData, evaluateConditionFn PartialEvaluateConditionFunc) ConditionsAwareDecision {
+	if unevaluatedDecision.IsUnconditional() {
+		return unevaluatedDecision // nothing to simplify
+	}
+	if evaluateConditionFn == nil {
+		return unevaluatedDecision // no simplification possible
+	}
+
+	if unevaluatedDecision.IsUnion() {
+		var newDecisionChain ConditionsAwareDecisionUnion
+		// Recursively walk through the decision DAG in a depth-first manner.
+
+		collectAndShortcircuitOnly := false
+		for authorizerName, unevaluatedSubDecision := range unevaluatedDecision.UnionedDecisions() {
+			// If collectAndShortcircuitOnly == true, a conditional decision that couldn't
+			// be evaluated to Allow/Deny/NoOpinion was encountered during a previous
+			// loop iteration. Then all latter decisions stay unevaluated.
+			if collectAndShortcircuitOnly {
+				newDecisionChain.Add(authorizerName, unevaluatedSubDecision)
+				continue
+			}
+
+			// When !collectAndShortcircuitOnly: All decisions so far in newDecisionChain are NoOpinions.
+
+			// Try evaluating or refining the leaf ConditionsMaps in this tree of decisions.
+			possiblyEvaluatedSubDecision := PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedSubDecision, data, evaluateConditionFn)
+
+			// Always preserve the indices and ordering of the decisions, as this ordering
+			// is used by the union authorizer to pair a decision with its
+			newDecisionChain.Add(authorizerName, possiblyEvaluatedSubDecision)
+
+			// We successfully evaluated to something, and because all previously-seen
+			// decisions were NoOpinions, we can simplify to Allow/Deny here.
+			if possiblyEvaluatedSubDecision.IsAllow() || possiblyEvaluatedSubDecision.IsDeny() {
+				return possiblyEvaluatedSubDecision
+			}
+
+			// If NoOpinion, try the next
+			if possiblyEvaluatedSubDecision.IsNoOpinion() {
+				continue
+			}
+
+			// If we got to here, the decision is a ConditionsMap or Union. This means that
+			// there is no chance of evaluating to an unconditional decision using builtinConditionsEvaluator.
+			// Thus, instead of continuing to try to evaluate later ConditionsMaps in-process,
+			// whose computation might be wasted if previous authorizer's ConditionsMaps indeed
+			// turn out to be Allow/Deny (and not NoOpinion), just short-circuit and do the webhook.
+			//
+			// collectAndShortcircuitOnly is used to preserve the tail of the union, without
+			// evaluating the suffix.
+			collectAndShortcircuitOnly = true
+		}
+		// If we got here, the first not-NoOpinion decision was Union or ConditionsMap, which means
+		// we cannot simplify it. Return a possibly refined decision chain for webhooking.
+		return newDecisionChain.ToDecision()
+	}
+
+	// Otherwise, the decision is a ConditionsMap. Try to evaluate it using the builtin evaluator.
+	return partiallyEvaluateConditionsMapInternal(ctx, unevaluatedDecision.ConditionsMap(), data, evaluateConditionFn)
+}
