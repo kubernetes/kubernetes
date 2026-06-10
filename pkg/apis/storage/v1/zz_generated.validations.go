@@ -196,7 +196,38 @@ func Validate_CSIDriverSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.CSIDriverSpec) (errs field.ErrorList) {
 
-	// field storagev1.CSIDriverSpec.AttachRequired has no validation
+	{ // field storagev1.CSIDriverSpec.AttachRequired
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *bool,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1.CSIDriverSpec) *bool {
+				return oldObj.AttachRequired
+			})
+		errs = append(errs, fn(fldPath.Child("attachRequired"), obj.AttachRequired, oldVal, oldObj != nil)...)
+	}
+
 	// field storagev1.CSIDriverSpec.PodInfoOnMount has no validation
 
 	{ // field storagev1.CSIDriverSpec.VolumeLifecycleModes
@@ -217,9 +248,6 @@ func Validate_CSIDriverSpec(
 			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {

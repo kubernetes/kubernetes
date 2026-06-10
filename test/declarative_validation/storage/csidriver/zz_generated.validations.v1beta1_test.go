@@ -61,6 +61,9 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.attachRequired": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.volumeLifecycleModes": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
