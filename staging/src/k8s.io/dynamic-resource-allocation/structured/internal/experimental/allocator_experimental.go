@@ -986,6 +986,16 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 			m.intersectionStack = append(m.intersectionStack, first)
 		} else {
 			// Scalar attribute: use existing behavior
+			switch {
+			case attribute.StringValue != nil:
+			case attribute.IntValue != nil:
+			case attribute.BoolValue != nil:
+			case attribute.VersionValue != nil:
+			default:
+				// Unknown value type, cannot match.
+				m.logger.V(7).Info("Match attribute type unknown")
+				return false, nil
+			}
 			m.attribute = attribute
 		}
 		m.numDevices = 1
