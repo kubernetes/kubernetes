@@ -65,26 +65,30 @@ func BenchmarkCacherInit(b *testing.B) {
 	}
 
 	for _, rangeStream := range []bool{false, true} {
-		b.Run(fmt.Sprintf("RangeStream=%v", rangeStream), func(b *testing.B) {
-			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+		for _, concurrentDecode := range []bool{false, true} {
+			name := fmt.Sprintf("RangeStream=%v/ConcurrentDecode=%v", rangeStream, concurrentDecode)
+			b.Run(name, func(b *testing.B) {
+				featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+				featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, concurrentDecode)
 
-			b.ResetTimer()
-			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				cacher, err := NewCacherFromConfig(config)
-				if err != nil {
-					b.Fatal(err)
+				b.ResetTimer()
+				b.ReportAllocs()
+				for i := 0; i < b.N; i++ {
+					cacher, err := NewCacherFromConfig(config)
+					if err != nil {
+						b.Fatal(err)
+					}
+					if err := cacher.Wait(ctx); err != nil {
+						b.Fatal(err)
+					}
+					b.StopTimer()
+					cacher.Stop()
+					etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
+					b.StartTimer()
 				}
-				if err := cacher.Wait(ctx); err != nil {
-					b.Fatal(err)
-				}
-				b.StopTimer()
-				cacher.Stop()
-				etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
-				b.StartTimer()
-			}
-			b.ReportMetric(float64(pods), "pods/cache")
-		})
+				b.ReportMetric(float64(pods), "pods/cache")
+			})
+		}
 	}
 }
 
