@@ -95,6 +95,12 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.conditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditions[*].type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.resourceClaimStatuses": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
