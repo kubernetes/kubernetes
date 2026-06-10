@@ -162,6 +162,17 @@ func SetDefaults_Service(obj *v1.Service) {
 
 }
 func SetDefaults_Pod(obj *v1.Pod) {
+	// Enforced on Pod but not on PodSpec. For historical reasons, PodTemplate is not defaulted this way.
+	if obj.Spec.TerminationGracePeriodSeconds != nil && *obj.Spec.TerminationGracePeriodSeconds < 0 {
+		obj.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
+	}
+
+	// drop init container annotations so they don't take effect on legacy kubelets
+	// and don't show up as differences when receiving requests from old clients.
+	// remove this once the oldest supported kubelet no longer honors the annotations
+	// over the field.
+	obj.Annotations = dropInitContainerAnnotations(obj.Annotations)
+
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
 	// because we only want this defaulting semantic to take place on a v1.Pod and not a v1.PodTemplate
@@ -208,6 +219,16 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
 }
+func SetDefaults_PodStatus(obj *v1.PodStatus) {
+	if len(obj.PodIP) > 0 {
+		if len(obj.PodIPs) == 0 || obj.PodIPs[0].IP != obj.PodIP {
+			obj.PodIPs = []v1.PodIP{{IP: obj.PodIP}}
+		}
+	} else if len(obj.PodIPs) > 0 {
+		obj.PodIP = obj.PodIPs[0].IP
+	}
+}
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445

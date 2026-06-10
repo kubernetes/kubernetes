@@ -4361,3 +4361,52 @@ func TestWarningsOnUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncPodIP(t *testing.T) {
+	tests := []struct {
+		name        string
+		status      api.PodStatus
+		expectPodIP string
+		expectIPs   []api.PodIP
+	}{
+		{
+			name:        "mismatched podIP is authoritative",
+			status:      api.PodStatus{PodIP: "1.1.2.1", PodIPs: []api.PodIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}},
+			expectPodIP: "1.1.2.1",
+			expectIPs:   []api.PodIP{{IP: "1.1.2.1"}},
+		},
+		{
+			name:        "only podIP",
+			status:      api.PodStatus{PodIP: "1.1.1.1"},
+			expectPodIP: "1.1.1.1",
+			expectIPs:   []api.PodIP{{IP: "1.1.1.1"}},
+		},
+		{
+			name:        "only podIPs",
+			status:      api.PodStatus{PodIPs: []api.PodIP{{IP: "1.1.1.1"}, {IP: "2000::"}}},
+			expectPodIP: "1.1.1.1",
+			expectIPs:   []api.PodIP{{IP: "1.1.1.1"}, {IP: "2000::"}},
+		},
+		{
+			name:        "matching",
+			status:      api.PodStatus{PodIP: "1.1.1.1", PodIPs: []api.PodIP{{IP: "1.1.1.1"}, {IP: "2000::"}}},
+			expectPodIP: "1.1.1.1",
+			expectIPs:   []api.PodIP{{IP: "1.1.1.1"}, {IP: "2000::"}},
+		},
+		{
+			name:   "neither set",
+			status: api.PodStatus{},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			SyncPodIP(&tc.status)
+			if tc.status.PodIP != tc.expectPodIP {
+				t.Errorf("expected podIP %q, got %q", tc.expectPodIP, tc.status.PodIP)
+			}
+			if !reflect.DeepEqual(tc.status.PodIPs, tc.expectIPs) {
+				t.Errorf("expected podIPs %#v, got %#v", tc.expectIPs, tc.status.PodIPs)
+			}
+		})
+	}
+}

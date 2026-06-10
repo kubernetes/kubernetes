@@ -228,8 +228,21 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
 
+	SyncPodIP(&newPod.Status)
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
+// SyncPodIP keeps status.podIP and status.podIPs[0] in sync. podIP is
+// authoritative when they disagree.
+func SyncPodIP(status *api.PodStatus) {
+	if len(status.PodIP) > 0 {
+		if len(status.PodIPs) == 0 || status.PodIPs[0].IP != status.PodIP {
+			status.PodIPs = []api.PodIP{{IP: status.PodIP}}
+		}
+	} else if len(status.PodIPs) > 0 {
+		status.PodIP = status.PodIPs[0].IP
+	}
 }
 
 // If a client request tries to clear `observedGeneration`, in the pod status or
