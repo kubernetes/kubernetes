@@ -424,6 +424,11 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		}
 	}
 
+	// All inputs processed: fail if a ValidateCustom_* function lacks a tag.
+	if err := validators.VerifyCustomValidationsHaveTags(); err != nil {
+		klog.Fatalf("%v", err)
+	}
+
 	// Emit per-Kind coverage test targets. No-op when --test-output-root is empty.
 	allowlist, err := loadAllowlist(args.TestAllowlist)
 	if err != nil {
