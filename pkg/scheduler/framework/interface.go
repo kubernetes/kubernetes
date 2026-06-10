@@ -24,7 +24,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -177,7 +176,7 @@ type PodGroupPostFilterPlugin interface {
 	fwk.Plugin
 
 	// PodGroupPostFilter is called after a PodGroup cannot be scheduled.
-	PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
+	PodGroupPostFilter(ctx context.Context, pgInfo fwk.PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
 }
 
 // PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
@@ -310,6 +309,9 @@ type Framework interface {
 	// a non-success status.
 	// Each PlacementCycleState is passed to ScorePlacement for the PodGroupAssignments at the same index.
 	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ns []fwk.PlacementPluginScores, status *fwk.Status)
+
+	// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
+	RunPodGroupPostFilterPlugins(ctx context.Context, state *CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
 
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool

@@ -2566,12 +2566,15 @@ func TestPreEnqueue(t *testing.T) {
 				cache.AddPodGroup(podGroup)
 			}
 
+			snapshot := internalcache.NewSnapshot(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()})
+
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewTestSnapshotWithPodGroups(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()}, tt.pgs)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
@@ -2605,11 +2608,11 @@ func TestPreEnqueue(t *testing.T) {
 			// Trigger preemption. Given custom PreemptPod implementation, the async preemption will not finish until
 			// finishPreemption is closed.
 			if tt.features.EnableGenericWorkload && tt.podToTriggerPreemption.Spec.SchedulingGroup != nil {
-				pg, err := informerFactory.Scheduling().V1alpha3().PodGroups().Lister().PodGroups(tt.podToTriggerPreemption.Namespace).Get(*tt.podToTriggerPreemption.Spec.SchedulingGroup.PodGroupName)
-				if err != nil {
-					t.Fatalf("could not find pg: %v", err)
+				pgInfo := &framework.PodGroupInfo{
+					Name:            *tt.podToTriggerPreemption.Spec.SchedulingGroup.PodGroupName,
+					Namespace:       tt.podToTriggerPreemption.Namespace,
+					UnscheduledPods: []*v1.Pod{tt.podToTriggerPreemption},
 				}
-				podsToPreempt := []*v1.Pod{tt.podToTriggerPreemption}
 				var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 					nodeInfo, _ := f.SnapshotSharedLister().NodeInfos().Get("node1")
 					if len(nodeInfo.GetPods()) == 0 {
@@ -2628,7 +2631,7 @@ func TestPreEnqueue(t *testing.T) {
 					}
 					return nil, fwk.NewStatus(fwk.Unschedulable, "need to preempt")
 				}
-				p.PodGroupPostFilter(ctx, pg, podsToPreempt, pgSchedulingFunc)
+				p.PodGroupPostFilter(ctx, pgInfo, pgSchedulingFunc)
 			} else {
 				p.PostFilter(ctx, state, tt.podToTriggerPreemption, filteredNodesStatuses)
 			}
@@ -2651,24 +2654,26 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 	// Create a node and a pod with an empty UID to induce a raw cache failure during preemption.
 	node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
 	invalidPod := st.MakePod().Name("pod-empty-uid").UID("").Node("node1").Priority(lowPriority).Obj()
+	preemptorPG := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()
 
 	testPods := []*v1.Pod{invalidPod}
 	nodes := []*v1.Node{node}
 
-	client := clientsetfake.NewClientset(invalidPod)
+	client := clientsetfake.NewClientset(invalidPod, preemptorPG)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	registeredPlugins := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 
-	preemptorPG := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj()
 	cache := internalcache.New(ctx, nil, true)
 	cache.AddPodGroup(preemptorPG)
 
+	snapshot := internalcache.NewSnapshot(testPods, nodes)
 	f, err := tf.NewFramework(ctx, registeredPlugins, "",
 		frameworkruntime.WithClientSet(client),
-		frameworkruntime.WithSnapshotSharedLister(internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1alpha3.PodGroup{preemptorPG})),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithLogger(logger),
 		frameworkruntime.WithPodGroupManager(cache),
@@ -2676,7 +2681,11 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetIndexer().Add(preemptorPG); err != nil {
+		t.Fatal(err)
+	}
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 	features := feature.Features{
 		EnableGenericWorkload: true,
 	}
@@ -2690,9 +2699,15 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
-	_, gotStatus := pl.PodGroupPostFilter(ctx, preemptorPG, preemptorPods, mockSchedulingFunc)
+	pgInfo := &framework.PodGroupInfo{
+		Name:            preemptorPG.Name,
+		Namespace:       preemptorPG.Namespace,
+		UnscheduledPods: preemptorPods,
+	}
 
-	if gotStatus == nil || gotStatus.Code() != fwk.Error {
+	_, gotStatus := pl.PodGroupPostFilter(ctx, pgInfo, mockSchedulingFunc)
+
+	if gotStatus.Code() != fwk.Error {
 		t.Fatalf("Expected status code %v, got status: %v", fwk.Error, gotStatus)
 	}
 
@@ -2702,3 +2717,151 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		t.Errorf("Expected wrapped error message %q, got %q", expectedMsg, gotMsg)
 	}
 }
+
+func TestDefaultPreemption_PodGroupPostFilter_SchedulingConstraints(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
+	pod := st.MakePod().Name("pod1").Node("node1").Priority(lowPriority).Obj()
+	pgWithConstraints := st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).TopologyKey("rack").Obj()
+	testPods := []*v1.Pod{pod}
+	nodes := []*v1.Node{node}
+
+	client := clientsetfake.NewClientset(pod, pgWithConstraints)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+
+	cache := internalcache.New(ctx, nil, true)
+	cache.AddPodGroup(pgWithConstraints)
+
+	snapshot := internalcache.NewSnapshot(testPods, nodes)
+	f, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetIndexer().Add(pgWithConstraints); err != nil {
+		t.Fatal(err)
+	}
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	features := feature.Features{
+		EnableGenericWorkload: true,
+	}
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		return nil, nil
+	}
+
+	pgInfo := &framework.PodGroupInfo{
+		Name:            pgWithConstraints.Name,
+		Namespace:       pgWithConstraints.Namespace,
+		UnscheduledPods: preemptorPods,
+	}
+
+	_, gotStatus := pl.PodGroupPostFilter(ctx, pgInfo, mockSchedulingFunc)
+	if gotStatus.Code() != fwk.Unschedulable {
+		t.Fatalf("Expected status code %v, got status: %v", fwk.Unschedulable, gotStatus)
+	}
+	expectedMsg := "pod group preemption: not supported with topology constraints"
+	if gotStatus.Message() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, gotStatus.Message())
+	}
+}
+
+func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
+	pod := st.MakePod().Name("pod1").Node("node1").Priority(lowPriority).Obj()
+	pgOk := st.MakePodGroup().Name("preemptor-pg-ok").Priority(highPriority).Obj()
+	testPods := []*v1.Pod{pod}
+	nodes := []*v1.Node{node}
+	client := clientsetfake.NewClientset(pod, pgOk)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+
+	cache := internalcache.New(ctx, nil, true)
+	cache.AddPodGroup(pgOk)
+
+	snapshot := internalcache.NewSnapshot(testPods, nodes)
+	f, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(&mockMutableSnapshotLister{}), // not concrete *cache.Snapshot
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetIndexer().Add(pgOk); err != nil {
+		t.Fatal(err)
+	}
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	features := feature.Features{
+		EnableGenericWorkload: true,
+	}
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		return nil, nil
+	}
+
+	pgInfo := &framework.PodGroupInfo{
+		Name:            pgOk.GetName(),
+		Namespace:       pgOk.GetNamespace(),
+		UnscheduledPods: preemptorPods,
+	}
+	_, gotStatus := pl.PodGroupPostFilter(ctx, pgInfo, mockSchedulingFunc)
+	if gotStatus.Code() != fwk.Error {
+		t.Fatalf("Expected status code %v, got status: %v", fwk.Error, gotStatus)
+	}
+	expectedMsg := "pod group preemption: failed to start mutations: failed to get concrete snapshot to backup"
+	if gotStatus.Message() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, gotStatus.Message())
+	}
+}
+
+type mockMutableSnapshotLister struct {
+	fwk.MutableSnapshotLister
+}
+
+func (m *mockMutableSnapshotLister) NodeInfos() fwk.NodeInfoLister {
+	return nil
+}
+
+func (m *mockMutableSnapshotLister) StartMutations() error {
+	return errors.New("failed to get concrete snapshot to backup")
+}
+
+func (m *mockMutableSnapshotLister) EndMutations() {}
