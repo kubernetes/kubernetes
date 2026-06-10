@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,9 +24,8 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	registry "k8s.io/kubernetes/pkg/registry/storage/csidriver"
 )
-
-var apiVersions = []string{"v1beta1", "v1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -49,7 +48,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			}
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 				})
 			}
 		})
@@ -57,6 +56,14 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateUpdate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	falseVal := false
 	trueVal := true
 	testCases := map[string]struct {
@@ -95,7 +102,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "storage.k8s.io",
-				APIVersion:        "v1",
+				APIVersion:        apiVersion,
 				Resource:          "csidrivers",
 				Name:              "test-driver",
 				IsResourceRequest: true,
@@ -103,7 +110,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			})
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
 }
