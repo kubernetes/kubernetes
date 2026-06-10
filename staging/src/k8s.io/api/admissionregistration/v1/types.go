@@ -1160,6 +1160,8 @@ type MutatingAdmissionPolicySpec struct {
 	// Thus, variables must be sorted by the order of first appearance and acyclic.
 	// +listType=atomic
 	// +optional
+	// +k8s:maxItems=10
+	// +k8s:optional
 	Variables []Variable `json:"variables,omitempty" protobuf:"bytes,3,rep,name=variables"`
 
 	// mutations contain operations to perform on matching objects.

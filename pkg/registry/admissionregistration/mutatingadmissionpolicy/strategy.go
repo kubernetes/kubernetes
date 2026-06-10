@@ -51,6 +51,12 @@ func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, resourceResolver
 	}
 }
 
+func (v *mutatingAdmissionPolicyStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{
+		DeclarativeEnforcement: true,
+	}
+}
+
 // NamespaceScoped returns false because MutatingAdmissionPolicy is cluster-scoped resource.
 func (v *mutatingAdmissionPolicyStrategy) NamespaceScoped() bool {
 	return false
