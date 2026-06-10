@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -30,13 +29,13 @@ func Test(t *testing.T) {
 		IntField:          10,
 		Int64Field:        20,
 		Uint64Field:       30,
-		IntPtrField:       ptr.To(40),
+		IntPtrField:       new(40),
 		MonotonicField:    50,
-		MonotonicPtrField: ptr.To(MonotonicType(60)),
+		MonotonicPtrField: new(MonotonicType(60)),
 		OptionalInt:       10,
 		RequiredInt:       10,
-		OptionalIntPtr:    ptr.To(10),
-		RequiredIntPtr:    ptr.To(10),
+		OptionalIntPtr:    new(10),
+		RequiredIntPtr:    new(10),
 		NegativeInt:       0,
 	}
 
@@ -44,13 +43,13 @@ func Test(t *testing.T) {
 		IntField:          11,
 		Int64Field:        21,
 		Uint64Field:       31,
-		IntPtrField:       ptr.To(41),
+		IntPtrField:       new(41),
 		MonotonicField:    51,
-		MonotonicPtrField: ptr.To(MonotonicType(61)),
+		MonotonicPtrField: new(MonotonicType(61)),
 		OptionalInt:       11,
 		RequiredInt:       11,
-		OptionalIntPtr:    ptr.To(11),
-		RequiredIntPtr:    ptr.To(11),
+		OptionalIntPtr:    new(11),
+		RequiredIntPtr:    new(11),
 		NegativeInt:       5,
 	}
 
@@ -58,13 +57,13 @@ func Test(t *testing.T) {
 		IntField:          9,
 		Int64Field:        19,
 		Uint64Field:       29,
-		IntPtrField:       ptr.To(39),
+		IntPtrField:       new(39),
 		MonotonicField:    49,
-		MonotonicPtrField: ptr.To(MonotonicType(59)),
+		MonotonicPtrField: new(MonotonicType(59)),
 		OptionalInt:       9,
 		RequiredInt:       9,
-		OptionalIntPtr:    ptr.To(9),
-		RequiredIntPtr:    ptr.To(9),
+		OptionalIntPtr:    new(9),
+		RequiredIntPtr:    new(9),
 		NegativeInt:       0,
 	}
 
@@ -90,8 +89,8 @@ func Test(t *testing.T) {
 	structZero := structOrig
 	structZero.OptionalInt = 0
 	structZero.RequiredInt = 0
-	structZero.OptionalIntPtr = ptr.To(0)
-	structZero.RequiredIntPtr = ptr.To(0)
+	structZero.OptionalIntPtr = new(0)
+	structZero.RequiredIntPtr = new(0)
 
 	// OptionalInt (non-pointer) -> 0 is INVALID (Fails because +k8s:update=NoUnset is present).
 	// RequiredInt -> 0 is INVALID (Fails because of both +k8s:update=NoUnset and +k8s:required).
@@ -117,7 +116,7 @@ func Test(t *testing.T) {
 
 	// OptionalIntPtr unset -> set should be valid (transition from nil to value)
 	structSet := structOrig
-	structSet.OptionalIntPtr = ptr.To(10)
+	structSet.OptionalIntPtr = new(10)
 	oldObjectSet := structSet
 	oldObjectSet.OptionalIntPtr = nil
 	st.Value(&structSet).OldValue(&oldObjectSet).ExpectValid()
