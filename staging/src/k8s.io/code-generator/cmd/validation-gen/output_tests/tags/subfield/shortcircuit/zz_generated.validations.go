@@ -251,83 +251,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-// Validate_AliasOpaqueTargetWithImmutable validates an instance of AliasOpaqueTargetWithImmutable according
-// to declarative validation rules in the API schema.
-func Validate_AliasOpaqueTargetWithImmutable(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *AliasOpaqueTargetWithImmutable) (errs field.ErrorList) {
-
-	{ // field AliasOpaqueTargetWithImmutable.Value
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *AliasOpaqueTargetWithImmutable) *string {
-				return &oldObj.Value
-			})
-		errs = append(errs, fn(fldPath.Child("value"), &obj.Value, oldVal, oldObj != nil)...)
-	}
-
-	// field AliasOpaqueTargetWithImmutable.Other has no validation
-	return errs
-}
-
-// Validate_AliasOpaqueTargetWithRequired validates an instance of AliasOpaqueTargetWithRequired according
-// to declarative validation rules in the API schema.
-func Validate_AliasOpaqueTargetWithRequired(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *AliasOpaqueTargetWithRequired) (errs field.ErrorList) {
-
-	{ // field AliasOpaqueTargetWithRequired.Value
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *AliasOpaqueTargetWithRequired) *string {
-				return oldObj.Value
-			})
-		errs = append(errs, fn(fldPath.Child("value"), obj.Value, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
 // Validate_ParentWithAlphaOpaqueField validates an instance of ParentWithAlphaOpaqueField according
 // to declarative validation rules in the API schema.
 func Validate_ParentWithAlphaOpaqueField(
@@ -717,8 +640,6 @@ func Validate_ParentWithOpaqueAlias(
 					errs = append(errs, e...)
 				}
 			}()
-			// call the type's validation function
-			errs = append(errs, Validate_AliasOpaqueTargetWithRequired(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -801,8 +722,6 @@ func Validate_ParentWithOpaqueImmutableAlias(
 					errs = append(errs, e...)
 				}
 			}()
-			// call the type's validation function
-			errs = append(errs, Validate_AliasOpaqueTargetWithImmutable(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
