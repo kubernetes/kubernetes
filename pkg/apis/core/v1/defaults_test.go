@@ -3402,6 +3402,58 @@ func setAllFeatures(t *testing.T, featuresEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, features)
 }
 
+func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
+	tests := []struct {
+		name     string
+		grace    *int64
+		expected *int64
+	}{
+		{name: "negative clamped to 1", grace: ptr.To[int64](-1), expected: ptr.To[int64](1)},
+		{name: "zero preserved", grace: ptr.To[int64](0), expected: ptr.To[int64](0)},
+		{name: "positive preserved", grace: ptr.To[int64](42), expected: ptr.To[int64](42)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{TerminationGracePeriodSeconds: tc.grace}}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if !reflect.DeepEqual(pod2.Spec.TerminationGracePeriodSeconds, tc.expected) {
+				t.Errorf("expected %v, got %v", *tc.expected, *pod2.Spec.TerminationGracePeriodSeconds)
+			}
+		})
+	}
+}
+
+func TestSetDefaultPodDropsInitContainerAnnotations(t *testing.T) {
+	annotations := map[string]string{
+		"pod.beta.kubernetes.io/init-containers": "[]",
+		"kept":                                   "value",
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: annotations}}
+	obj2 := roundTrip(t, runtime.Object(pod))
+	pod2 := obj2.(*v1.Pod)
+	if _, ok := pod2.Annotations["pod.beta.kubernetes.io/init-containers"]; ok {
+		t.Errorf("expected init-container annotation to be dropped, got %v", pod2.Annotations)
+	}
+	if pod2.Annotations["kept"] != "value" {
+		t.Errorf("expected unrelated annotation to be kept, got %v", pod2.Annotations)
+	}
+
+	template := &v1.PodTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Template: v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+				"pod.alpha.kubernetes.io/init-containers": "[]",
+			}},
+		},
+	}
+	obj3 := roundTrip(t, runtime.Object(template))
+	template2 := obj3.(*v1.PodTemplate)
+	if _, ok := template2.Template.Annotations["pod.alpha.kubernetes.io/init-containers"]; ok {
+		t.Errorf("expected template init-container annotation to be dropped, got %v", template2.Template.Annotations)
+	}
+}
+
 func TestSetDefaultPodStatusPodIPs(t *testing.T) {
 	tests := []struct {
 		name      string

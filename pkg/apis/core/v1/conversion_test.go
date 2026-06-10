@@ -710,7 +710,7 @@ func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
 			},
 			wantOut: &core.Pod{
 				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: ptr.To[int64](1),
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			},
 		},
@@ -749,7 +749,7 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 			},
 			wantOut: &v1.Pod{
 				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: ptr.To[int64](1),
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			},
 		},
