@@ -41,6 +41,7 @@ var SupportedVerbs = []string{
 	"update",
 	"updateStatus",
 	"delete",
+	"deleteWithResult",
 	"deleteCollection",
 	"get",
 	"list",
@@ -64,6 +65,7 @@ const genClientPrefix = "genclient:"
 // extension client functions for.
 var unsupportedExtensionVerbs = []string{
 	"updateStatus",
+	"deleteWithResult",
 	"deleteCollection",
 	"watch",
 	"delete",
