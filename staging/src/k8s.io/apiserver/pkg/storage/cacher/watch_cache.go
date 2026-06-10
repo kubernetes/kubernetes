@@ -756,6 +756,9 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
 	w.startIndex = w.endIndex
 	w.removedEventSinceRelist = false
+	// Clear out the stale cache so it don't hold old objects
+	// in memory until overwritten.
+	clear(w.cache)
 
 	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
 		return err
