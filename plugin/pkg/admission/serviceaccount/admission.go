@@ -152,9 +152,11 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return s.Validate(ctx, a, o)
 	}
 
-	// Set the default service account if needed
+	// Set the default service account if needed, keeping the deprecated alias
+	// in sync (see SetDefaults_PodSpec) so the result is defaulting-stable.
 	if len(pod.Spec.ServiceAccountName) == 0 {
 		pod.Spec.ServiceAccountName = DefaultServiceAccountName
+		pod.Spec.DeprecatedServiceAccount = DefaultServiceAccountName //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be set for backward compatibility
 	}
 
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)

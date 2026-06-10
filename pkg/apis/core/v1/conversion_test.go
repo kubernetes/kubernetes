@@ -138,15 +138,15 @@ func TestPodLogOptions(t *testing.T) {
 	}
 }
 
-// TestPodSpecConversion tests that v1.ServiceAccount is an alias for
-// ServiceAccountName.
+// TestPodSpecConversion tests that ServiceAccountName and its deprecated alias
+// are preserved verbatim by conversion in both directions (keeping them in
+// sync is handled by defaulting and the pod registry strategy, not conversion).
 func TestPodSpecConversion(t *testing.T) {
 	name, other := "foo", "bar"
 
-	// Test internal -> v1. Should have both alias (DeprecatedServiceAccount)
-	// and new field (ServiceAccountName).
 	i := &core.PodSpec{
-		ServiceAccountName: name,
+		ServiceAccountName:       name,
+		DeprecatedServiceAccount: other,
 	}
 	v := v1.PodSpec{}
 	if err := legacyscheme.Scheme.Convert(i, &v, nil); err != nil {
@@ -155,32 +155,19 @@ func TestPodSpecConversion(t *testing.T) {
 	if v.ServiceAccountName != name {
 		t.Fatalf("want v1.ServiceAccountName %q, got %q", name, v.ServiceAccountName)
 	}
-	if v.DeprecatedServiceAccount != name {
-		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", name, v.DeprecatedServiceAccount)
+	if v.DeprecatedServiceAccount != other {
+		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", other, v.DeprecatedServiceAccount)
 	}
 
-	// Test v1 -> internal. Either DeprecatedServiceAccount, ServiceAccountName,
-	// or both should translate to ServiceAccountName. ServiceAccountName wins
-	// if both are set.
-	testCases := []*v1.PodSpec{
-		// New
-		{ServiceAccountName: name},
-		// Alias
-		{DeprecatedServiceAccount: name},
-		// Both: same
-		{ServiceAccountName: name, DeprecatedServiceAccount: name},
-		// Both: different
-		{ServiceAccountName: name, DeprecatedServiceAccount: other},
+	got := core.PodSpec{}
+	if err := legacyscheme.Scheme.Convert(&v, &got, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	for k, v := range testCases {
-		got := core.PodSpec{}
-		err := legacyscheme.Scheme.Convert(v, &got, nil)
-		if err != nil {
-			t.Fatalf("unexpected error for case %d: %v", k, err)
-		}
-		if got.ServiceAccountName != name {
-			t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
-		}
+	if got.ServiceAccountName != name {
+		t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
+	}
+	if got.DeprecatedServiceAccount != other { //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
+		t.Fatalf("want core.DeprecatedServiceAccount %q, got %q", other, got.DeprecatedServiceAccount) //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
 	}
 }
 

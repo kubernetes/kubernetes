@@ -4523,7 +4523,6 @@ message PodSpec {
 
   // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
-  // +k8s:conversion-gen=false
   // +optional
   optional string serviceAccount = 9;
 

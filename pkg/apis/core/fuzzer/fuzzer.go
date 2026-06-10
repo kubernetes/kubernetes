@@ -81,6 +81,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			s.TerminationGracePeriodSeconds = &ttl
 
+			// DeprecatedServiceAccount is an alias for ServiceAccountName kept
+			// in sync by defaulting; valid objects always have them equal.
+			s.DeprecatedServiceAccount = s.ServiceAccountName //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be fuzzed for backward compatibility
+
 			c.Fill(s.SecurityContext)
 
 			if s.SecurityContext == nil {
