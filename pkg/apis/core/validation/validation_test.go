@@ -23520,6 +23520,7 @@ func TestValidateOSFields(t *testing.T) {
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",
+		"DeprecatedServiceAccount",
 		"SecurityContext.RunAsNonRoot",
 		"ServiceAccountName",
 		"SetHostnameAsFQDN",

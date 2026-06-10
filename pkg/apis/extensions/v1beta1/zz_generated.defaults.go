@@ -47,6 +47,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_DaemonSet(in *extensionsv1beta1.DaemonSet) {
 	SetDefaults_DaemonSet(in)
+	corev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -374,6 +375,7 @@ func SetObjectDefaults_DaemonSetList(in *extensionsv1beta1.DaemonSetList) {
 
 func SetObjectDefaults_Deployment(in *extensionsv1beta1.Deployment) {
 	SetDefaults_Deployment(in)
+	corev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -731,6 +733,7 @@ func SetObjectDefaults_NetworkPolicyList(in *extensionsv1beta1.NetworkPolicyList
 
 func SetObjectDefaults_ReplicaSet(in *extensionsv1beta1.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
+	corev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	corev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]

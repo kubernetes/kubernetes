@@ -50,6 +50,7 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 			}
 		}
 	}
+	apiscorev1.SetDefaults_PodTemplateSpec(&in.Spec.JobTemplate.Spec.Template)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
@@ -386,6 +387,7 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 			}
 		}
 	}
+	apiscorev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
