@@ -58,6 +58,8 @@ const (
 type ConditionsAwareDecision struct {
 	decisionType conditionsAwareDecisionType
 
+	conditionsMap ConditionsMap
+
 	reason string
 	err    error
 }
@@ -127,6 +129,18 @@ func (d ConditionsAwareDecision) IsDeny() bool {
 	return d.decisionType == conditionsAwareDecisionTypeDeny // == 0 == zero value
 }
 
+// IsConditionsMap returns true if the decision is a conditional response
+// with a map of conditions to evaluate.
+func (d ConditionsAwareDecision) IsConditionsMap() bool {
+	return d.decisionType == conditionsAwareDecisionTypeConditionsMap
+}
+
+// ConditionsMap returns the ConditionsMap, which is non-empty
+// if and only if IsConditionsMap is true.
+func (d ConditionsAwareDecision) ConditionsMap() ConditionsMap {
+	return d.conditionsMap
+}
+
 // IsUnconditional is true if d is Allow, Deny or NoOpinion.
 func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
@@ -142,6 +156,8 @@ func (d ConditionsAwareDecision) PossibleDecisions() sets.Set[Decision] {
 		return sets.New(DecisionAllow)
 	case d.IsNoOpinion():
 		return sets.New(DecisionNoOpinion)
+	case d.IsConditionsMap():
+		return d.ConditionsMap().PossibleDecisions()
 	default:
 		return sets.New(DecisionDeny)
 	}
@@ -165,7 +181,7 @@ func (d ConditionsAwareDecision) ContainsAllowOrDeny() bool {
 	if d.IsAllow() || d.IsDeny() {
 		return true
 	}
-	return false // NoOpinion
+	return false // NoOpinion or ConditionsMap
 }
 
 // Reason returns the reason supplied when constructing the decision
@@ -200,6 +216,18 @@ func (d ConditionsAwareDecision) String() string {
 	}
 	if d.IsNoOpinion() {
 		return fmt.Sprintf("NoOpinion%s", paramsStr())
+	}
+	if d.IsConditionsMap() {
+		if len(d.conditionsMap.denyConditions) != 0 {
+			params = append(params, fmt.Sprintf("denies=%d", len(d.conditionsMap.denyConditions)))
+		}
+		if len(d.conditionsMap.noOpinionConditions) != 0 {
+			params = append(params, fmt.Sprintf("noopinions=%d", len(d.conditionsMap.noOpinionConditions)))
+		}
+		if len(d.conditionsMap.allowConditions) != 0 {
+			params = append(params, fmt.Sprintf("allows=%d", len(d.conditionsMap.allowConditions)))
+		}
+		return fmt.Sprintf("ConditionsMap%s", paramsStr())
 	}
 	// Deny is written such that if none of the other modes apply,
 	// IsDenied() is true.
