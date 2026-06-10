@@ -255,44 +255,6 @@ func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, 
 	return nil
 }
 
-func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
-	if err := autoConvert_v1_PodStatus_To_core_PodStatus(in, out, s); err != nil {
-		return err
-	}
-
-	// If both fields (v1.PodIPs and v1.PodIP) are provided and differ, then PodIP is authoritative for compatibility with older kubelets
-	if (len(in.PodIP) > 0 && len(in.PodIPs) > 0) && (in.PodIP != in.PodIPs[0].IP) {
-		out.PodIPs = []core.PodIP{
-			{
-				IP: in.PodIP,
-			},
-		}
-	}
-	// at the this point, autoConvert copied v1.PodIPs -> core.PodIPs
-	// if v1.PodIPs was empty but v1.PodIP is not, then set core.PodIPs[0] with v1.PodIP
-	if len(in.PodIP) > 0 && len(in.PodIPs) == 0 {
-		out.PodIPs = []core.PodIP{
-			{
-				IP: in.PodIP,
-			},
-		}
-	}
-	return nil
-}
-
-func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
-	if err := autoConvert_core_PodStatus_To_v1_PodStatus(in, out, s); err != nil {
-		return err
-	}
-	// at the this point autoConvert copied core.PodIPs -> v1.PodIPs
-	//  v1.PodIP (singular value field, which does not exist in core) needs to
-	// be set with core.PodIPs[0]
-	if len(in.PodIPs) > 0 {
-		out.PodIP = in.PodIPs[0].IP
-	}
-	return nil
-}
-
 func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
 	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
 		return err

@@ -4603,6 +4603,11 @@ type PodStatus struct {
 	// +optional
 	HostIPs []HostIP
 
+	// PodIP address allocated to the pod, kept in sync with PodIPs[0] by the
+	// pod registry strategy. Routable at least within the cluster. Empty if
+	// not yet allocated.
+	// +optional
+	PodIP string
 	// PodIPs holds all of the known IP addresses allocated to the pod. Pods may be assigned AT MOST
 	// one value for each of IPv4 and IPv6.
 	// +optional

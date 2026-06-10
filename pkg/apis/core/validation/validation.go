@@ -4576,6 +4576,16 @@ func validatePodIPs(pod, oldPod *core.Pod) field.ErrorList {
 		}
 	}
 
+	// As an additional layer of safety, ensure podIP matches podIPs[0].IP.
+	hasPodIP := len(pod.Status.PodIP) > 0
+	hasPodIPs := len(pod.Status.PodIPs) > 0
+	switch {
+	case hasPodIP != hasPodIPs:
+		allErrs = append(allErrs, field.Invalid(podIPsField, pod.Status.PodIPs, "podIP and podIPs must either both be set or both be unset"))
+	case hasPodIPs && pod.Status.PodIP != pod.Status.PodIPs[0].IP:
+		allErrs = append(allErrs, field.Invalid(podIPsField.Index(0).Child("ip"), pod.Status.PodIPs[0].IP, "must be equal to `podIP`"))
+	}
+
 	return allErrs
 }
 

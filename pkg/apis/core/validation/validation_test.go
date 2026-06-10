@@ -25584,8 +25584,8 @@ func TestValidateOverhead(t *testing.T) {
 	}
 }
 
-// helper creates a pod with name, namespace and IPs
-func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod {
+// helper creates a pod with name, namespace, the singular podIP and the podIPs list.
+func makePod(podName string, podNamespace string, podIP string, podIPs []core.PodIP) core.Pod {
 	return core.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace},
 		Spec: core.PodSpec{
@@ -25596,6 +25596,7 @@ func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod 
 			DNSPolicy:     core.DNSClusterFirst,
 		},
 		Status: core.PodStatus{
+			PodIP:  podIP,
 			PodIPs: podIPs,
 		},
 	}
@@ -25613,56 +25614,64 @@ func TestPodIPsValidation(t *testing.T) {
 	}{
 		{
 			expectError: false,
-			pod:         makePod("nil-ips", "ns", nil),
+			pod:         makePod("nil-ips", "ns", "", nil),
 		}, {
 			expectError: false,
-			pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
+			pod:         makePod("empty-podips-list", "ns", "", []core.PodIP{}),
 		}, {
 			expectError: false,
-			pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
+			pod:         makePod("single-ip-family-6", "ns", "::1", []core.PodIP{{IP: "::1"}}),
 		}, {
 			expectError: false,
-			pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
+			pod:         makePod("single-ip-family-4", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}}),
 		}, {
 			expectError: false,
-			pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+			pod:         makePod("dual-stack-4-6", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
 		}, {
 			expectError: false,
-			pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+			pod:         makePod("dual-stack-6-4", "ns", "::1", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
 		}, {
 			expectError: false,
 			legacyIPs:   true,
-			pod:         makePod("legacy-pod-ip-with-legacy-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
+			pod:         makePod("legacy-pod-ip-with-legacy-validation", "ns", "001.002.003.004", []core.PodIP{{IP: "001.002.003.004"}}),
 		},
 		/* failure cases start here */
 		{
 			expectError:     true,
 			allowNoOpUpdate: true,
-			pod:             makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "1.1.1.01"}}),
+			pod:             makePod("invalid-pod-ip", "ns", "1.1.1.01", []core.PodIP{{IP: "1.1.1.01"}}),
 		}, {
 			expectError:     true,
 			allowNoOpUpdate: true,
-			pod:             makePod("legacy-pod-ip-with-strict-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
+			pod:             makePod("legacy-pod-ip-with-strict-validation", "ns", "001.002.003.004", []core.PodIP{{IP: "001.002.003.004"}}),
 		}, {
 			expectError: true,
-			pod:         makePod("dualstack-same-ip-family-6", "ns", []core.PodIP{{IP: "::1"}, {IP: "::2"}}),
+			pod:         makePod("dualstack-same-ip-family-6", "ns", "::1", []core.PodIP{{IP: "::1"}, {IP: "::2"}}),
 		}, {
 			expectError: true,
-			pod:         makePod("dualstack-same-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
+			pod:         makePod("dualstack-same-ip-family-4", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
 		}, {
 			expectError: true,
-			pod:         makePod("dualstack-repeated-ip-family-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
+			pod:         makePod("dualstack-repeated-ip-family-6", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
 		}, {
 			expectError: true,
-			pod:         makePod("dualstack-repeated-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+			pod:         makePod("dualstack-repeated-ip-family-4", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+		}, {
+			expectError: true,
+			pod:         makePod("dualstack-duplicate-ip-family-4", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+		}, {
+			expectError: true,
+			pod:         makePod("dualstack-duplicate-ip-family-6", "ns", "1.1.1.1", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
 		},
-
 		{
 			expectError: true,
-			pod:         makePod("dualstack-duplicate-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+			pod:         makePod("podip-without-podips", "ns", "1.1.1.1", nil),
 		}, {
 			expectError: true,
-			pod:         makePod("dualstack-duplicate-ip-family-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
+			pod:         makePod("podips-without-podip", "ns", "", []core.PodIP{{IP: "1.1.1.1"}}),
+		}, {
+			expectError: true,
+			pod:         makePod("podip-podips-mismatch", "ns", "2.2.2.2", []core.PodIP{{IP: "1.1.1.1"}}),
 		},
 	}
 
