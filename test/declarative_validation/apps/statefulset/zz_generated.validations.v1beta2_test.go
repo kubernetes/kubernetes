@@ -30,8 +30,21 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"},
 		coverage.FieldRules{
+			"spec.podManagementPolicy": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.selector": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.serviceName": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"spec.volumeClaimTemplates": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 		},
 	)

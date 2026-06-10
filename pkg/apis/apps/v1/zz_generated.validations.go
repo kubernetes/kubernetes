@@ -30,6 +30,8 @@ import (
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -360,7 +362,39 @@ func Validate_StatefulSetSpec(
 	obj, oldObj *appsv1.StatefulSetSpec) (errs field.ErrorList) {
 
 	// field appsv1.StatefulSetSpec.Replicas has no validation
-	// field appsv1.StatefulSetSpec.Selector has no validation
+
+	{ // field appsv1.StatefulSetSpec.Selector
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.LabelSelector,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1.StatefulSetSpec) *metav1.LabelSelector {
+				return oldObj.Selector
+			})
+		errs = append(errs, fn(fldPath.Child("selector"), obj.Selector, oldVal, oldObj != nil)...)
+	}
 
 	{ // field appsv1.StatefulSetSpec.Template
 		fn := func(
@@ -384,9 +418,102 @@ func Validate_StatefulSetSpec(
 		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1.StatefulSetSpec.VolumeClaimTemplates has no validation
-	// field appsv1.StatefulSetSpec.ServiceName has no validation
-	// field appsv1.StatefulSetSpec.PodManagementPolicy has no validation
+	{ // field appsv1.StatefulSetSpec.VolumeClaimTemplates
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []apicorev1.PersistentVolumeClaim,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1.StatefulSetSpec) []apicorev1.PersistentVolumeClaim {
+				return oldObj.VolumeClaimTemplates
+			})
+		errs = append(errs, fn(fldPath.Child("volumeClaimTemplates"), obj.VolumeClaimTemplates, oldVal, oldObj != nil)...)
+	}
+
+	{ // field appsv1.StatefulSetSpec.ServiceName
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1.StatefulSetSpec) *string {
+				return &oldObj.ServiceName
+			})
+		errs = append(errs, fn(fldPath.Child("serviceName"), &obj.ServiceName, oldVal, oldObj != nil)...)
+	}
+
+	{ // field appsv1.StatefulSetSpec.PodManagementPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *appsv1.PodManagementPolicyType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1.StatefulSetSpec) *appsv1.PodManagementPolicyType {
+				return &oldObj.PodManagementPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("podManagementPolicy"), &obj.PodManagementPolicy, oldVal, oldObj != nil)...)
+	}
+
 	// field appsv1.StatefulSetSpec.UpdateStrategy has no validation
 	// field appsv1.StatefulSetSpec.RevisionHistoryLimit has no validation
 	// field appsv1.StatefulSetSpec.MinReadySeconds has no validation
