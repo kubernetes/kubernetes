@@ -81,6 +81,13 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.TooLong(fldPath.Index(0).Child("message"), "", 32768).WithOrigin("maxLength").MarkAlpha(),
 			},
 		},
+		{
+			Name: "invalid status not supported",
+			Conditions: []metav1.Condition{MkCondition(TweakStatus(metav1.ConditionStatus("InvalidStatus")))},
+			ExpectedErrs: field.ErrorList{
+				field.NotSupported(fldPath.Index(0).Child("status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{}).MarkAlpha(),
+			},
+		},
 	}
 }
 

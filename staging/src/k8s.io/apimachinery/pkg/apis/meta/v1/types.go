@@ -1537,6 +1537,7 @@ const (
 	RowCompleted RowConditionType = "Completed"
 )
 
+// +k8s:alpha(since: "1.37")=+k8s:enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.

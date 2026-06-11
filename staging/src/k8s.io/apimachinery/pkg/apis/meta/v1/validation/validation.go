@@ -324,7 +324,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 
 	// status is set and is an accepted value
 	if !validConditionStatuses.Has(string(condition.Status)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()).MarkCoveredByDeclarative())
 	}
 
 	if condition.ObservedGeneration < 0 {

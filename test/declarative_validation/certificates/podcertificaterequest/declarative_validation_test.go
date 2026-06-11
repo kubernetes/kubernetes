@@ -94,6 +94,13 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
+					Name: "invalid status not supported",
+					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakStatus(metav1.ConditionStatus("InvalidStatus")))},
+					ExpectedErrs: field.ErrorList{
+						field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{}).MarkAlpha(),
+					},
+				},
+				{
 					Name: "invalid duplicate types",
 					Conditions: []metav1.Condition{
 						meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied))),
