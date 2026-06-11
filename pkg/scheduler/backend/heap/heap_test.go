@@ -745,6 +745,18 @@ func TestHeapWithRecorder(t *testing.T) {
 	if *metricRecorder != 7 {
 		t.Errorf("expected count to be 7 (3+4) but got %d", *metricRecorder)
 	}
+	// Update an existing item with a different size.
+	h.AddOrUpdate(mkHeapObj("baz", 100, 5))
+	if *metricRecorder != 9 {
+		t.Errorf("expected count to be 9 (5+4) but got %d", *metricRecorder)
+	}
+	// Delete an item using a lookup object whose size doesn't match the stored one.
+	if obj := h.Delete(mkHeapObj("baz", 100, 0)); obj.name == "" {
+		t.Fatalf("Failed to delete item")
+	}
+	if *metricRecorder != 4 {
+		t.Errorf("expected count to be 4 but got %d", *metricRecorder)
+	}
 
 	h.metricRecorder.Clear()
 	if *metricRecorder != 0 {
