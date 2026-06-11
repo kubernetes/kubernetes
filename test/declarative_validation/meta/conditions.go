@@ -59,6 +59,13 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.Required(fldPath.Index(0).Child("type"), "").MarkAlpha(),
 			},
 		},
+		{
+			Name: "invalid missing reason",
+			Conditions: []metav1.Condition{MkCondition(TweakReason(""))},
+			ExpectedErrs: field.ErrorList{
+				field.Required(fldPath.Index(0).Child("reason"), "").MarkAlpha(),
+			},
+		},
 	}
 }
 
@@ -102,4 +109,8 @@ func TweakStatus(status metav1.ConditionStatus) func(*metav1.Condition) {
 	return func(c *metav1.Condition) {
 		c.Status = status
 	}
+}
+
+func TweakReason(reason string) func(*metav1.Condition) {
+	return func(c *metav1.Condition) { c.Reason = reason }
 }

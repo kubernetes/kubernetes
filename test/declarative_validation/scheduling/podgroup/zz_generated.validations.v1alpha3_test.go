@@ -98,6 +98,9 @@ func init() {
 			"status.conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
+			"status.conditions[*].reason": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.conditions[*].type": {
 				{ErrorType: "FieldValueRequired"},
 			},
