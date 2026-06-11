@@ -17,13 +17,35 @@ limitations under the License.
 package responsewriters
 
 import (
+	"compress/gzip"
 	"net/http"
 	"strings"
+	"sync"
 
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
+
+const (
+	// gzipContentEncodingLevel is set to 1 which uses least CPU compared to higher levels, yet offers
+	// similar compression ratios (off by at most 1.5x, but typically within 1.1x-1.3x). For further details see -
+	// https://github.com/kubernetes/kubernetes/issues/112296
+	gzipContentEncodingLevel = 1
+)
+
+// NewGzipWriterPoolOrDie returns a sync.Pool of gzip.Writers configured with gzipContentEncodingLevel.
+func NewGzipWriterPoolOrDie() *sync.Pool {
+	return &sync.Pool{
+		New: func() interface{} {
+			gw, err := gzip.NewWriterLevel(nil, gzipContentEncodingLevel)
+			if err != nil {
+				panic(err)
+			}
+			return gw
+		},
+	}
+}
 
 // responseContentEncodingSupported returns a supported client-requested content encoding for the
 // provided request. It will return the empty string if no supported content encoding was

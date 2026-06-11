@@ -252,7 +252,7 @@ func TestSerializeObject(t *testing.T) {
 				"Content-Encoding": []string{"gzip"},
 				"Vary":             []string{"Accept-Encoding"},
 			},
-			wantBody: gzipContent(largePayload, defaultGzipContentEncodingLevel),
+			wantBody: gzipContent(largePayload, gzipContentEncodingLevel),
 		},
 
 		{
@@ -290,7 +290,7 @@ func TestSerializeObject(t *testing.T) {
 				"Content-Encoding": []string{"gzip"},
 				"Vary":             []string{"Accept-Encoding"},
 			},
-			wantBody: gzipContent(largePayload, defaultGzipContentEncodingLevel),
+			wantBody: gzipContent(largePayload, gzipContentEncodingLevel),
 		},
 
 		{
@@ -348,7 +348,7 @@ func TestSerializeObject(t *testing.T) {
 				"Content-Encoding": []string{"gzip"},
 				"Vary":             []string{"Accept-Encoding"},
 			},
-			wantBody: gzipContent([]byte(": "+string(largePayload)), defaultGzipContentEncodingLevel),
+			wantBody: gzipContent([]byte(": "+string(largePayload)), gzipContentEncodingLevel),
 		},
 	}
 	for _, tt := range tests {
