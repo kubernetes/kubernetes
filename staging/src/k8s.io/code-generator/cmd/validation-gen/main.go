@@ -147,7 +147,7 @@ func printDocs() {
 	}
 
 	// Initialize all registered validators.
-	validator := validators.InitGlobalValidator(c)
+	validator := validators.InitGlobalValidator(c, nil)
 
 	docs := validator.Docs()
 	for i := range docs {

@@ -240,6 +240,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	// it is MUCH faster.
 	inputPkgs := make([]string, 0, len(context.Inputs))
 	pkgToInput := map[string]string{}
+	inputToPkg := map[string]string{} // reverse of pkgToInput
 	for _, input := range context.Inputs {
 		klog.V(4).Infof("considering pkg %q", input)
 		pkg := context.Universe[input]
@@ -259,8 +260,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			klog.V(4).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
 			pkgToInput[input] = inputPath
+			inputToPkg[inputPath] = input
 		} else {
 			pkgToInput[input] = input
+			inputToPkg[input] = input
 		}
 	}
 
@@ -282,12 +285,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	for _, extra := range readOnlyPkgs {
 		inputPkgs = append(inputPkgs, extra)
 		pkgToInput[extra] = extra
-	}
-
-	// We also need the to be able to look up the packages of inputs
-	inputToPkg := make(map[string]string, len(pkgToInput))
-	for k, v := range pkgToInput {
-		inputToPkg[v] = k
+		// Don't let a read-only package override a generation mapping.
+		if _, ok := inputToPkg[extra]; !ok {
+			inputToPkg[extra] = extra
+		}
 	}
 
 	if len(inputPkgs) > 0 {
@@ -300,7 +301,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	context.Order = orderer.OrderUniverse(context.Universe)
 
 	// Initialize all validator plugins exactly once.
-	validator := validators.InitGlobalValidator(context)
+	validator := validators.InitGlobalValidator(context, inputToPkg)
 
 	// Create a type discoverer for all types of all inputs.
 	td := NewTypeDiscoverer(validator, inputToPkg)
@@ -453,6 +454,11 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		if args.TestOutputRoot != "" {
 			collectReports(typesPkg, rootTypes, td, groupKindReports)
 		}
+	}
+
+	// All inputs processed: fail if a ValidateCustom_* function lacks a tag.
+	if err := validators.VerifyCustomValidationsHaveTags(); err != nil {
+		klog.Fatalf("%v", err)
 	}
 
 	// Emit per-Kind coverage test targets. No-op when --test-output-root is empty.
