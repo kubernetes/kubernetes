@@ -213,7 +213,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
-	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
+	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-2"}
 	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.9.3"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.7.0-rc.0-0"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
@@ -222,8 +222,8 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.8"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.8"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v4.0.8"}
-	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.15-4"}
-	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.27-0"}
+	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.27.0-1"}
+	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.28.0-1"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.6.0"}
 	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.7.0"}
 	configs[NodePerfPytorchWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/pytorch-wide-deep", "1.0.0"}
