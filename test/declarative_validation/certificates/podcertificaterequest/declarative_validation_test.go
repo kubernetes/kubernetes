@@ -95,6 +95,13 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
+					Name: "invalid negative observedGeneration",
+					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakObservedGeneration(-1))},
+					ExpectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("status", "conditions").Index(0).Child("observedGeneration"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
+					},
+				},
+				{
 					Name: "invalid too long message",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakMessage(strings.Repeat("a", 32769)))},
 					ExpectedErrs: field.ErrorList{

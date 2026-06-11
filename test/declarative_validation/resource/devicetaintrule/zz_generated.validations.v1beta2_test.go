@@ -40,6 +40,9 @@ func init() {
 			"status.conditions[*].message": {
 				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
 			},
+			"status.conditions[*].observedGeneration": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"status.conditions[*].reason": {
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},

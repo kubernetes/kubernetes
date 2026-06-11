@@ -101,7 +101,37 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.Condition.ObservedGeneration has no validation
+	{ // field v1.Condition.ObservedGeneration
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.Condition) *int64 {
+				return &oldObj.ObservedGeneration
+			})
+		errs = append(errs, fn(fldPath.Child("observedGeneration"), &obj.ObservedGeneration, oldVal, oldObj != nil)...)
+	}
+
 	// field v1.Condition.LastTransitionTime has no validation
 
 	{ // field v1.Condition.Reason
