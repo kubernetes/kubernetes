@@ -43,9 +43,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
-	"k8s.io/kubernetes/test/e2e_node/criproxy"
-	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
+	"k8s.io/kubernetes/test/e2e_node_windows/criproxy"
 	"k8s.io/kubernetes/test/e2e_node_windows/services"
+	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node_windows/testing-manifests"
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
@@ -166,6 +166,7 @@ func TestE2eNode(t *testing.T) {
 	if *systemValidateMode {
 		// If system-validate-mode is specified, only run system validation in current process.
 		klog.Warningf("system spec validation is not supported on platform other than linux yet")
+		return
 	}
 
 	// We're not running in a special mode so lets run tests.
