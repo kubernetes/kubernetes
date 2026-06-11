@@ -2690,9 +2690,9 @@ func TestClassifyLBError(t *testing.T) {
 		expected lbErrorType
 	}{
 		{
-			name:     "nil error returns other",
+			name:     "nil error returns none",
 			err:      nil,
-			expected: lbErrOther,
+			expected: lbErrNone,
 		},
 		{
 			name:     "generic error returns other",
@@ -2757,6 +2757,7 @@ func TestLBErrorTypeConstants(t *testing.T) {
 		lbErrNotImplemented,
 		lbErrInvalidIP,
 		lbErrOther,
+		lbErrNone,
 	}
 	seen := make(map[lbErrorType]bool)
 	for _, et := range errTypes {
