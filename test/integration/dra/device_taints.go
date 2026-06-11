@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	"k8s.io/kubernetes/pkg/features"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -402,4 +403,95 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 				"Message": gomega.Equal(fmt.Sprintf("%d pods evicted since starting the controller.", numPods)),
 			}))))
 	}
+}
+
+func testNoScheduleRule(tCtx ktesting.TContext, useRule useRuleMode) {
+	tCtx.Parallel()
+
+	startScheduler(tCtx)
+
+	namespace := createTestNamespace(tCtx, nil)
+	class, driverName := createTestClass(tCtx, namespace)
+	slice := st.MakeResourceSlice("worker-0", driverName).Devices(device1)
+
+	taintKey := "testing"
+	ruleName := "rule-" + namespace
+	switch useRule {
+	case useV1alpha3Rule:
+		rule := &resourcealpha.DeviceTaintRule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ruleName,
+			},
+			Spec: resourcealpha.DeviceTaintRuleSpec{
+				DeviceSelector: &resourcealpha.DeviceTaintSelector{
+					Driver: &driverName,
+				},
+				Taint: resourcealpha.DeviceTaint{
+					Key:    taintKey,
+					Effect: resourcealpha.DeviceTaintEffectNoSchedule,
+				},
+			},
+		}
+		_ = must(tCtx, tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Create, rule, metav1.CreateOptions{})
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Delete(tCtx, ruleName, metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				return
+			}
+			tCtx.ExpectNoError(err)
+		})
+	case useV1beta2Rule:
+		rule := &resourcebeta.DeviceTaintRule{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ruleName,
+			},
+			Spec: resourcebeta.DeviceTaintRuleSpec{
+				DeviceSelector: &resourcebeta.DeviceTaintSelector{
+					Driver: &driverName,
+				},
+				Taint: resourcebeta.DeviceTaint{
+					Key:    taintKey,
+					Effect: resourcebeta.DeviceTaintEffectNoSchedule,
+				},
+			},
+		}
+		_ = must(tCtx, tCtx.Client().ResourceV1beta2().DeviceTaintRules().Create, rule, metav1.CreateOptions{})
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			err := tCtx.Client().ResourceV1beta2().DeviceTaintRules().Delete(tCtx, ruleName, metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				return
+			}
+			tCtx.ExpectNoError(err)
+		})
+	case useNoRule:
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
+			{
+				Key:    taintKey,
+				Effect: resourceapi.DeviceTaintEffectNoSchedule,
+			},
+		}
+	}
+
+	// Creating the ResourceSlice after the DeviceTaintRule exercises additional
+	// code paths in the ResourceSlice tracker.
+	_ = createSlice(tCtx, slice.Obj())
+
+	pod := st.MakePod().Name(podName).Namespace(namespace).
+		Container("my-container").
+		Obj()
+
+	untoleratingClaim := createClaim(tCtx, namespace, "-untolerating", class, claim)
+	untoleratingPod := createPod(tCtx, namespace, "-untolerating", pod, untoleratingClaim)
+	expectPodUnschedulable(tCtx, untoleratingPod, "cannot allocate all claims")
+
+	toleratingClaim := claim.DeepCopy()
+	toleratingClaim.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{
+		{
+			Key:    taintKey,
+			Effect: resourceapi.DeviceTaintEffectNoSchedule,
+		},
+	}
+	_ = createClaim(tCtx, namespace, "-tolerating", class, toleratingClaim)
+	toleratingPod := createPod(tCtx, namespace, "-tolerating", pod)
+	waitForPodScheduled(tCtx, namespace, toleratingPod.Name)
 }
