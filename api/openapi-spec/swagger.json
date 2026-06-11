@@ -4811,6 +4811,37 @@
         }
       ]
     },
+    "io.k8s.api.batch.v1.JobSchedulingConfiguration": {
+      "description": "JobSchedulingConfiguration composes the reusable workload-aware scheduling building blocks.",
+      "properties": {
+        "constraints": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingConstraints",
+          "description": "Constraints defines scheduling constraints (e.g. topology) for the Job's pods."
+        },
+        "disruptionMode": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.DisruptionMode",
+          "description": "DisruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All."
+        },
+        "policy": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingPolicy",
+          "description": "Policy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set."
+        },
+        "resourceClaims": {
+          "description": "ResourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupResourceClaim"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge,retainKeys"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.batch.v1.JobSpec": {
       "description": "JobSpec describes how the job execution will look like.",
       "properties": {
@@ -4863,6 +4894,10 @@
         "podReplacementPolicy": {
           "description": "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.",
           "type": "string"
+        },
+        "scheduling": {
+          "$ref": "#/definitions/io.k8s.api.batch.v1.JobSchedulingConfiguration",
+          "description": "scheduling defines the Workload-aware Scheduling configuration for this Job. When omitted, the Job defaults to basic (standard pod-by-pod) scheduling. This field is alpha-level and requires the WorkloadWithJob feature gate. Once set, this field is immutable except for the Gang.MinCount."
         },
         "selector": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",

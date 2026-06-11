@@ -33,6 +33,40 @@ func init() {
 			"spec.jobTemplate.spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
+			"spec.jobTemplate.spec.scheduling": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"spec.jobTemplate.spec.scheduling.constraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.scheduling.constraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.policy": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.policy.gang.minCount": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].resourceClaimName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].resourceClaimTemplateName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
 			"spec.schedule": {
 				{ErrorType: "FieldValueRequired"},
 			},

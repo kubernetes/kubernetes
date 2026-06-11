@@ -625,7 +625,21 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
+	allErrs = append(allErrs, validateJobSchedulingUpdate(spec.Scheduling, oldSpec.Scheduling, fldPath.Child("scheduling"))...)
 	return allErrs
+}
+
+func validateJobSchedulingUpdate(newConfig, oldConfig *batch.JobSchedulingConfiguration, fldPath *field.Path) field.ErrorList {
+	if oldConfig == nil {
+		return nil
+	}
+	// Compare everything except the mutable gang.minCount by normalizing it to the old value.
+	normalized := newConfig.DeepCopy()
+	if normalized != nil && normalized.Policy != nil && normalized.Policy.Gang != nil &&
+		oldConfig.Policy != nil && oldConfig.Policy.Gang != nil {
+		normalized.Policy.Gang.MinCount = oldConfig.Policy.Gang.MinCount // +k8s:verify-mutation:reason=clone
+	}
+	return apivalidation.ValidateImmutableField(normalized, oldConfig, fldPath)
 }
 
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
@@ -796,6 +810,10 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 
 	allErrs = append(allErrs, validateConcurrencyPolicy(&spec.ConcurrencyPolicy, fldPath.Child("concurrencyPolicy"))...)
 	allErrs = append(allErrs, ValidateJobTemplateSpec(&spec.JobTemplate, fldPath.Child("jobTemplate"), opts)...)
+
+	if oldSpec != nil {
+		allErrs = append(allErrs, validateJobSchedulingUpdate(spec.JobTemplate.Spec.Scheduling, oldSpec.JobTemplate.Spec.Scheduling, fldPath.Child("jobTemplate").Child("spec").Child("scheduling"))...)
+	}
 
 	if spec.SuccessfulJobsHistoryLimit != nil {
 		// zero is a valid SuccessfulJobsHistoryLimit

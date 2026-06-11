@@ -128,6 +128,16 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	return batchvalidation.ValidateJob(job, opts)
 }
 
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (jobStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	opts := []string{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
+		opts = append(opts, string(features.WorkloadWithJob))
+	}
+	return rest.DeclarativeValidationConfig{Options: opts}
+}
+
 // shouldAllowMutablePodTemplate returns true if the Job's pod template should
 // be mutable. This is safe for suspended jobs with no active pods that either
 // have never started or have the JobSuspended condition set.

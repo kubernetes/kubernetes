@@ -26,6 +26,7 @@ import (
 
 	k8s_io_api_core_v1 "k8s.io/api/core/v1"
 	v11 "k8s.io/api/core/v1"
+	v1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	math_bits "math/bits"
@@ -48,6 +49,8 @@ func (m *Job) Reset() { *m = Job{} }
 func (m *JobCondition) Reset() { *m = JobCondition{} }
 
 func (m *JobList) Reset() { *m = JobList{} }
+
+func (m *JobSchedulingConfiguration) Reset() { *m = JobSchedulingConfiguration{} }
 
 func (m *JobSpec) Reset() { *m = JobSpec{} }
 
@@ -472,6 +475,79 @@ func (m *JobList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *JobSchedulingConfiguration) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *JobSchedulingConfiguration) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *JobSchedulingConfiguration) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ResourceClaims) > 0 {
+		for iNdEx := len(m.ResourceClaims) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ResourceClaims[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if m.DisruptionMode != nil {
+		{
+			size, err := m.DisruptionMode.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Constraints != nil {
+		{
+			size, err := m.Constraints.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.Policy != nil {
+		{
+			size, err := m.Policy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *JobSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -492,6 +568,20 @@ func (m *JobSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Scheduling != nil {
+		{
+			size, err := m.Scheduling.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x8a
+	}
 	if m.SuccessPolicy != nil {
 		{
 			size, err := m.SuccessPolicy.MarshalToSizedBuffer(dAtA[:i])
@@ -1195,6 +1285,33 @@ func (m *JobList) Size() (n int) {
 	return n
 }
 
+func (m *JobSchedulingConfiguration) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Policy != nil {
+		l = m.Policy.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.Constraints != nil {
+		l = m.Constraints.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.DisruptionMode != nil {
+		l = m.DisruptionMode.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.ResourceClaims) > 0 {
+		for _, e := range m.ResourceClaims {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *JobSpec) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1252,6 +1369,10 @@ func (m *JobSpec) Size() (n int) {
 	}
 	if m.SuccessPolicy != nil {
 		l = m.SuccessPolicy.Size()
+		n += 2 + l + sovGenerated(uint64(l))
+	}
+	if m.Scheduling != nil {
+		l = m.Scheduling.Size()
 		n += 2 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -1544,6 +1665,24 @@ func (this *JobList) String() string {
 	}, "")
 	return s
 }
+func (this *JobSchedulingConfiguration) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForResourceClaims := "[]PodGroupResourceClaim{"
+	for _, f := range this.ResourceClaims {
+		repeatedStringForResourceClaims += fmt.Sprintf("%v", f) + ","
+	}
+	repeatedStringForResourceClaims += "}"
+	s := strings.Join([]string{`&JobSchedulingConfiguration{`,
+		`Policy:` + strings.Replace(fmt.Sprintf("%v", this.Policy), "PodGroupSchedulingPolicy", "v1alpha3.PodGroupSchedulingPolicy", 1) + `,`,
+		`Constraints:` + strings.Replace(fmt.Sprintf("%v", this.Constraints), "PodGroupSchedulingConstraints", "v1alpha3.PodGroupSchedulingConstraints", 1) + `,`,
+		`DisruptionMode:` + strings.Replace(fmt.Sprintf("%v", this.DisruptionMode), "DisruptionMode", "v1alpha3.DisruptionMode", 1) + `,`,
+		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *JobSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -1565,6 +1704,7 @@ func (this *JobSpec) String() string {
 		`PodReplacementPolicy:` + valueToStringGenerated(this.PodReplacementPolicy) + `,`,
 		`ManagedBy:` + valueToStringGenerated(this.ManagedBy) + `,`,
 		`SuccessPolicy:` + strings.Replace(this.SuccessPolicy.String(), "SuccessPolicy", "SuccessPolicy", 1) + `,`,
+		`Scheduling:` + strings.Replace(this.Scheduling.String(), "JobSchedulingConfiguration", "JobSchedulingConfiguration", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2898,6 +3038,198 @@ func (m *JobList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *JobSchedulingConfiguration) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: JobSchedulingConfiguration: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: JobSchedulingConfiguration: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Policy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Policy == nil {
+				m.Policy = &v1alpha3.PodGroupSchedulingPolicy{}
+			}
+			if err := m.Policy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Constraints", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Constraints == nil {
+				m.Constraints = &v1alpha3.PodGroupSchedulingConstraints{}
+			}
+			if err := m.Constraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DisruptionMode == nil {
+				m.DisruptionMode = &v1alpha3.DisruptionMode{}
+			}
+			if err := m.DisruptionMode.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaims", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResourceClaims = append(m.ResourceClaims, v1alpha3.PodGroupResourceClaim{})
+			if err := m.ResourceClaims[len(m.ResourceClaims)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *JobSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3346,6 +3678,42 @@ func (m *JobSpec) Unmarshal(dAtA []byte) error {
 				m.SuccessPolicy = &SuccessPolicy{}
 			}
 			if err := m.SuccessPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 17:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Scheduling", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Scheduling == nil {
+				m.Scheduling = &JobSchedulingConfiguration{}
+			}
+			if err := m.Scheduling.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
