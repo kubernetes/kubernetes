@@ -1741,7 +1741,7 @@ func TestWebsocketExecAttach(t *testing.T) {
 
 	errorChan := make(chan error)
 	go func() {
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
+		errorChan <- exec.StreamWithContext(tCtx, *options)
 	}()
 
 	select {

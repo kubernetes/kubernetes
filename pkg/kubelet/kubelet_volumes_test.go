@@ -84,7 +84,7 @@ func TestListVolumesForPod(t *testing.T) {
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod)
 	assert.NoError(t, err)
 
 	podName := util.GetUniquePodName(pod)
@@ -267,7 +267,7 @@ func TestPodVolumeDeadlineAttachAndMount(t *testing.T) {
 	for _, pod := range pods {
 		start := time.Now()
 		// ensure our context times out quickly
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+		ctx, cancel := context.WithDeadline(tCtx, time.Now().Add(2*time.Second))
 		err := kubelet.volumeManager.WaitForAttachAndMount(ctx, pod)
 		delta := time.Since(start)
 		// the standard timeout is 2 minutes, so if it's just a few seconds we know that the context timeout was the cause
@@ -327,12 +327,12 @@ func TestPodVolumeDeadlineUnmount(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	for i, pod := range pods {
-		if err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod); err != nil {
+		if err := kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod); err != nil {
 			t.Fatalf("pod %d failed: %v", i, err)
 		}
 		start := time.Now()
 		// ensure our context times out quickly
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+		ctx, cancel := context.WithDeadline(tCtx, time.Now().Add(2*time.Second))
 		err := kubelet.volumeManager.WaitForUnmount(ctx, pod)
 		delta := time.Since(start)
 		// the standard timeout is 2 minutes, so if it's just a few seconds we know that the context timeout was the cause
@@ -380,7 +380,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
@@ -443,7 +443,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
 	// Verify volumes attached
-	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
@@ -470,7 +470,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
-	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(context.Background(), pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(tCtx, pod))
 
 	// Verify volumes unmounted
 	hasMountedVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
@@ -550,7 +550,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		tCtx.Done(),
 		kubelet.volumeManager)
 
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -637,7 +637,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		kubelet.volumeManager)
 
 	// Verify volumes attached
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
