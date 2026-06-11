@@ -138,10 +138,10 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
-	wc.capacity = capacity
-	wc.cache = make([]*watchCacheEvent, capacity)
-	wc.lowerBoundCapacity = min(capacity, defaultLowerBoundCapacity)
-	wc.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
+	wc.history.capacity = capacity
+	wc.history.cache = make([]*watchCacheEvent, capacity)
+	wc.history.lowerBoundCapacity = min(capacity, defaultLowerBoundCapacity)
+	wc.history.upperBoundCapacity = max(capacity, defaultUpperBoundCapacity)
 
 	return wc
 }
@@ -284,8 +284,8 @@ func TestEvents(t *testing.T) {
 	defer store.Stop()
 
 	// no dynamic-size cache to fit old tests.
-	store.lowerBoundCapacity = 5
-	store.upperBoundCapacity = 5
+	store.history.lowerBoundCapacity = 5
+	store.history.upperBoundCapacity = 5
 
 	store.Add(makeTestPod("pod", 3))
 
@@ -917,23 +917,23 @@ func TestDynamicCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			store := newTestWatchCache(test.cacheCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 			defer store.Stop()
-			store.cache = make([]*watchCacheEvent, test.cacheCapacity)
-			store.startIndex = test.startIndex
-			store.lowerBoundCapacity = test.lowerBoundCapacity
-			store.upperBoundCapacity = test.upperBoundCapacity
+			store.history.cache = make([]*watchCacheEvent, test.cacheCapacity)
+			store.history.startIndex = test.startIndex
+			store.history.lowerBoundCapacity = test.lowerBoundCapacity
+			store.history.upperBoundCapacity = test.upperBoundCapacity
 			loadEventWithDuration(store, test.eventCount, test.interval)
 			nextInterval := store.clock.Now().Add(time.Duration(test.interval.Nanoseconds() * int64(test.eventCount)))
-			store.resizeCacheLocked(nextInterval)
-			if store.capacity != test.expectCapacity {
-				t.Errorf("expect capacity %d, but get %d", test.expectCapacity, store.capacity)
+			store.history.resizeCacheLocked(nextInterval, store.groupResource)
+			if store.history.capacity != test.expectCapacity {
+				t.Errorf("expect capacity %d, but get %d", test.expectCapacity, store.history.capacity)
 			}
 
 			// check cache's startIndex, endIndex and all elements.
-			if store.startIndex != test.expectStartIndex {
-				t.Errorf("expect startIndex %d, but get %d", test.expectStartIndex, store.startIndex)
+			if store.history.startIndex != test.expectStartIndex {
+				t.Errorf("expect startIndex %d, but get %d", test.expectStartIndex, store.history.startIndex)
 			}
-			if store.endIndex != test.startIndex+test.eventCount {
-				t.Errorf("expect endIndex %d get %d", test.startIndex+test.eventCount, store.endIndex)
+			if store.history.endIndex != test.startIndex+test.eventCount {
+				t.Errorf("expect endIndex %d get %d", test.startIndex+test.eventCount, store.history.endIndex)
 			}
 			if !checkCacheElements(store) {
 				t.Errorf("some elements locations in cache is wrong")
@@ -945,18 +945,18 @@ func TestDynamicCache(t *testing.T) {
 func loadEventWithDuration(cache *testWatchCache, count int, interval time.Duration) {
 	for i := 0; i < count; i++ {
 		event := &watchCacheEvent{
-			Key:        fmt.Sprintf("event-%d", i+cache.startIndex),
+			Key:        fmt.Sprintf("event-%d", i+cache.history.startIndex),
 			RecordTime: cache.clock.Now().Add(time.Duration(interval.Nanoseconds() * int64(i))),
 		}
-		cache.cache[(i+cache.startIndex)%cache.capacity] = event
+		cache.history.cache[(i+cache.history.startIndex)%cache.history.capacity] = event
 	}
-	cache.endIndex = cache.startIndex + count
+	cache.history.endIndex = cache.history.startIndex + count
 }
 
 func checkCacheElements(cache *testWatchCache) bool {
-	for i := cache.startIndex; i < cache.endIndex; i++ {
-		location := i % cache.capacity
-		if cache.cache[location].Key != fmt.Sprintf("event-%d", i) {
+	for i := cache.history.startIndex; i < cache.history.endIndex; i++ {
+		location := i % cache.history.capacity
+		if cache.history.cache[location].Key != fmt.Sprintf("event-%d", i) {
 			return false
 		}
 	}
@@ -974,7 +974,7 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 			ResourceVersion: rv,
 			RecordTime:      t,
 		}
-		store.updateCache(event)
+		store.history.updateCache(event, store.groupResource)
 	}
 
 	// Initial LIST comes from the moment of RV=10.
@@ -1209,8 +1209,8 @@ func TestCapacityUpperBound(t *testing.T) {
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
-	store.cache = store.cache[:0]
-	store.upperBoundCapacity = defaultUpperBoundCapacity
+	store.history.cache = store.history.cache[:0]
+	store.history.upperBoundCapacity = defaultUpperBoundCapacity
 	loadEventWithDuration(store, defaultUpperBoundCapacity, 0)
 	add := &watchCacheEvent{
 		Key:        fmt.Sprintf("event-%d", defaultUpperBoundCapacity),
@@ -1218,7 +1218,7 @@ func BenchmarkWatchCache_updateCache(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		store.updateCache(add)
+		store.history.updateCache(add, store.groupResource)
 	}
 }
 
@@ -1314,11 +1314,11 @@ func TestCacheSnapshots(t *testing.T) {
 
 	s := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer s.Stop()
-	s.upperBoundCapacity = 3
-	s.lowerBoundCapacity = 1
+	s.history.upperBoundCapacity = 3
+	s.history.lowerBoundCapacity = 1
 	clock := s.clock.(*testingclock.FakeClock)
 
-	_, found := s.snapshots.GetLessOrEqual(100)
+	_, found := s.storage.snapshots.GetLessOrEqual(100)
 	assert.False(t, found, "Expected empty cache to not include any snapshots")
 
 	t.Log("Test cache on rev 100")
@@ -1328,9 +1328,9 @@ func TestCacheSnapshots(t *testing.T) {
 	require.NoError(t, s.Delete(makeTestPod("foo", 300)))
 
 	t.Log("Test cache on rev 100")
-	_, found = s.snapshots.GetLessOrEqual(99)
+	_, found = s.storage.snapshots.GetLessOrEqual(99)
 	assert.False(t, found, "Expected store to not include rev 99")
-	lister, found := s.snapshots.GetLessOrEqual(100)
+	lister, found := s.storage.snapshots.GetLessOrEqual(100)
 	assert.True(t, found, "Expected store to not include rev 100")
 	elements, err := lister.OrderedListPrefix("", "")
 	require.NoError(t, err)
@@ -1339,11 +1339,11 @@ func TestCacheSnapshots(t *testing.T) {
 
 	t.Log("Overflow cache to remove rev 100")
 	require.NoError(t, s.Add(makeTestPod("foo", 400)))
-	_, found = s.snapshots.GetLessOrEqual(100)
+	_, found = s.storage.snapshots.GetLessOrEqual(100)
 	assert.False(t, found, "Expected overfilled cache to delete oldest rev 100")
 
 	t.Log("Test cache on rev 200")
-	lister, found = s.snapshots.GetLessOrEqual(200)
+	lister, found = s.storage.snapshots.GetLessOrEqual(200)
 	assert.True(t, found, "Expected store to still keep rev 200")
 	elements, err = lister.OrderedListPrefix("", "")
 	require.NoError(t, err)
@@ -1351,14 +1351,14 @@ func TestCacheSnapshots(t *testing.T) {
 	assert.Equal(t, makeTestPod("foo", 200), elements[0].(*store.Element).Object)
 
 	t.Log("Test cache on rev 300")
-	lister, found = s.snapshots.GetLessOrEqual(300)
+	lister, found = s.storage.snapshots.GetLessOrEqual(300)
 	assert.True(t, found, "Expected store to still keep rev 300")
 	elements, err = lister.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Empty(t, elements)
 
 	t.Log("Test cache on rev 400")
-	lister, found = s.snapshots.GetLessOrEqual(400)
+	lister, found = s.storage.snapshots.GetLessOrEqual(400)
 	assert.True(t, found, "Expected store to still keep rev 400")
 	elements, err = lister.OrderedListPrefix("", "")
 	require.NoError(t, err)
@@ -1366,16 +1366,16 @@ func TestCacheSnapshots(t *testing.T) {
 	assert.Equal(t, makeTestPod("foo", 400), elements[0].(*store.Element).Object)
 
 	t.Log("Add event outside the event fresh window to force cache capacity downsize")
-	assert.Equal(t, 3, s.capacity)
+	assert.Equal(t, 3, s.history.capacity)
 	clock.Step(DefaultEventFreshDuration + 1)
 	require.NoError(t, s.Update(makeTestPod("foo", 500)))
-	assert.Equal(t, 1, s.capacity)
-	assert.Equal(t, 1, s.snapshots.Len())
-	_, found = s.snapshots.GetLessOrEqual(499)
+	assert.Equal(t, 1, s.history.capacity)
+	assert.Equal(t, 1, s.storage.snapshots.Len())
+	_, found = s.storage.snapshots.GetLessOrEqual(499)
 	assert.False(t, found, "Expected overfilled cache to delete events below 500")
 
 	t.Log("Test cache on rev 500")
-	lister, found = s.snapshots.GetLessOrEqual(500)
+	lister, found = s.storage.snapshots.GetLessOrEqual(500)
 	assert.True(t, found, "Expected store to still keep rev 500")
 	elements, err = lister.OrderedListPrefix("", "")
 	require.NoError(t, err)
@@ -1384,11 +1384,11 @@ func TestCacheSnapshots(t *testing.T) {
 
 	t.Log("Add event to force capacity upsize")
 	require.NoError(t, s.Update(makeTestPod("foo", 600)))
-	assert.Equal(t, 2, s.capacity)
-	assert.Equal(t, 2, s.snapshots.Len())
+	assert.Equal(t, 2, s.history.capacity)
+	assert.Equal(t, 2, s.storage.snapshots.Len())
 
 	t.Log("Test cache on rev 600")
-	lister, found = s.snapshots.GetLessOrEqual(600)
+	lister, found = s.storage.snapshots.GetLessOrEqual(600)
 	assert.True(t, found, "Expected replace to be snapshotted")
 	elements, err = lister.OrderedListPrefix("", "")
 	require.NoError(t, err)
@@ -1396,17 +1396,17 @@ func TestCacheSnapshots(t *testing.T) {
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
 
 	t.Log("Replace cache to remove history")
-	_, found = s.snapshots.GetLessOrEqual(500)
+	_, found = s.storage.snapshots.GetLessOrEqual(500)
 	assert.True(t, found, "Confirm that cache stores history before replace")
 	err = s.Replace([]interface{}{makeTestPod("foo", 600)}, "700")
 	require.NoError(t, err)
-	_, found = s.snapshots.GetLessOrEqual(500)
+	_, found = s.storage.snapshots.GetLessOrEqual(500)
 	assert.False(t, found, "Expected replace to remove history")
-	_, found = s.snapshots.GetLessOrEqual(600)
+	_, found = s.storage.snapshots.GetLessOrEqual(600)
 	assert.False(t, found, "Expected replace to remove history")
 
 	t.Log("Test cache on rev 700")
-	lister, found = s.snapshots.GetLessOrEqual(700)
+	lister, found = s.storage.snapshots.GetLessOrEqual(700)
 	assert.True(t, found, "Expected replace to be snapshotted")
 	elements, err = lister.OrderedListPrefix("", "")
 	require.NoError(t, err)

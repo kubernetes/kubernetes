@@ -182,15 +182,15 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 			t.Error("Open watchers are not supported during compaction")
 		}
 
-		for c.cacher.watchCache.startIndex < c.cacher.watchCache.endIndex {
-			index := c.cacher.watchCache.startIndex % c.cacher.watchCache.capacity
-			if c.cacher.watchCache.cache[index].ResourceVersion > rv {
+		for c.cacher.watchCache.history.startIndex < c.cacher.watchCache.history.endIndex {
+			index := c.cacher.watchCache.history.startIndex % c.cacher.watchCache.history.capacity
+			if c.cacher.watchCache.history.cache[index].ResourceVersion > rv {
 				break
 			}
 
-			c.cacher.watchCache.startIndex++
+			c.cacher.watchCache.history.startIndex++
 		}
-		c.cacher.watchCache.listResourceVersion = rv
+		c.cacher.watchCache.storage.listResourceVersion = rv
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}
