@@ -953,7 +953,7 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 
 	rcConfig := testutils.RCConfig{
 		Client:               c,
-		Image:                imageutils.GetE2EImage(imageutils.ResourceConsumer),
+		Image:                imageutils.GetE2EImage(imageutils.Agnhost),
 		Name:                 name,
 		Namespace:            ns,
 		Timeout:              timeoutRC,
@@ -964,6 +964,7 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 		MemLimit:             memLimitMb * 1024 * 1024,
 		Annotations:          podAnnotations,
 		AdditionalContainers: additionalContainers,
+		Command:              []string{"/agnhost", "resource-consumer"},
 	}
 	if podResources != nil {
 		rcConfig.PodResources = podResources.DeepCopy()

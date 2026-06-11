@@ -692,6 +692,28 @@ Usage:
         [--port <port>] [--consumer-port <port>] [--consumer-service-name <service-name>] [--consumer-service-namespace <namespace>]
 ```
 
+### resource-consumer
+
+This subcommand starts the resource-consumer HTTP server used by autoscaling tests.
+
+The subcommand can accept the following flags:
+
+- `port` (default: 8080): The port number to listen to.
+
+It exposes the same endpoints as the standalone `test/images/resource-consumer` image:
+
+- `POST /ConsumeCPU`
+- `POST /ConsumeMem`
+- `POST /BumpMetric`
+- `POST /GetCurrentStatus`
+- `GET /metrics`
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost resource-consumer [--port <port>]
+```
+
 
 ### serve-hostname
 
