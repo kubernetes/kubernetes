@@ -34,7 +34,7 @@ type pathSpec interface {
 
 // localPath represents a client-native path, which will differ based
 // on the client OS, its methods will use path/filepath package which
-// is OS dependant
+// is OS dependent
 type localPath struct {
 	file string
 }
