@@ -858,7 +858,7 @@ func TestReconcileState(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	testPolicy, _ := NewStaticPolicy(
 		logger,
@@ -1315,7 +1315,6 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
 		mgr := &manager{
 			policy: testCase.policy,
 			state: &mockState{
@@ -1336,7 +1335,7 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
-		success, failure := mgr.reconcileState(context.Background())
+		success, failure := mgr.reconcileState(tCtx)
 
 		if !reflect.DeepEqual(testCase.expectStAssignments, mgr.state.GetCPUAssignments()) {
 			t.Errorf("%v", testCase.description)

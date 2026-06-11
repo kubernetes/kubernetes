@@ -5152,6 +5152,7 @@ func generateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alterna
 }
 
 func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
 
@@ -5173,7 +5174,6 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 	})
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
-	logger := klog.FromContext(context.Background())
 	kubelet.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
 		Phase: v1.PodRunning,
 		Conditions: []v1.PodCondition{
@@ -5215,7 +5215,7 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 		},
 	}
 
-	isTerminal, _, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, podStatus)
+	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
 	require.False(t, isTerminal)
 	require.NoError(t, err)
 

@@ -17,7 +17,6 @@ limitations under the License.
 package memorymanager
 
 import (
-	"context"
 	"runtime"
 	"testing"
 
@@ -39,6 +38,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Memory Manager static policy is not available on Windows")
 	}
+
+	tCtx := ktesting.Init(t)
 
 	testCases := []struct {
 		description                     string
@@ -129,7 +130,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			pod := getPodWithContainersAndPodLevelResources("pod1", tc.podMemoryRequest, tc.podMemoryRequest, nil, tc.containers)
 
 			// Start manager to initialize state
-			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
@@ -166,7 +167,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}

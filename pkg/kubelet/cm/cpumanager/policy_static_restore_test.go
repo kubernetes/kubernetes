@@ -17,7 +17,6 @@ limitations under the License.
 package cpumanager
 
 import (
-	"context"
 	"runtime"
 	"testing"
 	"time"
@@ -101,7 +100,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 			sDir := t.TempDir()
-			logger, _ := ktesting.NewTestContext(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			mgr, err := NewManager(
 				logger,
 				"static",
@@ -140,7 +139,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			pod.UID = types.UID("pod1")
 
 			// Start manager to initialize state and activePods
-			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
@@ -204,7 +203,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}
