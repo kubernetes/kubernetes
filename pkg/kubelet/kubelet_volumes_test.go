@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -470,7 +471,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
-	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(tCtx, pod))
+	require.NoError(t, kubelet.volumeManager.WaitForUnmount(tCtx, pod))
 
 	// Verify volumes unmounted
 	hasMountedVolumes := kubelet.volumeManager.HasPossiblyMountedVolumesForPod(
@@ -550,7 +551,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		tCtx.Done(),
 		kubelet.volumeManager)
 
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod))
+	require.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -637,7 +638,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		kubelet.volumeManager)
 
 	// Verify volumes attached
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod))
+	require.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
