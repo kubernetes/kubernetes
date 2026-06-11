@@ -138,8 +138,8 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		// stale or be closed by the plugin side. A fresh connection guarantees that
 		// NotifyRegistrationStatus is reliably delivered regardless of how long
 		// registration took.
-		notifyClient, notifyConn, notifyDialErr := dial(ctx, socketPath, dialTimeoutDuration)
-		if notifyDialErr != nil {
+		client, conn, redialErr := dial(ctx, socketPath, dialTimeoutDuration)
+		if redialErr != nil {
 			// The plugin socket disappeared while RegisterPlugin was running.
 			// Clean up local state and let the reconciler retry once the socket
 			// reappears.
@@ -147,17 +147,17 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			if registerErr == nil {
 				handler.DeRegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint)
 			}
-			return fmt.Errorf("RegisterPlugin error -- failed to re-dial socket %s for notification after RegisterPlugin, err: %w", socketPath, notifyDialErr)
+			return fmt.Errorf("RegisterPlugin error -- failed to re-dial socket %s for notification after RegisterPlugin, err: %w", socketPath, redialErr)
 		}
-		defer func() { _ = notifyConn.Close() }()
+		defer func() { _ = conn.Close() }()
 
 		if registerErr != nil {
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
-			return og.notifyPlugin(ctx, notifyClient, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", registerErr))
+			return og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", registerErr))
 		}
 
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
-		if err := og.notifyPlugin(ctx, notifyClient, true, ""); err != nil {
+		if err := og.notifyPlugin(ctx, client, true, ""); err != nil {
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
 			handler.DeRegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint)
 			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
