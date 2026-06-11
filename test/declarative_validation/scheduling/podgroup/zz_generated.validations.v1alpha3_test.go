@@ -98,6 +98,9 @@ func init() {
 			"status.conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
+			"status.conditions[*].message": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
 			"status.conditions[*].reason": {
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},

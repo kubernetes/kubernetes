@@ -87,6 +87,13 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
+					Name: "invalid too long message",
+					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakMessage(strings.Repeat("a", 32769)))},
+					ExpectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("message"), "", 32768).WithOrigin("maxLength").MarkAlpha(),
+					},
+				},
+				{
 					Name: "invalid duplicate types",
 					Conditions: []metav1.Condition{
 						meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied))),

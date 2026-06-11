@@ -347,7 +347,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	}
 
 	if len(condition.Message) > maxMessageLen {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen).WithOrigin("maxLength").MarkCoveredByDeclarative())
 	}
 
 	return allErrs

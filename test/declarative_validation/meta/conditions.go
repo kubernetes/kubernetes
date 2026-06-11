@@ -74,6 +74,13 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.TooLong(fldPath.Index(0).Child("reason"), "", 1024).WithOrigin("maxLength").MarkAlpha(),
 			},
 		},
+		{
+			Name: "invalid too long message",
+			Conditions: []metav1.Condition{MkCondition(TweakMessage(strings.Repeat("a", 32769)))},
+			ExpectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Index(0).Child("message"), "", 32768).WithOrigin("maxLength").MarkAlpha(),
+			},
+		},
 	}
 }
 
@@ -121,4 +128,8 @@ func TweakStatus(status metav1.ConditionStatus) func(*metav1.Condition) {
 
 func TweakReason(reason string) func(*metav1.Condition) {
 	return func(c *metav1.Condition) { c.Reason = reason }
+}
+
+func TweakMessage(message string) func(*metav1.Condition) {
+	return func(c *metav1.Condition) { c.Message = message }
 }
