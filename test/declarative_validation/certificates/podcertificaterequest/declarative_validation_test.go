@@ -73,6 +73,14 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
+					Name: "invalid type format",
+					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType("@invalid"))},
+					ExpectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("status", "conditions").Index(0).Child("type"), "@invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "type"), "@invalid", []string{"Issued", "Denied", "Failed"}).MarkFromImperative(),
+					},
+				},
+				{
 					Name: "invalid missing reason",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakReason(""))},
 					ExpectedErrs: field.ErrorList{

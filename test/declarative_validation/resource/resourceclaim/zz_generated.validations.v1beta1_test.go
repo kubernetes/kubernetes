@@ -177,6 +177,7 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.devices[*].conditions[*].type": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.devices[*].networkData.hardwareAddress": {

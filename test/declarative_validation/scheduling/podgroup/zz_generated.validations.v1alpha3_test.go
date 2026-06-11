@@ -110,6 +110,7 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.conditions[*].type": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.resourceClaimStatuses": {

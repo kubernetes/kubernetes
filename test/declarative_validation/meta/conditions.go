@@ -88,6 +88,13 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.NotSupported(fldPath.Index(0).Child("status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{}).MarkAlpha(),
 			},
 		},
+		{
+			Name: "invalid type format",
+			Conditions: []metav1.Condition{MkCondition(TweakType("@invalid"))},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("type"), "@invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 }
 
