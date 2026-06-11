@@ -845,9 +845,6 @@ function create-master-auth {
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
-  if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
-  fi
   if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
   fi
@@ -1239,7 +1236,7 @@ rules:
 
   # node and pod status calls from nodes are high-volume and can be large, don't log responses for expected updates from nodes
   - level: Request
-    users: ["kubelet", "system:node-problem-detector", "system:serviceaccount:kube-system:node-problem-detector"]
+    users: ["kubelet"]
     verbs: ["update","patch"]
     resources:
       - group: "" # core
@@ -1436,41 +1433,6 @@ function create-kubescheduler-policy-config {
   cat <<EOF >/etc/srv/kubernetes/kube-scheduler/policy-config
 ${SCHEDULER_POLICY_CONFIG}
 EOF
-}
-
-function create-node-problem-detector-kubeconfig {
-  local apiserver_address="${1}"
-  if [[ -z "${apiserver_address}" ]]; then
-    echo "Must provide API server address to create node-problem-detector kubeconfig file!"
-    exit 1
-  fi
-  echo "Creating node-problem-detector kubeconfig file"
-  mkdir -p /var/lib/node-problem-detector
-  cat <<EOF >/var/lib/node-problem-detector/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: node-problem-detector
-  user:
-    token: ${NODE_PROBLEM_DETECTOR_TOKEN}
-clusters:
-- name: local
-  cluster:
-    server: https://${apiserver_address}
-    certificate-authority-data: ${CA_CERT}
-contexts:
-- context:
-    cluster: local
-    user: node-problem-detector
-  name: service-account-context
-current-context: service-account-context
-EOF
-}
-
-function create-node-problem-detector-kubeconfig-from-kubelet {
-  echo "Creating node-problem-detector kubeconfig from /var/lib/kubelet/kubeconfig"
-  mkdir -p /var/lib/node-problem-detector
-  cp /var/lib/kubelet/kubeconfig /var/lib/node-problem-detector/kubeconfig
 }
 
 function create-master-etcd-auth {
@@ -1686,56 +1648,6 @@ EOF
 
   systemctl daemon-reload
   systemctl start kubelet.service
-}
-
-# This function assembles the node problem detector systemd service file and
-# starts it using systemctl.
-function start-node-problem-detector {
-  echo "Start node problem detector"
-  local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
-  echo "Using node problem detector binary at ${npd_bin}"
-
-  local flags="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
-  if [[ -z "${flags}" ]]; then
-    local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
-    # TODO(random-liu): Handle this for alternative container runtime.
-    local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
-    local -r sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor.json"
-    local -r ssm_config="${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json"
-
-    local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
-    local -r custom_sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json"
-
-    flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
-    flags+=" --logtostderr"
-    flags+=" --config.system-log-monitor=${km_config},${dm_config},${sm_config}"
-    flags+=" --config.system-stats-monitor=${ssm_config}"
-    flags+=" --config.custom-plugin-monitor=${custom_km_config},${custom_sm_config}"
-    local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
-    flags+=" --port=${npd_port}"
-    if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
-      flags+=" ${EXTRA_NPD_ARGS}"
-    fi
-  fi
-  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
-
-  # Write the systemd service file for node problem detector.
-  cat <<EOF >/etc/systemd/system/node-problem-detector.service
-[Unit]
-Description=Kubernetes node problem detector
-Requires=network-online.target
-After=network-online.target
-
-[Service]
-Restart=always
-RestartSec=10
-ExecStart=${npd_bin} ${flags}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-  systemctl start node-problem-detector.service
 }
 
 # Create the log file and set its properties.
@@ -2966,16 +2878,6 @@ function start-kube-addons {
     update-event-exporter ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
   fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
-    setup-addon-manifests "addons" "node-problem-detector"
-  fi
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    # Setup role binding(s) for standalone node problem detector.
-    if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-      setup-addon-manifests "addons" "node-problem-detector/standalone"
-    fi
-    setup-addon-manifests "addons" "node-problem-detector/kubelet-user-standalone" "node-problem-detector"
-  fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range" "gce"
   fi
@@ -3615,16 +3517,6 @@ function main() {
     log-wrap 'CreateNodePKI' create-node-pki
     log-wrap 'CreateKubeletKubeconfig' create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
     log-wrap 'CreateKubeproxyUserKubeconfig' create-kubeproxy-user-kubeconfig
-    if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-        log-wrap 'CreateNodeProblemDetectorKubeconfig' create-node-problem-detector-kubeconfig "${KUBERNETES_MASTER_NAME}"
-      elif [[ -f "/var/lib/kubelet/kubeconfig" ]]; then
-        log-wrap 'CreateNodeProblemDetectorKubeconfigFromKubelet' create-node-problem-detector-kubeconfig-from-kubelet
-      else
-        echo "Either NODE_PROBLEM_DETECTOR_TOKEN or /var/lib/kubelet/kubeconfig must be set"
-        exit 1
-      fi
-    fi
   fi
 
   log-wrap 'DetectCgroupConfig' detect-cgroup-config
@@ -3679,9 +3571,6 @@ function main() {
     log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &
   else
     log-wrap 'StartKubeProxy' start-kube-proxy
-    if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      log-wrap 'StartNodeProblemDetector' start-node-problem-detector
-    fi
   fi
   log-wrap 'ResetMotd' reset-motd
 

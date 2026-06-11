@@ -109,23 +109,12 @@ dependencies:
       match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
 
   - name: "node-problem-detector"
-    version: 1.34.0
+    version: 1.35.2
     refPaths:
     - path: test/e2e_node/image_list.go
       match: const defaultImage
     - path: test/kubemark/resources/hollow-node_template.yaml
       match: registry.k8s.io/node-problem-detector/node-problem-detector
-    - path: cluster/addons/node-problem-detector/npd.yaml
-      match: registry.k8s.io/node-problem-detector/node-problem-detector
-    - path: cluster/addons/node-problem-detector/npd.yaml
-      match: app.kubernetes.io/version
-    # TODO(dims): Ensure newer versions get uploaded to
-    # - https://console.cloud.google.com/storage/browser/gke-release/winnode/node-problem-detector
-    # - https://gcsweb.k8s.io/gcs/kubernetes-release/node-problem-detector/
-    # and then the following references get fixed.
-    #
-    - path: cluster/gce/gci/configure.sh
-      match: DEFAULT_NPD_VERSION=
     #- path: cluster/gce/windows/k8s-node-setup.psm1
     #  match: DEFAULT_NPD_VERSION
 
