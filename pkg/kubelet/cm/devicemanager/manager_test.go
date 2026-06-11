@@ -1095,7 +1095,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		pod := testCase.testPod
 		activePods = append(activePods, pod)
 		podsStub.updateActivePods(activePods)
-		err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+		err := testManager.Allocate(pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1328,9 +1328,9 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	activePods := []*v1.Pod{pod1, pod2}
 	podsStub.updateActivePods(activePods)
 
-	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0], lifecycle.AddOperation)
 	as.NoError(err)
-	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0], lifecycle.AddOperation)
 	as.NoError(err)
 
 	// when pod is in activePods, GetDeviceRunContainerOptions should return
@@ -1426,10 +1426,10 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container, lifecycle.AddOperation)
 	}
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container, lifecycle.AddOperation)
 	}
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInInitContainers.UID)
@@ -1536,10 +1536,10 @@ func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
 	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container, lifecycle.AddOperation)
 	}
 	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container, lifecycle.AddOperation)
 	}
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
@@ -1669,7 +1669,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
+	err = testManager.Allocate(pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
 	as.NoError(err)
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
 	as.NoError(err)
@@ -1697,7 +1697,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
 	activePods = append(activePods, pod2)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0], lifecycle.AddOperation)
 	as.NoError(err)
 	_, err = testManager.GetDeviceRunContainerOptions(tCtx, pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
@@ -1850,7 +1850,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
+				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0], lifecycle.AddOperation)
 			},
 		},
 		{
@@ -1858,7 +1858,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.GetPodTopologyHints(testPod)
+				manager.GetPodTopologyHints(testPod, lifecycle.AddOperation)
 			},
 		},
 	}
@@ -2143,7 +2143,7 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 				sourcesReady: &sourcesReadyStub{},
 			}
 
-			err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+			err := testManager.Allocate(pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
 			test.checkError(t, err)
 		})
 	}

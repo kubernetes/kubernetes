@@ -27,6 +27,7 @@ import (
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -48,9 +49,9 @@ func (m *fakeManager) Policy() Policy {
 	return pol
 }
 
-func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
 	logger := klog.TODO()
-	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
 	return nil
 }
 
@@ -63,21 +64,21 @@ func (m *fakeManager) RemoveContainer(logger logr.Logger, containerID string) er
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger := klog.TODO()
-	logger.Info("Get container topology hints")
+	logger.Info("Get container topology hints", "operation", operation)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger := klog.TODO()
-	logger.Info("Get pod topology hints")
+	logger.Info("Get pod topology hints", "operation", operation)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) AllocatePod(pod *v1.Pod) error {
+func (m *fakeManager) AllocatePod(pod *v1.Pod, operation lifecycle.Operation) error {
 	logger := klog.TODO()
-	logger.Info("AllocatePod", "pod", klog.KObj(pod))
+	logger.Info("AllocatePod", "pod", klog.KObj(pod), "operation", operation)
 	return nil
 }
 
