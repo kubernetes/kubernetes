@@ -778,6 +778,10 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err, "Expected no error")
+				// Verify that GetVolumesInUse() is empty after WaitForAllPodsUnmount completes
+				// This proves that volumes were fully detached (not just unmounted)
+				require.Empty(t, manager.GetVolumesInUse(),
+					"GetVolumesInUse() should be empty after WaitForAllPodsUnmount completes")
 			}
 		})
 	}
