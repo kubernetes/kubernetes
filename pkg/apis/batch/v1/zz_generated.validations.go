@@ -26,12 +26,14 @@ import (
 	fmt "fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -269,7 +271,29 @@ func Validate_JobSpec(
 
 	// field batchv1.JobSpec.Selector has no validation
 	// field batchv1.JobSpec.ManualSelector has no validation
-	// field batchv1.JobSpec.Template has no validation
+
+	{ // field batchv1.JobSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *apicorev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, corev1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *apicorev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
 	// field batchv1.JobSpec.TTLSecondsAfterFinished has no validation
 	// field batchv1.JobSpec.CompletionMode has no validation
 	// field batchv1.JobSpec.Suspend has no validation

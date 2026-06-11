@@ -46,6 +46,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		input        batch.Job
 		expectedErrs field.ErrorList
 	}{
+		"valid": {
+			input: mkJob(),
+		},
 		"maxFailedIndexes and backoffLimitPerIndex both set": {
 			input: mkJob(
 				tweakMaxFailedIndexes(ptr.To[int32](5)),
@@ -56,6 +59,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkJob(tweakMaxFailedIndexes(ptr.To[int32](5))),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+			},
+		},
+		"valid toleration key": {
+			input: mkJob(tweakTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
+		},
+		"valid toleration key without prefix": {
+			input: mkJob(tweakTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
+		},
+		"invalid toleration key format": {
+			input: mkJob(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 	}
@@ -90,6 +105,12 @@ func tweakMaxFailedIndexes(v *int32) func(*batch.Job) {
 func tweakBackoffLimitPerIndex(v *int32) func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.BackoffLimitPerIndex = v
+	}
+}
+
+func tweakTolerations(tolerations ...api.Toleration) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Template.Spec.Tolerations = tolerations
 	}
 }
 

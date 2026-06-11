@@ -187,6 +187,19 @@ func TestDeclarativeValidate(t *testing.T) {
 				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
+		// spec.template.spec.tolerations[*].key
+		"tolerations: valid key": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: valid key without prefix": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: invalid key format": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.spec.tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -311,5 +324,11 @@ func setSpecReplicas(val int32) func(rc *api.ReplicationController) {
 func setSpecMinReadySeconds(val int32) func(rc *api.ReplicationController) {
 	return func(rc *api.ReplicationController) {
 		rc.Spec.MinReadySeconds = val
+	}
+}
+
+func setSpecTolerations(tolerations ...api.Toleration) func(rc *api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		rc.Spec.Template.Spec.Tolerations = tolerations
 	}
 }

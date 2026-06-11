@@ -4315,7 +4315,7 @@ func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldToleratio
 		}
 	}
 
-	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath, opts)...)
+	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath, opts, KeyFormatCovered)...)
 	return allErrs
 }
 
@@ -4352,14 +4352,34 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 	return allErrs
 }
 
+// ValidateTolerationsOption is an option for ValidateTolerations that marks
+// which handwritten validation error messages are covered by declarative
+// validation.
+type ValidateTolerationsOption int
+
+const (
+	// KeyFormatCovered indicates the toleration key format check is
+	// covered by declarative validation. It must only be passed by callers whose
+	// tolerations are validated declaratively (the structured PodSpec.tolerations
+	// and RuntimeClass.scheduling.tolerations fields). It must NOT be passed by
+	// ValidateTolerationsInPodAnnotations, whose tolerations are parsed from an
+	// annotation string and have no declarative counterpart.
+	KeyFormatCovered ValidateTolerationsOption = iota
+)
+
 // ValidateTolerations tests if given tolerations have valid data.
-func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path, opts PodValidationOptions, validationOpts ...ValidateTolerationsOption) field.ErrorList {
 	allErrors := field.ErrorList{}
+	keyFormatCovered := slices.Contains(validationOpts, KeyFormatCovered)
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
 		// validate the toleration key
 		if len(toleration.Key) > 0 {
-			allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+			keyErrs := unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))
+			if keyFormatCovered {
+				keyErrs = keyErrs.MarkCoveredByDeclarative()
+			}
+			allErrors = append(allErrors, keyErrs...)
 		}
 
 		// empty toleration key with Exists operator and empty value means match all taints
@@ -4688,7 +4708,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	}
 
 	if len(spec.Tolerations) > 0 {
-		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"), opts)...)
+		allErrs = append(allErrs, ValidateTolerations(spec.Tolerations, fldPath.Child("tolerations"), opts, KeyFormatCovered)...)
 	}
 
 	if len(spec.HostAliases) > 0 {

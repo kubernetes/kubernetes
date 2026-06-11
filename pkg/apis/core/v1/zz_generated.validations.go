@@ -40,6 +40,36 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Pod
+	scheme.AddValidationFunc(
+		(*corev1.Pod)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/ephemeralcontainers", "/eviction", "/resize", "/status":
+				return Validate_Pod(
+					ctx, op, nil, /* fldPath */
+					obj.(*corev1.Pod),
+					safe.Cast[*corev1.Pod](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type PodTemplate
+	scheme.AddValidationFunc(
+		(*corev1.PodTemplate)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_PodTemplate(
+					ctx, op, nil, /* fldPath */
+					obj.(*corev1.PodTemplate),
+					safe.Cast[*corev1.PodTemplate](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ReplicationController
 	scheme.AddValidationFunc(
 		(*corev1.ReplicationController)(nil),
@@ -71,6 +101,191 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 			}
 		})
 	return nil
+}
+
+// Validate_Pod validates an instance of Pod according
+// to declarative validation rules in the API schema.
+func Validate_Pod(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Pod) (errs field.ErrorList) {
+
+	// field corev1.Pod.TypeMeta has no validation
+	// field corev1.Pod.ObjectMeta has no validation
+
+	{ // field corev1.Pod.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Pod) *corev1.PodSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.Pod.Status has no validation
+	return errs
+}
+
+// Validate_PodSpec validates an instance of PodSpec according
+// to declarative validation rules in the API schema.
+func Validate_PodSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodSpec) (errs field.ErrorList) {
+
+	// field corev1.PodSpec.Volumes has no validation
+	// field corev1.PodSpec.InitContainers has no validation
+	// field corev1.PodSpec.Containers has no validation
+	// field corev1.PodSpec.EphemeralContainers has no validation
+	// field corev1.PodSpec.RestartPolicy has no validation
+	// field corev1.PodSpec.TerminationGracePeriodSeconds has no validation
+	// field corev1.PodSpec.ActiveDeadlineSeconds has no validation
+	// field corev1.PodSpec.DNSPolicy has no validation
+	// field corev1.PodSpec.NodeSelector has no validation
+	// field corev1.PodSpec.ServiceAccountName has no validation
+	// field corev1.PodSpec.DeprecatedServiceAccount has no validation
+	// field corev1.PodSpec.AutomountServiceAccountToken has no validation
+	// field corev1.PodSpec.NodeName has no validation
+	// field corev1.PodSpec.HostNetwork has no validation
+	// field corev1.PodSpec.HostPID has no validation
+	// field corev1.PodSpec.HostIPC has no validation
+	// field corev1.PodSpec.ShareProcessNamespace has no validation
+	// field corev1.PodSpec.SecurityContext has no validation
+	// field corev1.PodSpec.ImagePullSecrets has no validation
+	// field corev1.PodSpec.Hostname has no validation
+	// field corev1.PodSpec.Subdomain has no validation
+	// field corev1.PodSpec.Affinity has no validation
+	// field corev1.PodSpec.SchedulerName has no validation
+
+	{ // field corev1.PodSpec.Tolerations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.Toleration,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Toleration); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.Toleration {
+				return oldObj.Tolerations
+			})
+		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.PodSpec.HostAliases has no validation
+	// field corev1.PodSpec.PriorityClassName has no validation
+	// field corev1.PodSpec.Priority has no validation
+	// field corev1.PodSpec.DNSConfig has no validation
+	// field corev1.PodSpec.ReadinessGates has no validation
+	// field corev1.PodSpec.RuntimeClassName has no validation
+	// field corev1.PodSpec.EnableServiceLinks has no validation
+	// field corev1.PodSpec.PreemptionPolicy has no validation
+	// field corev1.PodSpec.Overhead has no validation
+	// field corev1.PodSpec.TopologySpreadConstraints has no validation
+	// field corev1.PodSpec.SetHostnameAsFQDN has no validation
+	// field corev1.PodSpec.OS has no validation
+	// field corev1.PodSpec.HostUsers has no validation
+	// field corev1.PodSpec.SchedulingGates has no validation
+	// field corev1.PodSpec.ResourceClaims has no validation
+	// field corev1.PodSpec.Resources has no validation
+	// field corev1.PodSpec.HostnameOverride has no validation
+	// field corev1.PodSpec.SchedulingGroup has no validation
+	return errs
+}
+
+// Validate_PodTemplate validates an instance of PodTemplate according
+// to declarative validation rules in the API schema.
+func Validate_PodTemplate(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodTemplate) (errs field.ErrorList) {
+
+	// field corev1.PodTemplate.TypeMeta has no validation
+	// field corev1.PodTemplate.ObjectMeta has no validation
+
+	{ // field corev1.PodTemplate.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodTemplate) *corev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_PodTemplateSpec validates an instance of PodTemplateSpec according
+// to declarative validation rules in the API schema.
+func Validate_PodTemplateSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodTemplateSpec) (errs field.ErrorList) {
+
+	// field corev1.PodTemplateSpec.ObjectMeta has no validation
+
+	{ // field corev1.PodTemplateSpec.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodTemplateSpec) *corev1.PodSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	return errs
 }
 
 // Validate_ReplicationController validates an instance of ReplicationController according
@@ -207,7 +422,37 @@ func Validate_ReplicationControllerSpec(
 	}
 
 	// field corev1.ReplicationControllerSpec.Selector has no validation
-	// field corev1.ReplicationControllerSpec.Template has no validation
+
+	{ // field corev1.ReplicationControllerSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.ReplicationControllerSpec) *corev1.PodTemplateSpec {
+				return oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), obj.Template, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -255,5 +500,49 @@ func Validate_Secret(
 		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+// Validate_Toleration validates an instance of Toleration according
+// to declarative validation rules in the API schema.
+func Validate_Toleration(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Toleration) (errs field.ErrorList) {
+
+	{ // field corev1.Toleration.Key
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Toleration) *string {
+				return &oldObj.Key
+			})
+		errs = append(errs, fn(fldPath.Child("key"), &obj.Key, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.Toleration.Operator has no validation
+	// field corev1.Toleration.Value has no validation
+	// field corev1.Toleration.Effect has no validation
+	// field corev1.Toleration.TolerationSeconds has no validation
 	return errs
 }

@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -32,6 +33,7 @@ import (
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -134,6 +136,79 @@ func Validate_RuntimeClassSpec(
 	}
 
 	// field nodev1alpha1.RuntimeClassSpec.Overhead has no validation
-	// field nodev1alpha1.RuntimeClassSpec.Scheduling has no validation
+
+	{ // field nodev1alpha1.RuntimeClassSpec.Scheduling
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *nodev1alpha1.Scheduling,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_Scheduling(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.RuntimeClassSpec) *nodev1alpha1.Scheduling {
+				return oldObj.Scheduling
+			})
+		errs = append(errs, fn(fldPath.Child("scheduling"), obj.Scheduling, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_Scheduling validates an instance of Scheduling according
+// to declarative validation rules in the API schema.
+func Validate_Scheduling(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *nodev1alpha1.Scheduling) (errs field.ErrorList) {
+
+	// field nodev1alpha1.Scheduling.NodeSelector has no validation
+
+	{ // field nodev1alpha1.Scheduling.Tolerations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.Toleration,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, v1.Validate_Toleration); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.Scheduling) []corev1.Toleration {
+				return oldObj.Tolerations
+			})
+		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
