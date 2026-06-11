@@ -1274,12 +1274,12 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 }
 
 func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 
 	for _, tc := range tcases {
 		var providersHints []map[string][]TopologyHint
 		for _, provider := range tc.hp {
-			hints := provider.GetTopologyHints(&v1.Pod{}, &v1.Container{})
+			hints := provider.GetTopologyHints(ctx, &v1.Pod{}, &v1.Container{})
 			providersHints = append(providersHints, hints)
 		}
 

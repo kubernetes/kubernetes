@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -180,9 +181,9 @@ func (p *staticPolicy) validatePodScopeResources(logger logr.Logger, pod *v1.Pod
 // It's called once per pod by the Topology Manager's pod-scope admit handler.
 // The logic here allocates a single NUMA-aligned "bubble" of memory for the
 // entire pod. All containers within the pod will share this NUMA binding.
-func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) (rerr error) {
+func (p *staticPolicy) AllocatePod(ctx context.Context, s state.State, pod *v1.Pod) (rerr error) {
 	podUID := string(pod.UID)
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod))
 	logger.V(4).Info("AllocatePod called for pod-level managed pod")
 
 	qos := v1qos.GetPodQOS(pod)
@@ -421,9 +422,9 @@ func memoryBlocksToString(blocks []state.Block) string {
 }
 
 // Allocate call is idempotent
-func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	// allocate the memory only for guaranteed pods
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name)
 
 	podUID := string(pod.UID)
 	// Allocate the memory only for guaranteed pods
@@ -771,8 +772,8 @@ func getPodRequestedResources(logger logr.Logger, pod *v1.Pod) (map[v1.ResourceN
 	return reqRsrcs, nil
 }
 
-func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -829,8 +830,8 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil

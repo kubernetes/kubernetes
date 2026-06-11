@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -51,7 +52,7 @@ func (p *nonePolicy) Start(logger logr.Logger, s state.State) error {
 	return nil
 }
 
-func (p *nonePolicy) Allocate(_ logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *nonePolicy) Allocate(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
@@ -59,15 +60,15 @@ func (p *nonePolicy) RemoveContainer(_ logr.Logger, s state.State, podUID string
 	return nil
 }
 
-func (p *nonePolicy) GetTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetTopologyHints(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetPodTopologyHints(_ context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) error {
+func (p *nonePolicy) AllocatePod(_ context.Context, s state.State, pod *v1.Pod) error {
 	return nil
 }
 

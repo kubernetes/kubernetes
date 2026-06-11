@@ -663,7 +663,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	if testCase.reservedCPUs != nil {
 		cpus = testCase.reservedCPUs.Clone()
 	}
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
 	if err != nil {
 		t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -675,7 +675,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	}
 
 	container := &testCase.pod.Spec.Containers[0]
-	err = policy.Allocate(logger, st, testCase.pod, container)
+	err = policy.Allocate(ctx, st, testCase.pod, container)
 	if !reflect.DeepEqual(err, testCase.expErr) {
 		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
 			testCase.description, testCase.expErr, err)
@@ -738,7 +738,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
+		logger, ctx := ktesting.NewTestContext(t)
 		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -752,7 +752,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			_ = policy.Allocate(logger, st, pod, &container)
+			_ = policy.Allocate(ctx, st, pod, &container)
 		}
 		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %s but got %s",
@@ -795,7 +795,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
+		logger, ctx := ktesting.NewTestContext(t)
 		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -809,7 +809,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			err := policy.Allocate(logger, st, pod, &container)
+			err := policy.Allocate(ctx, st, pod, &container)
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 					testCase.description, err)
@@ -1154,7 +1154,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
+		logger, ctx := ktesting.NewTestContext(t)
 		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -1166,7 +1166,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 
 		container := &testCase.pod.Spec.Containers[0]
-		err = policy.Allocate(logger, st, testCase.pod, container)
+		err = policy.Allocate(ctx, st, testCase.pod, container)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1923,7 +1923,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed with %v", err)
@@ -1936,7 +1936,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 
 			for idx := range testCase.pod.Spec.Containers {
 				container := &testCase.pod.Spec.Containers[idx]
-				err := policy.Allocate(logger, st, testCase.pod, container)
+				err := policy.Allocate(ctx, st, testCase.pod, container)
 				if err != nil {
 					t.Fatalf("Allocate failed: pod=%q container=%q", testCase.pod.UID, container.Name)
 				}
@@ -2169,7 +2169,7 @@ func makePodWithContainersAndPodLevelResources(podName, podRequest, podLimit str
 }
 
 func TestStaticPolicyAllocatePod(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 
 	testCases := []staticPolicyAllocatePodTest{
 		{
@@ -2443,7 +2443,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
 
-			err = policy.AllocatePod(logger, st, testCase.pod)
+			err = policy.AllocatePod(ctx, st, testCase.pod)
 			if testCase.expErr != nil {
 				require.Error(t, err)
 
