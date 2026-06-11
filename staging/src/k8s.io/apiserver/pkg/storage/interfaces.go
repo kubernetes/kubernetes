@@ -34,8 +34,14 @@ import (
 // Feature is the name of each feature in storage that we check in feature_support_checker.
 type Feature = string
 
-// RequestWatchProgress is an etcd feature that may use to check if it supported or not.
+// RequestWatchProgress is an etcd feature for progress notification requests.
+// Default: false.
 var RequestWatchProgress Feature = "RequestWatchProgress"
+
+// RangeStream is an etcd feature (etcd 3.7+) for the streaming list RPC.
+// Default: true. MarkUnsupported flips it to false on an Unimplemented response,
+// reverting to true after a recheck interval.
+var RangeStream Feature = "RangeStream"
 
 // Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list. It is required to maintain storage invariants - updating an
