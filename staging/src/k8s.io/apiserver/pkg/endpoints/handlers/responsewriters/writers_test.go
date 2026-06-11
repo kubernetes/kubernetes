@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	rand2 "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters/encodings"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -57,7 +58,7 @@ import (
 const benchmarkSeed = 100
 
 func TestSerializeObjectParallel(t *testing.T) {
-	largePayload := bytes.Repeat([]byte("0123456789abcdef"), defaultGzipThresholdBytes/16+1)
+	largePayload := bytes.Repeat([]byte("0123456789abcdef"), defaultEncodingThresholdBytes/16+1)
 	type test struct {
 		name string
 
@@ -127,7 +128,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 
 func TestSerializeObject(t *testing.T) {
 	smallPayload := []byte("{test-object,test-object}")
-	largePayload := bytes.Repeat([]byte("0123456789abcdef"), defaultGzipThresholdBytes/16+1)
+	largePayload := bytes.Repeat([]byte("0123456789abcdef"), defaultEncodingThresholdBytes/16+1)
 	tests := []struct {
 		name string
 
@@ -252,7 +253,7 @@ func TestSerializeObject(t *testing.T) {
 				"Content-Encoding": []string{"gzip"},
 				"Vary":             []string{"Accept-Encoding"},
 			},
-			wantBody: gzipContent(largePayload, defaultGzipContentEncodingLevel),
+			wantBody: gzipContent(largePayload),
 		},
 
 		{
@@ -290,7 +291,7 @@ func TestSerializeObject(t *testing.T) {
 				"Content-Encoding": []string{"gzip"},
 				"Vary":             []string{"Accept-Encoding"},
 			},
-			wantBody: gzipContent(largePayload, defaultGzipContentEncodingLevel),
+			wantBody: gzipContent(largePayload),
 		},
 
 		{
@@ -348,7 +349,7 @@ func TestSerializeObject(t *testing.T) {
 				"Content-Encoding": []string{"gzip"},
 				"Vary":             []string{"Accept-Encoding"},
 			},
-			wantBody: gzipContent([]byte(": "+string(largePayload)), defaultGzipContentEncodingLevel),
+			wantBody: gzipContent([]byte(": "+string(largePayload))),
 		},
 	}
 	for _, tt := range tests {
@@ -380,8 +381,8 @@ func TestSerializeObject(t *testing.T) {
 }
 
 func TestDeferredResponseWriter_Write(t *testing.T) {
-	smallChunk := bytes.Repeat([]byte("b"), defaultGzipThresholdBytes-1)
-	largeChunk := bytes.Repeat([]byte("b"), defaultGzipThresholdBytes+1)
+	smallChunk := bytes.Repeat([]byte("b"), defaultEncodingThresholdBytes-1)
+	largeChunk := bytes.Repeat([]byte("b"), defaultEncodingThresholdBytes+1)
 
 	tests := []struct {
 		name          string
@@ -482,7 +483,7 @@ func TestDeferredResponseWriter_Write(t *testing.T) {
 			drw := &deferredResponseWriter{
 				mediaType:       "text/plain",
 				statusCode:      200,
-				contentEncoding: "gzip",
+				contentEncoding: encodings.Gzip,
 				hw:              mockResponseWriter,
 				ctx:             context.Background(),
 			}
@@ -551,7 +552,7 @@ func benchmarkChunkingGzip(b *testing.B, count int, chunk []byte) {
 	drw := &deferredResponseWriter{
 		mediaType:       "text/plain",
 		statusCode:      200,
-		contentEncoding: "gzip",
+		contentEncoding: encodings.Gzip,
 		hw:              mockResponseWriter,
 		ctx:             context.Background(),
 	}
@@ -807,9 +808,9 @@ func (e *fakeEncoder) Identifier() runtime.Identifier {
 	return runtime.Identifier("fake")
 }
 
-func gzipContent(data []byte, level int) []byte {
+func gzipContent(data []byte) []byte {
 	buf := &bytes.Buffer{}
-	gw, err := gzip.NewWriterLevel(buf, level)
+	gw, err := gzip.NewWriterLevel(buf, 1)
 	if err != nil {
 		panic(err)
 	}
@@ -823,7 +824,7 @@ func gzipContent(data []byte, level int) []byte {
 }
 
 func TestStreamingGzipIntegration(t *testing.T) {
-	largeChunk := bytes.Repeat([]byte("b"), defaultGzipThresholdBytes+1)
+	largeChunk := bytes.Repeat([]byte("b"), defaultEncodingThresholdBytes+1)
 	tcs := []struct {
 		name            string
 		serializer      runtime.Encoder
@@ -894,7 +895,7 @@ func TestStreamingGzipIntegration(t *testing.T) {
 			drw := &deferredResponseWriter{
 				mediaType:       "text/plain",
 				statusCode:      200,
-				contentEncoding: "gzip",
+				contentEncoding: encodings.Gzip,
 				hw:              mockResponseWriter,
 				ctx:             context.Background(),
 			}
