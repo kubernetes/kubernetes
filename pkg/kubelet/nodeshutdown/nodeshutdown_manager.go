@@ -128,6 +128,16 @@ func newPodManager(conf *Config) *podManager {
 // killPods terminates pods by priority.
 func (m *podManager) killPods(ctx context.Context, activePods []*v1.Pod) error {
 	groups := groupByPriority(m.shutdownGracePeriodByPodPriority, activePods)
+
+	// Wait for any pre-existing unmounted volumes to be fully detached.
+	// This handles the case where pods were deleted/evicted just before shutdown,
+	// and their volumes are still being unstaged. Without this wait, we might kill
+	// CSI drivers (which could be in the first or only group) before those orphan
+	// volumes finish unstaging.
+	if err := m.volumeManager.WaitForAllPodsUnmount(ctx, nil); err != nil {
+		m.logger.Error(err, "Failed waiting for pre-existing unmounted volumes to detach")
+	}
+
 	for _, group := range groups {
 		select {
 		case <-ctx.Done():
