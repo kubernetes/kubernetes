@@ -88,6 +88,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodeinfocache"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
@@ -318,6 +319,7 @@ func newTestKubeletWithImageList(
 	kubelet.reasonCache = NewReasonCache()
 	podCache := containertest.NewFakeCache(kubelet.containerRuntime)
 	kubelet.podCache = podCache
+	kubelet.nodeInfoCache = nodeinfocache.New()
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn: kubelet.SyncPod,
 		cache:     kubelet.podCache,
@@ -423,7 +425,7 @@ func newTestKubeletWithImageList(
 	handlers = append(handlers, shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
-	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources, kubelet.nodeInfoCache))
 
 	if !excludeAdmitHandlers {
 		kubelet.allocationManager.AddPodAdmitHandlers(handlers)
@@ -997,6 +999,63 @@ func TestHandlePortConflicts(t *testing.T) {
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
 }
 
+// TestHandlePodAdditions_MirrorPodNotCached locks in the invariant that the
+// NodeInfo cache holds only non-mirror admitted pods. A mirror pod must never
+// reach the cache: in HandlePodAdditions the wasMirror continue precedes the
+// AddPod, and in HandlePodUpdates/HandlePodReconcile GetPodByUID returns nil for
+// a mirror UID (podManager stores mirror pods separately). A regression would
+// double-count the static pod's resources — once for the static pod, once for
+// its mirror — silently over-counting node usage during admission.
+func TestHandlePodAdditions_MirrorPodNotCached(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "testNode", UID: types.UID("testNode")}
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, "TEST", "")
+
+	spec := v1.PodSpec{NodeName: string(kl.nodeName)}
+
+	// A regular pod is admitted and added to the cache (baseline = 1).
+	regularPod := podWithUIDNameNsSpec("11111111", "static-foo", "ns", spec)
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{regularPod})
+	if got := len(kl.nodeInfoCache.Snapshot().Pods); got != 1 {
+		t.Fatalf("after admitting a regular pod: cache has %d pods, want 1", got)
+	}
+
+	// The mirror pod for that static pod (distinct UID, mirror annotation) must
+	// NOT be added on ADD — the wasMirror continue filters it before AddPod.
+	mirrorPod := podWithUIDNameNsSpec("22222222", "static-foo", "ns", spec)
+	mirrorPod.Annotations = map[string]string{
+		kubetypes.ConfigSourceAnnotationKey: "api",
+		kubetypes.ConfigMirrorAnnotationKey: "mirror",
+	}
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{mirrorPod})
+	if got := len(kl.nodeInfoCache.Snapshot().Pods); got != 1 {
+		t.Fatalf("after a mirror pod ADD: cache has %d pods, want 1 (mirror pod must not be cached)", got)
+	}
+
+	// A mirror pod UPDATE must likewise leave the cache unchanged — GetPodByUID
+	// returns nil for the mirror UID, so the oldPod != nil guard skips it.
+	kl.HandlePodUpdates(tCtx, []*v1.Pod{mirrorPod})
+	if got := len(kl.nodeInfoCache.Snapshot().Pods); got != 1 {
+		t.Fatalf("after a mirror pod UPDATE: cache has %d pods, want 1 (mirror pod must not be cached)", got)
+	}
+}
+
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -1262,7 +1321,7 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
-	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc)})
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc, lifecycle.NewNodeInfoProviderStub())})
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{

@@ -22,9 +22,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/utils/ptr"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -36,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/utils/ptr"
 )
 
 var (
@@ -835,6 +837,148 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 			actualResult := rejectPodAdmissionBasedOnSupplementalGroupsPolicy(test.pod, test.node)
 			if test.expectRejection != actualResult {
 				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}
+
+// newResizablePod builds a pod with stable identity and a single container
+// requesting cpuMilli of CPU. Two pods built with the same name share a UID
+// (and namespace/name), so the scheduler-framework NodeInfo treats them as the
+// same pod. That identity match is what lets NodeInfo.RemovePod recognize an
+// old version of a pod against its resized version during admission.
+func newResizablePod(name string, cpuMilli int64) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+			UID:       apitypes.UID(name),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c0",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(cpuMilli, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}
+}
+
+// TestAdmitResizeOperation exercises predicateAdmitHandler.Admit() with
+// Operation: ResizeOperation — the branch that calls NodeInfo.RemovePod() on
+// the snapshot before resource fitting, so accounting reflects only the OTHER
+// pods on the node. The existing predicate tests call generalFilter() directly
+// and never go through Admit(), so the Snapshot()/RemovePod path is uncovered.
+//
+// The decisive check is a CONTRAST: with the same NodeInfo snapshot (which
+// already contains the old version of the pod) and the same resized pod,
+// ResizeOperation and AddOperation must reach OPPOSITE admission results. That
+// difference is produced solely by the RemovePod branch — nothing else differs
+// between the two calls.
+//
+// Worked example (single CPU dimension):
+//
+//	node allocatable CPU        = 10
+//	old pod already in snapshot =  6   (NewNodeInfoProviderStubWithPods)
+//	resized pod being admitted  =  8
+//
+//	ResizeOperation: RemovePod subtracts the old 6 -> 0 used -> 8 <= 10 -> ADMIT
+//	AddOperation:    no removal, 6 already used    -> 6 + 8 = 14 > 10  -> REJECT
+//
+// If both operations yield the same result, the RemovePod branch is not being
+// exercised — that means the table numbers are wrong, not the code.
+func TestAdmitResizeOperation(t *testing.T) {
+	tests := []struct {
+		name         string
+		nodeCPUMilli int64     // node allocatable CPU
+		snapshotCPU  int64     // CPU requested by the pod already in the snapshot (old version)
+		admitCPU     int64     // CPU requested by the pod being admitted (resized version)
+		operation    Operation // AddOperation or ResizeOperation
+		wantAdmit    bool
+	}{
+		{
+			// Baseline new-pod admission. Existing pod in the snapshot uses
+			// 4 CPU; admit pod requests 4 CPU. 4 + 4 = 8 <= 10 -> ADMIT.
+			name:         "AddOperation_fits",
+			nodeCPUMilli: 10,
+			snapshotCPU:  4,
+			admitCPU:     4,
+			operation:    AddOperation,
+			wantAdmit:    true,
+		},
+		{
+			// CONTRAST PAIR (1/2): AddOperation does NOT call RemovePod, so
+			// the old version's 6 CPU stays counted: 6 + 8 = 14 > 10 -> REJECT.
+			name:         "AddOperation_double_counts_into_overcommit",
+			nodeCPUMilli: 10,
+			snapshotCPU:  6,
+			admitCPU:     8,
+			operation:    AddOperation,
+			wantAdmit:    false,
+		},
+		{
+			// CONTRAST PAIR (2/2): identical inputs to the case above, but
+			// ResizeOperation triggers RemovePod -> 0 used + 8 requested = 8
+			// <= 10 -> ADMIT. The opposite verdict with identical inputs is
+			// the load-bearing signal that the RemovePod branch is exercised.
+			name:         "ResizeOperation_fits_only_after_removal",
+			nodeCPUMilli: 10,
+			snapshotCPU:  6,
+			admitCPU:     8,
+			operation:    ResizeOperation,
+			wantAdmit:    true,
+		},
+		{
+			// Resize that still exceeds node capacity even after the old
+			// allocation is removed: 0 + 15 > 10 -> REJECT.
+			name:         "ResizeOperation_exceeds_capacity_even_after_removal",
+			nodeCPUMilli: 10,
+			snapshotCPU:  6,
+			admitCPU:     15,
+			operation:    ResizeOperation,
+			wantAdmit:    false,
+		},
+		{
+			// Shrinking resize: new request <= old request <= capacity. Always fits.
+			name:         "ResizeOperation_shrink_fits",
+			nodeCPUMilli: 10,
+			snapshotCPU:  8,
+			admitCPU:     4,
+			operation:    ResizeOperation,
+			wantAdmit:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldPod := newResizablePod("resize-pod", tc.snapshotCPU)
+			// Same name -> same UID, so NodeInfo.RemovePod can match this
+			// resized pod against oldPod in the snapshot.
+			admitPod := newResizablePod("resize-pod", tc.admitCPU)
+
+			node := makeTestNode(v1.ResourceList{
+				v1.ResourceCPU:  *resource.NewMilliQuantity(tc.nodeCPUMilli, resource.DecimalSI),
+				v1.ResourcePods: *resource.NewQuantity(10, resource.DecimalSI),
+			})
+
+			w := &predicateAdmitHandler{
+				getNodeAnyWayFunc: func(ctx context.Context, useCache bool) (*v1.Node, error) {
+					return node, nil
+				},
+				pluginResourceUpdateFunc: func(*schedulerframework.NodeInfo, *PodAdmitAttributes) error {
+					return nil
+				},
+				admissionFailureHandler: NewAdmissionFailureHandlerStub(),
+				nodeInfoProvider:        NewNodeInfoProviderStubWithPods([]*v1.Pod{oldPod}),
+			}
+
+			result := w.Admit(context.TODO(), &PodAdmitAttributes{Pod: admitPod, Operation: tc.operation})
+			if result.Admit != tc.wantAdmit {
+				t.Errorf("Admit() Admit = %v (reason %q, message %q), want %v",
+					result.Admit, result.Reason, result.Message, tc.wantAdmit)
 			}
 		})
 	}
