@@ -168,6 +168,14 @@ type ControllerExpectationsInterface interface {
 // ControllerExpectations is a cache mapping controllers to what they expect to see before being woken up for a sync.
 type ControllerExpectations struct {
 	cache.Store
+	clock clock.Clock
+}
+
+func (r *ControllerExpectations) getClock() clock.Clock {
+	if r.clock != nil {
+		return r.clock
+	}
+	return clock.RealClock{}
 }
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
@@ -197,7 +205,7 @@ func (r *ControllerExpectations) SatisfiedExpectations(logger klog.Logger, contr
 		if exp.Fulfilled() {
 			logger.V(4).Info("Controller expectations fulfilled", "expectations", exp)
 			return true
-		} else if exp.isExpired() {
+		} else if exp.isExpired(r.getClock()) {
 			logger.V(4).Info("Controller expectations expired", "expectations", exp)
 			return true
 		} else {
@@ -219,16 +227,13 @@ func (r *ControllerExpectations) SatisfiedExpectations(logger klog.Logger, contr
 	return true
 }
 
-// TODO: Extend ExpirationCache to support explicit expiration.
-// TODO: Make this possible to disable in tests.
-// TODO: Support injection of clock.
-func (exp *ControlleeExpectations) isExpired() bool {
-	return clock.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
+func (exp *ControlleeExpectations) isExpired(clk clock.Clock) bool {
+	return clk.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(logger klog.Logger, controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
+	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: r.getClock().Now()}
 	logger.V(4).Info("Setting expectations", "expectations", exp)
 	return r.Add(exp)
 }
@@ -310,9 +315,26 @@ func (e *ControlleeExpectations) MarshalLog() interface{} {
 	}
 }
 
+// ExpectationsClock is the default clock used for new controller expectations.
+// Can be overridden during testing to simulate timeouts without real-world sleep.
+//
+// CONCURRENCY WARNING: Mutating this global variable will affect all controllers
+// created in the same process. Tests that mutate this variable MUST NOT be run
+// in parallel with other tests (do not use t.Parallel()), as it will cause
+// unpredictable clock skews and test flakes.
+var ExpectationsClock clock.Clock = clock.RealClock{}
+
 // NewControllerExpectations returns a store for ControllerExpectations.
 func NewControllerExpectations() *ControllerExpectations {
-	return &ControllerExpectations{cache.NewStore(ExpKeyFunc)}
+	return NewControllerExpectationsWithClock(ExpectationsClock)
+}
+
+// NewControllerExpectationsWithClock returns a store for ControllerExpectations using the specified clock.
+func NewControllerExpectationsWithClock(clk clock.Clock) *ControllerExpectations {
+	return &ControllerExpectations{
+		Store: cache.NewStore(ExpKeyFunc),
+		clock: clk,
+	}
 }
 
 // UIDSetKeyFunc to parse out the key from a UIDSet.
