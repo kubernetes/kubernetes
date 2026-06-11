@@ -17,10 +17,12 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"strings"
 	"testing"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -170,5 +172,80 @@ func TestHPAScaleToZero(t *testing.T) {
 	}
 	if !foundScaledToZero {
 		t.Fatal("Phase 3: ScaledToZero condition not found on HPA status")
+	}
+}
+
+// TestHPAScaleToZeroRejected verifies that scaling to zero is limited to object
+// and external metrics and is guarded by the HPAScaleToZero feature gate. In
+// both cases below the API server must reject an HPA with minReplicas: 0:
+//   - a resource (CPU) metric is never eligible to scale to zero, even with the
+//     feature gate enabled, and
+//   - while the feature gate is disabled, minReplicas: 0 is forbidden even for
+//     an otherwise eligible external metric.
+func TestHPAScaleToZeroRejected(t *testing.T) {
+	cpuMetric := autoscalingv2.MetricSpec{
+		Type: autoscalingv2.ResourceMetricSourceType,
+		Resource: &autoscalingv2.ResourceMetricSource{
+			Name: corev1.ResourceCPU,
+			Target: autoscalingv2.MetricTarget{
+				Type:               autoscalingv2.UtilizationMetricType,
+				AverageUtilization: ptr.To[int32](50),
+			},
+		},
+	}
+	externalMetric := autoscalingv2.MetricSpec{
+		Type: autoscalingv2.ExternalMetricSourceType,
+		External: &autoscalingv2.ExternalMetricSource{
+			Metric: autoscalingv2.MetricIdentifier{
+				Name: externalMetricName,
+			},
+			Target: autoscalingv2.MetricTarget{
+				Type:         autoscalingv2.ValueMetricType,
+				AverageValue: new(resource.MustParse("100")),
+			},
+		},
+	}
+
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		metricSpec         autoscalingv2.MetricSpec
+		wantErrSubstring   string
+	}{
+		{
+			name:               "resource metric is not eligible to scale to zero",
+			featureGateEnabled: true,
+			metricSpec:         cpuMetric,
+			wantErrSubstring:   "at least one Object or External metric",
+		},
+		{
+			name:               "minReplicas zero is forbidden while the feature gate is disabled",
+			featureGateEnabled: false,
+			metricSpec:         externalMetric,
+			wantErrSubstring:   "minReplicas",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tc.featureGateEnabled)
+
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+			t.Cleanup(server.TearDownFn)
+			clients, _ := createClients(t, server.ClientConfig)
+
+			cs := clients.apiServer
+			ns := createTestNamespace(t, cs)
+			deployment := createDeployment(t, cs, ns.Name, 1)
+
+			hpa := newHPA(deployment, tc.metricSpec, withHPAMinMaxReplicas(0, 10))
+			_, err := cs.AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Create(t.Context(), hpa, metav1.CreateOptions{})
+			if err == nil {
+				t.Fatal("expected creating an HPA with minReplicas: 0 to be rejected, but it succeeded")
+			}
+			if !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), tc.wantErrSubstring) {
+				t.Fatalf("expected an invalid error containing %q, got: %v", tc.wantErrSubstring, err)
+			}
+		})
 	}
 }

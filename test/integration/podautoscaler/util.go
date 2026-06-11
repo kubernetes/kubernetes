@@ -132,7 +132,10 @@ func withHPAMinMaxReplicas(minReplicas, maxReplicas int32) createHPAOption {
 	}
 }
 
-func createHPA(t *testing.T, cs *clientset.Clientset, deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, opts ...createHPAOption) *autoscalingv2.HorizontalPodAutoscaler {
+// newHPA builds an HPA targeting the given deployment with a single metric.
+// It applies opts but does not create the object, so callers can also use it to
+// build HPAs whose creation is expected to be rejected.
+func newHPA(deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, opts ...createHPAOption) *autoscalingv2.HorizontalPodAutoscaler {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hpaName,
@@ -152,7 +155,11 @@ func createHPA(t *testing.T, cs *clientset.Clientset, deployment *appsv1.Deploym
 	for _, opt := range opts {
 		opt(hpa)
 	}
-	hpa, err := cs.AutoscalingV2().HorizontalPodAutoscalers(deployment.Namespace).Create(t.Context(), hpa, metav1.CreateOptions{})
+	return hpa
+}
+
+func createHPA(t *testing.T, cs *clientset.Clientset, deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, opts ...createHPAOption) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa, err := cs.AutoscalingV2().HorizontalPodAutoscalers(deployment.Namespace).Create(t.Context(), newHPA(deployment, metricSpec, opts...), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create HPA: %v", err)
 	}
