@@ -201,6 +201,13 @@ var (
 var UseTestingLog bool
 var PerfSchedulingLabelFilter string
 var TestSchedulingLabelFilter string
+var enableCPUProfile bool
+var enableMemProfile bool
+var enableBlockProfile bool
+var enableMutexProfile bool
+var enableTrace bool
+var withDataItemsUniqueID bool
+var perTestFilePrefix string
 
 // InitTests should be called in a TestMain in each config subdirectory.
 func InitTests() error {
@@ -229,6 +236,12 @@ func InitTests() error {
 	flag.BoolVar(&UseTestingLog, "use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
 	flag.StringVar(&PerfSchedulingLabelFilter, "perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
 	flag.StringVar(&TestSchedulingLabelFilter, "test-scheduling-label-filter", "integration-test,-performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
+	flag.BoolVar(&enableCPUProfile, "perf-cpuprofile", false, "write a CPU profiles for each test")
+	flag.BoolVar(&enableMemProfile, "perf-memprofile", false, "write a memory profile for each test")
+	flag.BoolVar(&enableBlockProfile, "perf-blockprofile", false, "write a block profile for each test")
+	flag.BoolVar(&enableMutexProfile, "perf-mutexprofile", false, "write a mutex profile for each test")
+	flag.BoolVar(&enableTrace, "perf-trace", false, "write an execution trace for each test")
+	flag.BoolVar(&withDataItemsUniqueID, "with-data-items-unique-id", true, "include a unique run ID in the names of files written to -data-items-dir")
 
 	// This would fail if we hadn't removed the logging flags above.
 	logsapi.AddGoFlags(LoggingConfig, flag.CommandLine)
@@ -827,6 +840,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 						}
 					}
 
+					// This is used for our custom .dat files and profile files.
+					if withDataItemsUniqueID {
+						perTestFilePrefix = strings.ReplaceAll(fmt.Sprintf("%s_%s_%s_%s", tc.Name, w.Name, topicName, runID), "/", "_")
+					} else {
+						perTestFilePrefix = strings.ReplaceAll(fmt.Sprintf("%s_%s_%s", tc.Name, w.Name, topicName), "/", "_")
+					}
+
 					results, err := runWorkload(tCtx, tc, w, topicName, scheduler, informerFactory, opts)
 					if err != nil {
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
@@ -867,13 +887,9 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 							continue
 						}
 
-						destFile, err := dataFilename(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s_%s.dat", tc.Name, w.Name, topicName, runID), "/", "_"))
+						f, err := createOutputFile(".dat")
 						if err != nil {
 							b.Fatalf("prepare data file: %v", err)
-						}
-						f, err := os.Create(destFile)
-						if err != nil {
-							b.Fatalf("create data file: %v", err)
 						}
 
 						// Print progress over time.

@@ -69,7 +69,7 @@ const (
 	throughputSampleInterval = time.Second
 )
 
-var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
+var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard or performance profiles")
 
 var runID = time.Now().Format(dateFormat)
 
@@ -314,15 +314,20 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	return os.WriteFile(destFile, formatted.Bytes(), 0644)
 }
 
-func dataFilename(destFile string) (string, error) {
+func createOutputFile(suffix string) (*os.File, error) {
+	destFile := perTestFilePrefix + suffix
 	if *dataItemsDir != "" {
 		// Ensure the "dataItemsDir" path is valid.
 		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
-			return "", fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %w", *dataItemsDir, err)
+			return nil, fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %w", *dataItemsDir, err)
 		}
 		destFile = path.Join(*dataItemsDir, destFile)
 	}
-	return destFile, nil
+	f, err := os.Create(destFile)
+	if err != nil {
+		return nil, fmt.Errorf("create output file: %w", err)
+	}
+	return f, nil
 }
 
 type labelValues struct {
