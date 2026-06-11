@@ -32,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 	traceservice "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -48,6 +49,7 @@ import (
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -324,6 +326,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 }
 
 func TestAPIServerTracing(t *testing.T) {
+	klog.SetLogger(logr.Discard())
 	// Listen for traces from the API Server before starting it, so the
 	// API Server will successfully connect right away during the test.
 	listener, err := net.Listen("tcp", "localhost:")
@@ -1264,6 +1267,12 @@ func (t traceExpectation) updateForSpan(span *tracev1.Span, traceID trace.TraceI
 		return
 	}
 	for i, spanExpectation := range t {
+		if span.Name == "WatchServer.HandleHTTP" {
+			fmt.Printf("Span %s duration: %v\n", span.Name, time.Duration(span.EndTimeUnixNano-span.StartTimeUnixNano)*time.Nanosecond)
+			for _, event := range span.GetEvents() {
+				fmt.Printf("Event %v\n", event)
+			}
+		}
 		if spanExpectation.name != "" && span.Name != spanExpectation.name {
 			continue
 		}
