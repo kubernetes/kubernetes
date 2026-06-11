@@ -161,8 +161,7 @@
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
         "google.golang.org/grpc",
-        "google.golang.org/protobuf",
-        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
+        "google.golang.org/protobuf"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
