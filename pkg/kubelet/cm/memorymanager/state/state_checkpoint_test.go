@@ -111,46 +111,46 @@ func TestCheckpointStateRestore(t *testing.T) {
 		expectedState     *stateMemory
 	}{
 		{
-			"Restore non-existing checkpoint",
-			nil,
-			"",
-			"none",
-			"",
-			&stateMemory{},
+			description:       "Restore non-existing checkpoint",
+			fgRequirements:    nil,
+			checkpointContent: "",
+			policyName:        "none",
+			expectedError:     "",
+			expectedState:     &stateMemory{},
 		},
 		{
-			"Fail to restore checkpoint without data section",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint without data section",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 4215593881,
 				"dataChecksum": 1234
 			}`,
-			"none",
-			"could not load v3 checkpoint: failed to deserialize memory manager checkpoint data: unexpected end of JSON input",
-			&stateMemory{},
+			policyName:    "none",
+			expectedError: "could not load v3 checkpoint: failed to deserialize memory manager checkpoint data: unexpected end of JSON input",
+			expectedState: &stateMemory{},
 		},
 		{
-			"Fail to restore checkpoint without dataChecksum section",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint without dataChecksum section",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 4215593881,
 				"data": "{\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}"
 			}`,
-			"none",
-			"could not load v3 checkpoint: checkpoint is corrupted",
-			&stateMemory{},
+			policyName:    "none",
+			expectedError: "could not load v3 checkpoint: checkpoint is corrupted",
+			expectedState: &stateMemory{},
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore valid checkpoint",
-			nil,
-			`{
+			description:    "Restore valid checkpoint",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"other",
 				"machineState":{"0":{"numberOfAssignments":5,"memoryMap":{"memory":{"total":1024,"systemReserved":256,"allocatable":768,"reserved":256,"free":512}},"cells":[]}},
 				"entries":{"pod":{"containerX":[{"numaAffinity":[0],"type":"memory","size":128}]}},
@@ -158,9 +158,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}",
 				"dataChecksum": 1849615440
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -188,9 +188,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Fail to restore checkpoint with invalid dataChecksum",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint with invalid dataChecksum",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
@@ -198,14 +198,14 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}",
 				"dataChecksum": 1234
 			}`,
-			"none",
-			"could not load v3 checkpoint: checkpoint is corrupted",
-			&stateMemory{},
+			policyName:    "none",
+			expectedError: "could not load v3 checkpoint: checkpoint is corrupted",
+			expectedState: &stateMemory{},
 		},
 		{
-			"Fail to restore checkpoint with invalid data JSON",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint with invalid data JSON",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
@@ -213,23 +213,23 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{",
 				"dataChecksum": 1234
 			}`,
-			"none",
-			"could not load v3 checkpoint: failed to deserialize memory manager checkpoint data: unexpected end of JSON input",
-			&stateMemory{},
+			policyName:    "none",
+			expectedError: "could not load v3 checkpoint: failed to deserialize memory manager checkpoint data: unexpected end of JSON input",
+			expectedState: &stateMemory{},
 		},
 		{
-			"Fail to restore checkpoint with invalid JSON",
-			nil,
-			`{`,
-			"none",
-			"unexpected end of JSON input",
-			&stateMemory{},
+			description:       "Fail to restore checkpoint with invalid JSON",
+			fgRequirements:    nil,
+			checkpointContent: `{`,
+			policyName:        "none",
+			expectedError:     "unexpected end of JSON input",
+			expectedState:     &stateMemory{},
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Fail to restore checkpoint with invalid policy name",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint with invalid policy name",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"other",
 				"machineState":{"0":{"numberOfAssignments":5,"memoryMap":{"memory":{"total":1024,"systemReserved":256,"allocatable":768,"reserved":256,"free":512}},"cells":[]}},
 				"entries":{"pod":{"containerX":[{"numaAffinity":[0],"type":"memory","size":128}]}},
@@ -237,15 +237,15 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}",
 				"dataChecksum": 1849615440
 			}`,
-			"none",
-			`[memorymanager] configured policy "none" differs from state checkpoint policy "static"`,
-			&stateMemory{},
+			policyName:    "none",
+			expectedError: `[memorymanager] configured policy "none" differs from state checkpoint policy "static"`,
+			expectedState: &stateMemory{},
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore checkpoint ignoring unknown fields in data section",
-			nil,
-			`{
+			description:    "Restore checkpoint ignoring unknown fields in data section",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"other",
 				"machineState":{"0":{"numberOfAssignments":5,"memoryMap":{"memory":{"total":1024,"systemReserved":256,"allocatable":768,"reserved":256,"free":512}},"cells":[]}},
 				"entries":{"pod":{"containerX":[{"numaAffinity":[0],"type":"memory","size":128}]}},
@@ -253,9 +253,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{\"unknownField\":\"value\",\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}",
 				"dataChecksum": 2100279793
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -283,17 +283,17 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from v1 (migration)",
-			nil,
-			`{
+			description:    "Restore checkpoint from v1 (migration)",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 4215593881
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -322,18 +322,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below testcase podEntries is intentionally corrupted so loading v2 will fail and fallback to v1.
 		{
-			"Restore checkpoint from v1 (migration) with checksum zeroed",
-			nil,
-			`{
+			description:    "Restore checkpoint from v1 (migration) with checksum zeroed",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"podEntries":{"pod":3},
 				"checksum": 0
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -361,31 +361,31 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Fail to restore checkpoint from v1 with invalid checksum",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint from v1 with invalid checksum",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"affinity":[0],"type":"memory","size":512}]}},
 				"checksum": 101010
 			}`,
-			"static",
-			"checkpoint is corrupted",
-			&stateMemory{},
+			policyName:    "static",
+			expectedError: "checkpoint is corrupted",
+			expectedState: &stateMemory{},
 		},
 		{
-			"Restore checkpoint from v2 with PodLevelResourceManagers enabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: true},
-			`{
+			description:    "Restore checkpoint from v2 with PodLevelResourceManagers enabled",
+			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: true},
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 1278640530
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -424,18 +424,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from v2 with PodLevelResourceManagers disabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: false},
-			`{
+			description:    "Restore checkpoint from v2 with PodLevelResourceManagers disabled",
+			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: false},
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 1278640530
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -463,18 +463,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from v2 with zeroed checksum and with PodLevelResourceManagers enabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: true},
-			`{
+			description:    "Restore checkpoint from v2 with zeroed checksum and with PodLevelResourceManagers enabled",
+			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: true},
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 0
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -513,18 +513,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from v2 with zeroed checksum and with PodLevelResourceManagers disabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: false},
-			`{
+			description:    "Restore checkpoint from v2 with zeroed checksum and with PodLevelResourceManagers disabled",
+			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: false},
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 0
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -552,24 +552,24 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Fail to restore checkpoint from v2 with invalid checksum",
-			nil,
-			`{
+			description:    "Fail to restore checkpoint from v2 with invalid checksum",
+			fgRequirements: nil,
+			checkpointContent: `{
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 101010
 			}`,
-			"static",
-			"checkpoint is corrupted",
-			&stateMemory{},
+			policyName:    "static",
+			expectedError: "checkpoint is corrupted",
+			expectedState: &stateMemory{},
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore checkpoint from v3 with PodLevelResourceManagers enabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: true},
-			`{
+			description:    "Restore checkpoint from v3 with PodLevelResourceManagers enabled",
+			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: true},
+			checkpointContent: `{
 				"policyName":"other",
 				"machineState":{"0":{"numberOfAssignments":5,"memoryMap":{"memory":{"total":1024,"systemReserved":256,"allocatable":768,"reserved":256,"free":512}},"cells":[]}},
 				"entries":{"pod":{"containerX":[{"numaAffinity":[0],"type":"memory","size":128}]}},
@@ -578,9 +578,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}},\"podEntries\":{\"pod\":{\"memoryBlocks\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}",
 				"dataChecksum": 637296054
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
@@ -620,9 +620,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore checkpoint from v3 with PodLevelResourceManagers disabled",
-			FeatureGateCombination{features.PodLevelResourceManagers: false},
-			`{
+			description:    "Restore checkpoint from v3 with PodLevelResourceManagers disabled",
+			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: false},
+			checkpointContent: `{
 				"policyName":"other",
 				"machineState":{"0":{"numberOfAssignments":5,"memoryMap":{"memory":{"total":1024,"systemReserved":256,"allocatable":768,"reserved":256,"free":512}},"cells":[]}},
 				"entries":{"pod":{"containerX":[{"numaAffinity":[0],"type":"memory","size":128}]}},
@@ -631,9 +631,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"data": "{\"policyName\":\"static\",\"machineState\":{\"0\":{\"numberOfAssignments\":0,\"memoryMap\":{\"memory\":{\"total\":2048,\"systemReserved\":512,\"allocatable\":1536,\"reserved\":512,\"free\":1024}},\"cells\":[]}},\"entries\":{\"pod\":{\"container1\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}},\"podEntries\":{\"pod\":{\"memoryBlocks\":[{\"numaAffinity\":[0],\"type\":\"memory\",\"size\":512}]}}}",
 				"dataChecksum": 637296054
 			}`,
-			"static",
-			"",
-			&stateMemory{
+			policyName:    "static",
+			expectedError: "",
+			expectedState: &stateMemory{
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
