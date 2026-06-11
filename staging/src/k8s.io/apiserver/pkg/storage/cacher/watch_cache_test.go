@@ -133,6 +133,8 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 	pr := progress.NewConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
 	getCurrentRV := func(context.Context) (uint64, error) {
+		wc.RLock()
+		defer wc.RUnlock()
 		return wc.resourceVersion, nil
 	}
 	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
@@ -1412,4 +1414,111 @@ func TestCacheSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
+}
+
+func TestWatchCacheSnapshotConcurrency(t *testing.T) {
+	testCases := []struct {
+		name                          string
+		listFromSnapshot              bool
+		resourceVersionMatch          metav1.ResourceVersionMatch
+		expectItemRVLessOrEqualListRV bool
+		expectExactResourceVersion    bool
+	}{
+		{
+			name:                          "latest list with snapshotting disabled",
+			listFromSnapshot:              false,
+			resourceVersionMatch:          "",
+			expectItemRVLessOrEqualListRV: true,
+		},
+		{
+			name:                          "latest list with snapshotting enabled",
+			listFromSnapshot:              true,
+			resourceVersionMatch:          "",
+			expectItemRVLessOrEqualListRV: true,
+		},
+		{
+			name:                          "exact match with snapshotting enabled",
+			listFromSnapshot:              true,
+			resourceVersionMatch:          metav1.ResourceVersionMatchExact,
+			expectItemRVLessOrEqualListRV: true,
+			expectExactResourceVersion:    true,
+		},
+	}
+
+	for i := range testCases {
+		tc := &testCases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, tc.listFromSnapshot)
+
+			s := newTestWatchCache(50000, DefaultEventFreshDuration, &cache.Indexers{})
+			defer s.Stop()
+
+			require.NoError(t, s.Add(makeTestPod("initial", 1)))
+
+			testWatchCacheSnapshotConcurrency(t, s, tc.resourceVersionMatch, tc.expectItemRVLessOrEqualListRV, tc.expectExactResourceVersion)
+		})
+	}
+}
+
+func testWatchCacheSnapshotConcurrency(t *testing.T, s *testWatchCache, resourceVersionMatch metav1.ResourceVersionMatch, expectItemRVLessOrEqualListRV, expectExactResourceVersion bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	stopUpdates := make(chan struct{})
+	var wg wait.Group
+	wg.Start(func() {
+		var rv uint64 = 2
+		for {
+			select {
+			case <-stopUpdates:
+				return
+			default:
+				err := s.Update(makeTestPod("pod-test", rv))
+				if err != nil {
+					t.Errorf("failed to update: %v", err)
+					return
+				}
+				rv++
+			}
+		}
+	})
+
+	for j := range 1000 {
+		opts := storage.ListOptions{
+			Recursive:            true,
+			ResourceVersionMatch: resourceVersionMatch,
+		}
+		var targetRV uint64
+		if resourceVersionMatch == metav1.ResourceVersionMatchExact {
+			targetRV = uint64(j + 2)
+			opts.ResourceVersion = strconv.FormatUint(targetRV, 10)
+		}
+
+		resp, _, err := s.WaitUntilFreshAndGetList(ctx, "/prefix/", opts)
+		require.NoError(t, err)
+
+		if expectExactResourceVersion && resp.ResourceVersion != targetRV {
+			t.Errorf("Expected list ResourceVersion %d, got %d", targetRV, resp.ResourceVersion)
+		}
+		if expectItemRVLessOrEqualListRV {
+			maxItemRV := getMaxItemRV(t, s.versioner, resp.Items)
+			if maxItemRV > resp.ResourceVersion {
+				t.Errorf("Violated consistency: max item resource version %d is greater than list resource version %d", maxItemRV, resp.ResourceVersion)
+			}
+		}
+	}
+
+	close(stopUpdates)
+	wg.Wait()
+}
+
+func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}) uint64 {
+	var maxRV uint64
+	for _, item := range items {
+		elem := item.(*store.Element)
+		itemRV, err := versioner.ObjectResourceVersion(elem.Object)
+		require.NoError(t, err)
+		maxRV = max(maxRV, itemRV)
+	}
+	return maxRV
 }
