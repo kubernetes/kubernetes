@@ -167,6 +167,7 @@ func init() {
 			},
 			"status.devices[*].conditions[*].reason": {
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
 			},
 			"status.devices[*].conditions[*].type": {
 				{ErrorType: "FieldValueRequired"},
