@@ -159,6 +159,7 @@ func memqosMakePod(name, namespace string, requests, limits v1.ResourceList) *v1
 			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: new(int64(1)),
 			Containers: []v1.Container{
 				{
 					Name:    "test",
@@ -308,6 +309,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:    "test",
@@ -342,6 +344,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:    "container-1",
@@ -939,6 +942,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:  "mem-eater",
@@ -1001,6 +1005,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:  "oom-trigger",
@@ -1046,6 +1051,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:    "test",
