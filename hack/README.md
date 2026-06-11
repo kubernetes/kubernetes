@@ -1,4 +1,4 @@
-# Kubernetes hack GuideLines
+# Kubernetes hack Guidelines
 
 This document describes how you can use the scripts from [`hack`](.) directory 
 and gives a brief introduction and explanation of these scripts. 
