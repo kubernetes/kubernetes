@@ -8,11 +8,10 @@ godebug default=go1.25
 
 require (
 	google.golang.org/grpc v1.72.2
-	google.golang.org/protobuf v1.36.8
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
 
 require (
-	github.com/google/go-cmp v0.7.0 // indirect
 	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.36.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
