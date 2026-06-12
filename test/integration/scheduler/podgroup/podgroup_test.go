@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	intframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
@@ -843,5 +844,128 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.count)
+	}
+}
+
+// mockPodGroupPostFilterPlugin is a custom PodGroupPostFilter plugin that just counts invocations.
+type mockPodGroupPostFilterPlugin struct {
+	count int
+}
+
+func (m *mockPodGroupPostFilterPlugin) Name() string {
+	return "MockPodGroupPostFilter"
+}
+
+func (m *mockPodGroupPostFilterPlugin) PodGroupPostFilter(ctx context.Context, pgInfo *intframework.PodGroupInfo, pods []*v1.Pod, pgSchedulingFunc intfwk.PodGroupSchedulingFunc) (*intfwk.PodGroupPostFilterResult, *framework.Status) {
+	m.count++
+	return nil, framework.NewStatus(framework.Unschedulable)
+}
+
+func TestPodGroupPostFilterIteration(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:         true,
+		features.GangScheduling:          true,
+		features.WorkloadAwarePreemption: true,
+	})
+
+	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+
+	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
+	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
+		DisruptionModeAll().Priority(100).MinCount(3).Obj()
+
+	// Low priority pods taking up all resources
+	lowPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+		st.MakePod().Namespace("default").Name("low-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Obj(),
+	}
+
+	// High priority pods belonging to a group
+	highPods := []*v1.Pod{
+		st.MakePod().Namespace("default").Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+	}
+
+	mockPlugin := &mockPodGroupPostFilterPlugin{}
+	registry := frameworkruntime.Registry{
+		"MockPodGroupPostFilter": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+			return mockPlugin, nil
+		},
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				PodGroupPostFilter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: "MockPodGroupPostFilter"},
+						{Name: "DefaultPreemption"},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "pg-post-filter-iter",
+		scheduler.WithPodMaxBackoffSeconds(0),
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithProfiles(cfg.Profiles...),
+	)
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// 1. Create low priority pods
+	for _, p := range lowPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// Wait for low priority pods to be scheduled
+	for _, p := range lowPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+		}
+	}
+
+	// 2. Create workload
+	if _, err := cs.SchedulingV1alpha3().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create workload: %v", err)
+	}
+
+	// 3. Create PodGroup
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	// 4. Create high priority pods
+	for _, p := range highPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 5. Verify that MockPodGroupPostFilter was called at least once
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		if mockPlugin.count >= 1 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("MockPodGroupPostFilter was called %d times, expected at least 1", mockPlugin.count)
 	}
 }

@@ -194,13 +194,13 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	// Run workload aware preemption if required. If the preemption is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
 	if sched.workloadAwarePreemptionEnabled && result.status.Code() == fwk.Unschedulable {
-		var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 			res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
 			return &fwk.PodGroupAssignments{
 				ProposedAssignments: makeProposedAssignments(&res),
 			}, res.status
 		}
-		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupInfo, pgSchedulingFunc)
+		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupInfo.PodGroupInfo, podGroupInfo.UnscheduledPods, pgSchedulingFunc)
 		if status.IsSuccess() {
 			result.waitingOnPreemption = true
 			for i := range result.podResults {
