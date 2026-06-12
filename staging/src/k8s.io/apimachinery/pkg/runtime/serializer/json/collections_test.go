@@ -756,7 +756,7 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	normalSerializer := NewSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
 	normalBuffer := &bytes.Buffer{}
 	t.Run("CarpList", func(t *testing.T) {
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			list := &testapigroupv1.CarpList{}
 			f.Fill(list)
 			streamingBuffer.Reset()
@@ -779,7 +779,7 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 		}
 	})
 	t.Run("UnstructuredList", func(t *testing.T) {
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			list := &unstructured.UnstructuredList{}
 			f.Fill(list)
 			streamingBuffer.Reset()
@@ -798,6 +798,70 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 				t.Logf("normal: %s", normalBuffer.String())
 				t.Logf("streaming: %s", streamingBuffer.String())
 				t.Errorf("not matching:\n%s", diff)
+			}
+		}
+	})
+}
+
+func BenchmarkStreamEncodeCollections(b *testing.B) {
+	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
+	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
+		kvs[c.String(0)] = c.Bool()
+		kvs[c.String(0)] = c.Uint64()
+		kvs[c.String(0)] = c.String(0)
+	}
+	f := randfill.New().Funcs(disableFuzzFieldsV1, fuzzMap)
+	carpList := &testapigroupv1.CarpList{}
+	carpList.Items = make([]testapigroupv1.Carp, 1000)
+	for i := range 1000 {
+		f.Fill(&carpList.Items[i])
+	}
+	carpList.Kind = "CarpList"
+	carpList.APIVersion = "testapigroup.k8s.io/v1"
+	carpList.ResourceVersion = "12345"
+	unstructuredList := &unstructured.UnstructuredList{}
+	unstructuredList.Object = map[string]interface{}{
+		"kind":       "List",
+		"apiVersion": "v1",
+		"metadata": map[string]interface{}{
+			"resourceVersion": "12345",
+		},
+	}
+	unstructuredList.Items = make([]unstructured.Unstructured, 1000)
+	for i := range 1000 {
+		unstrMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&carpList.Items[i])
+		if err != nil {
+			b.Fatalf("failed to convert carp to unstructured: %v", err)
+		}
+		unstructuredList.Items[i] = unstructured.Unstructured{Object: unstrMap}
+	}
+	b.Run("CarpList", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			ok, err := streamEncodeCollections(carpList, &buf)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if !ok {
+				b.Fatal("not ok")
+			}
+		}
+	})
+	b.Run("UnstructuredList", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			ok, err := streamEncodeCollections(unstructuredList, &buf)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if !ok {
+				b.Fatal("not ok")
 			}
 		}
 	})

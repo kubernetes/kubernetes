@@ -1074,3 +1074,49 @@ func (b *writeCounter) Write(data []byte) (int, error) {
 	b.writeCount++
 	return b.Writer.Write(data)
 }
+
+func BenchmarkJSONStreaming(b *testing.B) {
+	scheme := runtime.NewScheme()
+	if err := v1.AddToScheme(scheme); err != nil {
+		b.Fatalf("failed to add v1 to scheme: %v", err)
+	}
+	typer := scheme
+	creater := scheme
+	serializerStreaming := jsonserializer.NewSerializerWithOptions(
+		jsonserializer.DefaultMetaFactory,
+		creater,
+		typer,
+		jsonserializer.SerializerOptions{StreamingCollectionsEncoding: true},
+	)
+	serializerNonStreaming := jsonserializer.NewSerializerWithOptions(
+		jsonserializer.DefaultMetaFactory,
+		creater,
+		typer,
+		jsonserializer.SerializerOptions{StreamingCollectionsEncoding: false},
+	)
+	podList := benchmarkItems(b, "testdata/exemplar_pod.yaml", 1000)
+	b.Run("Streaming", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			err := serializerStreaming.Encode(podList, &buf)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("NonStreaming", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			err := serializerNonStreaming.Encode(podList, &buf)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
