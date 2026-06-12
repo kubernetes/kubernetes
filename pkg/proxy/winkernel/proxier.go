@@ -912,28 +912,38 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, mapSt
 func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[string]loadBalancerType, ipFamilyStr string) {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
-	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
-		mapStaleLoadbalancer[svcInfo.hnsID] = lbTypeClusterIP
-		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource.", "hnsID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
-		metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeClusterIP), string(classifyLBError(err))).Inc()
-	} else {
-		// On successful delete, remove hnsId
-		svcInfo.hnsID = ""
+	if svcInfo.hnsID != "" {
+		klog.V(3).InfoS("Deleting ClusterIP LB during cleanup", "clusterIPLBID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
+		if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
+			mapStaleLoadbalancer[svcInfo.hnsID] = lbTypeClusterIP
+			klog.V(1).ErrorS(err, "Error deleting ClusterIP LB during cleanup.", "hnsID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
+			metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeClusterIP), string(classifyLBError(err))).Inc()
+		} else {
+			// On successful delete, remove hnsId
+			svcInfo.hnsID = ""
+		}
 	}
 
-	if err := hns.deleteLoadBalancer(svcInfo.nodePorthnsID); err != nil {
-		mapStaleLoadbalancer[svcInfo.nodePorthnsID] = lbTypeNodePort
-		klog.V(1).ErrorS(err, "Error deleting Hns NodePort policy resource.", "hnsID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
-		metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeNodePort), string(classifyLBError(err))).Inc()
-	} else {
-		// On successful delete, remove hnsId
-		svcInfo.nodePorthnsID = ""
+	if svcInfo.nodePorthnsID != "" {
+		klog.V(3).InfoS("Deleting NodePort LB during cleanup", "nodePortLBID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
+		if err := hns.deleteLoadBalancer(svcInfo.nodePorthnsID); err != nil {
+			mapStaleLoadbalancer[svcInfo.nodePorthnsID] = lbTypeNodePort
+			klog.V(1).ErrorS(err, "Error deleting NodePort LB during cleanup.", "hnsID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
+			metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeNodePort), string(classifyLBError(err))).Inc()
+		} else {
+			// On successful delete, remove hnsId
+			svcInfo.nodePorthnsID = ""
+		}
 	}
 
 	for _, externalIP := range svcInfo.externalIPs {
+		if externalIP.hnsID == "" {
+			continue
+		}
+		klog.V(3).InfoS("Deleting ExternalIP LB during cleanup", "externalIPLBID", externalIP.hnsID, "ExternalIP", externalIP.ip)
 		if err := hns.deleteLoadBalancer(externalIP.hnsID); err != nil {
 			mapStaleLoadbalancer[externalIP.hnsID] = lbTypeExternalIP
-			klog.V(1).ErrorS(err, "Error deleting Hns ExternalIP policy resource.", "hnsID", externalIP.hnsID, "IP", externalIP.ip)
+			klog.V(1).ErrorS(err, "Error deleting ExternalIP LB during cleanup.", "hnsID", externalIP.hnsID, "ExternalIP", externalIP.ip)
 			metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeExternalIP), string(classifyLBError(err))).Inc()
 		} else {
 			// On successful delete, remove hnsId
@@ -941,20 +951,23 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[st
 		}
 	}
 	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
-		klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for loadBalancer Ingress resources in cleanup", "lbIngressIP", lbIngressIP)
-		if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
-			mapStaleLoadbalancer[lbIngressIP.hnsID] = lbTypeIngressIP
-			klog.V(1).ErrorS(err, "Error deleting Hns IngressIP policy resource.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip)
-			metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeIngressIP), string(classifyLBError(err))).Inc()
-		} else {
-			// On successful delete, remove hnsId
-			lbIngressIP.hnsID = ""
+		if lbIngressIP.hnsID != "" {
+			klog.V(3).InfoS("Deleting Ingress LB during cleanup", "ingressLBID", lbIngressIP.hnsID, "IngressIP", lbIngressIP.ip)
+			if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
+				mapStaleLoadbalancer[lbIngressIP.hnsID] = lbTypeIngressIP
+				klog.V(1).ErrorS(err, "Error deleting Ingress LB during cleanup.", "hnsID", lbIngressIP.hnsID, "IngressIP", lbIngressIP.ip)
+				metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeIngressIP), string(classifyLBError(err))).Inc()
+			} else {
+				// On successful delete, remove hnsId
+				lbIngressIP.hnsID = ""
+			}
 		}
 
 		if lbIngressIP.healthCheckHnsID != "" {
+			klog.V(3).InfoS("Deleting Ingress LB HealthCheck during cleanup", "ingressLBHealthCheckID", lbIngressIP.healthCheckHnsID, "IngressIP", lbIngressIP.ip)
 			if err := hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID); err != nil {
 				mapStaleLoadbalancer[lbIngressIP.healthCheckHnsID] = lbTypeHealthCheck
-				klog.V(1).ErrorS(err, "Error deleting Hns IngressIP HealthCheck policy resource.", "hnsID", lbIngressIP.healthCheckHnsID, "IP", lbIngressIP.ip)
+				klog.V(1).ErrorS(err, "Error deleting Ingress LB HealthCheck during cleanup.", "hnsID", lbIngressIP.healthCheckHnsID, "IngressIP", lbIngressIP.ip)
 				metrics.WinKernelLBDeleteFailure.WithLabelValues(ipFamilyStr, string(lbTypeHealthCheck), string(classifyLBError(err))).Inc()
 			} else {
 				// On successful delete, remove hnsId
@@ -1199,6 +1212,11 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	prevNetworkID := proxier.network.id
 	updatedNetwork, err := hns.getNetworkByName(hnsNetworkName)
+	if IsHnsNotRunningError(err) {
+		klog.V(1).ErrorS(err, "HNS is not running. Unable to read network. Skipping sync", "hnsNetworkName", hnsNetworkName)
+		return
+	}
+
 	if updatedNetwork == nil || updatedNetwork.id != prevNetworkID || isNetworkNotFoundError(err) {
 		klog.InfoS("The HNS network is not present or has changed since the last sync, please check the CNI deployment", "hnsNetworkName", hnsNetworkName)
 		proxier.cleanupAllPolicies()
@@ -1462,7 +1480,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		if len(hnsEndpoints) == 0 {
 			if svcInfo.winProxyOptimization {
 				// Deleting loadbalancers when there are no endpoints to serve.
-				klog.V(3).InfoS("Cleanup existing ", "endpointInfo", hnsEndpoints, "serviceName", svcName)
+				klog.V(3).InfoS("Cleanup existing", "endpointInfo", hnsEndpoints, "serviceName", svcName)
 				svcInfo.deleteLoadBalancerPolicy(proxier.mapStaleLoadbalancers, ipFamilyStr)
 			}
 			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "serviceName", svcName)
