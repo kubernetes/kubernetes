@@ -41,10 +41,7 @@ type stateCheckpoint struct {
 }
 
 // NewStateCheckpoint creates new State for keeping track of pod resource information with checkpoint backend
-func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string) (State, error) {
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager for pod resource information tracking: %w", err)
@@ -58,7 +55,7 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 	}
 
 	stateCheckpoint := &stateCheckpoint{
-		cache:             NewStateMemory(pra),
+		cache:             NewStateMemory(logger, pra),
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
 		lastChecksum:      checksum,
@@ -137,13 +134,10 @@ func (sc *stateCheckpoint) GetPodResourceInfo(podUID types.UID) (PodResourceInfo
 }
 
 // SetContainerResoruces sets resources information for a pod's container
-func (sc *stateCheckpoint) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	err := sc.cache.SetContainerResources(podUID, containerName, resources)
+	err := sc.cache.SetContainerResources(logger, podUID, containerName, resources)
 	if err != nil {
 		return err
 	}
@@ -151,13 +145,10 @@ func (sc *stateCheckpoint) SetContainerResources(podUID types.UID, containerName
 }
 
 // SetPodLevelResources sets resources information for a pod's resources at pod-level.
-func (sc *stateCheckpoint) SetPodLevelResources(podUID types.UID, resInfo *v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (sc *stateCheckpoint) SetPodLevelResources(logger klog.Logger, podUID types.UID, resInfo *v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	err := sc.cache.SetPodLevelResources(podUID, resInfo)
+	err := sc.cache.SetPodLevelResources(logger, podUID, resInfo)
 	if err != nil {
 		return err
 	}
@@ -176,13 +167,13 @@ func (sc *stateCheckpoint) SetPodResourceInfo(logger klog.Logger, podUID types.U
 }
 
 // Delete deletes resource information for specified pod
-func (sc *stateCheckpoint) RemovePod(podUID types.UID) error {
+func (sc *stateCheckpoint) RemovePod(logger klog.Logger, podUID types.UID) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	// Skip writing the checkpoint for pod deletion, since there is no side effect to
 	// keeping a deleted pod. Deleted pods will eventually be cleaned up by RemoveOrphanedPods.
 	// The deletion will be stored the next time a non-delete update is made.
-	return sc.cache.RemovePod(podUID)
+	return sc.cache.RemovePod(logger, podUID)
 }
 
 func (sc *stateCheckpoint) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
@@ -214,11 +205,11 @@ func (sc *noopStateCheckpoint) GetPodResourceInfo(_ types.UID) (PodResourceInfo,
 	return PodResourceInfo{}, false
 }
 
-func (sc *noopStateCheckpoint) SetContainerResources(_ types.UID, _ string, _ v1.ResourceRequirements) error {
+func (sc *noopStateCheckpoint) SetContainerResources(_ klog.Logger, _ types.UID, _ string, _ v1.ResourceRequirements) error {
 	return nil
 }
 
-func (sc *noopStateCheckpoint) SetPodLevelResources(_ types.UID, _ *v1.ResourceRequirements) error {
+func (sc *noopStateCheckpoint) SetPodLevelResources(_ klog.Logger, _ types.UID, _ *v1.ResourceRequirements) error {
 	return nil
 }
 
@@ -226,7 +217,7 @@ func (sc *noopStateCheckpoint) SetPodResourceInfo(_ klog.Logger, _ types.UID, _ 
 	return nil
 }
 
-func (sc *noopStateCheckpoint) RemovePod(_ types.UID) error {
+func (sc *noopStateCheckpoint) RemovePod(_ klog.Logger, _ types.UID) error {
 	return nil
 }
 

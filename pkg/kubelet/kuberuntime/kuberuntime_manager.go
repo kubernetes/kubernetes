@@ -372,7 +372,7 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(rootDirectory, actuatedPodsStateFile)
+	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
@@ -907,7 +907,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 
 		}
-		if err = m.actuatedState.SetPodLevelResources(pod.UID, actuatedPodResources); err != nil {
+		if err = m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources); err != nil {
 			logger.Error(err, "SetPodLevelResources failed", "pod", pod.Name, "UID", pod.UID,
 				"pod", format.Pod(pod), "resourceName", resourceName)
 			return err
@@ -2161,7 +2161,7 @@ func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy
 	// Remove terminated pods from the actuated state.
 	for uid := range m.actuatedState.GetPodResourceInfoMap() {
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
-			if err := m.actuatedState.RemovePod(uid); err != nil {
+			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
 				// No need to act on the error beyond logging it here.
 				logger.Error(err, "Failed to remove pod from actuated state", "podUID", uid)
 			}
@@ -2198,7 +2198,7 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 	return m.runtimeService.ListPodSandboxMetrics(ctx)
 }
 
-func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error {
+func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return nil
 	}
@@ -2211,7 +2211,7 @@ func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod 
 		return nil
 	}
 
-	return m.actuatedState.SetPodLevelResources(actuatedPod.UID, actuatedPod.Spec.Resources)
+	return m.actuatedState.SetPodLevelResources(logger, actuatedPod.UID, actuatedPod.Spec.Resources)
 }
 
 // isPodResizeInProgress checks whether the actuated resizable resources differ from
