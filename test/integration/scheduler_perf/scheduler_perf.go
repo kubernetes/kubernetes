@@ -75,7 +75,7 @@ const (
 	sleepOpcode                  operationCode = "sleep"
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
 	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
-	waitForPodGroupsOpcode       operationCode = "waitForPodGroups"
+	createPodGroupsOpcode        operationCode = "createPodGroups"
 	startCollectingProfileOpcode operationCode = "startCollectingProfile"
 	stopCollectingProfileOpcode  operationCode = "stopCollectingProfile"
 )
@@ -515,7 +515,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		sleepOpcode:                  &sleepOp{},
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
 		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
-		waitForPodGroupsOpcode:       &waitForPodGroups{},
+		createPodGroupsOpcode:        &createPodGroups{},
 		startCollectingProfileOpcode: &startCollectingProfileOp{},
 		stopCollectingProfileOpcode:  &stopCollectingProfileOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
