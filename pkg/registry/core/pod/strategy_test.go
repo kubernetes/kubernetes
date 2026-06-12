@@ -4497,7 +4497,7 @@ func TestSyncPodIP(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			syncPodIP(&tc.status)
+			SyncPodIP(&tc.status)
 			if tc.status.PodIP != tc.expectPodIP {
 				t.Errorf("expected podIP %q, got %q", tc.expectPodIP, tc.status.PodIP)
 			}

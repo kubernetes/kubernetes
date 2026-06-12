@@ -234,15 +234,15 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
 
-	syncPodIP(&newPod.Status)
+	SyncPodIP(&newPod.Status)
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
-// syncPodIP keeps status.podIP and status.podIPs[0] in sync, with podIP
+// SyncPodIP keeps status.podIP and status.podIPs[0] in sync, with podIP
 // authoritative when they disagree, for compatibility with older clients that
 // set only the singular field. Historically applied during conversion.
-func syncPodIP(status *api.PodStatus) {
+func SyncPodIP(status *api.PodStatus) {
 	if len(status.PodIP) > 0 {
 		if len(status.PodIPs) == 0 || status.PodIPs[0].IP != status.PodIP {
 			status.PodIPs = []api.PodIP{{IP: status.PodIP}}

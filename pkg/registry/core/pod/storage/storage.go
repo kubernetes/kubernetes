@@ -89,6 +89,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
+		Decorator:      defaultOnRead,
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
@@ -269,6 +270,18 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		return pod, nil
 	}), dryRun, nil)
 	return finalPod, err
+}
+
+func defaultOnRead(obj runtime.Object) {
+	switch p := obj.(type) {
+	case *api.Pod:
+		registrypod.SyncPodIP(&p.Status)
+	case *api.PodList:
+		for i := range p.Items {
+			registrypod.SyncPodIP(&p.Items[i].Status)
+		}
+	default:
+	}
 }
 
 func copyLabelsWithOverwriting(pod *api.Pod, labels map[string]string) {

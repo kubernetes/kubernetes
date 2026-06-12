@@ -30,6 +30,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1419,3 +1420,61 @@ func TestEtcdCreateBindingScrubsLegacyAnnotations(t *testing.T) {
 		t.Errorf("expected unrelated binding annotation to be kept, got %v", pod.Annotations)
 	}
 }
+
+func TestDefaultOnRead(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "default")
+	pod := validNewPod()
+	pod.Name = "test-default-on-read"
+	pod.Status = api.PodStatus{
+		PodIP:  "1.2.3.4",
+		PodIPs: []api.PodIP{}, // Empty, which is un-synced
+	}
+
+	key, err := storage.Store.KeyFunc(ctx, pod.Name)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Write directly to the storage interface, bypassing the REST Strategy (and thus bypassing write-path syncing)
+	out := &api.Pod{}
+	err = storage.Store.Storage.Storage.Create(ctx, key, pod, out, 0)
+	if err != nil {
+		t.Fatalf("failed to write directly to etcd: %v", err)
+	}
+
+	// Read it back via the REST Get path, which should trigger the decorator
+	obj, err := storage.Get(ctx, pod.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get pod: %v", err)
+	}
+
+	readPod := obj.(*api.Pod)
+	if len(readPod.Status.PodIPs) != 1 || readPod.Status.PodIPs[0].IP != "1.2.3.4" {
+		t.Errorf("expected PodIPs to be synced on read, got: %+v", readPod.Status.PodIPs)
+	}
+
+	// Test list path as well
+	listObj, err := storage.List(ctx, &metainternalversion.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to list pods: %v", err)
+	}
+
+	podList := listObj.(*api.PodList)
+	found := false
+	for _, p := range podList.Items {
+		if p.Name == pod.Name {
+			found = true
+			if len(p.Status.PodIPs) != 1 || p.Status.PodIPs[0].IP != "1.2.3.4" {
+				t.Errorf("expected PodIPs to be synced on list, got: %+v", p.Status.PodIPs)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("did not find our test pod in the list")
+	}
+}
+
