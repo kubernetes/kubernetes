@@ -150,6 +150,38 @@ func TestNegotiate(t *testing.T) {
 			params:      map[string]string{"pretty": "1"},
 		},
 
+		// q=0 means "not acceptable": fall through to a type the client still accepts
+		{
+			accept:      "application/json;q=0,application/protobuf",
+			contentType: "application/protobuf",
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json", "application/protobuf"}},
+			serializer:  fakeCodec,
+		},
+		// q=0 on the only supported type leaves nothing acceptable
+		{
+			accept: "application/json;q=0",
+			ns:     &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			errFn: func(err error) bool {
+				return err.Error() == "only the following media types are accepted: application/json"
+			},
+		},
+		// a wildcard q=0 rejects everything
+		{
+			accept: "*/*;q=0",
+			ns:     &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			errFn: func(err error) bool {
+				return err.Error() == "only the following media types are accepted: application/json"
+			},
+		},
+		// a specific q=0 overrides a wildcard, so the only supported type is rejected
+		{
+			accept: "*/*,application/json;q=0",
+			ns:     &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			errFn: func(err error) bool {
+				return err.Error() == "only the following media types are accepted: application/json"
+			},
+		},
+
 		// query param triggers pretty
 		{
 			req: &http.Request{
@@ -305,5 +337,130 @@ func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
 		if options.Accepted != accepted[1] {
 			b.Errorf("Unexpected result")
 		}
+	}
+}
+
+// TestNegotiateAllMediaTypeOptions exercises the plural matcher used by the Accept
+// fallback path.
+func TestNegotiateAllMediaTypeOptions(t *testing.T) {
+	accepted := fakeSerializerInfoSlice() // [json, protobuf]
+
+	testCases := []struct {
+		name   string
+		header string
+		want   []string // MediaType strings in expected order
+	}{
+		{
+			name:   "empty header defaults to first supported",
+			header: "",
+			want:   []string{"application/json"},
+		},
+		{
+			name:   "single preferred type",
+			header: "application/json",
+			want:   []string{"application/json"},
+		},
+		{
+			name:   "proto then json preserves order",
+			header: "application/vnd.kubernetes.protobuf,application/json",
+			want:   []string{"application/vnd.kubernetes.protobuf", "application/json"},
+		},
+		{
+			name:   "json then proto preserves order",
+			header: "application/json,application/vnd.kubernetes.protobuf",
+			want:   []string{"application/json", "application/vnd.kubernetes.protobuf"},
+		},
+		{
+			name:   "wildcard expands to all supported without duplicates",
+			header: "application/vnd.kubernetes.protobuf,*/*",
+			want:   []string{"application/vnd.kubernetes.protobuf", "application/json"},
+		},
+		{
+			name:   "unsupported returns empty",
+			header: "unrecognized/stuff",
+			want:   nil,
+		},
+		{
+			name:   "quality-weighted order",
+			header: "application/json;q=0.5,application/vnd.kubernetes.protobuf;q=1.0",
+			want:   []string{"application/vnd.kubernetes.protobuf", "application/json"},
+		},
+		{
+			name:   "q=0 excludes the rejected type",
+			header: "application/vnd.kubernetes.protobuf,application/json;q=0",
+			want:   []string{"application/vnd.kubernetes.protobuf"},
+		},
+		{
+			name:   "q=0 wildcard excludes everything",
+			header: "*/*;q=0",
+			want:   nil,
+		},
+		{
+			name:   "specific q=0 overrides wildcard",
+			header: "application/vnd.kubernetes.protobuf,*/*,application/json;q=0",
+			want:   []string{"application/vnd.kubernetes.protobuf"},
+		},
+		{
+			name:   "wildcard accepts the rest while a specific q=0 is rejected",
+			header: "*/*,application/json;q=0",
+			want:   []string{"application/vnd.kubernetes.protobuf"},
+		},
+		{
+			name:   "wildcard is a fallback when a specific clause fails on params",
+			header: "application/json;as=Table,*/*",
+			want:   []string{"application/json", "application/vnd.kubernetes.protobuf"},
+		},
+		{
+			name:   "type wildcard expands to all matching subtypes",
+			header: "application/*",
+			want:   []string{"application/json", "application/vnd.kubernetes.protobuf"},
+		},
+		{
+			name:   "type wildcard q=0 rejects all matching subtypes",
+			header: "application/*;q=0",
+			want:   nil,
+		},
+		{
+			name:   "exact clause overrides a type wildcard q=0",
+			header: "application/json,application/*;q=0",
+			want:   []string{"application/json"},
+		},
+		{
+			name:   "lone q=0 rejection matches nothing",
+			header: "application/json;q=0",
+			want:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := negotiateAllMediaTypeOptions(tc.header, accepted, DefaultEndpointRestrictions)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %d results, want %d: %+v", len(got), len(tc.want), got)
+			}
+			for i := range got {
+				if got[i].Accepted.MediaType != tc.want[i] {
+					t.Errorf("position %d: got %q, want %q", i, got[i].Accepted.MediaType, tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+// TestNegotiateOutputMediaTypes_NotAcceptable verifies the plural API returns a
+// NotAcceptableError when no clause matches any supported serializer.
+func TestNegotiateOutputMediaTypes_NotAcceptable(t *testing.T) {
+	ns := &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}}
+	req := &http.Request{Header: http.Header{"Accept": []string{"text/html"}}}
+	mts, err := NegotiateOutputMediaTypes(req, ns, DefaultEndpointRestrictions)
+	if err == nil {
+		t.Fatalf("expected NotAcceptableError, got nil; mts=%v", mts)
+	}
+	s, ok := err.(statusError)
+	if !ok {
+		t.Fatalf("expected statusError, got %T", err)
+	}
+	if s.Status().Code != http.StatusNotAcceptable {
+		t.Errorf("expected 406, got %d", s.Status().Code)
 	}
 }

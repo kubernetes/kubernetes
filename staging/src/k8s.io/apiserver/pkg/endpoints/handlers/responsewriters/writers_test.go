@@ -30,6 +30,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"sigs.k8s.io/yaml"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1049,4 +1051,160 @@ func BenchmarkJSONStreaming(b *testing.B) {
 			}
 		}
 	})
+}
+
+// fakeNonProtoObject is a runtime.Object that intentionally does NOT implement
+// the Kubernetes protobuf marshalling interface, so the protobuf serializer
+// will return errNotMarshalable for it.
+type fakeNonProtoObject struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Value      string `json:"value"`
+}
+
+func (f *fakeNonProtoObject) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (f *fakeNonProtoObject) DeepCopyObject() runtime.Object {
+	out := *f
+	return &out
+}
+
+// fakeNegotiatedSerializer exposes an ordered list of media types and returns
+// the supplied serializers as-is from EncoderForVersion (no version wrapping).
+type fakeNegotiatedSerializer struct {
+	infos []runtime.SerializerInfo
+}
+
+func (f *fakeNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+	return f.infos
+}
+func (f *fakeNegotiatedSerializer) EncoderForVersion(e runtime.Encoder, _ runtime.GroupVersioner) runtime.Encoder {
+	return e
+}
+func (f *fakeNegotiatedSerializer) DecoderToVersion(d runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
+	return d
+}
+
+func TestTrySerializeObject_FallbackSignal(t *testing.T) {
+	pbSer := protobuf.NewSerializerWithOptions(nil, nil, protobuf.SerializerOptions{})
+	obj := &fakeNonProtoObject{
+		APIVersion: "v1", Kind: "Fake",
+		Value: "hello",
+	}
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+
+	// allowRetry=true: encoder reports not-marshalable before any flush → caller
+	// should get (committed=false) so it can try the next candidate.
+	rec := httptest.NewRecorder()
+	committed := trySerializeObject("application/vnd.kubernetes.protobuf", pbSer, rec, req, http.StatusOK, obj, true)
+	if committed {
+		t.Fatalf("expected committed=false when the encoder cannot represent the object and retry is allowed")
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("expected no response body, got %q", rec.Body.String())
+	}
+
+	// allowRetry=false: current behavior must be preserved — a 406 body is
+	// written using the protobuf encoder (Status implements proto).
+	rec = httptest.NewRecorder()
+	committed = trySerializeObject("application/vnd.kubernetes.protobuf", pbSer, rec, req, http.StatusOK, obj, false)
+	if !committed {
+		t.Fatalf("expected committed=true in non-retry mode")
+	}
+	if rec.Code != http.StatusNotAcceptable {
+		t.Errorf("expected 406 status, got %d", rec.Code)
+	}
+}
+
+func TestTrySerializeObject_JSONSucceeds(t *testing.T) {
+	jsonSer := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{})
+	obj := &fakeNonProtoObject{
+		APIVersion: "v1", Kind: "Fake",
+		Value: "hello",
+	}
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+
+	rec := httptest.NewRecorder()
+	committed := trySerializeObject("application/json", jsonSer, rec, req, http.StatusOK, obj, true)
+	if !committed {
+		t.Fatalf("expected committed=true on successful JSON encode")
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"value":"hello"`) {
+		t.Errorf("expected JSON body to contain value, got %q", rec.Body.String())
+	}
+}
+
+func TestWriteObjectNegotiated_FallsBackFromProtoToJSON(t *testing.T) {
+	pbSer := protobuf.NewSerializerWithOptions(nil, nil, protobuf.SerializerOptions{})
+	jsonSer := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{})
+	ns := &fakeNegotiatedSerializer{infos: []runtime.SerializerInfo{
+		{
+			MediaType:        "application/vnd.kubernetes.protobuf",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "vnd.kubernetes.protobuf",
+			Serializer:       pbSer,
+		},
+		{
+			MediaType:        "application/json",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "json",
+			Serializer:       jsonSer,
+		},
+	}}
+	obj := &fakeNonProtoObject{
+		APIVersion: "v1", Kind: "Fake",
+		Value: "hello",
+	}
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Accept", "application/vnd.kubernetes.protobuf,application/json")
+
+	rec := httptest.NewRecorder()
+	WriteObjectNegotiated(ns, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, rec, req, http.StatusOK, obj, false)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK after fallback to JSON, got %d; body=%q", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %q", ct)
+	}
+	if !strings.Contains(rec.Body.String(), `"value":"hello"`) {
+		t.Errorf("expected JSON body, got %q", rec.Body.String())
+	}
+}
+
+func TestWriteObjectNegotiated_ProtoOnlyStillReturns406(t *testing.T) {
+	// Regression guard: clients that accept only protobuf and hit a non-proto
+	// object must continue to receive a 406 — we do not invent a JSON response
+	// when JSON was not requested.
+	pbSer := protobuf.NewSerializerWithOptions(nil, nil, protobuf.SerializerOptions{})
+	jsonSer := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{})
+	ns := &fakeNegotiatedSerializer{infos: []runtime.SerializerInfo{
+		{
+			MediaType:        "application/vnd.kubernetes.protobuf",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "vnd.kubernetes.protobuf",
+			Serializer:       pbSer,
+		},
+		{
+			MediaType:        "application/json",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "json",
+			Serializer:       jsonSer,
+		},
+	}}
+	obj := &fakeNonProtoObject{
+		APIVersion: "v1", Kind: "Fake",
+		Value: "hello",
+	}
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
+
+	rec := httptest.NewRecorder()
+	WriteObjectNegotiated(ns, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, rec, req, http.StatusOK, obj, false)
+
+	if rec.Code != http.StatusNotAcceptable {
+		t.Fatalf("expected 406, got %d; body=%q", rec.Code, rec.Body.String())
+	}
 }
