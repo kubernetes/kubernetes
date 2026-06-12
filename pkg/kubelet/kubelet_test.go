@@ -3186,7 +3186,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 func TestMissingSecretsNotReportedWithoutPullError(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	unexpectedEvent := "FailedToRetrieveImagePullSecret"
+	unexpectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets (missing); attempting to pull the image may not succeed."
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
