@@ -102,7 +102,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	// Admission (e.g. the ServiceAccount plugin) may set ServiceAccountName
 	// after defaulting synced the deprecated alias; re-sync before persisting.
-	pod.Spec.DeprecatedServiceAccount = pod.Spec.ServiceAccountName
+	pod.Spec.DeprecatedServiceAccount = pod.Spec.ServiceAccountName //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be synced for backward compatibility
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

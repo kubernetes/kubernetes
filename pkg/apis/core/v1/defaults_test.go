@@ -3423,7 +3423,6 @@ func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
 	}
 }
 
-
 func TestSetDefaultPodStatusPodIPs(t *testing.T) {
 	tests := []struct {
 		name      string

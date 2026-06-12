@@ -2041,4 +2041,3 @@ func DropInitContainerAnnotations(oldAnnotations map[string]string) map[string]s
 	}
 	return newAnnotations
 }
-

@@ -83,7 +83,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			// DeprecatedServiceAccount is an alias for ServiceAccountName kept
 			// in sync by defaulting; valid objects always have them equal.
-			s.DeprecatedServiceAccount = s.ServiceAccountName
+			s.DeprecatedServiceAccount = s.ServiceAccountName //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be fuzzed for backward compatibility
 
 			c.Fill(s.SecurityContext)
 

@@ -166,8 +166,8 @@ func TestPodSpecConversion(t *testing.T) {
 	if got.ServiceAccountName != name {
 		t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
 	}
-	if got.DeprecatedServiceAccount != other {
-		t.Fatalf("want core.DeprecatedServiceAccount %q, got %q", other, got.DeprecatedServiceAccount)
+	if got.DeprecatedServiceAccount != other { //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
+		t.Fatalf("want core.DeprecatedServiceAccount %q, got %q", other, got.DeprecatedServiceAccount) //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
 	}
 }
 

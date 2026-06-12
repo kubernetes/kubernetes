@@ -170,8 +170,6 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		obj.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
 	}
 
-
-
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
 	// because we only want this defaulting semantic to take place on a v1.Pod and not a v1.PodTemplate
@@ -561,4 +559,3 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 		pod.Spec.Resources.Limits = podLims
 	}
 }
-
