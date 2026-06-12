@@ -224,11 +224,6 @@ func (mp *MemoryManagerCheckpointV1) VerifyChecksum() error {
 
 // VerifyChecksum verifies that current checksum of checkpoint is valid in v2 format
 func (mp *MemoryManagerCheckpointV2) VerifyChecksum() error {
-	if mp.Checksum == 0 {
-		// accept empty checksum for compatibility with old file backend
-		return nil
-	}
-
 	ck := mp.Checksum
 	mp.Checksum = 0
 	object := dump.ForHash(mp)

@@ -320,7 +320,6 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 			},
 		},
-		// In below testcase podEntries is intentionally corrupted so loading v2 will fail and fallback to v1.
 		{
 			description:    "Restore checkpoint from v1 (migration) with checksum zeroed",
 			fgRequirements: nil,
@@ -328,7 +327,6 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"policyName":"static",
 				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
-				"podEntries":{"pod":3},
 				"checksum": 0
 			}`,
 			policyName:    "static",
@@ -439,56 +437,6 @@ func TestCheckpointStateRestore(t *testing.T) {
 				assignments: ContainerMemoryAssignments{
 					"pod": map[string][]Block{
 						"container1": {
-							{
-								NUMAAffinity: []int{0},
-								Type:         v1.ResourceMemory,
-								Size:         512,
-							},
-						},
-					},
-				},
-				machineState: NUMANodeMap{
-					0: &NUMANodeState{
-						MemoryMap: map[v1.ResourceName]*MemoryTable{
-							v1.ResourceMemory: {
-								Allocatable:    1536,
-								Free:           1024,
-								Reserved:       512,
-								SystemReserved: 512,
-								TotalMemSize:   2048,
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			description:    "Restore checkpoint from v2 with zeroed checksum and with PodLevelResourceManagers enabled",
-			fgRequirements: FeatureGateCombination{features.PodLevelResourceManagers: true},
-			checkpointContent: `{
-				"policyName":"static",
-				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
-				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
-				"podEntries":{"pod":{"memoryBlocks":[{"numaAffinity":[0],"type":"memory","size":512}]}},
-				"checksum": 0
-			}`,
-			policyName:    "static",
-			expectedError: "",
-			expectedState: &stateMemory{
-				assignments: ContainerMemoryAssignments{
-					"pod": map[string][]Block{
-						"container1": {
-							{
-								NUMAAffinity: []int{0},
-								Type:         v1.ResourceMemory,
-								Size:         512,
-							},
-						},
-					},
-				},
-				podAssignments: PodMemoryAssignments{
-					"pod": PodEntry{
-						MemoryBlocks: []Block{
 							{
 								NUMAAffinity: []int{0},
 								Type:         v1.ResourceMemory,
