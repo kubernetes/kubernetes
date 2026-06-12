@@ -125,7 +125,6 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -3125,7 +3124,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 
 	kubeCfg := kubeletconfiginternal.KubeletConfiguration{
 		MaxPods:                10,
-		MemoryThrottlingFactor: ptr.To[float64](0),
+		MemoryThrottlingFactor: new(float64),
 	}
 
 	tracerProvider := noopoteltrace.NewTracerProvider()
@@ -3425,7 +3424,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
 		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
-		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		MemoryThrottlingFactor:                    new(float64),
 		CrashLoopBackOff: kubeletconfiginternal.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
 		},
@@ -3588,7 +3587,7 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
 		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
-		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		MemoryThrottlingFactor:                    new(float64),
 		CrashLoopBackOff: kubeletconfiginternal.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
 		},
@@ -3697,9 +3696,9 @@ func TestSyncPodSpans(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
-		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		MemoryThrottlingFactor:                    new(float64),
 		MaxPods:                                   110,
-		MaxParallelImagePulls:                     ptr.To[int32](5),
+		MaxParallelImagePulls:                     new(int32(5)),
 	}
 
 	exp := tracetest.NewInMemoryExporter()
@@ -3740,7 +3739,7 @@ func TestSyncPodSpans(t *testing.T) {
 				ImagePullPolicy: v1.PullAlways,
 			},
 		},
-		EnableServiceLinks: ptr.To(false),
+		EnableServiceLinks: new(false),
 	})
 
 	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
