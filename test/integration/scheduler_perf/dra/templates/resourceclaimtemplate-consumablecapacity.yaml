@@ -11,10 +11,10 @@ spec:
           deviceClassName: test-class
           capacity:
             requests:
-              memory: 40Gi
+              memory: 10Gi
       - name: req-1
         exactly:
           deviceClassName: test-class
           capacity:
             requests:
-              memory: 40Gi
+              memory: 10Gi
