@@ -40,7 +40,6 @@ import (
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -254,7 +253,7 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		}
 		// Binding annotations bypass Pod defaulting; apply the same legacy
 		// init-container annotation scrub defaulting applies.
-		for k, v := range corev1.DropInitContainerAnnotations(annotations) {
+		for k, v := range podutil.DropInitContainerAnnotations(annotations) {
 			pod.Annotations[k] = v
 		}
 		// Copy all labels from the Binding over to the Pod object, overwriting

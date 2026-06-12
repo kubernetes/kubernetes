@@ -1905,3 +1905,41 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 	}
 	return false
 }
+
+var initContainerAnnotations = map[string]struct{}{
+	"pod.beta.kubernetes.io/init-containers":          {},
+	"pod.alpha.kubernetes.io/init-containers":         {},
+	"pod.beta.kubernetes.io/init-container-statuses":  {},
+	"pod.alpha.kubernetes.io/init-container-statuses": {},
+}
+
+// DropInitContainerAnnotations returns a copy of the annotations with the legacy
+// alpha/beta init container annotations removed, or the original map if no changes were made.
+// Support for these annotations was deprecated in v1.8 in favor of the Spec.InitContainers
+// field. They are dropped on write paths to prevent old clients or legacy kubelets from
+// honoring them over the spec fields.
+func DropInitContainerAnnotations(oldAnnotations map[string]string) map[string]string {
+	if len(oldAnnotations) == 0 {
+		return oldAnnotations
+	}
+
+	// the legacy annotations are rare, so do a scan for them first
+	found := false
+	for k := range initContainerAnnotations {
+		if _, ok := oldAnnotations[k]; ok {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return oldAnnotations
+	}
+
+	newAnnotations := make(map[string]string, len(oldAnnotations))
+	for k, v := range oldAnnotations {
+		if _, ok := initContainerAnnotations[k]; !ok {
+			newAnnotations[k] = v
+		}
+	}
+	return newAnnotations
+}

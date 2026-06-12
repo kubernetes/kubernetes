@@ -84,6 +84,7 @@ func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	rs.Generation = 1
 
 	pod.DropDisabledTemplateFields(&rs.Spec.Template, nil)
+	rs.Spec.Template.Annotations = pod.DropInitContainerAnnotations(rs.Spec.Template.Annotations)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -94,6 +95,7 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	newRS.Status = oldRS.Status
 
 	pod.DropDisabledTemplateFields(&newRS.Spec.Template, &oldRS.Spec.Template)
+	newRS.Spec.Template.Annotations = pod.DropInitContainerAnnotations(newRS.Spec.Template.Annotations)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

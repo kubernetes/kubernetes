@@ -77,6 +77,7 @@ func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	}
 
 	pod.DropDisabledTemplateFields(&daemonSet.Spec.Template, nil)
+	daemonSet.Spec.Template.Annotations = pod.DropInitContainerAnnotations(daemonSet.Spec.Template.Annotations)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -85,6 +86,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldDaemonSet := old.(*apps.DaemonSet)
 
 	pod.DropDisabledTemplateFields(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	newDaemonSet.Spec.Template.Annotations = pod.DropInitContainerAnnotations(newDaemonSet.Spec.Template.Annotations)
 
 	// update is not allowed to set status
 	newDaemonSet.Status = oldDaemonSet.Status

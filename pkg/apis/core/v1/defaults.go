@@ -167,12 +167,6 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		obj.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
 	}
 
-	// drop init container annotations so they don't take effect on legacy kubelets
-	// and don't show up as differences when receiving requests from old clients.
-	// remove this once the oldest supported kubelet no longer honors the annotations
-	// over the field.
-	obj.Annotations = DropInitContainerAnnotations(obj.Annotations)
-
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
 	// because we only want this defaulting semantic to take place on a v1.Pod and not a v1.PodTemplate
@@ -230,9 +224,6 @@ func SetDefaults_PodStatus(obj *v1.PodStatus) {
 }
 
 func SetDefaults_PodTemplateSpec(obj *v1.PodTemplateSpec) {
-	// drop init container annotations so they don't take effect on legacy kubelets
-	// and don't show up as differences when receiving requests from old clients.
-	obj.Annotations = DropInitContainerAnnotations(obj.Annotations)
 }
 
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
@@ -561,39 +552,4 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 	if len(podLims) > 0 {
 		pod.Spec.Resources.Limits = podLims
 	}
-}
-
-var initContainerAnnotations = map[string]struct{}{
-	"pod.beta.kubernetes.io/init-containers":          {},
-	"pod.alpha.kubernetes.io/init-containers":         {},
-	"pod.beta.kubernetes.io/init-container-statuses":  {},
-	"pod.alpha.kubernetes.io/init-container-statuses": {},
-}
-
-// DropInitContainerAnnotations returns a copy of the annotations with the legacy
-// init container annotations removed.
-func DropInitContainerAnnotations(oldAnnotations map[string]string) map[string]string {
-	if len(oldAnnotations) == 0 {
-		return oldAnnotations
-	}
-
-	// the legacy annotations are rare, so do a scan for them first
-	found := false
-	for k := range initContainerAnnotations {
-		if _, ok := oldAnnotations[k]; ok {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return oldAnnotations
-	}
-
-	newAnnotations := make(map[string]string, len(oldAnnotations))
-	for k, v := range oldAnnotations {
-		if _, ok := initContainerAnnotations[k]; !ok {
-			newAnnotations[k] = v
-		}
-	}
-	return newAnnotations
 }

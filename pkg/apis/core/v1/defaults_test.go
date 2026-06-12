@@ -3424,36 +3424,6 @@ func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
 	}
 }
 
-func TestSetDefaultPodDropsInitContainerAnnotations(t *testing.T) {
-	annotations := map[string]string{
-		"pod.beta.kubernetes.io/init-containers": "[]",
-		"kept":                                   "value",
-	}
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: annotations}}
-	obj2 := roundTrip(t, runtime.Object(pod))
-	pod2 := obj2.(*v1.Pod)
-	if _, ok := pod2.Annotations["pod.beta.kubernetes.io/init-containers"]; ok {
-		t.Errorf("expected init-container annotation to be dropped, got %v", pod2.Annotations)
-	}
-	if pod2.Annotations["kept"] != "value" {
-		t.Errorf("expected unrelated annotation to be kept, got %v", pod2.Annotations)
-	}
-
-	template := &v1.PodTemplate{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Template: v1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-				"pod.alpha.kubernetes.io/init-containers": "[]",
-			}},
-		},
-	}
-	obj3 := roundTrip(t, runtime.Object(template))
-	template2 := obj3.(*v1.PodTemplate)
-	if _, ok := template2.Template.Annotations["pod.alpha.kubernetes.io/init-containers"]; ok {
-		t.Errorf("expected template init-container annotation to be dropped, got %v", template2.Template.Annotations)
-	}
-}
-
 func TestSetDefaultPodStatusPodIPs(t *testing.T) {
 	tests := []struct {
 		name      string
