@@ -347,7 +347,7 @@ func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Conte
 		if apierrors.IsNotFound(err) {
 			klog.V(5).InfoS("Unwanted APF object was concurrently deleted", "name", name)
 		} else {
-			return fmt.Errorf("failed to delete unwatned APF object %q - %w", name, err)
+			return fmt.Errorf("failed to delete unwanted APF object %q - %w", name, err)
 		}
 	}
 	return nil
