@@ -295,19 +295,19 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
 			}
 			indexerFunc := func(i int) *watchCacheEvent {
-				return wc.cache[i%wc.capacity]
+				return wc.history.cache[i%wc.history.capacity]
 			}
 
 			wci := newCacheInterval(
 				c.intervalStartIndex,
-				wc.endIndex,
+				wc.history.endIndex,
 				indexerFunc,
 				wc.isIndexValidLocked,
 				wc.resourceVersion,
 				&wc.RWMutex,
 			)
 
-			numExpectedEvents := wc.endIndex - c.intervalStartIndex
+			numExpectedEvents := wc.history.endIndex - c.intervalStartIndex
 			for i := 0; i < numExpectedEvents; i++ {
 				// Simulate and test interval invalidation iff
 				// the watchCache itself is not empty.
@@ -319,8 +319,8 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					// copying over events from the underlying watch cache,
 					// i.e. freshly filling in the interval buffer.
 					if i%bufferSize == 0 && i != c.eventsAddedToWatchcache {
-						originalCacheStartIndex := wc.startIndex
-						wc.startIndex = wci.startIndex + 1
+						originalCacheStartIndex := wc.history.startIndex
+						wc.history.startIndex = wci.startIndex + 1
 						event, err := wci.Next()
 						if err == nil {
 							t.Errorf("expected non-nil error")
@@ -329,7 +329,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 							t.Errorf("expected nil event, got %v", *event)
 						}
 						// Restore startIndex.
-						wc.startIndex = originalCacheStartIndex
+						wc.history.startIndex = originalCacheStartIndex
 					}
 				}
 
@@ -350,8 +350,8 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					return
 				}
 
-				expectedIndex := (c.intervalStartIndex + i) % wc.capacity
-				expectedEvent := wc.cache[expectedIndex]
+				expectedIndex := (c.intervalStartIndex + i) % wc.history.capacity
+				expectedEvent := wc.history.cache[expectedIndex]
 				if err := verifyEvent(true, event, expectedEvent); err != nil {
 					t.Error(err)
 				}
@@ -374,7 +374,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
+	store := store.NewIndexer(nil)
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -437,7 +437,6 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 		name    string
 		indexer store.Indexer
 	}{
-		{"legacy", cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))},
 		{"btree", store.NewIndexer(nil)},
 	}
 	for _, tc := range cases {

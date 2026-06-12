@@ -182,7 +182,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 		ipts := utiliptables.NewBestEffort()
 
 		logger.Info("Using ipvs Proxier")
-		message := "The ipvs proxier is now deprecated and may be removed in a future release. Please use 'nftables' instead."
+		message := "The ipvs proxier has been deprecated and will be disabled by default in Kubernetes 1.40 and removed in Kubernetes 1.43. Migrate to the 'nftables' proxier instead."
 		logger.Error(nil, message)
 		s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, "IPVSDeprecation", "StartKubeProxy", message)
 		if dualStack {

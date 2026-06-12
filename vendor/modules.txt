@@ -31,7 +31,7 @@ github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
 github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/Microsoft/hnslib v0.1.2
+# github.com/Microsoft/hnslib v0.1.3
 ## explicit; go 1.22.0
 github.com/Microsoft/hnslib
 github.com/Microsoft/hnslib/hcn
@@ -91,7 +91,7 @@ github.com/containerd/log
 # github.com/containerd/ttrpc v1.2.8
 ## explicit; go 1.22
 github.com/containerd/ttrpc
-# github.com/containerd/typeurl/v2 v2.2.3
+# github.com/containerd/typeurl/v2 v2.3.0
 ## explicit; go 1.21
 github.com/containerd/typeurl/v2
 # github.com/coredns/caddy v1.1.1
@@ -1236,8 +1236,8 @@ k8s.io/utils/ptr
 k8s.io/utils/strings
 k8s.io/utils/third_party/forked/golang/btree
 k8s.io/utils/trace
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0
-## explicit; go 1.21
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.36.0
+## explicit; go 1.24.0
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics

@@ -150,7 +150,6 @@
         "github.com/containerd/containerd/api",
         "github.com/containerd/errdefs/pkg",
         "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl/v2",
         "github.com/google/cadvisor",
         "k8s.io/code-generator"
       ],
@@ -162,8 +161,7 @@
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
         "google.golang.org/grpc",
-        "google.golang.org/protobuf",
-        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
+        "google.golang.org/protobuf"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"

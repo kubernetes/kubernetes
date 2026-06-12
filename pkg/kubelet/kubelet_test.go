@@ -34,7 +34,6 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -65,7 +64,6 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
-	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
 	fakeremote "k8s.io/cri-client/pkg/fake"
@@ -3293,12 +3291,6 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 	return fakeRuntime, endpoint
 }
 
-func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing.T, tp oteltrace.TracerProvider) internalapi.RuntimeService {
-	runtimeService, err := remote.NewRemoteRuntimeService(ctx, endpoint, 15*time.Second, tp, false)
-	require.NoError(t, err)
-	return runtimeService
-}
-
 func TestNewMainKubeletStandAlone(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	tempDir, err := os.MkdirTemp("", "logs")
@@ -3313,9 +3305,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
 	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
 	t.Cleanup(func() {
-		ContainerLogsDir = containerLogsDir
-		err := os.RemoveAll(tempDir)
-		require.NoError(t, err)
+		cleanUpTempDir(t, tempDir, containerLogsDir)
 	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
@@ -3369,7 +3359,11 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		fakeRuntime.Stop()
 	}()
 	fakeRecorder := &record.FakeRecorder{}
-	rtSvc := createRemoteRuntimeService(tCtx, endpoint, t, noopoteltrace.NewTracerProvider())
+	rtSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		Build(tCtx)
+	require.NoError(t, err)
 	kubeDep := &Dependencies{
 		Auth:                 nil,
 		CAdvisorInterface:    cadvisor,
@@ -3474,9 +3468,7 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
 	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
 	t.Cleanup(func() {
-		ContainerLogsDir = containerLogsDir
-		err := os.RemoveAll(tempDir)
-		require.NoError(t, err)
+		cleanUpTempDir(t, tempDir, containerLogsDir)
 	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
@@ -3530,7 +3522,11 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 		fakeRuntime.Stop()
 	}()
 	fakeRecorder := &record.FakeRecorder{}
-	rtSvc := createRemoteRuntimeService(tCtx, endpoint, t, noopoteltrace.NewTracerProvider())
+	rtSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		Build(tCtx)
+	require.NoError(t, err)
 	kubeDep := &Dependencies{
 		Auth:                 nil,
 		CAdvisorInterface:    cadvisor,
@@ -3632,12 +3628,21 @@ func TestSyncPodSpans(t *testing.T) {
 	defer func() {
 		fakeRuntime.Stop()
 	}()
-	runtimeSvc := createRemoteRuntimeService(tCtx, endpoint, t, tp)
+	runtimeSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		WithTracerProvider(tp).
+		Build(tCtx)
+	require.NoError(t, err)
 	kubelet.runtimeService = runtimeSvc
 
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
-	imageSvc, err := remote.NewRemoteImageService(tCtx, endpoint, 15*time.Second, tp, false)
+	imageSvc, err := remote.NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		WithTracerProvider(tp).
+		Build(tCtx)
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
@@ -5147,6 +5152,7 @@ func generateCAAndCertKeyWithOptions(host string, alternateIPs []net.IP, alterna
 }
 
 func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RestartAllContainersOnContainerExits, true)
 
@@ -5168,7 +5174,6 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 	})
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
-	logger := klog.FromContext(context.Background())
 	kubelet.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
 		Phase: v1.PodRunning,
 		Conditions: []v1.PodCondition{
@@ -5210,11 +5215,27 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 		},
 	}
 
-	isTerminal, _, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, podStatus)
+	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
 	require.False(t, isTerminal)
 	require.NoError(t, err)
 
 	// We expect SyncPod to be called once by us, and once recursively via UpdatePod -> fakePodWorkers.syncPodFn
 	// because the SyncResults contained a successful RemoveContainer action.
 	require.Equal(t, 1, callCount)
+}
+
+func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {
+	t.Helper()
+	ContainerLogsDir = originalLogsDir
+	// On Windows, we might need to retry RemoveAll because concurrent goroutines
+	// (like the garbage collector) might take a moment to exit and release file/dir handles.
+	var err error
+	for range 10 {
+		err = os.RemoveAll(tempDir)
+		if err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	require.NoError(t, err)
 }

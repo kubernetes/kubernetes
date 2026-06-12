@@ -46,7 +46,7 @@ func mkCountRule(counter *int, realRule lintRule) lintRule {
 	}
 }
 
-var validator = validators.InitGlobalValidator(&generator.Context{})
+var validator = validators.InitGlobalValidator(&generator.Context{}, nil)
 
 func TestLintCommentsRuleInvocation(t *testing.T) {
 	tests := []struct {

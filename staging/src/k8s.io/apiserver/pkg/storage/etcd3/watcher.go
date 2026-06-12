@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -291,6 +292,21 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
+	if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
+		etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream) {
+		err := wc.syncStreamRecursive()
+		if err == nil {
+			return nil
+		}
+		if grpcstatus.Code(err) != grpccodes.Unimplemented {
+			return err
+		}
+		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
+	}
+	return wc.syncPaginated()
+}
+
+func (wc *watchChan) syncPaginated() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
@@ -345,6 +361,51 @@ func (wc *watchChan) sync() error {
 			opts = append(opts, clientv3.WithRev(withRev))
 		}
 	}
+}
+
+func (wc *watchChan) syncStreamRecursive() error {
+	if !wc.recursive {
+		return fmt.Errorf("syncStreamRecursive called on a non-recursive watch")
+	}
+	opts := []clientv3.OpOption{
+		clientv3.WithRange(clientv3.GetPrefixRangeEnd(wc.key)),
+	}
+
+	startTime := time.Now()
+	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
+	if err != nil {
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
+		}
+		return err
+	}
+	defer func() {
+		metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
+	}()
+
+	var initialRev int64
+	for r := range streamResp {
+		if err = r.Err(); err != nil {
+			// paging=false: a compaction mid-stream can't be resumed with a
+			// continue token, so surface it as ResourceExpired for a relist.
+			return interpretListError(err, false, wc.key, wc.key)
+		}
+		rangeResp := r.RangeResponse
+		for i, kv := range rangeResp.Kvs {
+			wc.queueEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
+			rangeResp.Kvs[i] = nil
+		}
+		if initialRev == 0 && rangeResp.Header != nil {
+			initialRev = rangeResp.Header.Revision
+		}
+	}
+	if initialRev == 0 {
+		return fmt.Errorf("rangeStream for %q completed without a revision", wc.key)
+	}
+
+	wc.initialRev = initialRev
+	return nil
 }
 
 func logWatchChannelErr(err error) {

@@ -263,7 +263,7 @@ func TestShouldDelegateList(t *testing.T) {
 			}
 			defer cacher.Stop()
 			if snapshotAvailable {
-				cacher.watchCache.snapshots.Add(uint64(mustAtoi(oldRV)), fakeOrderedLister{})
+				cacher.watchCache.storage.snapshots.Add(uint64(mustAtoi(oldRV)), fakeIndexer{})
 			}
 			result, err := delegator.ShouldDelegateList(toStorageOpts(opt), cacher)
 			if err != nil {
@@ -570,12 +570,12 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 			defer cacher.Stop()
 			snapshotRequestCount := 0
 			cacher.watchCache.RWMutex.Lock()
-			cacher.watchCache.snapshots = &fakeSnapshotter{
-				getLessOrEqual: func(rv uint64) (store.OrderedLister, bool) {
+			cacher.watchCache.storage.snapshots = &fakeSnapshotter{
+				getLessOrEqual: func(rv uint64) (store.Snapshot, bool) {
 					snapshotAvailable := tc.snapshotsAvailable[snapshotRequestCount]
 					snapshotRequestCount++
 					if snapshotAvailable {
-						return fakeOrderedLister{}, true
+						return fakeIndexer{}, true
 					} else {
 						return nil, false
 					}
@@ -2034,7 +2034,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 			object = event.Object.(runtime.CacheableObject).GetObject()
 
 			if event.Type == watch.Deleted {
-				resourceVersion, err := cacher.versioner.ObjectResourceVersion(cacher.watchCache.cache[index].PrevObject)
+				resourceVersion, err := cacher.versioner.ObjectResourceVersion(cacher.watchCache.history.cache[index].PrevObject)
 				if err != nil {
 					t.Fatalf("Failed to parse resource version: %v", err)
 				}
@@ -2044,9 +2044,9 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 			var e runtime.Object
 			switch event.Type {
 			case watch.Added, watch.Modified:
-				e = cacher.watchCache.cache[index].Object
+				e = cacher.watchCache.history.cache[index].Object
 			case watch.Deleted:
-				e = cacher.watchCache.cache[index].PrevObject
+				e = cacher.watchCache.history.cache[index].PrevObject
 			default:
 				t.Errorf("unexpected watch event: %#v", event)
 			}
@@ -2092,7 +2092,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	}
 	once := sync.Once{}
 	indexValidator := func(index int) bool {
-		isValid := valid && (index >= cacher.watchCache.startIndex)
+		isValid := valid && (index >= cacher.watchCache.history.startIndex)
 		once.Do(invalidateCacheInterval)
 		return isValid
 	}
@@ -3148,35 +3148,61 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	}
 }
 
-type fakeOrderedLister struct {
+type fakeIndexer struct {
 }
 
-func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
-func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
-func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
-func (f fakeOrderedLister) Clone() store.OrderedLister   { return f }
-func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface{} {
+func (f fakeIndexer) Add(obj interface{}) error    { return nil }
+func (f fakeIndexer) Update(obj interface{}) error { return nil }
+func (f fakeIndexer) Delete(obj interface{}) error { return nil }
+func (f fakeIndexer) Clone() store.Snapshot        { return f }
+func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
+	return nil, nil
+}
+
+func (f fakeIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+
+func (f fakeIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+
+func (f fakeIndexer) List() []interface{} {
 	return nil
 }
-func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }
+
+func (f fakeIndexer) ListKeys() []string {
+	return nil
+}
+
+func (f fakeIndexer) Replace([]interface{}, string) error {
+	return nil
+}
+func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
+	return nil, nil
+}
+func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
 
 type fakeSnapshotter struct {
-	getLessOrEqual func(rv uint64) (store.OrderedLister, bool)
+	getLessOrEqual func(rv uint64) (store.Snapshot, bool)
 }
 
 var _ store.Snapshotter = (*fakeSnapshotter)(nil)
 
 func (f *fakeSnapshotter) Reset() {}
-func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (store.OrderedLister, bool) {
+func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (store.Snapshot, bool) {
 	if f.getLessOrEqual == nil {
 		return nil, false
 	}
 	return f.getLessOrEqual(rv)
 }
-func (f *fakeSnapshotter) Add(rv uint64, indexer store.OrderedLister) {}
-func (f *fakeSnapshotter) RemoveLess(rv uint64)                       {}
+func (f *fakeSnapshotter) Add(rv uint64, indexer store.Indexer) {}
+func (f *fakeSnapshotter) RemoveLess(rv uint64)                 {}
 func (f *fakeSnapshotter) Len() int {
 	return 0
+}
+func (f *fakeSnapshotter) Latest() (store.Snapshot, bool) {
+	return nil, false
 }
 
 // --- Sharding unit tests for filterWithAttrsAndPrefixFunction ---

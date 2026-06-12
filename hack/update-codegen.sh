@@ -449,7 +449,6 @@ function codegen::validation() {
     # used, but not regenerated, unless they are also listed as a "regular"
     # input on the command-line.
     local readonly_pkgs=(
-        k8s.io/apimachinery/pkg/apis/meta/v1
         k8s.io/apimachinery/pkg/api/resource
         k8s.io/apimachinery/pkg/runtime
         k8s.io/apimachinery/pkg/types

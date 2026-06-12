@@ -1028,21 +1028,21 @@ func TestOmitempty(t *testing.T) {
 
 type InlineTestPrimitive struct {
 	NoNameTagPrimitive          int64 `json:""`
-	NoNameTagInlinePrimitive    int64 `json:""`
+	NoNameTagInlinePrimitive    int64 `json:",inline"` // TODO: expect error when switching to json/v2
 	NoNameTagOmitemptyPrimitive int64 `json:",omitempty"`
 }
 type InlineTestAnonymous struct {
 	NoTag
 	NoNameTag          `json:""`
 	NameTag            `json:"nameTagEmbedded"`
-	NoNameTagInline    `json:""`
+	NoNameTagInline    `json:",inline"`
 	NoNameTagOmitempty `json:",omitempty"`
 }
 type InlineTestNamed struct {
 	NoTag              NoTag
 	NoNameTag          NoNameTag          `json:""`
 	NameTag            NameTag            `json:"nameTagEmbedded"`
-	NoNameTagInline    NoNameTagInline    `json:""`
+	NoNameTagInline    NoNameTagInline    `json:",inline"`
 	NoNameTagOmitempty NoNameTagOmitempty `json:",omitempty"`
 }
 type NoTag struct {
@@ -1113,13 +1113,20 @@ func TestInline(t *testing.T) {
 		{
 			name: "named-zero",
 			obj:  &InlineTestNamed{},
-			expect: map[string]any{
-				"NoTag":              map[string]any{"data0": int64(0)},
-				"nameTagEmbedded":    map[string]any{"data1": int64(0)},
-				"NoNameTag":          map[string]any{"data2": int64(0)},
-				"NoNameTagInline":    map[string]any{"data3": int64(0)},
-				"NoNameTagOmitempty": map[string]any{"data4": int64(0)},
-			},
+			expect: func() map[string]any {
+				m := map[string]any{
+					"NoTag":              map[string]any{"data0": int64(0)},
+					"nameTagEmbedded":    map[string]any{"data1": int64(0)},
+					"NoNameTag":          map[string]any{"data2": int64(0)},
+					"NoNameTagOmitempty": map[string]any{"data4": int64(0)},
+				}
+				if stdlibSupportsInlineTag {
+					m["data3"] = int64(0)
+				} else {
+					m["NoNameTagInline"] = map[string]any{"data3": int64(0)}
+				}
+				return m
+			}(),
 		},
 		{
 			name: "named-set",
@@ -1130,13 +1137,20 @@ func TestInline(t *testing.T) {
 				NoNameTagInline:    NoNameTagInline{Data3: 13},
 				NoNameTagOmitempty: NoNameTagOmitempty{Data4: 14},
 			},
-			expect: map[string]any{
-				"NoTag":              map[string]any{"data0": int64(10)},
-				"nameTagEmbedded":    map[string]any{"data1": int64(11)},
-				"NoNameTag":          map[string]any{"data2": int64(12)},
-				"NoNameTagInline":    map[string]any{"data3": int64(13)},
-				"NoNameTagOmitempty": map[string]any{"data4": int64(14)},
-			},
+			expect: func() map[string]any {
+				m := map[string]any{
+					"NoTag":              map[string]any{"data0": int64(10)},
+					"nameTagEmbedded":    map[string]any{"data1": int64(11)},
+					"NoNameTag":          map[string]any{"data2": int64(12)},
+					"NoNameTagOmitempty": map[string]any{"data4": int64(14)},
+				}
+				if stdlibSupportsInlineTag {
+					m["data3"] = int64(13)
+				} else {
+					m["NoNameTagInline"] = map[string]any{"data3": int64(13)}
+				}
+				return m
+			}(),
 		},
 	}
 	for _, tc := range testcases {

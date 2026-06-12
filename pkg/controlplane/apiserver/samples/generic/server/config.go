@@ -88,7 +88,7 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 	}
 
 	serviceResolver := webhook.NewDefaultServiceResolver()
-	kubeAPIs, pluginInitializer, err := controlplaneapiserver.CreateConfig(opts, genericConfig, versionedInformers, storageFactory, serviceResolver, nil)
+	kubeAPIs, pluginInitializer, err := controlplaneapiserver.CreateConfig(opts, genericConfig, versionedInformers, nil, storageFactory, serviceResolver, nil)
 	if err != nil {
 		return nil, err
 	}

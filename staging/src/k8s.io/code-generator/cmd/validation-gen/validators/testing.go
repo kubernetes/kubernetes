@@ -89,8 +89,10 @@ func (frtv fixedResultTagValidator) GetValidations(context Context, tag codetags
 		return result, fmt.Errorf("can't decode tag payload: %w", err)
 	}
 	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).
-		WithTypeArgs(args.typeArgs...).
-		WithEmits(Emission{field.ErrorTypeInvalid, "validateFalse", ""})
+		WithTypeArgs(args.typeArgs...)
+	if !frtv.result {
+		fn = fn.WithEmits(Emission{field.ErrorTypeInvalid, "validateFalse", ""})
+	}
 	fn.Cohort = args.cohort
 	result.AddFunction(fn)
 

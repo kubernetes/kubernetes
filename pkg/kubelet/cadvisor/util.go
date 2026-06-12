@@ -64,7 +64,7 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 	c := v1.ResourceList{
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(
 			int64(info.Capacity),
-			resource.BinarySI),
+			resource.DecimalSI),
 	}
 	return c
 }

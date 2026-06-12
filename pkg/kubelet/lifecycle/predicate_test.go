@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -293,6 +294,7 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 }
 
 func TestGeneralPredicates(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	resourceTests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulerframework.NodeInfo
@@ -634,7 +636,7 @@ func TestGeneralPredicates(t *testing.T) {
 				}
 				return test.syncNode, nil
 			}}
-			reasons := w.generalFilter(context.Background(), test.pod, test.nodeInfo)
+			reasons := w.generalFilter(tCtx, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}

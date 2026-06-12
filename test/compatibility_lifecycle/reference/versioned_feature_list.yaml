@@ -615,6 +615,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: EtcdRangeStream
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: EventedPLEG
   versionedSpecs:
   - default: false
@@ -987,6 +993,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: KubeProxyIPVS
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.11"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
@@ -1065,6 +1077,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: MemoryQoS
   versionedSpecs:
   - default: false
@@ -2031,6 +2047,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: WebhookRoundTripLoadBalancing
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: WindowsCPUAndMemoryAffinity
   versionedSpecs:
   - default: false

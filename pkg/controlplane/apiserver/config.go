@@ -42,6 +42,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -75,6 +76,10 @@ type Extra struct {
 
 	EnableLogsSupport bool
 	ProxyTransport    *http.Transport
+
+	// EndpointSliceGetter is a getter to look up endpoint slices for IP routing.
+	// If nil, endpoint slice routing is unavailable.
+	EndpointSliceGetter proxy.EndpointSliceGetter
 
 	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
 	// that can not be served locally
@@ -271,6 +276,7 @@ func CreateConfig(
 	opts options.CompletedOptions,
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
+	endpointSliceGetter proxy.EndpointSliceGetter,
 	storageFactory *serverstorage.DefaultStorageFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	additionalInitializers []admission.PluginInitializer,
@@ -301,6 +307,8 @@ func CreateConfig(
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			EndpointSliceGetter: endpointSliceGetter,
 
 			CoordinatedLeadershipLeaseDuration: opts.CoordinatedLeadershipLeaseDuration,
 			CoordinatedLeadershipRenewDeadline: opts.CoordinatedLeadershipRenewDeadline,

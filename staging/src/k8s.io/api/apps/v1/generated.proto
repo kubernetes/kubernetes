@@ -228,6 +228,7 @@ message DaemonSetUpdateStrategy {
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
 message Deployment {
   // Standard object's metadata.
@@ -394,6 +395,7 @@ message DeploymentStrategy {
 }
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
@@ -619,6 +621,7 @@ message RollingUpdateStatefulSetStrategy {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
 message StatefulSet {
   // Standard object's metadata.

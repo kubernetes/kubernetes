@@ -2962,8 +2962,7 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status, false)
+		actions := m.computePodActions(tCtx, pod, status, false)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)

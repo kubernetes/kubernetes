@@ -18,7 +18,6 @@ package cacher
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
@@ -119,20 +118,6 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-type sortableWatchCacheEvents []*watchCacheEvent
-
-func (s sortableWatchCacheEvents) Len() int {
-	return len(s)
-}
-
-func (s sortableWatchCacheEvents) Less(i, j int) bool {
-	return s[i].Key < s[j].Key
-}
-
-func (s sortableWatchCacheEvents) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
@@ -167,9 +152,6 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 			ResourceVersion: resourceVersion,
 		}
 		buffer.endIndex++
-	}
-	if _, ordered := indexer.(store.OrderedLister); !ordered {
-		sort.Sort(sortableWatchCacheEvents(buffer.buffer))
 	}
 	ci := &watchCacheInterval{
 		startIndex: 0,

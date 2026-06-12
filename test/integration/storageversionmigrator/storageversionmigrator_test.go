@@ -19,6 +19,7 @@ package storageversionmigrator
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"strconv"
 	"sync"
 	"testing"
@@ -169,7 +170,8 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 
 	crVersions := make(map[string]versions)
 
-	svmTest := svmSetup(ctx, t)
+	// chaos goroutines delete objects mid-migration, producing expected 404s on patch
+	svmTest := svmSetup(ctx, t, http.StatusNotFound)
 	certCtx := svmTest.setupServerCert(t)
 
 	// simulate monkeys creating and deleting CRs
@@ -309,7 +311,8 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 
 	ctx := ktesting.Init(t)
 
-	svmTest := svmSetup(ctx, t)
+	// chaos goroutines delete objects mid-migration, producing expected 404s on patch
+	svmTest := svmSetup(ctx, t, http.StatusNotFound)
 
 	svmTest.createChaos(ctx, t)
 

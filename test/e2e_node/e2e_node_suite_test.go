@@ -26,6 +26,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"os"
 	"os/exec"
@@ -48,6 +50,9 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
+	"k8s.io/kubernetes/test/e2e_node/mounter"
+	gcpcredentialprovider "k8s.io/kubernetes/test/e2e_node/plugins/gcp-credential-provider/pkg"
+	"k8s.io/kubernetes/test/e2e_node/runner/node"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
@@ -120,6 +125,37 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	// e2e_node.test can behave like several other commands which are required
+	// when doing node testing on a remote virtual machine.
+	//
+	// e2e_node.test owns pflag.CommandLine and flag.CommandLine.
+	// Other commands must use separate FlagSets.
+	pflag.Usage = func() {
+		fmt.Fprint(pflag.CommandLine.Output(), `Usage when invoked under a different name:
+    gcp-credential-provider (no flags) - emulate test/e2e_node/plugins/gcp-credential-provider
+    mounter (no flags) - emulate cluster/gce/gci/mounter
+
+Usage as e2e_node.test:
+    e2e_node.test remote <remote flags> - run remote testing, replacing "testgrid2 noop -test=node", see "remote -help" for flags
+    e2e_node.test <test flags> - execute Ginkgo test suite, see following flags
+
+`)
+		pflag.CommandLine.PrintDefaults()
+	}
+	cmdName := filepath.Base(os.Args[0])
+	switch {
+	case strings.HasPrefix(cmdName, "gcp-credential-provider"):
+		gcpcredentialprovider.Main()
+	case strings.HasPrefix(cmdName, "mounter"):
+		mounter.Main()
+	case len(os.Args) > 1 && os.Args[1] == "remote":
+		node.Main(os.Args[2:])
+	default:
+		testMain(m)
+	}
+}
+
+func testMain(m *testing.M) {
 	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)

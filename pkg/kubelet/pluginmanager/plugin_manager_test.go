@@ -17,6 +17,7 @@ limitations under the License.
 package pluginmanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,7 +53,7 @@ func newFakePluginHandler() *fakePluginHandler {
 }
 
 // ValidatePlugin is a fake method
-func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (f *fakePluginHandler) ValidatePlugin(_ context.Context, pluginName string, endpoint string, versions []string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.events = append(f.events, "validate "+pluginName+" "+endpoint)
@@ -60,7 +61,7 @@ func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, v
 }
 
 // RegisterPlugin is a fake method
-func (f *fakePluginHandler) RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (f *fakePluginHandler) RegisterPlugin(_ context.Context, pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	f.Lock()
 	defer f.Unlock()
 	f.events = append(f.events, "register "+pluginName+" "+endpoint)
@@ -68,7 +69,7 @@ func (f *fakePluginHandler) RegisterPlugin(pluginName, endpoint string, versions
 }
 
 // DeRegisterPlugin is a fake method
-func (f *fakePluginHandler) DeRegisterPlugin(pluginName, endpoint string) {
+func (f *fakePluginHandler) DeRegisterPlugin(_ context.Context, pluginName, endpoint string) {
 	f.Lock()
 	defer f.Unlock()
 	f.events = append(f.events, "deregister "+pluginName+" "+endpoint)

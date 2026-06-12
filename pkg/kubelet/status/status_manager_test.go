@@ -2347,6 +2347,7 @@ func TestMergePodStatus(t *testing.T) {
 }
 
 func TestContainerTerminationMetric(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	metrics.Register()
 	manager := newTestManager(&fake.Clientset{})
 	pod := &v1.Pod{
@@ -2376,9 +2377,9 @@ func TestContainerTerminationMetric(t *testing.T) {
 			},
 		},
 	}
-	manager.SetPodStatus(klog.Background(), pod, initialStatus)
+	manager.SetPodStatus(logger, pod, initialStatus)
 
-	manager.testSyncBatch(context.Background())
+	manager.testSyncBatch(tCtx)
 
 	// Test successful termination (exit code 0)
 	successStatus := v1.PodStatus{
@@ -2395,8 +2396,8 @@ func TestContainerTerminationMetric(t *testing.T) {
 			},
 		},
 	}
-	manager.SetPodStatus(klog.Background(), pod, successStatus)
-	manager.testSyncBatch(context.Background())
+	manager.SetPodStatus(logger, pod, successStatus)
+	manager.testSyncBatch(tCtx)
 
 	count, err := testutil.GetCounterMetricValue(metrics.TerminatedContainersTotal.WithLabelValues(metrics.Container, "0", "Completed"))
 	require.NoError(t, err)
@@ -2431,8 +2432,8 @@ func TestContainerTerminationMetric(t *testing.T) {
 			},
 		},
 	}
-	manager.SetPodStatus(klog.Background(), errorPod, errorStatus)
-	manager.testSyncBatch(context.Background())
+	manager.SetPodStatus(logger, errorPod, errorStatus)
+	manager.testSyncBatch(tCtx)
 
 	count, err = testutil.GetCounterMetricValue(metrics.TerminatedContainersTotal.WithLabelValues(metrics.Container, "1", "Error"))
 	require.NoError(t, err)

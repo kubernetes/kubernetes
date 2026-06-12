@@ -40,6 +40,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.template.spec.tolerations[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
 		},
 	)
 }

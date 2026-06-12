@@ -122,6 +122,10 @@ type Heap[T Item] struct {
 func (h *Heap[T]) AddOrUpdate(obj T) {
 	key := h.data.keyFunc(obj)
 	if idx, exists := h.data.keyIndex[key]; exists {
+		if h.metricRecorder != nil {
+			// The new object might have a different size than the stored one.
+			h.metricRecorder.Add(obj.Size() - h.data.queue[idx].obj.Size())
+		}
 		h.data.queue[idx].obj = obj
 		heap.Fix(h.data, idx)
 	} else {
@@ -138,7 +142,9 @@ func (h *Heap[T]) Delete(obj T) T {
 	if idx, ok := h.data.keyIndex[key]; ok {
 		removed := heap.Remove(h.data, idx).(T)
 		if h.metricRecorder != nil {
-			h.metricRecorder.Add(-obj.Size())
+			// Use the size of the removed object, because the passed obj might be
+			// a lookup object whose size doesn't match the stored one.
+			h.metricRecorder.Add(-removed.Size())
 		}
 		return removed
 	}

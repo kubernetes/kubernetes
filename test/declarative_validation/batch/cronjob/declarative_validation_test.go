@@ -54,6 +54,30 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Required(field.NewPath("spec", "schedule"), "").MarkAlpha(),
 			},
 		},
+		"jobTemplate.spec.maxFailedIndexes set without backoffLimitPerIndex": {
+			input: mkCronJob(tweakJobTemplateMaxFailedIndexes(ptr.To[int32](5))),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "jobTemplate", "spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+			},
+		},
+		"jobTemplate.spec.maxFailedIndexes and backoffLimitPerIndex both set": {
+			input: mkCronJob(
+				tweakJobTemplateMaxFailedIndexes(ptr.To[int32](5)),
+				tweakJobTemplateBackoffLimitPerIndex(ptr.To[int32](1)),
+			),
+		},
+		"tolerations: valid key": {
+			input: mkCronJob(tweakTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: valid key without prefix": {
+			input: mkCronJob(tweakTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: invalid key format": {
+			input: mkCronJob(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -119,6 +143,24 @@ func mkCronJob(mutators ...func(*batch.CronJob)) batch.CronJob {
 func tweakSchedule(schedule string) func(*batch.CronJob) {
 	return func(job *batch.CronJob) {
 		job.Spec.Schedule = schedule
+	}
+}
+
+func tweakJobTemplateMaxFailedIndexes(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.MaxFailedIndexes = v
+	}
+}
+
+func tweakJobTemplateBackoffLimitPerIndex(v *int32) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.BackoffLimitPerIndex = v
+	}
+}
+
+func tweakTolerations(tolerations ...api.Toleration) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		job.Spec.JobTemplate.Spec.Template.Spec.Tolerations = tolerations
 	}
 }
 

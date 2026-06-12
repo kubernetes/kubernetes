@@ -735,6 +735,9 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.Queue
 		if p.unschedulableEntities.get(entity) == nil {
 			logger.V(5).Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
 		}
+		// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
+		// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
+		entity.SetWasFlushedFromUnschedulable(false)
 		p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
 		// Entity not moved to activeQ.
 		return false
@@ -762,6 +765,9 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.Queu
 			if uInfo := p.unschedulableEntities.get(entity); uInfo == nil {
 				logger.V(5).Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
 			}
+			// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
+			// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
+			entity.SetWasFlushedFromUnschedulable(false)
 			p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
 			return false
 		}

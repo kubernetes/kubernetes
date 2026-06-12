@@ -19,8 +19,9 @@ As a containerd sub-project, you will find the:
 
 information in our [`containerd/project`](https://github.com/containerd/project) repository.
 
-## Optional
+## Gogo Protobuf Support Deprecation
 
-By default, support for gogoproto is available along side the standard Google
-protobuf types.
-You can choose to leave gogo support out by using the `!no_gogo` build tag.
+Support for gogoprotobuf was removed in v2.3.0. The upstream package has been deprecated since 2022 and users of
+typeurl should not rely on Gogo Protobuf support anymore. Users which are still transitioning away from it may
+continue to use the v2.2 release until that transition is complete. Since v2.2.1, gogo proto support can be
+explicitly removed using the `!no_gogo` build tag.

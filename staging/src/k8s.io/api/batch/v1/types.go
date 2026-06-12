@@ -372,6 +372,8 @@ type JobSpec struct {
 	// It can be null or up to completions. It is required and must be
 	// less than or equal to 10^4 when is completions greater than 10^5.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
 	MaxFailedIndexes *int32 `json:"maxFailedIndexes,omitempty" protobuf:"varint,13,opt,name=maxFailedIndexes"`
 
 	// TODO enabled it when https://github.com/kubernetes/kubernetes/issues/28486 has been fixed
