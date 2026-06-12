@@ -2431,6 +2431,30 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 			},
 			expectedPodStatusUpdates: 1,
 		},
+		// Node transitions from NotReady (false) to Unreachable (unknown) without going back through Ready.
+		// Pods must be marked not ready in this case. (#112733)
+		{
+			desc: "node transitions from NotReady to Unreachable, pods must be marked not ready",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			fakeGetPodsAssignedToNode: fakeGetPodsAssignedToNode,
+			nodeIterations: []nodeIteration{
+				{
+					timeToPass: 0,
+					newNodes:   makeNodes(v1.ConditionTrue, timeNow, timeNow),
+				},
+				{
+					timeToPass: 0,
+					newNodes:   makeNodes(v1.ConditionFalse, timeNow, timeNow),
+				},
+				{
+					timeToPass: testNodeMonitorGracePeriod + 10*time.Second,
+					newNodes:   makeNodes(v1.ConditionFalse, timeNow, timeNow),
+				},
+			},
+			expectedPodStatusUpdates: 1,
+		},
 	}
 
 	for _, item := range table {
