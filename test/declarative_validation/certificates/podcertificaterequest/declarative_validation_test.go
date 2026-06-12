@@ -109,10 +109,19 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
+					Name: "invalid missing status",
+					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakStatus(""))},
+					ExpectedErrs: field.ErrorList{
+						field.Required(field.NewPath("status", "conditions").Index(0).Child("status"), "").MarkAlpha(),
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), metav1.ConditionStatus(""), []metav1.ConditionStatus{metav1.ConditionTrue}).MarkFromImperative(),
+					},
+				},
+				{
 					Name: "invalid status not supported",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakStatus(metav1.ConditionStatus("InvalidStatus")))},
 					ExpectedErrs: field.ErrorList{
 						field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{}).MarkAlpha(),
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{metav1.ConditionTrue}).MarkFromImperative(),
 					},
 				},
 				{
