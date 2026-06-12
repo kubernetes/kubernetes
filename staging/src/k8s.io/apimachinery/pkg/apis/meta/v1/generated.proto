@@ -210,6 +210,8 @@ message Condition {
   // with respect to the current state of the instance.
   // +optional
   // +kubebuilder:validation:Minimum=0
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:minimum=0
   optional int64 observedGeneration = 3;
 
   // lastTransitionTime is the last time the condition transitioned from one status to another.

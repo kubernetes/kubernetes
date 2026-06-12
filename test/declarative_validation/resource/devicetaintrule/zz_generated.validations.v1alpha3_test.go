@@ -37,6 +37,9 @@ func init() {
 			"status.conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
+			"status.conditions[*].observedGeneration": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"status.conditions[*].type": {
 				{ErrorType: "FieldValueRequired"},
 			},
