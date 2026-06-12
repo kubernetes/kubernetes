@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"k8s.io/klog/v2"
 )
@@ -297,6 +298,11 @@ func decodeDockerConfigFieldAuth(field string) (username, password string, err e
 	}
 
 	if err != nil {
+		return
+	}
+
+	if !utf8.Valid(decoded) {
+		err = fmt.Errorf("invalid UTF-8 in auth field")
 		return
 	}
 

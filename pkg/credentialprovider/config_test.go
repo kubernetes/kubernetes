@@ -171,6 +171,17 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 			fail: true,
 		},
 
+		// auth field with non-UTF-8 data causes failure
+		{
+			input: []byte(`{"auth": "/v4=", "email": "foo@example.com"}`),
+			expect: DockerConfigEntry{
+				Username: "",
+				Password: "",
+				Email:    "foo@example.com",
+			},
+			fail: true,
+		},
+
 		// invalid JSON causes failure
 		{
 			input: []byte(`{"email": false}`),
@@ -254,6 +265,12 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 		// only new line characters are ignored
 		{
 			input: "Zm9vOmJhcg== ",
+			fail:  true,
+		},
+
+		// non-UTF-8 auth field
+		{
+			input: "/v4=",
 			fail:  true,
 		},
 
