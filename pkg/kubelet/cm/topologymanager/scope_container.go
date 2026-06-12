@@ -79,7 +79,6 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAd
 		if IsAlignmentGuaranteed(s.policy) {
 			logger.V(4).Info("Resource alignment at container scope guaranteed", "pod", klog.KObj(pod))
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
-			metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 		}
 	}
 	return admission.GetPodAdmitResult(nil)

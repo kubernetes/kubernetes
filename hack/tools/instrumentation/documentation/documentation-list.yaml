@@ -4890,7 +4890,7 @@
     endpoint: /metrics
 - name: topology_manager_admission_duration_ms
   subsystem: kubelet
-  help: Duration in miliseconds to serve a pod admission request.
+  help: Duration in milliseconds to serve a pod admission request.
   type: Histogram
   deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
