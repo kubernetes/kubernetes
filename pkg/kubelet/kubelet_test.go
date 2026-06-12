@@ -3183,6 +3183,87 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 	assert.Contains(t, events, expectedEvent)
 }
 
+func TestMissingSecretsNotReportedWithoutPullError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	unexpectedEvent := "FailedToRetrieveImagePullSecret"
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// Replace the recorder so we can inspect the events
+	fakeRecorder := record.NewFakeRecorder(10)
+	kubelet.recorder = fakeRecorder
+
+	// Replace the secret manager with one that will return a not found
+	kubelet.secretManager = secret.NewFakeManagerWithSecrets([]*v1.Secret{})
+
+	// Fake a runtime that will get as far as the image pull
+	kubelet.dnsConfigurer = createDNSConfigurer()
+
+	kubeCfg := kubeletconfiginternal.KubeletConfiguration{
+		MaxPods:                10,
+		MemoryThrottlingFactor: new(float64),
+	}
+
+	tracerProvider := noopoteltrace.NewTracerProvider()
+
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+	}()
+	runtimeSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		WithTracerProvider(tracerProvider).
+		Build(tCtx)
+	require.NoError(t, err)
+	kubelet.runtimeService = runtimeSvc
+
+	imageSvc, err := remote.NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(15 * time.Second).
+		WithTracerProvider(tracerProvider).
+		WithUseStreaming(false).
+		Build(tCtx)
+	require.NoError(t, err)
+
+	kubelet.containerRuntime, _, err = createGenericRuntimeManager(tCtx, kubelet, kubeCfg, runtimeSvc, imageSvc, tracerProvider)
+	require.NoError(t, err)
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		ImagePullSecrets: []v1.LocalObjectReference{
+			{
+				Name: "missing",
+			},
+		},
+		Containers: []v1.Container{
+			{
+				Name:            "bar",
+				Image:           "missing:latest",
+				ImagePullPolicy: v1.PullAlways,
+			},
+		},
+		EnableServiceLinks: new(false),
+	})
+	_, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	if err != nil {
+		require.NotContains(t, err.Error(), "ErrImagePull", "Image pull must not fail to check missing pull secret event is not emitted")
+	}
+
+	events := make([]string, 0, 10)
+	for done := false; !done; {
+		select {
+		case event := <-fakeRecorder.Events:
+			events = append(events, event)
+		default:
+			done = true
+		}
+	}
+	assert.NotContains(t, events, unexpectedEvent)
+}
+
 func TestSyncLabels(t *testing.T) {
 	tests := []struct {
 		name             string
