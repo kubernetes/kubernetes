@@ -376,6 +376,16 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeDeclaredFeatures},
 								},
 							},
+							PreScore: configv1.PluginSet{
+								Disabled: []configv1.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
+							Score: configv1.PluginSet{
+								Disabled: []configv1.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
 							Bind: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
 									{Name: "BarPlugin"},

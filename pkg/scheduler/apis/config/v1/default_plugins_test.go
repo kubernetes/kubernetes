@@ -38,6 +38,38 @@ func TestApplyFeatureGates(t *testing.T) {
 		wantConfig *v1.Plugins
 	}{
 		{
+			name: "Feature gate StorageCapacityScoring enabled",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			wantConfig: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: names.SchedulingGates},
+						{Name: names.PrioritySort},
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
+						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
+						{Name: names.VolumeRestrictions},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
+						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
+						{Name: names.DefaultPreemption},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
+						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
+						{Name: names.DefaultBinder},
+						{Name: names.NodeDeclaredFeatures},
+					},
+				},
+			},
+		},
+		{
 			name: "Feature gate DynamicResourceAllocation disabled",
 			features: map[featuregate.Feature]bool{
 				features.DynamicResourceAllocation: false,
@@ -242,6 +274,10 @@ func TestApplyFeatureGates(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, test.features)
 
 			gotConfig := getDefaultPlugins()
+			if !feature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring) {
+				test.wantConfig.PreScore.Disabled = []v1.Plugin{{Name: names.VolumeBinding}}
+				test.wantConfig.Score.Disabled = []v1.Plugin{{Name: names.VolumeBinding}}
+			}
 			if diff := cmp.Diff(test.wantConfig, gotConfig); diff != "" {
 				t.Errorf("unexpected config diff (-want, +got): %s", diff)
 			}

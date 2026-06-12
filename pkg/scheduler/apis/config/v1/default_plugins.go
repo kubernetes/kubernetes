@@ -70,6 +70,9 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		applyTopologyAwareWorkloadScheduling(config)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring) {
+		disableVolumeBindingScoring(config)
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
@@ -97,6 +100,12 @@ func applyGangScheduling(config *v1.Plugins) {
 func applyTopologyAwareWorkloadScheduling(config *v1.Plugins) {
 	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
 	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)})
+}
+
+func disableVolumeBindingScoring(config *v1.Plugins) {
+	// Keep VolumeBinding enabled in MultiPoint for its filtering and binding extension points.
+	config.PreScore.Disabled = append(config.PreScore.Disabled, v1.Plugin{Name: names.VolumeBinding})
+	config.Score.Disabled = append(config.Score.Disabled, v1.Plugin{Name: names.VolumeBinding})
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.

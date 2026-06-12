@@ -50,6 +50,16 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeDeclaredFeatures},
 		},
 	},
+	PreScore: config.PluginSet{
+		Disabled: []config.Plugin{
+			{Name: names.VolumeBinding},
+		},
+	},
+	Score: config.PluginSet{
+		Disabled: []config.Plugin{
+			{Name: names.VolumeBinding},
+		},
+	},
 }
 
 // ExpandedPluginsV1 default set of v1 plugins after MultiPoint expansion
@@ -110,7 +120,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodeResourcesFit},
-			{Name: names.VolumeBinding},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.NodeResourcesBalancedAllocation},
@@ -127,7 +136,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			// - This is a score coming from user preference.
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodeResourcesFit, Weight: 1},
-			{Name: names.VolumeBinding, Weight: 1},
 			// Weight is doubled because:
 			// - This is a score coming from user preference.
 			// - It makes its signal comparable to NodeResourcesLeastAllocated.
