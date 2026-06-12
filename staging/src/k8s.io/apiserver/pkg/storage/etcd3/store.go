@@ -31,6 +31,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -763,20 +765,51 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	}
 
 	// loop until we have filled the requested limit from etcd or there are no more results
-	var lastKey []byte
 	var hasMore bool
 	var getResp kubernetes.ListResponse
 	var numFetched int
-	var numEvald int
+
+	aggregator := s.listErrAggrFactory()
+	proc := &listItemProcessor{
+		store:       s,
+		ctx:         ctx,
+		opts:        opts,
+		v:           v,
+		newItemFunc: newItemFunc,
+		aggregator:  aggregator,
+		estimator:   s.getResourceSizeEstimator(),
+	}
+
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
-		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, numEvald, numReturn)
+		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, proc.numEvald, v.Len())
 	}()
 
-	aggregator := s.listErrAggrFactory()
-	for {
+	canStream := opts.Recursive && opts.Predicate.Limit == 0 && len(opts.Predicate.Continue) == 0 && withRev == 0 &&
+		utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
+		etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream)
+
+	streamed := false
+	if canStream {
+		streamRev, streamFetched, streamErr := s.listStream(ctx, keyPrefix, proc.process)
+		switch {
+		case streamErr == nil:
+			if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(streamRev)); err != nil {
+				return err
+			}
+			streamed = true
+			numFetched += streamFetched
+			withRev = streamRev
+		case grpcstatus.Code(streamErr) == grpccodes.Unimplemented:
+			klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", s.groupResource)
+		default:
+			// paging=false so a mid-stream compaction surfaces as ResourceExpired for a relist.
+			return interpretListError(streamErr, false, keyPrefix, keyPrefix)
+		}
+	}
+
+	for !streamed {
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
 			Revision: withRev,
 			Limit:    limit,
@@ -821,44 +854,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				hasMore = true
 				break
 			}
-			lastKey = kv.Key
-
-			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
-			if err != nil {
-				if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-					return aggregator.Err()
-				}
-				continue
+			if err := proc.process(kv); err != nil {
+				return err
 			}
-
-			// Check if the request has already timed out before decode object
-			select {
-			case <-ctx.Done():
-				// parent context is canceled or timed out, no point in continuing
-				return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
-			default:
-			}
-
-			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
-			if err != nil {
-				recordDecodeError(s.groupResource, string(kv.Key))
-				if done := aggregator.Aggregate(string(kv.Key), err); done {
-					return aggregator.Err()
-				}
-				continue
-			}
-
-			// being unable to set the version does not prevent the object from being extracted
-			if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
-				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-			}
-
-			numEvald++
-
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
 		}
-		continueKey = string(lastKey) + "\x00"
+		continueKey = string(proc.lastKey) + "\x00"
 
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
@@ -888,7 +890,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
 	}
 
-	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(proc.lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
 	if err != nil {
 		return err
 	}
@@ -899,6 +901,101 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		opts.Predicate.SetShardInfoOnList(listObj)
 	}
 	return nil
+}
+
+type listItemProcessor struct {
+	store       *store
+	ctx         context.Context
+	opts        storage.ListOptions
+	v           reflect.Value
+	newItemFunc func() runtime.Object
+	aggregator  ListErrorAggregator
+	estimator   *resourceSizeEstimator
+
+	lastKey  []byte
+	numEvald int
+}
+
+// Shared by the unary Range loop and the RangeStream path. A non-nil return
+// must be propagated by the caller; nil skips to the next item.
+func (p *listItemProcessor) process(kv *mvccpb.KeyValue) error {
+	p.lastKey = kv.Key
+	if p.estimator != nil {
+		p.estimator.UpdateKey(kv)
+	}
+
+	data, _, err := p.store.transformer.TransformFromStorage(p.ctx, kv.Value, authenticatedDataString(kv.Key))
+	if err != nil {
+		if done := p.aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+			return p.aggregator.Err()
+		}
+		return nil
+	}
+
+	// Check if the request has already timed out before decode object
+	select {
+	case <-p.ctx.Done():
+		// parent context is canceled or timed out, no point in continuing
+		return storage.NewTimeoutError(string(kv.Key), "request did not complete within requested timeout")
+	default:
+	}
+
+	obj, err := p.store.decoder.DecodeListItem(p.ctx, data, uint64(kv.ModRevision), p.newItemFunc)
+	if err != nil {
+		recordDecodeError(p.store.groupResource, string(kv.Key))
+		if done := p.aggregator.Aggregate(string(kv.Key), err); done {
+			return p.aggregator.Err()
+		}
+		return nil
+	}
+
+	// being unable to set the version does not prevent the object from being extracted
+	if matched, err := p.opts.Predicate.Matches(obj); err == nil && matched {
+		p.v.Set(reflect.Append(p.v, reflect.ValueOf(obj).Elem()))
+	}
+
+	p.numEvald++
+	return nil
+}
+
+// listStream mirrors watcher.go's syncStreamRecursive: one RangeStream RPC, with
+// the list revision taken from the first chunk that carries a header. On an
+// Unimplemented error it marks the feature unsupported so the caller falls back.
+func (s *store) listStream(ctx context.Context, keyPrefix string, processListItem func(kv *mvccpb.KeyValue) error) (rev int64, numFetched int, err error) {
+	startTime := time.Now()
+	streamResp, err := s.client.KV.GetStream(ctx, keyPrefix, clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix)))
+	if err != nil {
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
+		}
+		return 0, 0, err
+	}
+	// Record over the full stream, not just establishment, like watcher.go.
+	var streamErr error
+	defer func() {
+		metrics.RecordEtcdRequest("listStream", s.groupResource, streamErr, startTime)
+	}()
+	for r := range streamResp {
+		if streamErr = r.Err(); streamErr != nil {
+			return 0, 0, streamErr
+		}
+		rangeResp := r.RangeResponse
+		numFetched += len(rangeResp.Kvs)
+		for i, kv := range rangeResp.Kvs {
+			if perr := processListItem(kv); perr != nil {
+				return 0, 0, perr
+			}
+			// free kv early. Long lists can take O(seconds) to decode.
+			rangeResp.Kvs[i] = nil
+		}
+		if rev == 0 && rangeResp.Header != nil {
+			rev = rangeResp.Header.Revision
+		}
+	}
+	if rev == 0 {
+		return 0, 0, fmt.Errorf("rangeStream for %q completed without a revision", keyPrefix)
+	}
+	return rev, numFetched, nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
@@ -921,11 +1018,6 @@ func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, o
 			resp.Count = 0
 			resp.Revision = getResp.Revision
 		}
-	}
-
-	stats := s.getResourceSizeEstimator()
-	if len(resp.Kvs) > 0 && stats != nil {
-		stats.Update(resp.Kvs)
 	}
 	return resp, err
 }
