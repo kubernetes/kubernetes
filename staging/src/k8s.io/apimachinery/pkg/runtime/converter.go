@@ -385,7 +385,10 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	} else {
 		items := strings.Split(jsonTag, ",")
 		info.name = items[0]
-		if len(info.name) == 0 && !typeField.Anonymous {
+		if isInlinedFromTag(typeField, items[0], items[1:]) {
+			// match stdlib behavior when controlled by tag
+			info.name = ""
+		} else if len(info.name) == 0 && !typeField.Anonymous {
 			// match stdlib behavior for naming fields that don't specify a json tag name
 			info.name = typeField.Name
 		}
