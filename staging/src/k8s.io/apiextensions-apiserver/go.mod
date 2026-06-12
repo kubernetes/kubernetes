@@ -24,7 +24,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2
 	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.72.1
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
