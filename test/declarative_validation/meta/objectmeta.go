@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 	t.Helper()
 	fldPath := field.NewPath("metadata")
 
+	// TODO: Remove MarkFromImperative from expected errors after adding corresponding declarative validation tags on ObjectMeta.
 	testCases := []struct {
 		Name         string
 		Modify       func(metav1.Object)
@@ -79,6 +80,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 	t.Helper()
 	fldPath := field.NewPath("metadata")
 
+	// TODO: Remove MarkFromImperative from expected errors after adding corresponding declarative validation tags on ObjectMeta.
 	testCases := []struct {
 		Name         string
 		Modify       func(old, new metav1.Object)

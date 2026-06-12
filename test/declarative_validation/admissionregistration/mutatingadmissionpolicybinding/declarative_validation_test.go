@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package mutatingadmissionpolicybinding
 
 import (
+	"testing"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -25,7 +27,6 @@ import (
 	registry "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingadmissionpolicybinding"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
-	"testing"
 )
 
 // TODO: remove this apiVersions variable once coverage tests are generated for this package.
