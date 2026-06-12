@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,13 +17,14 @@ limitations under the License.
 package validatingwebhookconfiguration
 
 import (
+	"testing"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	registry "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
-	"testing"
 )
 
 // TODO: remove this apiVersions variable once coverage tests are generated for this package.
