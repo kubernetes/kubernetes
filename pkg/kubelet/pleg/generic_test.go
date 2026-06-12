@@ -454,8 +454,7 @@ func TestContainerFinishedLog(t *testing.T) {
 	for _, want := range []string{
 		"container finished",
 		`pod="my-namespace/my-pod"`,
-		"podUID=",
-		"test-pod-uid",
+		`podUID="test-pod-uid"`,
 		`containerName="my-container"`,
 		"exitCode=137",
 	} {

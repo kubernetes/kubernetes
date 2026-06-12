@@ -398,14 +398,14 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 		}
 		// Log exit code of containers when they finished in a particular event
 		if events[i].Type == ContainerDied {
-			// Fill up containerStatuses map for ContainerDied event when first time appeared
-			if len(containerStatuses) == 0 && pod != nil && err == nil {
+			// Fill up containerStatuses map for ContainerDied event when first time appeared.
+			if len(containerStatuses) == 0 && pod != nil {
 				for _, containerStatus := range status.ContainerStatuses {
 					containerStatuses[containerStatus.ID.ID] = containerStatus
 				}
 			}
 			if containerID, ok := events[i].Data.(string); ok {
-				if containerStatus, ok := containerStatuses[containerID]; ok && pod != nil {
+				if containerStatus, ok := containerStatuses[containerID]; ok {
 					logger.V(2).Info("Generic (PLEG): container finished",
 						"pod", klog.KRef(pod.Namespace, pod.Name),
 						"podUID", pod.ID,
