@@ -52,8 +52,9 @@ func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 }
 
 func (si *threadedStoreIndexer) Clone() Snapshot {
-	si.lock.RLock()
-	defer si.lock.RUnlock()
+	// Clone should not be called concurrently.
+	si.lock.Lock()
+	defer si.lock.Unlock()
 	return si.store.Clone()
 }
 
@@ -151,6 +152,8 @@ type btreeStore struct {
 	tree *btree.BTree[*Element]
 }
 
+// Clone should not be called concurrently.
+// Ref: https://github.com/kubernetes/kubernetes/blob/4a8f617f3ca/vendor/k8s.io/utils/third_party/forked/golang/btree/btree.go#L586-L588
 func (s *btreeStore) Clone() Snapshot {
 	return &btreeStore{
 		tree: s.tree.Clone(),
