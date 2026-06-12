@@ -93,12 +93,11 @@ func Test(t *testing.T) {
 	structZero.RequiredIntPtr = new(0)
 
 	// OptionalInt (non-pointer) -> 0 is INVALID (Fails because +k8s:update=NoUnset is present).
-	// RequiredInt -> 0 is INVALID (Fails because of both +k8s:update=NoUnset and +k8s:required).
+	// RequiredInt -> 0 is INVALID (Fails because of +k8s:required).
 	// OptionalIntPtr -> 0 is INVALID (Monotonic check detects decreased value).
 	// RequiredIntPtr -> 0 is INVALID (Monotonic check detects decreased value).
 	st.Value(&structZero).OldValue(&structOrig).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("optionalInt"), 0, "").WithOrigin("update"),
-		field.Invalid(field.NewPath("requiredInt"), 0, "").WithOrigin("update"),
 		field.Required(field.NewPath("requiredInt"), ""),
 		field.Invalid(field.NewPath("optionalIntPtr"), 0, "").WithOrigin("monotonic"),
 		field.Invalid(field.NewPath("requiredIntPtr"), 0, "").WithOrigin("monotonic"),
@@ -127,4 +126,15 @@ func Test(t *testing.T) {
 	st.Value(&structUnset).OldValue(&structOrig).ExpectMatches(field.ErrorMatcher{}.ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("optionalIntPtr"), nil, "").WithOrigin("update"),
 	})
+
+	// Invalid because it violates the minimum constraint (origin = "minimum")
+	structBad := Struct{RequiredInt: 1, RequiredIntPtr: new(int)}
+	structBad.NegativeInt = -11 // below the declared -10
+
+	st.Value(&structBad).ExpectMatches(
+		field.ErrorMatcher{}.ByOrigin(),
+		field.ErrorList{
+			field.Invalid(field.NewPath("negativeInt"), -11, "").
+				WithOrigin("minimum"),
+		})
 }

@@ -432,7 +432,11 @@ linters:
                   type: "All"
                   dependsOn:
                     - "k8s:minimum"
+                - identifier: "k8s:monotonic" 
+                  type: "Any"
+                  dependsOn:
                     - "k8s:update=NoUnset"
+                    - "k8s:required"
             # jsonTags:
             #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
             # nomaps:

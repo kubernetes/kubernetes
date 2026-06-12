@@ -91,14 +91,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -126,14 +118,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -161,14 +145,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -197,6 +173,9 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
 			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
@@ -318,10 +297,6 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -395,10 +370,6 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -429,15 +400,7 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, -10); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			if e := validate.Monotonic(ctx, op, fldPath, obj, oldObj); len(e) != 0 {

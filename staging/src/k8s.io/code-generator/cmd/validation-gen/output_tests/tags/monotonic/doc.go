@@ -29,20 +29,18 @@ type Struct struct {
 	TypeMeta int
 
 	// +k8s:minimum=0
-	// +k8s:update=NoUnset
 	// +k8s:monotonic
 	IntField int `json:"intField"`
 
 	// +k8s:minimum=0
-	// +k8s:update=NoUnset
 	// +k8s:monotonic
 	Int64Field int64 `json:"int64Field"`
 
 	// +k8s:minimum=0
-	// +k8s:update=NoUnset
 	// +k8s:monotonic
 	Uint64Field uint64 `json:"uint64Field"`
 
+	// +k8s:optional
 	// +k8s:minimum=0
 	// +k8s:update=NoUnset
 	// +k8s:monotonic
@@ -56,11 +54,10 @@ type Struct struct {
 	// +k8s:minimum=0
 	// +k8s:update=NoUnset
 	// +k8s:monotonic
-	OptionalInt int `json:"optionalInt"`
+	OptionalInt int `json:"optionalInt,omitempty"`
 
 	// +k8s:required
 	// +k8s:minimum=0
-	// +k8s:update=NoUnset
 	// +k8s:monotonic
 	RequiredInt int `json:"requiredInt"`
 
@@ -72,12 +69,10 @@ type Struct struct {
 
 	// +k8s:required
 	// +k8s:minimum=0
-	// +k8s:update=NoUnset
 	// +k8s:monotonic
 	RequiredIntPtr *int `json:"requiredIntPtr"`
 
-	// +k8s:minimum=0
-	// +k8s:update=NoUnset
+	// +k8s:minimum=-10
 	// +k8s:monotonic
 	NegativeInt int `json:"negativeInt"`
 }
