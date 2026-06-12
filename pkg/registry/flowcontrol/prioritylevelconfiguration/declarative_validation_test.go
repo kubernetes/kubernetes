@@ -103,6 +103,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
 			},
 		},
+		"spec.type: empty": {
+			input: mkPLC(tweakSpecType(""), tweakLimited(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"limitResponse.type: empty": {
+			input: mkPLC(tweakLimitResponseType("")),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -223,6 +235,13 @@ func tweakExempt() func(*flowcontrol.PriorityLevelConfiguration) {
 func tweakLimited(limited *flowcontrol.LimitedPriorityLevelConfiguration) func(*flowcontrol.PriorityLevelConfiguration) {
 	return func(obj *flowcontrol.PriorityLevelConfiguration) {
 		obj.Spec.Limited = limited
+	}
+}
+
+// tweakSpecType sets the Spec.Type field directly.
+func tweakSpecType(t flowcontrol.PriorityLevelEnablement) func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		obj.Spec.Type = t
 	}
 }
 
