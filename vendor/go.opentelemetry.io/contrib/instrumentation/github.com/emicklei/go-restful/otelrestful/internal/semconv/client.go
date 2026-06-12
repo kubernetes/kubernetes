@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,8 +20,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv/v1.40.0"
-	"go.opentelemetry.io/otel/semconv/v1.40.0/httpconv"
+	"go.opentelemetry.io/otel/semconv/v1.41.0"
+	"go.opentelemetry.io/otel/semconv/v1.41.0/httpconv"
 )
 
 type HTTPClient struct {
@@ -166,7 +167,7 @@ func (n HTTPClient) ResponseTraceAttrs(resp *http.Response) []attribute.KeyValue
 
 func (n HTTPClient) method(method string) (attribute.KeyValue, attribute.KeyValue) {
 	if method == "" {
-		return semconv.HTTPRequestMethodGet, attribute.KeyValue{}
+		return semconv.HTTPRequestMethodOther, attribute.KeyValue{}
 	}
 	if attr, ok := methodLookup[method]; ok {
 		return attr, attribute.KeyValue{}
@@ -176,7 +177,7 @@ func (n HTTPClient) method(method string) (attribute.KeyValue, attribute.KeyValu
 	if attr, ok := methodLookup[strings.ToUpper(method)]; ok {
 		return attr, orig
 	}
-	return semconv.HTTPRequestMethodGet, orig
+	return semconv.HTTPRequestMethodOther, orig
 }
 
 func (n HTTPClient) MetricAttributes(req *http.Request, statusCode int, additionalAttributes []attribute.KeyValue) []attribute.KeyValue {
@@ -249,12 +250,48 @@ func (o MetricOpts) AddOptions() metric.AddOption {
 
 func (n HTTPClient) MetricOptions(ma MetricAttributes) MetricOpts {
 	attributes := n.MetricAttributes(ma.Req, ma.StatusCode, ma.AdditionalAttributes)
+	if ma.StatusCode == 0 && ma.Err != nil {
+		attributes = append(attributes, n.ErrorType(ma.Err))
+	}
 	set := metric.WithAttributeSet(attribute.NewSet(attributes...))
 
 	return MetricOpts{
 		measurement: set,
 		addOptions:  set,
 	}
+}
+
+// ErrorType returns an error.type attribute for the given error. The otelhttp
+// Transport calls the underlying RoundTripper directly, so transport failures
+// arrive as *net.OpError (connection refused, timeout, etc.) rather than
+// *url.Error (which http.Client.Do adds above the Transport layer). This
+// function intentionally does not unwrap further: reporting a single concrete
+// type per failure keeps attribute cardinality bounded, as required by the
+// OTel spec (error.type SHOULD have low cardinality). Callers that need
+// finer-grained error distinctions should inspect the error themselves.
+func (n HTTPClient) ErrorType(err error) attribute.KeyValue {
+	t := reflect.TypeOf(err)
+	if t == nil {
+		return semconv.ErrorTypeOther
+	}
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	var value string
+	if t.PkgPath() == "" || t.Name() == "" {
+		// t.PkgPath() == "" covers builtin and unnamed types.
+		// t.Name() == "" covers anonymous struct types that implement error,
+		// which are uncommon but possible. Fall back to t.String() for both.
+		value = t.String()
+	} else {
+		value = fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
+	}
+
+	if value == "" {
+		return semconv.ErrorTypeOther
+	}
+
+	return semconv.ErrorTypeKey.String(value)
 }
 
 func (n HTTPClient) RecordMetrics(ctx context.Context, md MetricData, opts MetricOpts) {
