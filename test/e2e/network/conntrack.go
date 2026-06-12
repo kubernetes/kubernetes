@@ -155,7 +155,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -233,7 +234,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -313,7 +315,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 1 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 1 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -406,7 +409,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		clientPod.Spec.HostNetwork = true
@@ -496,7 +500,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -688,7 +693,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo serverport | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		testCmd := fmt.Sprintf(`echo serverport | nc -u -w 5 -p %d %s %d`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)

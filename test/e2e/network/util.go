@@ -251,3 +251,17 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 	}
 	return nil
 }
+
+// wrapCommandWithTimestampObservations creates a command to be run 'iter'
+// times, with consistent wrapping to emit logs for retrospective analysis of
+// execution timestamps.
+func wrapCommandWithTimestampObservations(cmd string, iter int) string {
+	finalCmd := `date; `
+	finalCmd += fmt.Sprintf("for i in $(seq 1 %d); do", iter)
+	finalCmd += `echo "$(date) Try: ${i}"; `
+	finalCmd += cmd + `; `
+	finalCmd += `echo; `
+	finalCmd += `done`
+
+	return finalCmd
+}
