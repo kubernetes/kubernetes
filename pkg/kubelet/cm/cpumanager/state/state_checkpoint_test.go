@@ -323,7 +323,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}`,
 			"static",
 			containermap.ContainerMap{},
-			"cannot unmarshal string into Go struct field CPUManagerCheckpointV2.entries of type map[string]string",
+			"cannot unmarshal string into Go struct field CPUManagerCheckpointV2.entries",
 			nil,
 		},
 		{
