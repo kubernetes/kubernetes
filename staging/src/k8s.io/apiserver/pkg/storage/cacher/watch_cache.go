@@ -668,13 +668,42 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 			return listSnapshot{Items: result}, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	if w.storage.snapshots != nil {
+	return w.getLatestSnapshotLocked(key, continueKey)
+}
+
+func (w *watchCache) getLatestSnapshotLocked(key, continueKey string) (store.Snapshot, uint64, string, error) {
+	if w.storage.snapshots != nil && w.storage.snapshottingEnabled.Load() {
 		snap, ok := w.storage.snapshots.Latest()
 		if ok {
+			// Snapshots are added in order as we update store, so the
+			// latest snapshot match latest store state and latest revision.
 			return snap, w.resourceVersion, "", nil
 		}
 	}
-	return w.storage.store, w.resourceVersion, "", nil
+	// TODO: Consider using Indexer Clone() after benchmarking.
+	snap, err := orderedSnapshotResponseFromIndexer(w.storage.store, key, continueKey)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	return snap, w.resourceVersion, "", nil
+}
+
+func orderedSnapshotResponseFromIndexer(indexer store.Indexer, key, continueKey string) (store.Snapshot, error) {
+	items, err := indexer.OrderedListPrefix(key, continueKey)
+	if err != nil {
+		return nil, err
+	}
+	return orderedListSnapshot{Items: items}, nil
+}
+
+type orderedListSnapshot struct {
+	Items []interface{}
+}
+
+var _ store.Snapshot = (*orderedListSnapshot)(nil)
+
+func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+	return o.Items, nil
 }
 
 type listSnapshot struct {
