@@ -55,7 +55,18 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsListCount.WithLabelValues("v1").Inc()
 
-	pods := p.podsProvider.GetPods()
+	var pods []*v1.Pod
+	allPods := p.podsProvider.GetPods()
+	pods = make([]*v1.Pod, 0, len(allPods))
+	for _, pod := range allPods {
+		// Skip terminal pods (Failed or Succeeded).
+		// Terminal pods should not appear in podresources as they no longer consume resources.
+		if podutil.IsPodTerminal(pod) {
+			continue
+		}
+		pods = append(pods, pod)
+	}	
+
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
 	p.devicesProvider.UpdateAllocatedDevices()
 
