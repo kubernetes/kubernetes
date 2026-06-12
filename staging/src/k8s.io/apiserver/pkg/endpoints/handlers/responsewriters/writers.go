@@ -32,6 +32,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -88,6 +89,14 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	_ = trySerializeObject(mediaType, encoder, hw, req, statusCode, object, false)
+}
+
+// trySerializeObject is the implementation behind SerializeObject. When allowRetry is
+// true and the encoder cannot represent the object (protobuf.IsNotMarshalable) before
+// any bytes have been flushed, it returns false so the caller can try the next
+// serializer. Otherwise it writes the response and returns true.
+func trySerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, allowRetry bool) (committed bool) {
 	ctx := req.Context()
 	ctx, span := tracing.Start(ctx, "SerializeObject",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
@@ -123,7 +132,14 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 			// we cannot write an error to the writer anymore as the Encode call was successful.
 			utilruntime.HandleError(fmt.Errorf("apiserver was unable to close cleanly the response writer: %v", err))
 		}
-		return
+		return true
+	}
+	// If the encoder can't represent this object and nothing has been committed yet,
+	// signal the caller to try the next acceptable serializer. The predicate is narrow
+	// by design; if other serializers grow the same failure mode, a shared marker
+	// interface in apimachinery would be the natural generalization.
+	if allowRetry && !w.hasWritten && !w.hasBuffered && protobuf.IsNotMarshalable(err) {
+		return false
 	}
 
 	// make a best effort to write the object if a failure is detected
@@ -143,6 +159,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback JSON response: %v", err))
 	}
 	w.Close()
+	return true
 }
 
 var gzipPool = NewGzipWriterPoolOrDie()
@@ -297,7 +314,9 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	mediaType, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
+	// Try candidates in Accept quality order; fall through if an encoder can't
+	// represent the object and nothing has been written yet.
+	mediaTypes, err := negotiation.NegotiateOutputMediaTypes(req, s, restrictions)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
@@ -312,19 +331,28 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 
 	audit.LogResponseObject(req.Context(), object, gv, s)
 
-	var encoder runtime.Encoder
-	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-		encoder = s.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), gv)
-	} else {
-		encoder = s.EncoderForVersion(serializer.Serializer, gv)
-	}
-	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
-		if listGVKInContentType {
-			SerializeObject(generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)
+	for i := range mediaTypes {
+		serializer := mediaTypes[i].Accepted
+		var encoder runtime.Encoder
+		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+			encoder = s.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), gv)
 		} else {
-			SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+			encoder = s.EncoderForVersion(serializer.Serializer, gv)
 		}
-	})
+		// The last candidate must commit so the client always gets a response.
+		allowRetry := i < len(mediaTypes)-1
+		mt := serializer.MediaType
+		if listGVKInContentType {
+			mt = generateMediaTypeWithGVK(serializer.MediaType, mediaTypes[i].Convert)
+		}
+		var committed bool
+		request.TrackSerializeResponseObjectLatency(req.Context(), func() {
+			committed = trySerializeObject(mt, encoder, w, req, statusCode, object, allowRetry)
+		})
+		if committed {
+			return
+		}
+	}
 }
 
 func generateMediaTypeWithGVK(mediaType string, gvk *schema.GroupVersionKind) string {
