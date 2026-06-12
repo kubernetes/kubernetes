@@ -61,49 +61,49 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 		},
 		{
-			Name: "invalid missing reason",
+			Name:       "invalid missing reason",
 			Conditions: []metav1.Condition{MkCondition(TweakReason(""))},
 			ExpectedErrs: field.ErrorList{
 				field.Required(fldPath.Index(0).Child("reason"), "").MarkAlpha(),
 			},
 		},
 		{
-			Name: "invalid too long reason",
+			Name:       "invalid too long reason",
 			Conditions: []metav1.Condition{MkCondition(TweakReason(strings.Repeat("A", 1025)))},
 			ExpectedErrs: field.ErrorList{
 				field.TooLong(fldPath.Index(0).Child("reason"), "", 1024).WithOrigin("maxLength").MarkAlpha(),
 			},
 		},
 		{
-			Name: "invalid too long message",
+			Name:       "invalid too long message",
 			Conditions: []metav1.Condition{MkCondition(TweakMessage(strings.Repeat("a", 32769)))},
 			ExpectedErrs: field.ErrorList{
 				field.TooLong(fldPath.Index(0).Child("message"), "", 32768).WithOrigin("maxLength").MarkAlpha(),
 			},
 		},
 		{
-			Name: "invalid missing status",
+			Name:       "invalid missing status",
 			Conditions: []metav1.Condition{MkCondition(TweakStatus(""))},
 			ExpectedErrs: field.ErrorList{
 				field.Required(fldPath.Index(0).Child("status"), "").MarkAlpha(),
 			},
 		},
 		{
-			Name: "invalid status not supported",
+			Name:       "invalid status not supported",
 			Conditions: []metav1.Condition{MkCondition(TweakStatus(metav1.ConditionStatus("InvalidStatus")))},
 			ExpectedErrs: field.ErrorList{
 				field.NotSupported(fldPath.Index(0).Child("status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{}).MarkAlpha(),
 			},
 		},
 		{
-			Name: "invalid type format",
+			Name:       "invalid type format",
 			Conditions: []metav1.Condition{MkCondition(TweakType("@invalid"))},
 			ExpectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Index(0).Child("type"), "@invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
-			Name: "invalid negative observedGeneration",
+			Name:       "invalid negative observedGeneration",
 			Conditions: []metav1.Condition{MkCondition(TweakObservedGeneration(-1))},
 			ExpectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Index(0).Child("observedGeneration"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),

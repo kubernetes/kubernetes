@@ -73,7 +73,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
-					Name: "invalid type format",
+					Name:       "invalid type format",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType("@invalid"))},
 					ExpectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("status", "conditions").Index(0).Child("type"), "@invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
@@ -81,35 +81,35 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
-					Name: "invalid missing reason",
+					Name:       "invalid missing reason",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakReason(""))},
 					ExpectedErrs: field.ErrorList{
 						field.Required(field.NewPath("status", "conditions").Index(0).Child("reason"), "").MarkAlpha(),
 					},
 				},
 				{
-					Name: "invalid too long reason",
+					Name:       "invalid too long reason",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakReason(strings.Repeat("A", 1025)))},
 					ExpectedErrs: field.ErrorList{
 						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("reason"), "", 1024).WithOrigin("maxLength").MarkAlpha(),
 					},
 				},
 				{
-					Name: "invalid negative observedGeneration",
+					Name:       "invalid negative observedGeneration",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakObservedGeneration(-1))},
 					ExpectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("status", "conditions").Index(0).Child("observedGeneration"), int64(-1), "").WithOrigin("minimum").MarkAlpha(),
 					},
 				},
 				{
-					Name: "invalid too long message",
+					Name:       "invalid too long message",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakMessage(strings.Repeat("a", 32769)))},
 					ExpectedErrs: field.ErrorList{
 						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("message"), "", 32768).WithOrigin("maxLength").MarkAlpha(),
 					},
 				},
 				{
-					Name: "invalid missing status",
+					Name:       "invalid missing status",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakStatus(""))},
 					ExpectedErrs: field.ErrorList{
 						field.Required(field.NewPath("status", "conditions").Index(0).Child("status"), "").MarkAlpha(),
@@ -117,7 +117,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
-					Name: "invalid status not supported",
+					Name:       "invalid status not supported",
 					Conditions: []metav1.Condition{meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakStatus(metav1.ConditionStatus("InvalidStatus")))},
 					ExpectedErrs: field.ErrorList{
 						field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionStatus("InvalidStatus"), []metav1.ConditionStatus{}).MarkAlpha(),
