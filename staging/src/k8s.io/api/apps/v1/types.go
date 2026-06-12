@@ -38,8 +38,6 @@ const (
 // +genclient:method=ApplyScale,verb=apply,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
-// +k8s:supportsSubresource="/scale"
-
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //   - Network: A single stable DNS and hostname.
