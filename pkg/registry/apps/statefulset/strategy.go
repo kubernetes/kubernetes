@@ -78,6 +78,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 
 	dropStatefulSetDisabledFields(statefulSet, nil)
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
+	statefulSet.Spec.Template.Annotations = pod.DropInitContainerAnnotations(statefulSet.Spec.Template.Annotations)
 }
 
 // maxUnavailableInUse returns true if StatefulSet's maxUnavailable set(used)
@@ -101,6 +102,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 
 	dropStatefulSetDisabledFields(newStatefulSet, oldStatefulSet)
 	pod.DropDisabledTemplateFields(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
+	newStatefulSet.Spec.Template.Annotations = pod.DropInitContainerAnnotations(newStatefulSet.Spec.Template.Annotations)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.

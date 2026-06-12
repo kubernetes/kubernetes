@@ -93,6 +93,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
+	pod.Annotations = podutil.DropInitContainerAnnotations(pod.Annotations)
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
@@ -110,6 +111,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	newPod.Annotations = podutil.DropInitContainerAnnotations(newPod.Annotations)
 	updatePodGeneration(newPod, oldPod)
 }
 

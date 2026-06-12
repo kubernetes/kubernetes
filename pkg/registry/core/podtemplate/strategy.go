@@ -50,6 +50,7 @@ func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	template := obj.(*api.PodTemplate)
 	template.Generation = 1
 	pod.DropDisabledTemplateFields(&template.Template, nil)
+	template.Template.Annotations = pod.DropInitContainerAnnotations(template.Template.Annotations)
 }
 
 // Validate validates a new pod template.
@@ -80,6 +81,7 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	oldTemplate := old.(*api.PodTemplate)
 
 	pod.DropDisabledTemplateFields(&newTemplate.Template, &oldTemplate.Template)
+	newTemplate.Template.Annotations = pod.DropInitContainerAnnotations(newTemplate.Template.Annotations)
 
 	// Any changes to the template increment the generation number.
 	// See metav1.ObjectMeta description for more information on Generation.
