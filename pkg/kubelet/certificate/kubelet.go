@@ -92,7 +92,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		&compbasemetrics.CounterOpts{
 			Subsystem:         metrics.KubeletSubsystem,
 			Name:              "server_expiration_renew_errors",
-			Help:              "Counter of certificate renewal errors.",
+			Help:              "Counter of certificate renewal errors. Deprecated in favor of kubelet_server_expiration_renew_errors_total",
 			StabilityLevel:    compbasemetrics.ALPHA,
 			DeprecatedVersion: "1.38.0",
 		},
@@ -232,7 +232,7 @@ func NewKubeletClientCertificateManager(
 			Namespace:         metrics.KubeletSubsystem,
 			Subsystem:         "certificate_manager",
 			Name:              "client_expiration_renew_errors",
-			Help:              "Counter of certificate renewal errors.",
+			Help:              "Counter of certificate renewal errors. Deprecated in favor of kubelet_certificate_manager_client_expiration_renew_errors_total",
 			StabilityLevel:    compbasemetrics.ALPHA,
 			DeprecatedVersion: "1.38.0",
 		},
