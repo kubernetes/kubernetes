@@ -156,6 +156,7 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	// in sync (see SetDefaults_PodSpec) so the result is defaulting-stable.
 	if len(pod.Spec.ServiceAccountName) == 0 {
 		pod.Spec.ServiceAccountName = DefaultServiceAccountName
+		//lint:ignore SA1019 DeprecatedServiceAccount must be set for backward compatibility
 		pod.Spec.DeprecatedServiceAccount = DefaultServiceAccountName
 	}
 

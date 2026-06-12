@@ -83,6 +83,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			// DeprecatedServiceAccount is an alias for ServiceAccountName kept
 			// in sync by defaulting; valid objects always have them equal.
+			//lint:ignore SA1019 DeprecatedServiceAccount must be fuzzed for backward compatibility
 			s.DeprecatedServiceAccount = s.ServiceAccountName
 
 			c.Fill(s.SecurityContext)
