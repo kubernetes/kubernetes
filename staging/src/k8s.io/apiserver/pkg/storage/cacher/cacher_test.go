@@ -745,15 +745,15 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 			b.Cleanup(terminate)
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			tracker := storagetesting.NewWatchLatencyTracker(clock.RealClock{})
-			originalHandler := cacher.cacher.watchCache.eventHandler
-			cacher.cacher.watchCache.eventHandler = func(event *watchCacheEvent) {
+			originalHandler := cacher.cacher.watchCache.config.eventHandler
+			cacher.cacher.watchCache.config.eventHandler = func(event *watchCacheEvent) {
 				if originalHandler != nil {
 					originalHandler(event)
 				}
 				tracker.HandleEvent(event.Object)
 			}
 			b.Cleanup(func() {
-				cacher.cacher.watchCache.eventHandler = originalHandler
+				cacher.cacher.watchCache.config.eventHandler = originalHandler
 			})
 			storagetesting.RunBenchmarkWriteThroughput(ctx, b, cacher, data, true, tracker)
 		})
