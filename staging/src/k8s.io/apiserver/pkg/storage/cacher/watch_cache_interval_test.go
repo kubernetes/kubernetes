@@ -302,7 +302,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				c.intervalStartIndex,
 				wc.history.endIndex,
 				indexerFunc,
-				wc.isIndexValidLocked,
+				wc.history.isIndexValidLocked,
 				wc.resourceVersion,
 				&wc.RWMutex,
 			)

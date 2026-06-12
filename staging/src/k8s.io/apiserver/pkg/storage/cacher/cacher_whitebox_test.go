@@ -1984,7 +1984,7 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 	defer cacher.Stop()
 
 	dispatchedEvents := []*watchCacheEvent{}
-	cacher.watchCache.eventHandler = func(event *watchCacheEvent) {
+	cacher.watchCache.config.eventHandler = func(event *watchCacheEvent) {
 		dispatchedEvents = append(dispatchedEvents, event)
 		cacher.processEvent(event)
 	}
@@ -2096,7 +2096,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 		once.Do(invalidateCacheInterval)
 		return isValid
 	}
-	cacher.watchCache.indexValidator = indexValidator
+	cacher.watchCache.config.indexValidator = indexValidator
 
 	makePod := func(i int) *examplev1.Pod {
 		return &examplev1.Pod{
