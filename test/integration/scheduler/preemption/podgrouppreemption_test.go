@@ -50,9 +50,7 @@ import (
 // TestPodGroupPreemption tests preemption scenarios involving pod groups.
 func TestPodGroupPreemption(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.GangScheduling:          true,
-		features.WorkloadAwarePreemption: true,
+		features.GenericWorkload: true,
 	})
 	tests := []struct {
 		name                       string

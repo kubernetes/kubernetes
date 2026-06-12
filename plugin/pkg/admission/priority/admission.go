@@ -194,7 +194,7 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 // admitPodGroup makes sure a new pod group does not set spec.Priority field. It also makes sure that
 // the PriorityClassName exists if it is provided and resolves the pod group priority from the PriorityClassName.
 func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		return nil
 	}
 

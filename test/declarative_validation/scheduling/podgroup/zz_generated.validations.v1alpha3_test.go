@@ -31,7 +31,6 @@ func init() {
 		schema.GroupVersionKind{Group: "scheduling.k8s.io", Version: "v1alpha3", Kind: "PodGroup"},
 		coverage.FieldRules{
 			"spec.disruptionMode": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 				{ErrorType: "FieldValueRequired"},
@@ -49,12 +48,10 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.priority": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.priorityClassName": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},

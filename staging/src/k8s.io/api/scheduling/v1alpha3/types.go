@@ -164,27 +164,19 @@ type PodGroupTemplate struct {
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+	// +k8s:optional
 	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
 
 	// PriorityClassName indicates the priority that should be considered when scheduling
 	// a pod group created from this template. If no priority class is specified, admission
 	// control can set this to the global default priority class if it exists. Otherwise,
 	// pod groups created from this template will have the priority set to zero.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:format=k8s-long-name
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
 	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,6,opt,name=priorityClassName"`
 
 	// Priority is the value of priority of pod groups created from this template. Various
@@ -192,14 +184,10 @@ type PodGroupTemplate struct {
 	// Priority Admission Controller is enabled, it prevents users from setting this field.
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:optional
+	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
@@ -427,15 +415,11 @@ type PodGroupSpec struct {
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
 	// One of Single, All. Defaults to Single if unset.
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +default={"single": {}}
 	// +optional
-	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+	// +k8s:optional
+	// +k8s:immutable
 	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
 
 	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
@@ -444,15 +428,11 @@ type PodGroupSpec struct {
 	// (i.e. if no priority class is specified, admission control can set this to the global default
 	// priority class if it exists. Otherwise, the pod group's priority will be zero).
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:format=k8s-long-name
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+	// +k8s:optional
+	// +k8s:immutable
+	// +k8s:format=k8s-long-name
 	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,6,opt,name=priorityClassName"`
 
 	// Priority is the value of priority of this pod group. Various system components
@@ -461,15 +441,11 @@ type PodGroupSpec struct {
 	// controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	//
-	// +featureGate=WorkloadAwarePreemption
 	// +optional
-	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:optional
+	// +k8s:immutable
+	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
