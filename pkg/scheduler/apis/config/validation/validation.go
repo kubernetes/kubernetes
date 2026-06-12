@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
@@ -179,6 +180,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 			"postBind":           profile.Plugins.PostBind,
 			"placementGenerate":  profile.Plugins.PlacementGenerate,
 			"placementScore":     profile.Plugins.PlacementScore,
+			"podGroupPostFilter": profile.Plugins.PodGroupPostFilter,
 		}
 
 		pluginsPath := path.Child("plugins")
