@@ -134,6 +134,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(0),
 				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(0),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
@@ -159,6 +162,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 					"": timelessSample(1),
 				}),
 				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(1),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(1),
 				}),
 			})
@@ -188,6 +194,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(0),
 				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(0),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
@@ -206,10 +215,13 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			idFn := makeCustomPairID("scope", "boundary")
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
-				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(1),
 				}),
 				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(0),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(0),
 				}),
 			})
@@ -241,6 +253,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 					"": timelessSample(int(allocatableCPUs.Size() * 1000)),
 				}),
 				"kubelet_cpu_manager_exclusive_cpu_allocated": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(0),
+				}),
+				"kubelet_cpu_manager_exclusive_cpu_allocation_count": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
 				}),
 			})
@@ -276,6 +291,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				"kubelet_cpu_manager_exclusive_cpu_allocated": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
 				}),
+				"kubelet_cpu_manager_exclusive_cpu_allocation_count": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(0),
+				}),
 			})
 			ginkgo.By(fmt.Sprintf("Pool allocatable resources from the kubelet: shared pool %d cpus %d millis", allocatableCPUs.Size(), allocatableCPUsIdleMillis))
 
@@ -292,6 +310,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 					"": timelessSample(allocatableCPUsIdleMillis - (smtLevel * 1000)),
 				}),
 				"kubelet_cpu_manager_exclusive_cpu_allocated": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(smtLevel),
+				}),
+				"kubelet_cpu_manager_exclusive_cpu_allocation_count": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(smtLevel),
 				}),
 			})
@@ -329,7 +350,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			idFn := makeCustomPairID("scope", "boundary")
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
-				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::uncore_cache": timelessSample(1),
 				}),
 			})
@@ -354,7 +375,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			idFn := makeCustomPairID("scope", "boundary")
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
-				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::uncore_cache": timelessSample(1),
 				}),
 			})
@@ -382,7 +403,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			idFn := makeCustomPairID("scope", "boundary")
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
-				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::uncore_cache": timelessSample(0),
 				}),
 			})
