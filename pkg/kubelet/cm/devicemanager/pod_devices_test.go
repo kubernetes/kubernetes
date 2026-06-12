@@ -17,7 +17,9 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -327,10 +329,6 @@ func TestPodDevicesConcurrentAccess(t *testing.T) {
 	// was waiting for the lock.
 	//
 	// The fix: containerDevicesLocked() assumes caller already holds the lock.
-	// Before the fix, when podDevices() held RLock() and called containerDevices()
-	// which also tried to acquire RLock(), a waiting writer could cause issues.
-	//
-	// The fix: containerDevicesLocked() assumes caller already holds the lock.
 	pdev := newPodDevices()
 
 	// Setup: pod with multiple containers using same resource
@@ -345,13 +343,13 @@ func TestPodDevicesConcurrentAccess(t *testing.T) {
 
 	const numReaders = 10
 	const numWriters = 5
-	readerDone := make(chan bool, numReaders)
-	writerDone := make(chan bool, numWriters)
+	var wg sync.WaitGroup
+	wg.Add(numReaders + numWriters)
 
 	// Start multiple readers calling podDevices() which triggers the fixed code path
 	for i := 0; i < numReaders; i++ {
 		go func() {
-			defer func() { readerDone <- true }()
+			defer wg.Done()
 			for j := 0; j < 100; j++ {
 				pdev.podDevices("pod1", "resource1")
 			}
@@ -360,8 +358,8 @@ func TestPodDevicesConcurrentAccess(t *testing.T) {
 
 	// Start writers that need write lock (competing with readers)
 	for i := 0; i < numWriters; i++ {
-		go func(idx int) {
-			defer func() { writerDone <- true }()
+		go func() {
+			defer wg.Done()
 			for j := 0; j < 50; j++ {
 				pdev.insert("pod2", "cont3", "resource2",
 					checkpoint.DevicesPerNUMA{0: []string{"dev5"}},
@@ -369,27 +367,22 @@ func TestPodDevicesConcurrentAccess(t *testing.T) {
 				)
 				pdev.delete([]string{"pod2"})
 			}
-		}(i)
+		}()
 	}
 
-	// Wait for all readers with timeout
-	for i := 0; i < numReaders; i++ {
-		select {
-		case <-readerDone:
-			// Reader completed successfully
-		case <-time.After(10 * time.Second):
-			t.Fatalf("reader %d deadlocked", i)
-		}
-	}
-
-	// Wait for all writers with timeout
-	for i := 0; i < numWriters; i++ {
-		select {
-		case <-writerDone:
-			// Writer completed successfully
-		case <-time.After(10 * time.Second):
-			t.Fatalf("writer %d deadlocked", i)
-		}
+	// Wait for all goroutines with timeout to detect deadlock
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		// All goroutines completed successfully
+	case <-ctx.Done():
+		t.Fatal("deadlock detected: concurrent access test timed out")
 	}
 
 	// Verify final state is consistent
