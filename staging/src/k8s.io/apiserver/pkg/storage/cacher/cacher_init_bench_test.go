@@ -64,31 +64,46 @@ func BenchmarkCacherInit(b *testing.B) {
 		Clock:        clock.RealClock{},
 	}
 
-	for _, rangeStream := range []bool{false, true} {
-		for _, concurrentDecode := range []bool{false, true} {
-			name := fmt.Sprintf("RangeStream=%v/ConcurrentDecode=%v", rangeStream, concurrentDecode)
-			b.Run(name, func(b *testing.B) {
-				featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
-				featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, concurrentDecode)
-
-				b.ResetTimer()
-				b.ReportAllocs()
-				for i := 0; i < b.N; i++ {
-					cacher, err := NewCacherFromConfig(config)
-					if err != nil {
-						b.Fatal(err)
-					}
-					if err := cacher.Wait(ctx); err != nil {
-						b.Fatal(err)
-					}
-					b.StopTimer()
-					cacher.Stop()
-					etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
-					b.StartTimer()
-				}
-				b.ReportMetric(float64(pods), "pods/cache")
-			})
+	// Warm up once so the first timed iteration doesn't pay process cold-start
+	// (cold GC, OS page cache, lazy init) and skew the first sub-benchmark.
+	{
+		warm, err := NewCacherFromConfig(config)
+		if err != nil {
+			b.Fatal(err)
 		}
+		if err := warm.Wait(ctx); err != nil {
+			b.Fatal(err)
+		}
+		warm.Stop()
+		etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
+	}
+
+	for _, concurrentDecode := range []bool{false, true} {
+		b.Run(fmt.Sprintf("ConcurrentDecode=%v", concurrentDecode), func(b *testing.B) {
+			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, concurrentDecode)
+			for _, rangeStream := range []bool{false, true} {
+				b.Run(fmt.Sprintf("RangeStream=%v", rangeStream), func(b *testing.B) {
+					featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+
+					b.ResetTimer()
+					b.ReportAllocs()
+					for i := 0; i < b.N; i++ {
+						cacher, err := NewCacherFromConfig(config)
+						if err != nil {
+							b.Fatal(err)
+						}
+						if err := cacher.Wait(ctx); err != nil {
+							b.Fatal(err)
+						}
+						b.StopTimer()
+						cacher.Stop()
+						etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
+						b.StartTimer()
+					}
+					b.ReportMetric(float64(pods), "pods/cache")
+				})
+			}
+		})
 	}
 }
 
