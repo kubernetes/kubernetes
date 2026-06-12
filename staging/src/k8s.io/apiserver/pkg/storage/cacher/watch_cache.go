@@ -22,7 +22,6 @@ import (
 	"math"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -188,49 +187,6 @@ func newWatchCache(
 	return wc
 }
 
-type watchCacheHistory struct {
-	config *ImmutableWatchCacheConfig
-
-	// Maximum size of history window.
-	capacity int
-
-	// upper bound of capacity since event cache has a dynamic size.
-	upperBoundCapacity int
-
-	// lower bound of capacity since event cache has a dynamic size.
-	lowerBoundCapacity int
-
-	// cache is used a cyclic buffer - the "current" contents of it are
-	// stored in [start_index%capacity, end_index%capacity) - so the
-	// "current" contents have exactly end_index-start_index items.
-	cache      []*watchCacheEvent
-	startIndex int
-	endIndex   int
-	// removedEventSinceRelist holds the information whether any of the events
-	// were already removed from the `cache` cyclic buffer since the last relist
-	removedEventSinceRelist bool
-
-	// eventFreshDuration defines the minimum watch history watchcache will store.
-	eventFreshDuration time.Duration
-}
-
-type watchCacheStorage struct {
-	config *ImmutableWatchCacheConfig
-
-	// store will effectively support LIST operation from the "end of cache
-	// history" i.e. from the moment just after the newest cached watched event.
-	// It is necessary to effectively allow clients to start watching at now.
-	// NOTE: We assume that <store> is thread-safe.
-	store store.Indexer
-
-	// ResourceVersion of the last list result (populated via Replace() method).
-	listResourceVersion uint64
-
-	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
-	snapshots           store.Snapshotter
-	snapshottingEnabled atomic.Bool
-}
-
 // capacityUpperBound denotes the maximum possible capacity of the watch cache
 // to which it can resize.
 func capacityUpperBound(eventFreshDuration time.Duration) int {
@@ -379,60 +335,6 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	return nil
 }
 
-// Assumes that lock is already held for write.
-func (w *watchCacheHistory) updateCache(event *watchCacheEvent) {
-	w.resizeCacheLocked(event.RecordTime)
-	if w.isCacheFullLocked() {
-		// Cache is full - remove the oldest element.
-		w.startIndex++
-		w.removedEventSinceRelist = true
-	}
-	w.cache[w.endIndex%w.capacity] = event
-	w.endIndex++
-}
-
-// resizeCacheLocked resizes the cache if necessary:
-// - increases capacity by 2x if cache is full and all cached events occurred within last eventFreshDuration.
-// - decreases capacity by 2x when recent quarter of events occurred outside of eventFreshDuration(protect watchCache from flapping).
-func (w *watchCacheHistory) resizeCacheLocked(eventTime time.Time) {
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime) < w.eventFreshDuration {
-		capacity := min(w.capacity*2, w.upperBoundCapacity)
-		if capacity > w.capacity {
-			w.doCacheResizeLocked(capacity)
-		}
-		return
-	}
-	if w.isCacheFullLocked() && eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime) > w.eventFreshDuration {
-		capacity := max(w.capacity/2, w.lowerBoundCapacity)
-		if capacity < w.capacity {
-			w.doCacheResizeLocked(capacity)
-		}
-		return
-	}
-}
-
-// isCacheFullLocked used to judge whether watchCacheEvent is full.
-// Assumes that lock is already held for write.
-func (w *watchCacheHistory) isCacheFullLocked() bool {
-	return w.endIndex == w.startIndex+w.capacity
-}
-
-// doCacheResizeLocked resize watchCache's event array with different capacity.
-// Assumes that lock is already held for write.
-func (w *watchCacheHistory) doCacheResizeLocked(capacity int) {
-	newCache := make([]*watchCacheEvent, capacity)
-	if capacity < w.capacity {
-		// adjust startIndex if cache capacity shrink.
-		w.startIndex = w.endIndex - capacity
-	}
-	for i := w.startIndex; i < w.endIndex; i++ {
-		newCache[i%capacity] = w.cache[i%w.capacity]
-	}
-	w.cache = newCache
-	metrics.RecordsWatchCacheCapacityChange(w.config.groupResource, w.capacity, capacity)
-	w.capacity = capacity
-}
-
 func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	rv, err := w.config.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
@@ -459,11 +361,6 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		w.config.eventHandler(wcEvent)
 	}
 	metrics.RecordResourceVersion(w.config.groupResource, rv)
-}
-
-// List returns list of pointers to <store.Element> objects.
-func (w *watchCache) List() []interface{} {
-	return w.storage.store.List()
 }
 
 // waitUntilFreshLocked waits until cache is at least as fresh as given resourceVersion.
@@ -514,20 +411,6 @@ func (w *watchCache) waitUntilFreshLocked(ctx context.Context, consistentReadSup
 	}
 	span.AddEvent("watchCache fresh enough")
 	return nil
-}
-
-type sortableStoreElements []interface{}
-
-func (s sortableStoreElements) Len() int {
-	return len(s)
-}
-
-func (s sortableStoreElements) Less(i, j int) bool {
-	return s[i].(*store.Element).Key < s[j].(*store.Element).Key
-}
-
-func (s sortableStoreElements) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
 }
 
 func (c *watchCache) WaitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
@@ -682,67 +565,8 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 			return listSnapshot{Items: result}, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	return w.getLatestSnapshotLocked(key, continueKey)
-}
-
-func (w *watchCache) getLatestSnapshotLocked(key, continueKey string) (store.Snapshot, uint64, string, error) {
-	if w.storage.snapshots != nil && w.storage.snapshottingEnabled.Load() {
-		snap, ok := w.storage.snapshots.Latest()
-		if ok {
-			// Snapshots are added in order as we update store, so the
-			// latest snapshot match latest store state and latest revision.
-			return snap, w.resourceVersion, "", nil
-		}
-	}
-	// TODO: Consider using Indexer Clone() after benchmarking.
-	snap, err := orderedSnapshotResponseFromIndexer(w.storage.store, key, continueKey)
-	if err != nil {
-		return nil, 0, "", err
-	}
-	return snap, w.resourceVersion, "", nil
-}
-
-func orderedSnapshotResponseFromIndexer(indexer store.Indexer, key, continueKey string) (store.Snapshot, error) {
-	items, err := indexer.OrderedListPrefix(key, continueKey)
-	if err != nil {
-		return nil, err
-	}
-	return orderedListSnapshot{Items: items}, nil
-}
-
-type orderedListSnapshot struct {
-	Items []interface{}
-}
-
-var _ store.Snapshot = (*orderedListSnapshot)(nil)
-
-func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	return o.Items, nil
-}
-
-type listSnapshot struct {
-	Items []interface{}
-}
-
-var _ store.Snapshot = (*listSnapshot)(nil)
-
-func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]interface{}, error) {
-	var result []interface{}
-	for _, item := range l.Items {
-		elem, ok := item.(*store.Element)
-		if !ok {
-			return nil, fmt.Errorf("non *store.Element returned from storage: %v", item)
-		}
-		if len(continueKey) > 0 && continueKey >= elem.Key {
-			continue
-		}
-		if !hasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		result = append(result, item)
-	}
-	sort.Sort(sortableStoreElements(result))
-	return result, nil
+	snap, err = w.storage.getLatestSnapshotLocked(key, continueKey)
+	return snap, w.resourceVersion, "", err
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
@@ -762,30 +586,6 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion u
 	}
 	value, exists, err := w.storage.store.GetByKey(key)
 	return value, exists, w.resourceVersion, err
-}
-
-func (w *watchCache) ListKeys() []string {
-	return w.storage.store.ListKeys()
-}
-
-// Get takes runtime.Object as a parameter. However, it returns
-// pointer to <storeElement>.
-func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
-	object, ok := obj.(runtime.Object)
-	if !ok {
-		return nil, false, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
-	}
-	key, err := w.config.keyFunc(object)
-	if err != nil {
-		return nil, false, fmt.Errorf("couldn't compute key: %v", err)
-	}
-
-	return w.storage.store.Get(&store.Element{Key: key, Object: object})
-}
-
-// GetByKey returns pointer to <storeElement>.
-func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
-	return w.storage.store.GetByKey(key)
 }
 
 // Replace takes slice of runtime.Object as a parameter.
@@ -923,12 +723,6 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 	return chanSize
 }
 
-// isIndexValidLocked checks if a given index is still valid.
-// This assumes that the lock is held.
-func (w *watchCacheHistory) isIndexValidLocked(index int) bool {
-	return index >= w.startIndex
-}
-
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the watchCache lock.
@@ -993,28 +787,4 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
 	return w.storage.getIntervalLocked(w.resourceVersion, key, matchesSingle)
-}
-
-func (w *watchCacheStorage) getIntervalLocked(resourceVersion uint64, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	ci, err := newCacheIntervalFromStore(resourceVersion, w.store, key, matchesSingle)
-	if err != nil {
-		return nil, err
-	}
-	return ci, nil
-}
-
-func (w *watchCacheStorage) Compact(rev uint64) {
-	if w.snapshots == nil {
-		return
-	}
-	w.snapshots.RemoveLess(rev)
-}
-
-func (w *watchCacheStorage) MarkConsistent(consistent bool) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
-		w.snapshottingEnabled.Store(consistent)
-		if !consistent && w.snapshots != nil {
-			w.snapshots.Reset()
-		}
-	}
 }
