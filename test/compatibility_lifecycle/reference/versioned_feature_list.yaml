@@ -1615,6 +1615,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: SchedulerPreQueueingHints
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: SELinuxChangePolicy
   versionedSpecs:
   - default: false
