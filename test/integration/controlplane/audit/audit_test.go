@@ -17,9 +17,11 @@ limitations under the License.
 package audit
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -40,11 +42,20 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
+	apiserveraudit "k8s.io/apiserver/pkg/audit"
 	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 )
@@ -740,4 +751,226 @@ func createDeployment(t *testing.T, cs clientset.Interface, namespace string) *a
 	_, err := cs.AppsV1().Deployments(deploy.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{})
 	expectNoError(t, err, fmt.Sprintf("failed to create deployment %v", deploy))
 	return deploy
+}
+
+func TestAuditCBORPatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+
+	version := "audit.k8s.io/v1"
+	namespace := "audit-cbor-patch"
+
+	auditPolicy := fmt.Sprintf(`
+apiVersion: %s
+kind: Policy
+rules:
+  - level: RequestResponse
+    namespaces: ["%s"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
+`, version, namespace)
+
+	policyFile, err := os.CreateTemp("", "audit-policy.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create audit policy file: %v", err)
+	}
+	defer os.Remove(policyFile.Name())
+	if _, err := policyFile.Write([]byte(auditPolicy)); err != nil {
+		t.Fatalf("Failed to write audit policy file: %v", err)
+	}
+	policyFile.Close()
+
+	logFile, err := os.CreateTemp("", "audit.log")
+	if err != nil {
+		t.Fatalf("Failed to create audit log file: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, logFile)
+	defer func() {
+		if t.Failed() {
+			in, err := os.Open(logFile.Name())
+			if err != nil {
+				t.Logf("Failed to open log file for copying: %v", err)
+				return
+			}
+			defer in.Close()
+			out, err := os.Create("audit-failure.log")
+			if err != nil {
+				t.Logf("Failed to create failure log file: %v", err)
+				return
+			}
+			defer out.Close()
+			if _, err := io.Copy(out, in); err != nil {
+				t.Logf("Failed to copy log file: %v", err)
+			} else {
+				t.Logf("Saved failure audit log to audit-failure.log")
+			}
+		}
+	}()
+
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil,
+		[]string{
+			"--audit-policy-file", policyFile.Name(),
+			"--audit-log-version", version,
+			"--audit-log-mode", "blocking",
+			"--audit-log-path", logFile.Name(),
+			"--feature-gates=CBORServingAndStorage=true",
+		},
+		framework.SharedEtcd(),
+	)
+	var tornDown bool
+	tearDown := func() {
+		if !tornDown {
+			result.TearDownFn()
+			tornDown = true
+		}
+	}
+	defer tearDown()
+
+	kubeclient := clientset.NewForConfigOrDie(result.ClientConfig)
+
+	_, err = kubeclient.CoreV1().Namespaces().Create(context.TODO(), &apiv1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	}, metav1.CreateOptions{})
+	expectNoError(t, err, "failed to create namespace")
+
+	configMap := &apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "audit-configmap",
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"map-key": "map-value",
+		},
+	}
+	_, err = kubeclient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), configMap, metav1.CreateOptions{})
+	expectNoError(t, err, "failed to create audit-configmap")
+
+	patchMap := map[string]any{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]any{
+			"name":      "audit-configmap",
+			"namespace": namespace,
+		},
+		"data": map[string]any{
+			"map-key": "cbor-value",
+		},
+	}
+	cborBytes, err := cbor.Marshal(patchMap)
+	expectNoError(t, err, "failed to marshal CBOR patch")
+
+	_, err = kubeclient.CoreV1().RESTClient().Patch(types.ApplyCBORPatchType).
+		Namespace(namespace).
+		Resource("configmaps").
+		Name(configMap.Name).
+		Param("fieldManager", "audit_cbor_test").
+		Param("force", "true").
+		Body(cborBytes).
+		Do(context.TODO()).
+		Get()
+	expectNoError(t, err, "failed to patch configmap with CBOR")
+
+	yamlPatch := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-configmap
+  namespace: ` + namespace + `
+data:
+  map-key: yaml-value
+`
+	_, err = kubeclient.CoreV1().RESTClient().Patch(types.ApplyYAMLPatchType).
+		Namespace(namespace).
+		Resource("configmaps").
+		Name(configMap.Name).
+		Param("fieldManager", "audit_yaml_test").
+		Param("force", "true").
+		Body([]byte(yamlPatch)).
+		Do(context.TODO()).
+		Get()
+	expectNoError(t, err, "failed to patch configmap with YAML")
+
+	// Stop the apiserver to flush audit logs
+	tearDown()
+
+	f, err := os.Open(logFile.Name())
+	expectNoError(t, err, "failed to open audit log file")
+	defer f.Close()
+
+	var decodedEvents []auditinternal.Event
+	scanner := bufio.NewScanner(f)
+	gv := schema.GroupVersion{Group: auditinternal.GroupName, Version: "v1"}
+	decoder := apiserveraudit.Codecs.UniversalDecoder(gv)
+	for scanner.Scan() {
+		line := scanner.Text()
+		e := &auditinternal.Event{}
+		if err := runtime.DecodeInto(decoder, []byte(line), e); err != nil {
+			t.Fatalf("failed decoding buf: %s, err: %v", line, err)
+		}
+		decodedEvents = append(decodedEvents, *e)
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("error reading log file: %v", err)
+	}
+
+	t.Logf("Total decoded events: %d", len(decodedEvents))
+	for _, ev := range decodedEvents {
+		t.Logf("Decoded Event: Verb=%q, Stage=%q, RequestURI=%q", ev.Verb, ev.Stage, ev.RequestURI)
+	}
+
+	var cborEvent, yamlEvent *auditinternal.Event
+	for i := range decodedEvents {
+		ev := &decodedEvents[i]
+		if ev.Verb == "patch" && ev.Stage == auditinternal.StageResponseComplete {
+			if strings.Contains(ev.RequestURI, "fieldManager=audit_cbor_test") {
+				cborEvent = ev
+			} else if strings.Contains(ev.RequestURI, "fieldManager=audit_yaml_test") {
+				yamlEvent = ev
+			}
+		}
+	}
+
+	if cborEvent == nil {
+		t.Fatal("CBOR patch audit event not found")
+	}
+	if yamlEvent == nil {
+		t.Fatal("YAML patch audit event not found")
+	}
+
+	if cborEvent.RequestObject == nil {
+		t.Error("CBOR patch event missing RequestObject")
+	} else {
+		unk := cborEvent.RequestObject
+		if unk.ContentType != "application/json" {
+			t.Errorf("Expected ContentType to be application/json, got %q", unk.ContentType)
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal(unk.Raw, &parsed); err != nil {
+			t.Errorf("Failed to unmarshal RequestObject.Raw as JSON: %v. Raw: %s", err, string(unk.Raw))
+		} else {
+			data, _ := parsed["data"].(map[string]any)
+			if val, _ := data["map-key"].(string); val != "cbor-value" {
+				t.Errorf("Expected map-key to be %q, got %q", "cbor-value", val)
+			}
+		}
+	}
+
+	if yamlEvent.RequestObject == nil {
+		t.Error("YAML patch event missing RequestObject")
+	} else {
+		unk := yamlEvent.RequestObject
+		if unk.ContentType != "application/json" {
+			t.Errorf("Expected ContentType to be application/json, got %q", unk.ContentType)
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal(unk.Raw, &parsed); err != nil {
+			t.Errorf("Failed to unmarshal RequestObject.Raw as JSON: %v. Raw: %s", err, string(unk.Raw))
+		} else {
+			data, _ := parsed["data"].(map[string]any)
+			if val, _ := data["map-key"].(string); val != "yaml-value" {
+				t.Errorf("Expected map-key to be %q, got %q", "yaml-value", val)
+			}
+		}
+	}
 }

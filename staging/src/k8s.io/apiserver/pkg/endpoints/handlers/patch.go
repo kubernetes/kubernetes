@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -130,7 +131,13 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 		admit = admission.WithAudit(admit)
 
-		audit.LogRequestPatch(req.Context(), patchBytes)
+		patchForAudit, err := transcodePatchToJSON(patchBytes, patchType)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to transcode patch for audit")
+			patchForAudit = patchBytes
+		}
+
+		audit.LogRequestPatch(req.Context(), patchForAudit)
 		span.AddEvent("Recorded the audit event")
 
 		var baseContentType string
@@ -493,8 +500,8 @@ type applyPatcher struct {
 	fieldManager        *managedfields.FieldManager
 	userAgent           string
 	validationDirective string
-	unmarshalFn         func(data []byte, v interface{}) error
-	unmarshalStrictFn   func(data []byte, v interface{}) error
+	unmarshalFn         func(data []byte, v any) error
+	unmarshalStrictFn   func(data []byte, v any) error
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context, obj runtime.Object) (runtime.Object, error) {
@@ -506,9 +513,9 @@ func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context,
 		panic("FieldManager must be installed to run apply")
 	}
 
-	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	patchObj := &unstructured.Unstructured{Object: map[string]any{}}
 	if err := p.unmarshalFn(p.patch, &patchObj.Object); err != nil {
-		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
+		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch bytes: %v", err))
 	}
 
 	obj, err := p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
@@ -519,9 +526,9 @@ func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context,
 	// TODO: spawn something to track deciding whether a fieldValidation=Strict
 	// fatal error should return before an error from the apply operation
 	if p.validationDirective == metav1.FieldValidationStrict || p.validationDirective == metav1.FieldValidationWarn {
-		if err := p.unmarshalStrictFn(p.patch, &map[string]interface{}{}); err != nil {
+		if err := p.unmarshalStrictFn(p.patch, &map[string]any{}); err != nil {
 			if p.validationDirective == metav1.FieldValidationStrict {
-				return nil, errors.NewBadRequest(fmt.Sprintf("error strict decoding YAML: %v", err))
+				return nil, errors.NewBadRequest(fmt.Sprintf("error strict decoding patch bytes: %v", err))
 			}
 			addStrictDecodingWarnings(requestContext, []error{err})
 		}
@@ -832,4 +839,19 @@ func patchToCreateOptions(po *metav1.PatchOptions) *metav1.CreateOptions {
 	}
 	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
 	return co
+}
+
+func transcodePatchToJSON(patchBytes []byte, patchType types.PatchType) ([]byte, error) {
+	switch patchType {
+	case types.ApplyCBORPatchType:
+		var obj any
+		if err := cbor.Unmarshal(patchBytes, &obj); err != nil {
+			return nil, err
+		}
+		return json.Marshal(obj)
+	case types.ApplyYAMLPatchType:
+		return yaml.ToJSON(patchBytes)
+	default:
+		return patchBytes, nil
+	}
 }
