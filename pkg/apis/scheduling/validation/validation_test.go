@@ -177,8 +177,7 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 		for i := range errs {
 			if errs[i].Type != v.T {
 				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
-			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
-			matcher.Test(t, TODO, errs)
+			}
 		}
 	}
 }
