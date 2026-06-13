@@ -80,7 +80,7 @@ func NewCustomResourceController(
 		),
 	}
 
-	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			crController.addSVM(logger, obj)
 		},
@@ -90,7 +90,8 @@ func NewCustomResourceController(
 		DeleteFunc: func(obj interface{}) {
 			crController.deleteSVM(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return crController
 }
