@@ -4245,6 +4245,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		desiredPodLevelResources    *resourceRequirements
 		updatedPodLevelResources    bool
 		enablePLR                   bool
+		nilCgroupConfig             bool
 	}{
 		{
 			testName: "Increase cpu and memory requests and limits, with computed pod limits",
@@ -4583,6 +4584,21 @@ func TestDoPodResizeAction(t *testing.T) {
 			expectPodCgroupUpdates:   1, // Pod level cgroup update for memory limit
 			enablePLR:                true,
 		},
+		{
+			testName: "Nil pod cgroup config does not panic (cgroupsPerQOS=false)",
+			currentResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: resourceRequirements{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    0, // pod cgroups not managed, no pod-level cgroup updates
+			nilCgroupConfig:           true,
+		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
 			_, _, m, err := createTestRuntimeManager(tCtx, withErrors(tc.runtimeErrors))
@@ -4598,21 +4614,26 @@ func TestDoPodResizeAction(t *testing.T) {
 			mockPCM := cmtesting.NewMockPodContainerManager(t)
 			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
 
-			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
-				Memory: ptr.To(tc.currentResources.memoryLimit),
-			}, nil).Maybe()
-			mockPCM.EXPECT().GetPodCgroupMemoryUsage(mock.Anything).Return(0, nil).Maybe()
-			// Set up mock pod cgroup config
-			podCPURequest := tc.currentResources.cpuRequest
-			podCPULimit := tc.currentResources.cpuLimit
-			if tc.otherContainersHaveLimits {
-				podCPURequest += 200
-				podCPULimit += 200
+			if tc.nilCgroupConfig {
+				mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(nil, nil).Maybe()
+				mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(nil, nil).Maybe()
+			} else {
+				mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
+					Memory: ptr.To(tc.currentResources.memoryLimit),
+				}, nil).Maybe()
+				// Set up mock pod cgroup config
+				podCPURequest := tc.currentResources.cpuRequest
+				podCPULimit := tc.currentResources.cpuLimit
+				if tc.otherContainersHaveLimits {
+					podCPURequest += 200
+					podCPULimit += 200
+				}
+				mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+					CPUShares: ptr.To(cm.MilliCPUToShares(podCPURequest)),
+					CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
+				}, nil).Maybe()
 			}
-			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
-				CPUShares: ptr.To(cm.MilliCPUToShares(podCPURequest)),
-				CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
-			}, nil).Maybe()
+			mockPCM.EXPECT().GetPodCgroupMemoryUsage(mock.Anything).Return(0, nil).Maybe()
 			if tc.expectPodCgroupUpdates > 0 {
 				// TODO: Update to use proper logger once contextual logging migration is complete
 				call := mockPCM.EXPECT().SetPodCgroupConfig(klog.TODO(), mock.Anything, mock.Anything)
