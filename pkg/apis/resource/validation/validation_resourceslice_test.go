@@ -834,6 +834,56 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			consumableCapacityFeatureGate: true,
 		},
+		"invalid-request-policy-zero-step": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("capacity").Key("cap").Child("requestPolicy").Child("validRange", "step"), "0", "must be greater than zero"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				slice.Spec.Devices[1].AllowMultipleAllocations = ptr.To(true)
+				capacity := resourceapi.DeviceCapacity{
+					Value: resource.MustParse("1Gi"),
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: ptr.To(resource.MustParse("10Mi")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min:  ptr.To(resource.MustParse("1Mi")),
+							Max:  ptr.To(resource.MustParse("100Mi")),
+							Step: ptr.To(resource.MustParse("0")),
+						},
+					},
+				}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate: true,
+		},
+		"invalid-request-policy-negative-step": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("capacity").Key("cap").Child("requestPolicy").Child("validRange", "step"), "-1Mi", "must be greater than zero"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				slice.Spec.Devices[1].AllowMultipleAllocations = ptr.To(true)
+				capacity := resourceapi.DeviceCapacity{
+					Value: resource.MustParse("1Gi"),
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: ptr.To(resource.MustParse("10Mi")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min:  ptr.To(resource.MustParse("1Mi")),
+							Max:  ptr.To(resource.MustParse("100Mi")),
+							Step: ptr.To(resource.MustParse("-1Mi")),
+						},
+					},
+				}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate: true,
+		},
 		"invalid-node-selecor-label-value": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
 			slice: func() *resourceapi.ResourceSlice {
