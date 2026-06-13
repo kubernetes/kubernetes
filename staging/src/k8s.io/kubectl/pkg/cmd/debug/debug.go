@@ -504,7 +504,7 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 		return nil, "", fmt.Errorf("error creating JSON for debug container: %v", err)
 	}
 
-	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, debugJS, pod)
+	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, debugJS, pod, strategicpatch.WithDuplicateMergeKeySupport(true))
 	if err != nil {
 		return nil, "", fmt.Errorf("error creating patch to add debug container: %v", err)
 	}
