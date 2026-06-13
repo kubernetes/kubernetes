@@ -39,6 +39,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +58,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -636,6 +638,16 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	pcm := kl.containerManager.NewPodContainerManager()
 	_, cgroupParent := pcm.GetPodContainerName(pod)
 	return cgroupParent
+}
+
+// ResizeEphemeralVolume directly triggers a resize of the specified volume.
+func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *apiresource.Quantity) error {
+	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName, newSize)
+}
+
+// GetVolumeSize returns the current size of the specified volume.
+func (kl *Kubelet) GetVolumeSize(pod *v1.Pod, volumeName string) (*apiresource.Quantity, error) {
+	return kl.volumeManager.GetVolumeSize(pod, volumeName)
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -2357,6 +2369,56 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 					status.VolumeMounts[i].VolumeStatus.Image = &v1.ImageVolumeStatus{}
 				}
 				status.VolumeMounts[i].VolumeStatus.Image.ImageRef = imageRef
+			}
+		}
+
+		// Propagate volume size to status for memory-backed emptyDir volumes
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			for _, vol := range pod.Spec.Volumes {
+				if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+					continue
+				}
+				size, err := kl.volumeManager.GetVolumeSize(pod, vol.Name)
+				if err != nil {
+					logger.Error(err, "error getting volume size", "volume", vol.Name)
+					continue
+				}
+				if size == nil {
+					logger.Error(nil, "volume size is nil", "volume", vol.Name)
+					continue
+				}
+
+				var vms *v1.VolumeMountStatus
+				for idx := range status.VolumeMounts {
+					if status.VolumeMounts[idx].Name == vol.Name {
+						vms = &status.VolumeMounts[idx]
+						break
+					}
+				}
+				if vms == nil {
+					if containerSpec := kubecontainer.GetContainerSpec(pod, cs.Name); containerSpec != nil {
+						for _, mount := range containerSpec.VolumeMounts {
+							if mount.Name == vol.Name {
+								status.VolumeMounts = append(status.VolumeMounts, v1.VolumeMountStatus{
+									Name:      mount.Name,
+									MountPath: mount.MountPath,
+									ReadOnly:  mount.ReadOnly,
+								})
+								vms = &status.VolumeMounts[len(status.VolumeMounts)-1]
+								break
+							}
+						}
+					}
+				}
+				if vms != nil {
+					if vms.VolumeStatus == nil {
+						vms.VolumeStatus = &v1.VolumeStatus{}
+					}
+					if vms.VolumeStatus.EmptyDir == nil {
+						vms.VolumeStatus.EmptyDir = &v1.EmptyDirVolumeStatus{}
+					}
+					vms.VolumeStatus.EmptyDir.SizeLimit = size
+				}
 			}
 		}
 

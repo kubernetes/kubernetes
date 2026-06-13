@@ -5093,6 +5093,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sizeLimit
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.core.v1.EmptyDirVolumeStatus
+  map:
+    fields:
+    - name: sizeLimit
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.core.v1.EndpointAddress
   map:
     fields:
@@ -8493,6 +8499,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.VolumeStatus
   map:
     fields:
+    - name: emptyDir
+      type:
+        namedType: io.k8s.api.core.v1.EmptyDirVolumeStatus
     - name: image
       type:
         namedType: io.k8s.api.core.v1.ImageVolumeStatus

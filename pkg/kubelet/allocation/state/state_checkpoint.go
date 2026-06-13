@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -122,6 +123,13 @@ func (sc *stateCheckpoint) GetPodLevelResources(podUID types.UID) (*v1.ResourceR
 	return sc.cache.GetPodLevelResources(podUID)
 }
 
+// GetEmptyDirVolumeLimit returns current resources information for emptyDir volume
+func (sc *stateCheckpoint) GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+	return sc.cache.GetEmptyDirVolumeLimit(podUID, volumeName)
+}
+
 // GetPodResourceInfoMap returns current pod resource information map
 func (sc *stateCheckpoint) GetPodResourceInfoMap() PodResourceInfoMap {
 	sc.mux.RLock()
@@ -158,6 +166,18 @@ func (sc *stateCheckpoint) SetPodLevelResources(podUID types.UID, resInfo *v1.Re
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	err := sc.cache.SetPodLevelResources(podUID, resInfo)
+	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
+}
+
+// SetEmptyDirVolumeLimit sets the size limit for a pod's emptyDir volume.
+func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
+	logger := klog.TODO()
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	err := sc.cache.SetEmptyDirVolumeLimit(podUID, volumeName, limit)
 	if err != nil {
 		return err
 	}
@@ -206,6 +226,10 @@ func (sc *noopStateCheckpoint) GetPodLevelResources(_ types.UID) (*v1.ResourceRe
 	return nil, false
 }
 
+func (sc *noopStateCheckpoint) GetEmptyDirVolumeLimit(_ types.UID, _ string) (*resource.Quantity, bool) {
+	return nil, false
+}
+
 func (sc *noopStateCheckpoint) GetPodResourceInfoMap() PodResourceInfoMap {
 	return nil
 }
@@ -219,6 +243,10 @@ func (sc *noopStateCheckpoint) SetContainerResources(_ types.UID, _ string, _ v1
 }
 
 func (sc *noopStateCheckpoint) SetPodLevelResources(_ types.UID, _ *v1.ResourceRequirements) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetEmptyDirVolumeLimit(_ types.UID, _ string, _ *resource.Quantity) error {
 	return nil
 }
 

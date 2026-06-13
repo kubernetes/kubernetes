@@ -684,6 +684,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.DownwardAPIVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("EmptyDirVolumeSource"):
 		return &applyconfigurationscorev1.EmptyDirVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("EmptyDirVolumeStatus"):
+		return &applyconfigurationscorev1.EmptyDirVolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("EndpointAddress"):
 		return &applyconfigurationscorev1.EndpointAddressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("EndpointPort"):

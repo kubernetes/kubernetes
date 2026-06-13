@@ -1303,6 +1303,8 @@ status:
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
       volumeStatus:
+        emptyDir:
+          sizeLimit: "0"
         image:
           imageRef: imageRefValue
   ephemeralContainerStatuses:
@@ -1370,6 +1372,8 @@ status:
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
       volumeStatus:
+        emptyDir:
+          sizeLimit: "0"
         image:
           imageRef: imageRefValue
   extendedResourceClaimStatus:
@@ -1446,6 +1450,8 @@ status:
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
       volumeStatus:
+        emptyDir:
+          sizeLimit: "0"
         image:
           imageRef: imageRefValue
   message: messageValue

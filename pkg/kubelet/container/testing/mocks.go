@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	types0 "k8s.io/kubernetes/pkg/kubelet/types"
@@ -170,6 +171,63 @@ func (_c *MockRuntime_CheckpointContainer_Call) Return(err error) *MockRuntime_C
 }
 
 func (_c *MockRuntime_CheckpointContainer_Call) RunAndReturn(run func(ctx context.Context, options *v1.CheckpointContainerRequest) error) *MockRuntime_CheckpointContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckpointEmptyDirSizeLimitsIfNotSet provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) CheckpointEmptyDirSizeLimitsIfNotSet(logger klog.Logger, allocatedPod *v10.Pod) error {
+	ret := _mock.Called(logger, allocatedPod)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckpointEmptyDirSizeLimitsIfNotSet")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v10.Pod) error); ok {
+		r0 = returnFunc(logger, allocatedPod)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckpointEmptyDirSizeLimitsIfNotSet'
+type MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call struct {
+	*mock.Call
+}
+
+// CheckpointEmptyDirSizeLimitsIfNotSet is a helper method to define mock.On call
+//   - logger klog.Logger
+//   - allocatedPod *v10.Pod
+func (_e *MockRuntime_Expecter) CheckpointEmptyDirSizeLimitsIfNotSet(logger interface{}, allocatedPod interface{}) *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call {
+	return &MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call{Call: _e.mock.On("CheckpointEmptyDirSizeLimitsIfNotSet", logger, allocatedPod)}
+}
+
+func (_c *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call) Run(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call) Return(err error) *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call) RunAndReturn(run func(logger klog.Logger, allocatedPod *v10.Pod) error) *MockRuntime_CheckpointEmptyDirSizeLimitsIfNotSet_Call {
 	_c.Call.Return(run)
 	return _c
 }

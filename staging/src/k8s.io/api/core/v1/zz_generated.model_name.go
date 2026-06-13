@@ -252,6 +252,11 @@ func (in EmptyDirVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EmptyDirVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.EmptyDirVolumeStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in EndpointAddress) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.EndpointAddress"
 }
