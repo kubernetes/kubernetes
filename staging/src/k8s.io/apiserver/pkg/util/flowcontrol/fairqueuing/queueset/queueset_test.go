@@ -1056,6 +1056,30 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 	}.exercise(t)
 }
 
+func TestZeroConcurrencyLimitWithoutQueuingRejects(t *testing.T) {
+	now := time.Now()
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestZeroConcurrencyLimitWithoutQueuingRejects",
+		DesiredNumQueues: 0,
+	}
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsComplete(qsc, 0)
+
+	req, idle := qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{InitialSeats: 1}, 0, "", "fs", "test", "request", nil)
+	if req != nil {
+		t.Fatal("expected request to be rejected, got a Request object")
+	}
+	if !idle {
+		t.Fatal("expected queue set to remain idle after rejecting request")
+	}
+}
+
 // TestContextCancel tests cancellation of a request's context.
 // The outline is:
 //  1. Use a concurrency limit of 1.
