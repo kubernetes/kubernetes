@@ -67,7 +67,10 @@ type ManagerImpl struct {
 	endpoints map[string]endpointInfo // Key is ResourceName
 	mutex     sync.Mutex
 
-	server plugin.Server
+	// servers are the device plugin registration listeners. servers[0] is
+	// the primary listener (rooted under --root-dir). Additional entries are
+	// back-compat listeners (e.g. the hardcoded /var/lib/kubelet path).
+	servers []plugin.Server
 
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
@@ -130,20 +133,41 @@ type PodReusableDevices map[string]map[string]sets.Set[string]
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
-// NewManagerImpl creates a new manager.
-func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+// NewManagerImpl creates a new manager. rootDir is the kubelet root directory
+// (the value of --root-dir). When rootDir is empty, the legacy hardcoded path
+// is used as the only listener.
+func NewManagerImpl(rootDir string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
-	socketPath := pluginapi.KubeletSocket
-	if runtime.GOOS == "windows" {
-		socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
-	}
-	return newManagerImpl(logger, socketPath, topology, topologyAffinityStore)
+	return newManagerImpl(logger, devicePluginSocketPaths(rootDir), topology, topologyAffinityStore)
 }
 
-func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	logger.V(2).Info("Creating Device Plugin manager", "path", socketPath)
+// devicePluginSocketPaths returns the listen socket paths for the device
+// plugin registration server. The primary path lives under rootDir; when
+// rootDir differs from the legacy hardcoded location, the legacy path is also
+// returned so that plugins compiled against pluginapi.KubeletSocket continue
+// to work without modification.
+func devicePluginSocketPaths(rootDir string) []string {
+	legacy := pluginapi.KubeletSocket
+	if runtime.GOOS == "windows" {
+		legacy = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
+	}
+	if rootDir == "" {
+		return []string{legacy}
+	}
+	primary := filepath.Join(rootDir, "device-plugins", "kubelet.sock")
+	if primary == legacy {
+		return []string{primary}
+	}
+	return []string{primary, legacy}
+}
+
+func newManagerImpl(logger klog.Logger, socketPaths []string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+	if len(socketPaths) == 0 {
+		return nil, fmt.Errorf("at least one device plugin socket path is required")
+	}
+	logger.V(2).Info("Creating Device Plugin manager", "primary", socketPaths[0], "extras", socketPaths[1:])
 
 	var numaNodes []int
 	for _, node := range topology {
@@ -164,13 +188,14 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 		update:                make(chan resourceupdates.Update, 100),
 	}
 
-	server, err := plugin.NewServer(logger, socketPath, manager, manager)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create plugin server: %v", err)
+	for _, sp := range socketPaths {
+		server, err := plugin.NewServer(logger, sp, manager, manager)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create plugin server for %q: %v", sp, err)
+		}
+		manager.servers = append(manager.servers, server)
 	}
-
-	manager.server = server
-	manager.checkpointdir, _ = filepath.Split(server.SocketPath())
+	manager.checkpointdir, _ = filepath.Split(manager.servers[0].SocketPath())
 
 	// The following structures are populated with real implementations in manager.Start()
 	// Before that, initializes them to perform no-op operations.
@@ -348,14 +373,18 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceNa
 	logger.V(2).Info("Processed device updates for resource", "resourceName", resourceName, "totalCount", len(devices), "healthyCount", healthyCount)
 }
 
-// GetWatcherHandler returns the plugin handler
+// GetWatcherHandler returns the plugin handler. The primary (rootdir-relative)
+// server is returned because the kubelet plugin-watcher only watches the
+// rootdir-relative plugins_registry directory.
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
-	return m.server
+	return m.servers[0]
 }
 
-// GetHealthChecker returns the plugin handler
+// GetHealthChecker returns the plugin handler health checker for the primary
+// server. Back-compat listener failures are surfaced via Start errors rather
+// than ongoing healthz reporting.
 func (m *ManagerImpl) GetHealthChecker() healthz.HealthChecker {
-	return m.server
+	return m.servers[0]
 }
 
 // checkpointFile returns device plugin checkpoint file path.
@@ -380,14 +409,25 @@ func (m *ManagerImpl) Start(logger klog.Logger, activePods ActivePodsFunc, sourc
 		logger.Error(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
-	return m.server.Start(logger)
+	for _, srv := range m.servers {
+		if err := srv.Start(logger); err != nil {
+			return fmt.Errorf("failed to start device plugin server at %q: %v", srv.SocketPath(), err)
+		}
+	}
+	return nil
 }
 
-// Stop is the function that can stop the plugin server.
+// Stop is the function that can stop the plugin servers.
 // Can be called concurrently, more than once, and is safe to call
 // without a prior Start.
 func (m *ManagerImpl) Stop(logger klog.Logger) error {
-	return m.server.Stop(logger)
+	var errs []error
+	for _, srv := range m.servers {
+		if err := srv.Stop(logger); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errorsutil.NewAggregate(errs)
 }
 
 // Allocate is the call that you can use to allocate a set of devices
