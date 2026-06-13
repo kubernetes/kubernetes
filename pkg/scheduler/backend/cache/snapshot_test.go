@@ -587,6 +587,213 @@ func TestSnapshot_AssumeForget(t *testing.T) {
 	}
 }
 
+func TestSnapshot_AssumeForgetAffinityAndPVC(t *testing.T) {
+	node1 := st.MakeNode().Name("node-1").Obj()
+	node2 := st.MakeNode().Name("node-2").Obj()
+
+	affinityPod := st.MakePod().Name("affinity-pod").UID("affinity-pod").Node("node-1").
+		PodAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAffinityWithRequiredReq).Obj()
+	affinityPod2 := st.MakePod().Name("affinity-pod-2").UID("affinity-pod-2").Node("node-1").
+		PodAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAffinityWithRequiredReq).Obj()
+	antiAffinityPod := st.MakePod().Name("anti-affinity-pod").UID("anti-affinity-pod").Node("node-1").
+		PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAntiAffinityWithRequiredReq).Obj()
+	bothPod := st.MakePod().Name("both-pod").UID("both-pod").Node("node-2").
+		PodAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAffinityWithRequiredReq).
+		PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "qux"}}, st.PodAntiAffinityWithRequiredReq).Obj()
+	pvcPod := st.MakePod().Name("pvc-pod").UID("pvc-pod").Namespace("ns").Node("node-1").PVC("my-pvc").Obj()
+	mixedVolumePod := st.MakePod().Name("mixed-pod").UID("mixed-pod").Namespace("ns").Node("node-1").
+		PVC("tracked-pvc").
+		Volume(v1.Volume{Name: "empty", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}).
+		Volume(v1.Volume{Name: "cm", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{}}}).Obj()
+
+	// Pods that are already part of the snapshot (passed to NewSnapshot, not
+	// assumed). ForgetPod must never revert the indexes they contributed.
+	preexistingAffinityPod := st.MakePod().Name("pre-affinity-pod").UID("pre-affinity-pod").Node("node-2").
+		PodAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAffinityWithRequiredReq).Obj()
+	preexistingAntiAffinityPod := st.MakePod().Name("pre-anti-pod").UID("pre-anti-pod").Node("node-2").
+		PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAntiAffinityWithRequiredReq).Obj()
+	preexistingPVCPod := st.MakePod().Name("pre-pvc-pod").UID("pre-pvc-pod").Namespace("ns").Node("node-2").PVC("pre-pvc").Obj()
+	// affinityPodNode2 is assumed onto node-2, which already hosts a pod with
+	// affinity terms, to exercise the "no double-append" path.
+	affinityPodNode2 := st.MakePod().Name("affinity-pod-n2").UID("affinity-pod-n2").Node("node-2").
+		PodAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}, st.PodAffinityWithRequiredReq).Obj()
+	// sharedPVCPod is assumed onto node-1 but references the same PVC as the
+	// pre-existing preexistingPVCPod.
+	sharedPVCPod := st.MakePod().Name("shared-pvc-pod").UID("shared-pvc-pod").Namespace("ns").Node("node-1").PVC("pre-pvc").Obj()
+
+	mustPodInfo := func(pod *v1.Pod) *framework.PodInfo {
+		podInfo, err := framework.NewPodInfo(pod)
+		if err != nil {
+			t.Fatalf("Failed to build PodInfo for %q: %v", pod.Name, err)
+		}
+		return podInfo
+	}
+
+	tests := []struct {
+		name string
+		// initialPods are part of the snapshot from the start (passed to
+		// NewSnapshot). They are not assumed and must survive ForgetPod.
+		initialPods          []*v1.Pod
+		podsToAssume         []*v1.Pod
+		podsToForget         []*v1.Pod
+		expectedAffinity     sets.Set[string]
+		expectedAntiAffinity sets.Set[string]
+		expectedUsedPVCSet   sets.Set[string]
+	}{
+		{
+			name:             "assume pod with required affinity",
+			podsToAssume:     []*v1.Pod{affinityPod},
+			expectedAffinity: sets.New("node-1"),
+		},
+		{
+			name:         "assume pod with required anti-affinity",
+			podsToAssume: []*v1.Pod{antiAffinityPod},
+			// A pod declaring anti-affinity also counts as having affinity terms.
+			expectedAffinity:     sets.New("node-1"),
+			expectedAntiAffinity: sets.New("node-1"),
+		},
+		{
+			name:               "assume pod with a PVC volume",
+			podsToAssume:       []*v1.Pod{pvcPod},
+			expectedUsedPVCSet: sets.New("ns/my-pvc"),
+		},
+		{
+			name:         "forget pod with affinity returns to baseline",
+			podsToAssume: []*v1.Pod{affinityPod},
+			podsToForget: []*v1.Pod{affinityPod},
+		},
+		{
+			name:         "forget pod with anti-affinity returns to baseline",
+			podsToAssume: []*v1.Pod{antiAffinityPod},
+			podsToForget: []*v1.Pod{antiAffinityPod},
+		},
+		{
+			name:         "forget pod with PVC returns to baseline",
+			podsToAssume: []*v1.Pod{pvcPod},
+			podsToForget: []*v1.Pod{pvcPod},
+		},
+		{
+			// AssumePod/ForgetPod are documented as LIFO, so we forget the
+			// pod assumed last; node-1 must remain in the list because the
+			// first pod still has affinity terms.
+			name:             "two pods with affinity on the same node, forget the last assumed",
+			podsToAssume:     []*v1.Pod{affinityPod, affinityPod2},
+			podsToForget:     []*v1.Pod{affinityPod2},
+			expectedAffinity: sets.New("node-1"),
+		},
+		{
+			// Forgetting both assumed pods (in reverse order) must return the
+			// affinity list to its empty baseline.
+			name:         "two pods with affinity on the same node, forget both returns to baseline",
+			podsToAssume: []*v1.Pod{affinityPod, affinityPod2},
+			podsToForget: []*v1.Pod{affinityPod2, affinityPod},
+		},
+		{
+			name:                 "pod with both affinity and anti-affinity terms",
+			podsToAssume:         []*v1.Pod{bothPod},
+			expectedAffinity:     sets.New("node-2"),
+			expectedAntiAffinity: sets.New("node-2"),
+		},
+		{
+			name:               "pod with mixed volumes only tracks the PVC",
+			podsToAssume:       []*v1.Pod{mixedVolumePod},
+			expectedUsedPVCSet: sets.New("ns/tracked-pvc"),
+		},
+		{
+			// node-2 already hosts a pod with affinity terms, so assuming
+			// another one must not append node-2 to the list a second time.
+			name:             "assume affinity pod on a node that already has affinity pods",
+			initialPods:      []*v1.Pod{preexistingAffinityPod},
+			podsToAssume:     []*v1.Pod{affinityPodNode2},
+			expectedAffinity: sets.New("node-2"),
+		},
+		{
+			// Forgetting the assumed pod must keep node-2 in the list because
+			// the pre-existing pod still declares affinity terms.
+			name:             "forget assumed pod keeps the pre-existing affinity entry",
+			initialPods:      []*v1.Pod{preexistingAffinityPod},
+			podsToAssume:     []*v1.Pod{affinityPodNode2},
+			podsToForget:     []*v1.Pod{affinityPodNode2},
+			expectedAffinity: sets.New("node-2"),
+		},
+		{
+			// The assumed pod shares a PVC with a pre-existing pod, so the key
+			// is already tracked; ForgetPod must not drop it.
+			name:               "forget assumed pod keeps a PVC shared with a pre-existing pod",
+			initialPods:        []*v1.Pod{preexistingPVCPod},
+			podsToAssume:       []*v1.Pod{sharedPVCPod},
+			podsToForget:       []*v1.Pod{sharedPVCPod},
+			expectedUsedPVCSet: sets.New("ns/pre-pvc"),
+		},
+		{
+			// Pre-existing affinity, anti-affinity and PVC state on node-2,
+			// plus several pods assumed onto node-1 and partially forgotten in
+			// reverse order. node-1 must appear in the affinity list exactly
+			// once even though two assumed pods declare affinity terms there.
+			name:                 "pre-existing state with multiple assume and partial forget",
+			initialPods:          []*v1.Pod{preexistingAffinityPod, preexistingAntiAffinityPod, preexistingPVCPod},
+			podsToAssume:         []*v1.Pod{affinityPod, pvcPod, antiAffinityPod},
+			podsToForget:         []*v1.Pod{antiAffinityPod, pvcPod},
+			expectedAffinity:     sets.New("node-1", "node-2"),
+			expectedAntiAffinity: sets.New("node-2"),
+			expectedUsedPVCSet:   sets.New("ns/pre-pvc"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			snapshot := NewSnapshot(tt.initialPods, []*v1.Node{node1, node2})
+
+			for _, p := range tt.podsToAssume {
+				if err := snapshot.AssumePod(mustPodInfo(p)); err != nil {
+					t.Fatalf("Failed to assume pod %q: %v", p.Name, err)
+				}
+			}
+			for _, p := range tt.podsToForget {
+				if err := snapshot.ForgetPod(logger, p); err != nil {
+					t.Fatalf("Failed to forget pod %q: %v", p.Name, err)
+				}
+			}
+
+			affinityList, err := snapshot.HavePodsWithAffinityList()
+			if err != nil {
+				t.Fatalf("HavePodsWithAffinityList failed: %v", err)
+			}
+			gotAffinity := sets.New[string]()
+			for _, n := range affinityList {
+				gotAffinity.Insert(n.Node().Name)
+			}
+			if !gotAffinity.Equal(tt.expectedAffinity) {
+				t.Errorf("Unexpected affinity node list, want: %v, got: %v", sets.List(tt.expectedAffinity), sets.List(gotAffinity))
+			}
+			if len(affinityList) != gotAffinity.Len() {
+				t.Errorf("affinity node list contains duplicates: %v", affinityList)
+			}
+
+			antiAffinityList, err := snapshot.HavePodsWithRequiredAntiAffinityList()
+			if err != nil {
+				t.Fatalf("HavePodsWithRequiredAntiAffinityList failed: %v", err)
+			}
+			gotAntiAffinity := sets.New[string]()
+			for _, n := range antiAffinityList {
+				gotAntiAffinity.Insert(n.Node().Name)
+			}
+			if !gotAntiAffinity.Equal(tt.expectedAntiAffinity) {
+				t.Errorf("Unexpected anti-affinity node list, want: %v, got: %v", sets.List(tt.expectedAntiAffinity), sets.List(gotAntiAffinity))
+			}
+
+			wantPVC := tt.expectedUsedPVCSet
+			if wantPVC == nil {
+				wantPVC = sets.New[string]()
+			}
+			if diff := cmp.Diff(wantPVC, snapshot.usedPVCSet); diff != "" {
+				t.Errorf("Unexpected usedPVCSet (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSnapshot_Placement(t *testing.T) {
 	tt := []struct {
 		name           string
