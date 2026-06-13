@@ -17,10 +17,10 @@ limitations under the License.
 package stats
 
 import (
-	"reflect"
 	"testing"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/google/go-cmp/cmp"
 
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 
@@ -59,8 +59,8 @@ func Test_hostStatsProvider_getPodEtcHostsStats(t *testing.T) {
 				t.Errorf("getPodEtcHostsStats() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getPodEtcHostsStats() got = %v, want %v", got, tt.want)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("getPodEtcHostsStats() diff (-want,+got):\n%s", diff)
 			}
 		})
 	}
