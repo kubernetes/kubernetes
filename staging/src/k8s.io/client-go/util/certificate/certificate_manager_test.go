@@ -19,6 +19,9 @@ package certificate
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -43,6 +46,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
@@ -1184,6 +1188,122 @@ func TestContext(t *testing.T) {
 		return m.Current() != nil
 	}, 10*time.Second, time.Microsecond, "current certificate")
 	require.Contains(t, logger.GetSink().(ktesting.Underlier).GetBuffer().String(), "certificate: Rotating certificates", "contextual log output from manager.rotateCerts")
+}
+
+// testGenerateECKeyPEM1 is a EC P-256 private key fixture.
+const testGenerateECKeyPEM1 = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIHb7bL0ccx8oLfPycKQT/R2sKrPH8LU5CnDz/65jUjWooAoGCCqGSM49
+AwEHoUQDQgAExNsMY0QTw83e3eFOZMLqpT6vqEAvpSMo5+9TSU/faJScYeSsHxlK
+tO96nbPcQbWCMGjhrpBWYZcn07iu125DpA==
+-----END EC PRIVATE KEY-----
+`
+
+// testGenerateECKeyPEM2 is a EC P-256 private key fixture.
+const testGenerateECKeyPEM2 = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIGy34cJkuN1N5chK9kLnf/Y5OT1rulnzyz6qignGpOJvoAoGCCqGSM49
+AwEHoUQDQgAE5CqbCF3D+r/QNUv8yrr/+kqOMTP6PGUe2G4AFvisUqGx0KoRj5dq
+F3qmQC6E+3zzI7+uhpZ3Ju/+696ZQ6GrJQ==
+-----END EC PRIVATE KEY-----
+`
+
+// testGenerateRSAKeyPEM is a RSA 1024 private key fixture.
+// Note: This is of size 1024 bits to keep the test data small.
+const testGenerateRSAKeyPEM = `-----BEGIN PRIVATE KEY-----
+MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBALB6f6vwyY0IZWcE
+Fv8ViUi5kZ64sWUAiWnQhfK0lrAtICJCqy2p95cloaAVNpqvX6uLK3odT0aA7vRZ
+PXtYhDtpYTSHvvbAXbHUPl9/u3EPSQ1ByOtdAPio8DmMdWD6xRK4JjfHhH6bLsI+
+VHblKik/+BK+xgVo1VuNoRWC8NYRAgMBAAECgYALCs0mgGFSE2CJ5LP+J7YwcFkD
+1AVYfyM59VfOPv2vPhGUxzRf/fKtmMePRUiGfvrm2EVDBaa2T/6zmApcZ4ZVeSf8
+izNQilInGkCyOQhEbIJ+CE9IUXQG9h5qwdsM9Ehb6+ZkdF/JatkzKtceC0PYlSw8
+ZouKqMKMylvEXHLr6QJBAOSY7MRdsip/lAaNJOk/1JCqblV15DS9WpxzDZ1+JBhp
+NYrnEy7qe/p1tUKBQMt3nM2Kt1N2HXyPhWVhMvpitkkCQQDFoi2T9T31nVm/4HFV
+ALK5wt3FU0MLLn+E+km/++SUjVebtjCC5Gxz+ByAsj963jhCdh+2EzgyPkOKGK5a
+LwGJAkBBjuXgDuroqzvdgR8D0a15a5dG5Q90XJWe5pQSBbn+UjXrxwdGXjL+CkHY
+d88ISx5qCA05X1dngJWGFJEVI7gZAkAbWHFOA6TrEzaT4g5MYKhaI6hj4T1pkql6
+UNdbhRL/qv7wQKk9szV+ZlorRH6cFZtbNtT0cHxaF1tpBDk7qT1hAkEAs8WLPccN
+N2BAYjQjJanWfMAIyHPdwenmKhlvkWFvnwZWQecHXDmfHZlEREqpkd9IxOIGNii7
+OiCuooK0UDdbPw==
+-----END PRIVATE KEY-----
+`
+
+func TestGenerateKeyConfig(t *testing.T) {
+	ecKey1, err := keyutil.ParsePrivateKeyPEM([]byte(testGenerateECKeyPEM1))
+	if err != nil {
+		t.Fatalf("failed to parse EC key: %v", err)
+	}
+	parsedECKey1 := ecKey1.(*ecdsa.PrivateKey)
+
+	ecKey2, err := keyutil.ParsePrivateKeyPEM([]byte(testGenerateECKeyPEM2))
+	if err != nil {
+		t.Fatalf("failed to parse EC key 2: %v", err)
+	}
+	parsedECKey2 := ecKey2.(*ecdsa.PrivateKey)
+
+	rsaKey, err := keyutil.ParsePrivateKeyPEM([]byte(testGenerateRSAKeyPEM))
+	if err != nil {
+		t.Fatalf("failed to parse RSA key: %v", err)
+	}
+	parsedRSAKey := rsaKey.(*rsa.PrivateKey)
+
+	fixedErr := errors.New("some error")
+
+	testCases := []struct {
+		name        string
+		generateKey func() (crypto.Signer, error)
+		wantKey     crypto.Signer
+		wantErr     error
+	}{
+		{
+			name:        "nil returns default EC key (key1)",
+			generateKey: nil,
+			wantKey:     parsedECKey1,
+		},
+		{
+			name:        "returns custom EC key (key2)",
+			generateKey: func() (crypto.Signer, error) { return parsedECKey2, nil },
+			wantKey:     parsedECKey2,
+		},
+		{
+			name:        "returns custom RSA key",
+			generateKey: func() (crypto.Signer, error) { return parsedRSAKey, nil },
+			wantKey:     parsedRSAKey,
+		},
+		{
+			name:        "simulate parsing error",
+			generateKey: func() (crypto.Signer, error) { return nil, fixedErr },
+			wantErr:     fixedErr,
+		},
+	}
+
+	// Setup default overload.
+	orig := generateKeyFunc
+	generateKeyFunc = func() (crypto.Signer, error) { return parsedECKey1, nil }
+	defer func() { generateKeyFunc = orig }()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			m := manager{
+				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+				generateKey: tc.generateKey,
+				now:         time.Now,
+				ctx:         ctx,
+			}
+			_, _, _, key, err := m.generateCSR()
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Errorf("expected error %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if key != tc.wantKey {
+				t.Errorf("expected key: %T, got: %T", tc.wantKey, key)
+			}
+		})
+	}
 }
 
 type fakeClientFailureType int
