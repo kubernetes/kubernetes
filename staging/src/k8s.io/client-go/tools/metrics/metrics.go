@@ -25,7 +25,37 @@ import (
 	"time"
 )
 
-var registerMetrics sync.Once
+var (
+	registerMetrics      sync.Once
+	ensureRegisteredOnce sync.Once
+	// ensureRegisteredFn, if set via RegisterOpts.RegisterFn, is invoked
+	// exactly once before any rest client is constructed. Adapter packages
+	// (e.g. k8s.io/component-base/metrics/prometheus/restclient) install
+	// this callback in their init() so that the actual registration with
+	// legacyregistry — and the metric Create() that reads
+	// feature-gate-derived options like NativeHistograms — happens at
+	// runtime rather than at init() time. See EnsureRegistered for the
+	// caller-side contract.
+	ensureRegisteredFn func()
+)
+
+// EnsureRegistered invokes the callback installed via RegisterOpts.RegisterFn (if
+// any) exactly once. Callers should treat it as idempotent; subsequent calls are
+// effectively free.
+//
+// New public constructors or entry points for packages in client-go that create
+// a REST client, HTTP transport, or credential provider should invoke EnsureRegistered()
+// at the very beginning of the function. Adapter Observe methods
+// also call EnsureRegistered(), so no observations are lost if a constructor
+// forgets to invoke it, but if invoked, the entrypoint call shifts registration from
+// "first-observation" to "first client construction", meaning the metric
+// series is visible to Promteheus scrapes from process startup rather than
+// appearing only after the first request.
+func EnsureRegistered() {
+	if ensureRegisteredFn != nil {
+		ensureRegisteredOnce.Do(ensureRegisteredFn)
+	}
+}
 
 // DurationMetric is a measurement of some amount of time.
 type DurationMetric interface {
@@ -163,6 +193,12 @@ type RegisterOpts struct {
 	TransportCAReloads           TransportCAReloadsMetric
 	TransportCertRotationGCCalls TransportCertRotationGCCallsMetric
 	TransportCacheGCCalls        TransportCacheGCCallsMetric
+
+	// RegisterFn, if non-nil, is invoked exactly once by EnsureRegistered().
+	// before the first rest client is constructed. Adapters use this to defer
+	// registrations that depend on runtime state (eg., feature gates read my metric
+	// Create() without changing the import side contract of the adpater package.)
+	RegisterFn func()
 }
 
 // Register registers metrics for the rest client to use. This can
@@ -216,6 +252,9 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.TransportCacheGCCalls != nil {
 			TransportCacheGCCalls = opts.TransportCacheGCCalls
+		}
+		if opts.RegisterFn != nil {
+			ensureRegisteredFn = opts.RegisterFn
 		}
 	})
 }
