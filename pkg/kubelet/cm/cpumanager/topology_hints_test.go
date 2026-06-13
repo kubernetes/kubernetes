@@ -270,7 +270,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(logger, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
@@ -645,7 +645,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetTopologyHints
-			containerHints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+			containerHints := m.GetTopologyHints(logger, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
 			sort.SliceStable(containerHints, func(i, j int) bool {
 				return containerHints[i].LessThan(containerHints[j])
 			})

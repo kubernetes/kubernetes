@@ -30,10 +30,7 @@ import (
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
-func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *ManagerImpl) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 

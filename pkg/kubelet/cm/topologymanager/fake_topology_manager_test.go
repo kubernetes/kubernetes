@@ -26,7 +26,8 @@ import (
 )
 
 func TestNewFakeManager(t *testing.T) {
-	fm := NewFakeManager()
+	logger, _ := ktesting.NewTestContext(t)
+	fm := NewFakeManager(logger)
 
 	if _, ok := fm.(Manager); !ok {
 		t.Errorf("Result is not Manager type")
@@ -35,6 +36,7 @@ func TestNewFakeManager(t *testing.T) {
 }
 
 func TestFakeGetAffinity(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tcases := []struct {
 		name          string
 		containerName string
@@ -50,7 +52,7 @@ func TestFakeGetAffinity(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		fm := fakeManager{}
-		actual := fm.GetAffinity(tc.podUID, tc.containerName)
+		actual := fm.GetAffinity(logger, tc.podUID, tc.containerName)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}

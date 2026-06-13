@@ -138,7 +138,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 
 	// If pod has exclusive cpu and the container in question has integer cpu requests
 	// the cfs quota will not be enforced
-	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(pod, container)
+	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(logger, pod, container)
 	logger.V(5).Info("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
 	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit, disableCPUQuota)
 

@@ -117,7 +117,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 					},
 				},
 			}
-			affinity := topologymanager.NewFakeManager()
+			affinity := topologymanager.NewFakeManager(logger)
 
 			// Create new manager
 			sDir := t.TempDir()
@@ -137,7 +137,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 
 			// Allocate resources
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(logger, pod)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}

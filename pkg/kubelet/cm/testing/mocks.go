@@ -68,7 +68,7 @@ func (_m *MockContainerManager) EXPECT() *MockContainerManager_Expecter {
 }
 
 // ContainerHasExclusiveCPUs provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+func (_mock *MockContainerManager) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
 	ret := _mock.Called(pod, container)
 
 	if len(ret) == 0 {
@@ -92,7 +92,7 @@ type MockContainerManager_ContainerHasExclusiveCPUs_Call struct {
 // ContainerHasExclusiveCPUs is a helper method to define mock.On call
 //   - pod *v1.Pod
 //   - container *v1.Container
-func (_e *MockContainerManager_Expecter) ContainerHasExclusiveCPUs(pod interface{}, container interface{}) *MockContainerManager_ContainerHasExclusiveCPUs_Call {
+func (_e *MockContainerManager_Expecter) ContainerHasExclusiveCPUs(logger klog.Logger, pod interface{}, container interface{}) *MockContainerManager_ContainerHasExclusiveCPUs_Call {
 	return &MockContainerManager_ContainerHasExclusiveCPUs_Call{Call: _e.mock.On("ContainerHasExclusiveCPUs", pod, container)}
 }
 
@@ -263,7 +263,7 @@ func (_c *MockContainerManager_GetAllocatableMemory_Call) RunAndReturn(run func(
 }
 
 // GetAllocateResourcesPodAdmitHandler provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (_mock *MockContainerManager) GetAllocateResourcesPodAdmitHandler(_ klog.Logger) lifecycle.PodAdmitHandler {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -287,7 +287,7 @@ type MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call struct {
 }
 
 // GetAllocateResourcesPodAdmitHandler is a helper method to define mock.On call
-func (_e *MockContainerManager_Expecter) GetAllocateResourcesPodAdmitHandler() *MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call {
+func (_e *MockContainerManager_Expecter) GetAllocateResourcesPodAdmitHandler(_ klog.Logger) *MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call {
 	return &MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call{Call: _e.mock.On("GetAllocateResourcesPodAdmitHandler")}
 }
 
@@ -368,7 +368,7 @@ func (_c *MockContainerManager_GetCPUs_Call) RunAndReturn(run func(podUID string
 }
 
 // GetCapacity provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (_mock *MockContainerManager) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	ret := _mock.Called(localStorageCapacityIsolation)
 
 	if len(ret) == 0 {
@@ -393,7 +393,7 @@ type MockContainerManager_GetCapacity_Call struct {
 
 // GetCapacity is a helper method to define mock.On call
 //   - localStorageCapacityIsolation bool
-func (_e *MockContainerManager_Expecter) GetCapacity(localStorageCapacityIsolation interface{}) *MockContainerManager_GetCapacity_Call {
+func (_e *MockContainerManager_Expecter) GetCapacity(_ klog.Logger, localStorageCapacityIsolation interface{}) *MockContainerManager_GetCapacity_Call {
 	return &MockContainerManager_GetCapacity_Call{Call: _e.mock.On("GetCapacity", localStorageCapacityIsolation)}
 }
 
@@ -421,7 +421,7 @@ func (_c *MockContainerManager_GetCapacity_Call) RunAndReturn(run func(localStor
 }
 
 // GetDevicePluginResourceCapacity provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+func (_mock *MockContainerManager) GetDevicePluginResourceCapacity(_ klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -464,7 +464,7 @@ type MockContainerManager_GetDevicePluginResourceCapacity_Call struct {
 }
 
 // GetDevicePluginResourceCapacity is a helper method to define mock.On call
-func (_e *MockContainerManager_Expecter) GetDevicePluginResourceCapacity() *MockContainerManager_GetDevicePluginResourceCapacity_Call {
+func (_e *MockContainerManager_Expecter) GetDevicePluginResourceCapacity(_ klog.Logger) *MockContainerManager_GetDevicePluginResourceCapacity_Call {
 	return &MockContainerManager_GetDevicePluginResourceCapacity_Call{Call: _e.mock.On("GetDevicePluginResourceCapacity")}
 }
 
@@ -545,7 +545,7 @@ func (_c *MockContainerManager_GetDevices_Call) RunAndReturn(run func(podUID str
 }
 
 // GetDynamicResources provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*v10.DynamicResource {
+func (_mock *MockContainerManager) GetDynamicResources(_ klog.Logger, pod *v1.Pod, container *v1.Container) []*v10.DynamicResource {
 	ret := _mock.Called(pod, container)
 
 	if len(ret) == 0 {
@@ -571,7 +571,7 @@ type MockContainerManager_GetDynamicResources_Call struct {
 // GetDynamicResources is a helper method to define mock.On call
 //   - pod *v1.Pod
 //   - container *v1.Container
-func (_e *MockContainerManager_Expecter) GetDynamicResources(pod interface{}, container interface{}) *MockContainerManager_GetDynamicResources_Call {
+func (_e *MockContainerManager_Expecter) GetDynamicResources(_ klog.Logger, pod interface{}, container interface{}) *MockContainerManager_GetDynamicResources_Call {
 	return &MockContainerManager_GetDynamicResources_Call{Call: _e.mock.On("GetDynamicResources", pod, container)}
 }
 
@@ -1099,7 +1099,7 @@ func (_c *MockContainerManager_GetResources_Call) RunAndReturn(run func(ctx cont
 }
 
 // InternalContainerLifecycle provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) InternalContainerLifecycle() cm.InternalContainerLifecycle {
+func (_mock *MockContainerManager) InternalContainerLifecycle(logger klog.Logger) cm.InternalContainerLifecycle {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
@@ -1123,7 +1123,7 @@ type MockContainerManager_InternalContainerLifecycle_Call struct {
 }
 
 // InternalContainerLifecycle is a helper method to define mock.On call
-func (_e *MockContainerManager_Expecter) InternalContainerLifecycle() *MockContainerManager_InternalContainerLifecycle_Call {
+func (_e *MockContainerManager_Expecter) InternalContainerLifecycle(_ klog.Logger) *MockContainerManager_InternalContainerLifecycle_Call {
 	return &MockContainerManager_InternalContainerLifecycle_Call{Call: _e.mock.On("InternalContainerLifecycle")}
 }
 
@@ -1191,7 +1191,7 @@ func (_c *MockContainerManager_NewPodContainerManager_Call) RunAndReturn(run fun
 }
 
 // PodHasExclusiveCPUs provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+func (_mock *MockContainerManager) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
 	ret := _mock.Called(pod)
 
 	if len(ret) == 0 {
@@ -1214,7 +1214,7 @@ type MockContainerManager_PodHasExclusiveCPUs_Call struct {
 
 // PodHasExclusiveCPUs is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockContainerManager_Expecter) PodHasExclusiveCPUs(pod interface{}) *MockContainerManager_PodHasExclusiveCPUs_Call {
+func (_e *MockContainerManager_Expecter) PodHasExclusiveCPUs(logger klog.Logger, pod interface{}) *MockContainerManager_PodHasExclusiveCPUs_Call {
 	return &MockContainerManager_PodHasExclusiveCPUs_Call{Call: _e.mock.On("PodHasExclusiveCPUs", pod)}
 }
 

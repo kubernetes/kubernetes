@@ -210,7 +210,7 @@ type mockHintProvider struct {
 	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
 	return m.th
 }
 
@@ -218,7 +218,7 @@ func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]Topolog
 	return m.th
 }
 
-func (m *mockHintProvider) AllocatePod(pod *v1.Pod) error {
+func (m *mockHintProvider) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
 	return nil
 }
 

@@ -27,6 +27,7 @@ import (
 )
 
 func TestGetAffinity(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tcases := []struct {
 		name          string
 		containerName string
@@ -42,7 +43,7 @@ func TestGetAffinity(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		scope := scope{}
-		actual := scope.GetAffinity(tc.podUID, tc.containerName)
+		actual := scope.GetAffinity(logger, tc.podUID, tc.containerName)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}

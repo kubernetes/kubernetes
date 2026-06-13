@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
@@ -36,7 +37,7 @@ type mockAffinityStore struct {
 	hint topologymanager.TopologyHint
 }
 
-func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
+func (m *mockAffinityStore) GetAffinity(_ klog.Logger, podUID string, containerName string) topologymanager.TopologyHint {
 	return m.hint
 }
 
@@ -62,6 +63,8 @@ func makeSocketMask(sockets ...int) bitmask.BitMask {
 
 func TestGetTopologyHints(t *testing.T) {
 	tcases := getCommonTestCases()
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	for _, tc := range tcases {
 		m := ManagerImpl{
@@ -97,7 +100,7 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
-		hints := m.GetTopologyHints(tc.pod, &tc.pod.Spec.Containers[0])
+		hints := m.GetTopologyHints(logger, tc.pod, &tc.pod.Spec.Containers[0])
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {

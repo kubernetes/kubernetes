@@ -135,7 +135,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cadvisorInterface: cadvisorInterface,
 	}
 
-	cm.topologyManager = topologymanager.NewFakeManager()
+	cm.topologyManager = topologymanager.NewFakeManager(logger)
 	cm.cpuManager = cpumanager.NewFakeManager(logger)
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
 
@@ -242,7 +242,7 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 	return result
 }
 
-func (cm *containerManagerImpl) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (cm *containerManagerImpl) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	return cm.capacity
 }
 
@@ -255,8 +255,8 @@ func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
 	return []healthz.HealthChecker{cm.deviceManager.GetHealthChecker()}
 }
 
-func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
-	return cm.deviceManager.GetCapacity()
+func (cm *containerManagerImpl) GetDevicePluginResourceCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
+	return cm.deviceManager.GetCapacity(logger)
 }
 
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
@@ -297,7 +297,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
-func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+func (cm *containerManagerImpl) InternalContainerLifecycle(_ klog.Logger) InternalContainerLifecycle {
 	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, cm.topologyManager}
 }
 
@@ -317,7 +317,7 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }
 
-func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler(_ klog.Logger) lifecycle.PodAdmitHandler {
 	return cm.topologyManager
 }
 
@@ -357,7 +357,7 @@ func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
 	return nil
 }
 
@@ -373,16 +373,10 @@ func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) 
 	return false
 }
 
-func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (cm *containerManagerImpl) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
 	return podHasExclusiveCPUs(logger, cm.cpuManager, pod)
 }
 
-func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
 	return containerHasExclusiveCPUs(logger, cm.cpuManager, pod, container)
 }

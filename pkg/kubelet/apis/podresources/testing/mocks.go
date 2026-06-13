@@ -23,6 +23,7 @@ package testing
 import (
 	mock "github.com/stretchr/testify/mock"
 	v10 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
@@ -670,7 +671,7 @@ func (_m *MockDynamicResourcesProvider) EXPECT() *MockDynamicResourcesProvider_E
 }
 
 // GetDynamicResources provides a mock function for the type MockDynamicResourcesProvider
-func (_mock *MockDynamicResourcesProvider) GetDynamicResources(pod *v10.Pod, container *v10.Container) []*v1.DynamicResource {
+func (_mock *MockDynamicResourcesProvider) GetDynamicResources(_ klog.Logger, pod *v10.Pod, container *v10.Container) []*v1.DynamicResource {
 	ret := _mock.Called(pod, container)
 
 	if len(ret) == 0 {

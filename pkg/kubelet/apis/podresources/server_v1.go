@@ -62,6 +62,8 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsListCount.WithLabelValues("v1").Inc()
 
+	logger := klog.FromContext(ctx)
+
 	var pods []*v1.Pod
 	if p.useActivePods {
 		// GetActivePods already filters out terminal pods, so no need for additional filtering.
@@ -86,11 +88,11 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 				continue
 			}
 
-			pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, &container))
+			pRes.Containers = append(pRes.Containers, p.getContainerResources(logger, pod, &container))
 		}
 
 		for _, container := range pod.Spec.Containers {
-			pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, &container))
+			pRes.Containers = append(pRes.Containers, p.getContainerResources(logger, pod, &container))
 		}
 		podResources[i] = &pRes
 	}
@@ -120,6 +122,8 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsGetCount.WithLabelValues("v1").Inc()
 
+	logger := klog.FromContext(ctx)
+
 	pod, exist := p.podsProvider.GetPodByName(req.PodNamespace, req.PodName)
 	if !exist {
 		metrics.PodResourcesEndpointErrorsGetCount.WithLabelValues("v1").Inc()
@@ -138,11 +142,11 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 			continue
 		}
 
-		podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, &container))
+		podResources.Containers = append(podResources.Containers, p.getContainerResources(logger, pod, &container))
 	}
 
 	for _, container := range pod.Spec.Containers {
-		podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, &container))
+		podResources.Containers = append(podResources.Containers, p.getContainerResources(logger, pod, &container))
 	}
 
 	response := &podresourcesv1.GetPodResourcesResponse{
@@ -151,13 +155,13 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 	return response, nil
 }
 
-func (p *v1PodResourcesServer) getContainerResources(pod *v1.Pod, container *v1.Container) *podresourcesv1.ContainerResources {
+func (p *v1PodResourcesServer) getContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) *podresourcesv1.ContainerResources {
 	containerResources := &podresourcesv1.ContainerResources{
 		Name:             container.Name,
 		Devices:          p.devicesProvider.GetDevices(string(pod.UID), container.Name),
 		CpuIds:           p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 		Memory:           p.memoryProvider.GetMemory(string(pod.UID), container.Name),
-		DynamicResources: p.dynamicResourcesProvider.GetDynamicResources(pod, container),
+		DynamicResources: p.dynamicResourcesProvider.GetDynamicResources(logger, pod, container),
 	}
 	return containerResources
 }
