@@ -38,7 +38,7 @@ type PriorityClass struct {
 	// value represents the integer value of this priority class. This is the actual priority that pods
 	// receive when they have the name of this class in their pod spec.
 	// +optional
-    // +default=0
+	// +default=0
 	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +default=0
