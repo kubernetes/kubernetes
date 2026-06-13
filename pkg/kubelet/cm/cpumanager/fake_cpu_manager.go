@@ -109,6 +109,10 @@ func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Conta
 	return cmqos.ResourceIsolationContainer
 }
 
+func (m *fakeManager) CanAllocateExclusively(res v1.ResourceName) bool {
+	return false
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager(logger logr.Logger) Manager {
 	logger = klog.LoggerWithName(logger, "cpu.fake")

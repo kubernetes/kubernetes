@@ -162,6 +162,9 @@ type ContainerManager interface {
 	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
 	ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool
 
+	// AllocationMode returns the allocation mode for the given resource, and whether this manager handles the resource.
+	AllocationMode(res v1.ResourceName) (ResourceAllocationMode, bool)
+
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider

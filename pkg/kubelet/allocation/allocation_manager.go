@@ -36,6 +36,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -122,7 +123,8 @@ type manager struct {
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
 
-	recorder record.EventRecorderLogger
+	recorder        record.EventRecorderLogger
+	resourceManager cm.ResourceManager
 }
 
 func NewManager(checkpointDirectory string,
@@ -132,6 +134,7 @@ func NewManager(checkpointDirectory string,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
+	resourceManager cm.ResourceManager,
 ) Manager {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
@@ -143,11 +146,12 @@ func NewManager(checkpointDirectory string,
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:          time.NewTicker(initialRetryDelay),
+		triggerPodSync:  triggerPodSync,
+		getActivePods:   getActivePods,
+		getPodByUID:     getPodByUID,
+		recorder:        recorder,
+		resourceManager: resourceManager,
 	}
 }
 

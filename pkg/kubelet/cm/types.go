@@ -139,3 +139,29 @@ type PodContainerManager interface {
 	// Set resource config values for the specified resource type on the pod cgroup
 	SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error
 }
+
+// ResourceAllocationMode describes the allocation behavior a resource manager is configured to provide.
+type ResourceAllocationMode int
+
+const (
+	// ResourceAllocationModeShared means resources are allocated from a shared pool.
+	ResourceAllocationModeShared ResourceAllocationMode = iota
+	// ResourceAllocationModeExclusive means resources are exclusively assigned.
+	ResourceAllocationModeExclusive
+)
+
+func (m ResourceAllocationMode) String() string {
+	switch m {
+	case ResourceAllocationModeExclusive:
+		return "exclusive"
+	default:
+		return "shared"
+	}
+}
+
+// ResourceManager provides resource allocation capability discovery.
+type ResourceManager interface {
+	// AllocationMode returns the allocation mode for the given resource.
+	// The bool return value indicates whether this manager handles the resource at all.
+	AllocationMode(resName v1.ResourceName) (ResourceAllocationMode, bool)
+}

@@ -110,6 +110,9 @@ type Manager interface {
 
 	// GetResourceIsolationLevel returns the isolation level of the container.
 	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
+
+	// Returns true if this manager can allocate exclusively to a container the resource(s) it manages.
+	CanAllocateExclusively(res v1.ResourceName) bool
 }
 
 type manager struct {
@@ -589,4 +592,11 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 	}
 
 	return cmqos.ResourceIsolationContainer
+}
+
+func (m *manager) CanAllocateExclusively(res v1.ResourceName) bool {
+	if res != v1.ResourceCPU {
+		return false
+	}
+	return m.policy.CanAllocateExclusively()
 }

@@ -208,6 +208,10 @@ func (cm *containerManagerStub) ContainerHasExclusiveCPUs(pod *v1.Pod, container
 	return false
 }
 
+func (cm *containerManagerStub) AllocationMode(res v1.ResourceName) (ResourceAllocationMode, bool) {
+	return ResourceAllocationModeShared, false
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }
