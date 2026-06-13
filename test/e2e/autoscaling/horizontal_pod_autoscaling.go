@@ -223,7 +223,7 @@ func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupV
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 
-	// Pick the CPU load helper once. perPodCPULoad addresses each pod
+	// Pick the CPU load helper. perPodCPULoad addresses each pod
 	// directly via pod proxy (total/N millicores per pod), bypassing the
 	// random kube-proxy LB used by ConsumeCPU.
 	consumeCPU := rc.ConsumeCPU
