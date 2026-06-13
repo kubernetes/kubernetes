@@ -64,8 +64,7 @@ func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) er
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
+func (m *fakeManager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	logger.Info("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
 	return map[string][]topologymanager.TopologyHint{}
 }
@@ -76,8 +75,7 @@ func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) AllocatePod(pod *v1.Pod) error {
-	logger := klog.TODO()
+func (m *fakeManager) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
 	logger.Info("AllocatePod", "pod", klog.KObj(pod))
 	return nil
 }

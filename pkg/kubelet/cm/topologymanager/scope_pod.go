@@ -101,7 +101,7 @@ func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod) life
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 	}
 
-	err := s.allocatePodAlignedResources(pod)
+	err := s.allocatePodAlignedResources(logger, pod)
 	if err != nil {
 		logger.Error(err, "Pod-level allocation failed", "pod", klog.KObj(pod))
 		metrics.TopologyManagerAdmissionErrorsTotal.Inc()

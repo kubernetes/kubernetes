@@ -93,7 +93,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 
 func TestStaticPolicyName(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 	if err != nil {
 		t.Fatalf("NewStaticPolicy() failed: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestStaticPolicyStart(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
-			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), testCase.options)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), testCase.options)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}
@@ -655,15 +655,15 @@ func TestStaticPolicyAdd(t *testing.T) {
 }
 
 func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
-	tm := topologymanager.NewFakeManager()
+	logger, _ := ktesting.NewTestContext(t)
+	tm := topologymanager.NewFakeManager(logger)
 	if testCase.topologyHint != nil {
-		tm = topologymanager.NewFakeManagerWithHint(testCase.topologyHint)
+		tm = topologymanager.NewFakeManagerWithHint(logger, testCase.topologyHint)
 	}
 	cpus := cpuset.New()
 	if testCase.reservedCPUs != nil {
 		cpus = testCase.reservedCPUs.Clone()
 	}
-	logger, _ := ktesting.NewTestContext(t)
 	policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
 	if err != nil {
 		t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -739,7 +739,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -796,7 +796,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -882,7 +882,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -976,7 +976,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		p, err := NewStaticPolicy(logger, tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		p, err := NewStaticPolicy(logger, tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -1077,7 +1077,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
-			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(logger), testCase.cpuPolicyOptions)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
@@ -1155,7 +1155,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -1924,7 +1924,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(logger), testCase.cpuPolicyOptions)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed with %v", err)
 			}
@@ -2433,7 +2433,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 			metrics.ResourceManagerAllocationErrorsTotal.Reset()
 			metrics.ResourceManagerContainerAssignments.Reset()
 
-			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManager(), testCase.options)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManager(logger), testCase.options)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}

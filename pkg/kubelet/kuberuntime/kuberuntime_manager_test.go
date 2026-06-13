@@ -90,7 +90,7 @@ func withRecorder(recorder *record.FakeRecorder) testRuntimeManagerOption {
 	}
 }
 
-func createTestRuntimeManager(tCtx ktesting.TContext, opts ...testRuntimeManagerOption) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+func createTestRuntimeManager(tCtx context.Context, opts ...testRuntimeManagerOption) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	options := &testRuntimeManagerOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -4225,7 +4225,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		t.Skip("unsupported OS")
 	}
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
@@ -4592,8 +4592,8 @@ func TestDoPodResizeAction(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.enablePLR)
 
 			mockCM := cmtesting.NewMockContainerManager(t)
-			mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything).Return(false).Maybe()
-			mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
+			mockCM.EXPECT().PodHasExclusiveCPUs(logger, mock.Anything).Return(false).Maybe()
+			mockCM.EXPECT().ContainerHasExclusiveCPUs(logger, mock.Anything, mock.Anything).Return(false).Maybe()
 			m.containerManager = mockCM
 			mockPCM := cmtesting.NewMockPodContainerManager(t)
 			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)

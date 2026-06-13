@@ -178,9 +178,9 @@ type requiredMetrics struct {
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
 	logger, _ := ktesting.NewTestContext(t)
-	manager := topologymanager.NewFakeManager()
+	manager := topologymanager.NewFakeManager(logger)
 	if hint != nil {
-		manager = topologymanager.NewFakeManagerWithHint(hint)
+		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
 
 	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)

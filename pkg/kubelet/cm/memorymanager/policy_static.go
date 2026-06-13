@@ -218,7 +218,7 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 
 	// 3. Handle hints and NUMA alignment.
 	machineState := s.GetMachineState()
-	bestHint := p.affinity.GetAffinity(podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	bestHint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
 	if bestHint.NUMANodeAffinity == nil {
 		defaultHint, err := p.getDefaultHint(machineState, pod, podTotalMemory)
 		if err != nil {
@@ -455,7 +455,7 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	}
 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
-	hint := p.affinity.GetAffinity(podUID, container.Name)
+	hint := p.affinity.GetAffinity(logger, podUID, container.Name)
 	logger.Info("Got topology affinity", "hint", hint)
 
 	requestedResources, err := getContainerRequestedResources(logger, pod, container)
