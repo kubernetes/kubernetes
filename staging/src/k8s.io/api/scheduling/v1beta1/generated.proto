@@ -43,6 +43,7 @@ message PriorityClass {
   // +optional
   // +k8s:alpha(since: "1.37")=+k8s:immutable
   // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +default=0
   optional int32 value = 2;
 
   // globalDefault specifies whether this PriorityClass should be considered as

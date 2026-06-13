@@ -70,6 +70,7 @@ func Validate_PriorityClass(
 			fldPath *field.Path,
 			obj, oldObj *int32,
 			oldValueCorrelated bool) (errs field.ErrorList) {
+			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
 				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
@@ -80,9 +81,6 @@ func Validate_PriorityClass(
 			earlyReturn := false
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {

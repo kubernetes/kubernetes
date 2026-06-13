@@ -41,6 +41,7 @@ type PriorityClass struct {
     // +default=0
 	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +default=0
 	Value int32 `json:"value" protobuf:"bytes,2,opt,name=value"`
 
 	// globalDefault specifies whether this PriorityClass should be considered as
