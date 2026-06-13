@@ -17,6 +17,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,11 +26,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	apitest "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
@@ -93,6 +98,192 @@ func TestCreatePodSandbox(t *testing.T) {
 	assert.Len(t, sandboxes, 1)
 	assert.Equal(t, sandboxes[0].Id, fmt.Sprintf("%s_%s_%s_1", pod.Name, pod.Namespace, pod.UID))
 	assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandboxes[0].State)
+}
+
+func TestCreatePodSandboxRemovesSandboxAfterCancelledRunPodSandbox(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	runErr := status.Error(codes.Canceled, "stream terminated by RST_STREAM with error code: CANCEL")
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withErrors(map[string][]error{
+		"RunPodSandbox": {runErr},
+	}))
+	require.NoError(t, err)
+	pod := newTestPod()
+	const attempt uint32 = 1
+	sandbox := makeFakePodSandbox(tCtx, m, sandboxTemplate{
+		pod:     pod,
+		attempt: attempt,
+		state:   runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+	})
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
+
+	id, _, err := m.createPodSandbox(tCtx, pod, attempt)
+
+	assert.Empty(t, id)
+	assert.ErrorIs(t, err, runErr)
+	assertCallBefore(t, fakeRuntime.GetCalls(), "StopPodSandbox", "RemovePodSandbox")
+	sandboxes, err := fakeRuntime.ListPodSandbox(tCtx, &runtimeapi.PodSandboxFilter{Id: sandbox.Id})
+	require.NoError(t, err)
+	assert.Empty(t, sandboxes)
+}
+
+func TestCreatePodSandboxRemovesSandboxAfterReservedNameRunPodSandboxError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	runErr := status.Error(codes.FailedPrecondition, `failed to reserve sandbox name "bar_new_12345678_1": name "bar_new_12345678_1" is reserved for "1234"`)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withErrors(map[string][]error{
+		"RunPodSandbox": {runErr},
+	}))
+	require.NoError(t, err)
+	pod := newTestPod()
+	const attempt uint32 = 1
+	sandbox := makeFakePodSandbox(tCtx, m, sandboxTemplate{
+		pod:     pod,
+		attempt: attempt,
+		state:   runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+	})
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
+
+	id, _, err := m.createPodSandbox(tCtx, pod, attempt)
+
+	assert.Empty(t, id)
+	assert.ErrorIs(t, err, runErr)
+	assertCallBefore(t, fakeRuntime.GetCalls(), "StopPodSandbox", "RemovePodSandbox")
+	sandboxes, err := fakeRuntime.ListPodSandbox(tCtx, &runtimeapi.PodSandboxFilter{Id: sandbox.Id})
+	require.NoError(t, err)
+	assert.Empty(t, sandboxes)
+}
+
+func TestCreatePodSandboxReusesReadySandboxAndRemovesNonReadySandboxAfterReservedNameRunPodSandboxError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	runErr := status.Error(codes.FailedPrecondition, `failed to reserve sandbox name "bar_new_12345678_1": name "bar_new_12345678_1" is reserved for "1234"`)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withErrors(map[string][]error{
+		"RunPodSandbox": {runErr},
+	}))
+	require.NoError(t, err)
+	pod := newTestPod()
+	const attempt uint32 = 1
+	sandbox := makeFakePodSandbox(tCtx, m, sandboxTemplate{
+		pod:     pod,
+		attempt: attempt,
+		state:   runtimeapi.PodSandboxState_SANDBOX_READY,
+	})
+	nonReadySandbox := makeFakePodSandbox(tCtx, m, sandboxTemplate{
+		pod:     pod,
+		attempt: attempt,
+		state:   runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+	})
+	nonReadySandbox.Id += "-not-ready"
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox, nonReadySandbox})
+
+	id, _, err := m.createPodSandbox(tCtx, pod, attempt)
+
+	assert.NoError(t, err)
+	assert.Equal(t, sandbox.Id, id)
+	assertCallBefore(t, fakeRuntime.GetCalls(), "StopPodSandbox", "RemovePodSandbox")
+	sandboxes, err := fakeRuntime.ListPodSandbox(tCtx, &runtimeapi.PodSandboxFilter{Id: nonReadySandbox.Id})
+	require.NoError(t, err)
+	assert.Empty(t, sandboxes)
+	sandboxes, err = fakeRuntime.ListPodSandbox(tCtx, &runtimeapi.PodSandboxFilter{Id: sandbox.Id})
+	require.NoError(t, err)
+	assert.Len(t, sandboxes, 1)
+}
+
+func TestCreatePodSandboxReturnsRunPodSandboxErrorWhenRecoveryRemoveFails(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	runErr := status.Error(codes.Canceled, "stream terminated by RST_STREAM with error code: CANCEL")
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withErrors(map[string][]error{
+		"RunPodSandbox":    {runErr},
+		"RemovePodSandbox": {errors.New("remove failed")},
+	}))
+	require.NoError(t, err)
+	pod := newTestPod()
+	const attempt uint32 = 1
+	sandbox := makeFakePodSandbox(tCtx, m, sandboxTemplate{
+		pod:     pod,
+		attempt: attempt,
+		state:   runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+	})
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
+
+	id, _, err := m.createPodSandbox(tCtx, pod, attempt)
+
+	assert.Empty(t, id)
+	assert.ErrorIs(t, err, runErr)
+	assertCallBefore(t, fakeRuntime.GetCalls(), "StopPodSandbox", "RemovePodSandbox")
+	sandboxes, err := fakeRuntime.ListPodSandbox(tCtx, &runtimeapi.PodSandboxFilter{Id: sandbox.Id})
+	require.NoError(t, err)
+	assert.Len(t, sandboxes, 1)
+}
+
+func TestShouldRecoverPodSandboxFromRunPodSandboxError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "plain context canceled",
+			err:  context.Canceled,
+			want: true,
+		},
+		{
+			name: "plain context deadline exceeded",
+			err:  context.DeadlineExceeded,
+			want: true,
+		},
+		{
+			name: "grpc canceled",
+			err:  status.Error(codes.Canceled, "canceled"),
+			want: true,
+		},
+		{
+			name: "grpc deadline exceeded",
+			err:  status.Error(codes.DeadlineExceeded, "deadline exceeded"),
+			want: true,
+		},
+		{
+			name: "grpc already exists",
+			err:  status.Error(codes.AlreadyExists, "sandbox already exists"),
+			want: true,
+		},
+		{
+			name: "grpc failed precondition",
+			err:  status.Error(codes.FailedPrecondition, "sandbox name conflict"),
+			want: true,
+		},
+		{
+			name: "reserved name message",
+			err:  errors.New(`failed to reserve sandbox name "bar_new_12345678_1": name "bar_new_12345678_1" is reserved for "1234"`),
+			want: true,
+		},
+		{
+			name: "permission denied",
+			err:  status.Error(codes.PermissionDenied, "permission denied"),
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, shouldRecoverPodSandboxFromRunPodSandboxError(test.err))
+		})
+	}
+}
+
+func assertCallBefore(t *testing.T, calls []string, before, after string) {
+	t.Helper()
+	beforeIndex := -1
+	afterIndex := -1
+	for i, call := range calls {
+		if call == before && beforeIndex == -1 {
+			beforeIndex = i
+		}
+		if call == after && afterIndex == -1 {
+			afterIndex = i
+		}
+	}
+	require.NotEqual(t, -1, beforeIndex, "%s not called; calls: %#v", before, calls)
+	require.NotEqual(t, -1, afterIndex, "%s not called; calls: %#v", after, calls)
+	assert.Less(t, beforeIndex, afterIndex)
 }
 
 func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
