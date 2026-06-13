@@ -78,7 +78,14 @@ type watchCacheEvent struct {
 	PrevObjFields   fields.Set
 	Key             string
 	ResourceVersion uint64
-	RecordTime      time.Time
+
+	// RecordTime represents when the watch cache first received the event
+	// from the storage layer (etcd)
+	RecordTime time.Time
+
+	// WatchCacheEnqueuedAt represents when the event was added to the watch
+	// cache's ring buffer
+	WatchCacheEnqueuedAt time.Time
 }
 
 // watchCache implements a Store interface.
@@ -389,6 +396,7 @@ func (w *watchCacheHistory) updateCache(event *watchCacheEvent) {
 	}
 	w.cache[w.endIndex%w.capacity] = event
 	w.endIndex++
+	event.WatchCacheEnqueuedAt = w.clock.Now()
 }
 
 // resizeCacheLocked resizes the cache if necessary:

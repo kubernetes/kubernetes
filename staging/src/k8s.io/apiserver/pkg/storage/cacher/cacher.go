@@ -307,7 +307,7 @@ type Cacher struct {
 	// watchers is mapping from the value of trigger function that a
 	// watcher is interested into the watchers
 	watcherIdx int
-	watchers   indexedWatchers
+	watchers      indexedWatchers
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
 	// while dispatching event before shutting them down.
@@ -968,12 +968,21 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
 
+	timing := TimingInfo{
+		ReceivedFromStorageAt: event.RecordTime,
+		RingBufferedAt:        event.WatchCacheEnqueuedAt,
+		DispatchedAt:          c.clock.Now(),
+	}
+	if !timing.RingBufferedAt.IsZero() {
+		metrics.WatchCacheQueueDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(timing.DispatchedAt.Sub(timing.RingBufferedAt).Seconds())
+	}
+
 	// Since add() can block, we explicitly add when cacher is unlocked.
 	// Dispatching event in nonblocking way first, which make faster watchers
 	// not be blocked by slower ones.
 	if event.Type == watch.Bookmark {
 		for _, watcher := range c.watchersBuffer {
-			watcher.nonblockingAdd(event)
+			watcher.nonblockingAdd(event, timing)
 		}
 	} else {
 		// Set up caching of object serializations only for dispatching this event.
@@ -995,7 +1004,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
-			if !watcher.nonblockingAdd(event) {
+			if !watcher.nonblockingAdd(event, timing) {
 				c.blockedWatchers = append(c.blockedWatchers, watcher)
 			}
 		}
@@ -1014,7 +1023,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// is running, not only the first ones in the list.
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
-				if !watcher.add(event, timer) {
+				if !watcher.add(event, timing, timer) {
 					// fired, clean the timer by set it to nil.
 					timer = nil
 				}
