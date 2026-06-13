@@ -52,9 +52,10 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 
 	pra, checksum, err := restoreState(logger, checkpointManager, checkpointName)
 	if err != nil {
-		//lint:ignore ST1005 user-facing error message
-		return nil, fmt.Errorf("could not restore state from checkpoint: %w, please drain this node and delete pod resource information checkpoint file %q before restarting Kubelet",
-			err, path.Join(stateDir, checkpointName))
+		logger.Error(err, "Failed to restore pod resource allocation checkpoint, starting fresh",
+			"checkpointPath", path.Join(stateDir, checkpointName))
+		pra = nil
+		checksum = 0
 	}
 
 	stateCheckpoint := &stateCheckpoint{
