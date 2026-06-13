@@ -7,6 +7,7 @@ go 1.26.0
 godebug default=go1.26
 
 require (
+	github.com/go-ole/go-ole v1.3.0
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.45.0
