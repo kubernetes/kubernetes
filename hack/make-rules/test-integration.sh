@@ -106,16 +106,40 @@ runTests() {
   cleanup
 }
 
-checkEtcdOnPath() {
-  kube::log::status "Checking etcd is on PATH"
-  which etcd && return
-  kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions."
-  kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
-  return 1
+checkOrInstallEtcd() {
+  local third_party_etcd="${KUBE_ROOT}/third_party/etcd/etcd"
+  local install_docs="Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions."
+  local required_version
+  required_version=$(grep -oP "etcd_version',\s*'\K[0-9.]+" "${KUBE_ROOT}/cluster/gce/manifests/etcd.manifest" 2>/dev/null || echo "")
+
+  if [[ ! -f "${third_party_etcd}" ]]; then
+    kube::log::status "etcd not found in third_party, installing"
+    kube::etcd::install || {
+      kube::log::status "Failed to install etcd. ${install_docs}"
+      return 1
+    }
+    return 0
+  fi
+
+  if [[ -n "${required_version}" ]]; then
+    local installed_version
+    installed_version=$("${third_party_etcd}" --version 2>/dev/null | grep Version | head -n 1 | cut -d " " -f 3)
+    if [[ "${installed_version}" != "${required_version}" ]]; then
+      kube::log::status "etcd version ${installed_version} differs from required ${required_version}, installing"
+      kube::etcd::install || {
+        kube::log::status "Failed to install etcd ${required_version}. ${install_docs}"
+        return 1
+      }
+      return 0
+    fi
+  fi
+
+  export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
+  hash etcd
+  kube::log::status "etcd ${required_version} is ready"
 }
 
-checkEtcdOnPath
+checkOrInstallEtcd
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
