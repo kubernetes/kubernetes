@@ -4186,10 +4186,16 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 		}
 
 		for i, search := range dnsConfig.Searches {
-			if search != "." {
+			if opts.AllowRelaxedDNSSearchValidation {
+				if search != "." {
+					search = strings.TrimSuffix(search, ".")
+					allErrs = append(allErrs, ValidateDNS1123SubdomainWithUnderScore(search, fldPath.Child("searches").Index(i))...)
+				}
+			} else {
 				search = strings.TrimSuffix(search, ".")
-				allErrs = append(allErrs, ValidateDNS1123SubdomainWithUnderScore(search, fldPath.Child("searches").Index(i))...)
+				allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 			}
+
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {
@@ -4474,6 +4480,8 @@ type PodValidationOptions struct {
 	ResourceIsPod bool
 	// Allow relaxed validation of environment variable names
 	AllowRelaxedEnvironmentVariableValidation bool
+	// Allow the use of a relaxed DNS search
+	AllowRelaxedDNSSearchValidation bool
 	// Allows zero value for Pod Lifecycle Sleep Action
 	AllowPodLifecycleSleepActionZeroValue bool
 	// Allow only Recursive value of SELinuxChangePolicy.
@@ -7581,6 +7589,13 @@ func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path
 		return allErrs
 	}
 
+	if resourceName == core.ResourcePID {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PerPodPIDLimit) {
+			return append(allErrs, field.Invalid(fldPath, resourceName, "pid resource requires PerPodPIDLimit feature gate"))
+		}
+		return allErrs
+	}
+
 	if !resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(resourceName)) {
 		return append(allErrs, field.NotSupported(fldPath, resourceName, sets.List(resourcehelper.SupportedPodLevelResources())))
 	}
@@ -7969,6 +7984,7 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 			}
 		}
 
+		allErrs = append(allErrs, validatePIDResourceValue(resourceName, quantity, fldPath)...)
 		if supportedQoSComputeResources.Has(resourceName) {
 			limContainsCPUOrMemory = true
 		}
@@ -7999,6 +8015,10 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
 			}
 		}
+		if resourceName == core.ResourcePID {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "pid may only be specified in limits, not requests"))
+		}
+		allErrs = append(allErrs, validatePIDResourceValue(resourceName, quantity, fldPath)...)
 		if supportedQoSComputeResources.Has(resourceName) {
 			reqContainsCPUOrMemory = true
 		}
@@ -8082,6 +8102,23 @@ func validateResourceQuantityHugePageValue(name core.ResourceName, quantity reso
 		return fmt.Errorf("%s is not positive integer multiple of %s", quantity.String(), name)
 	}
 
+	return nil
+}
+
+const (
+	minPIDLimit = 1024
+	maxPIDLimit = 16384
+)
+
+// validatePIDResourceValue validates that pid resource values are within the allowed range.
+func validatePIDResourceValue(name core.ResourceName, quantity resource.Quantity, fldPath *field.Path) field.ErrorList {
+	if name != core.ResourcePID {
+		return nil
+	}
+	val := quantity.Value()
+	if val < minPIDLimit || val > maxPIDLimit {
+		return field.ErrorList{field.Invalid(fldPath, quantity.String(), fmt.Sprintf("pid limit must be between %d and %d", minPIDLimit, maxPIDLimit))}
+	}
 	return nil
 }
 

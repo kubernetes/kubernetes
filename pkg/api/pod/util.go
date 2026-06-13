@@ -438,6 +438,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
 	// we must allow it
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
+	opts.AllowRelaxedDNSSearchValidation = true
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
@@ -735,6 +736,7 @@ func dropDisabledFields(
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
+	dropDisabledPodPIDLimitFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -2004,6 +2006,36 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 				}
 			}
 		}
+	}
+	return false
+}
+
+// dropDisabledPodPIDLimitFields strips pid from pod-level resources when the
+// PerPodPIDLimit feature gate is disabled (unless an existing object already
+// uses it). Requests.pid is always stripped because only limits.pid is valid.
+func dropDisabledPodPIDLimitFields(podSpec, oldPodSpec *api.PodSpec) {
+	if podSpec == nil || podSpec.Resources == nil {
+		return
+	}
+	// requests.pid is never valid — always strip it
+	delete(podSpec.Resources.Requests, api.ResourcePID)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PerPodPIDLimit) {
+		return
+	}
+	if podPIDLimitInUse(oldPodSpec) {
+		return
+	}
+	delete(podSpec.Resources.Limits, api.ResourcePID)
+}
+
+// podPIDLimitInUse returns true if the pod spec has a pid limit set at the pod level.
+func podPIDLimitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil || podSpec.Resources == nil {
+		return false
+	}
+	if _, ok := podSpec.Resources.Limits[api.ResourcePID]; ok {
+		return true
 	}
 	return false
 }

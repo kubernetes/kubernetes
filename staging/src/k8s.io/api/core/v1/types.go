@@ -2572,8 +2572,7 @@ type ResourceFieldSelector struct {
 type ConfigMapKeySelector struct {
 	// The ConfigMap to select from.
 	LocalObjectReference `json:"" protobuf:"bytes,1,opt,name=localObjectReference"`
-	// The key to select from the ConfigMap's Data field.
-	// Keys in the BinaryData field are not currently propagated to container env vars.
+	// The key to select.
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 	// Specify whether the ConfigMap or its key must be defined
 	// +optional
@@ -2611,7 +2610,6 @@ type EnvFromSource struct {
 //
 // The contents of the target ConfigMap's Data field will represent the
 // key-value pairs as environment variables.
-// Keys in the BinaryData field are not currently propagated to container env vars.
 type ConfigMapEnvSource struct {
 	// The ConfigMap to select from.
 	LocalObjectReference `json:"" protobuf:"bytes,1,opt,name=localObjectReference"`
@@ -7004,6 +7002,14 @@ const (
 	ResourceStorage ResourceName = "storage"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
+	// PID limit for a pod (integer count of processes).
+	// ResourcePID is a pod-level PID limit set via spec.resources.limits.pid.
+	// Valid range: 1024-16384. Only limits are accepted; requests.pid is
+	// forbidden. The effective limit enforced by the kubelet is
+	// min(node podPidsLimit, pod pid limit). Requires the PerPodPIDLimit
+	// feature gate (Alpha) and cgroupsv2.
+	// When omitted, the node-level --pod-pids-limit applies.
+	ResourcePID ResourceName = "pid"
 )
 
 const (
@@ -8105,8 +8111,6 @@ type ConfigMap struct {
 	// the Data field, this is enforced during validation process.
 	// Using this field will require 1.10+ apiserver and
 	// kubelet.
-	// Note: BinaryData keys are not currently propagated to container env vars
-	// via ConfigMapKeyRef or ConfigMapRef env sources; only Data keys are used.
 	// +optional
 	BinaryData map[string][]byte `json:"binaryData,omitempty" protobuf:"bytes,3,rep,name=binaryData"`
 }

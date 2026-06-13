@@ -21464,6 +21464,140 @@ func TestValidateResourceNames(t *testing.T) {
 	}
 }
 
+func TestValidateContainerResourceName_PID(t *testing.T) {
+	tests := []struct {
+		name      string
+		gateOn    bool
+		resource  core.ResourceName
+		expectErr bool
+	}{
+		{
+			name:      "pid rejected at container level even when gate is on",
+			gateOn:    true,
+			resource:  core.ResourcePID,
+			expectErr: true,
+		},
+		{
+			name:      "pid rejected at container level when gate is off",
+			gateOn:    false,
+			resource:  core.ResourcePID,
+			expectErr: true,
+		},
+		{
+			name:      "cpu still works with gate on",
+			gateOn:    true,
+			resource:  core.ResourceCPU,
+			expectErr: false,
+		},
+		{
+			name:      "cpu still works with gate off",
+			gateOn:    false,
+			resource:  core.ResourceCPU,
+			expectErr: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, tc.gateOn)
+			errs := validateContainerResourceName(tc.resource, field.NewPath("resources"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected error for resource %q with gate=%v, got none", tc.resource, tc.gateOn)
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("expected no error for resource %q with gate=%v, got: %v", tc.resource, tc.gateOn, errs)
+			}
+		})
+	}
+}
+
+func TestValidatePodResourceRequirements_PID(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, true)
+	path := field.NewPath("spec", "resources")
+
+	tests := []struct {
+		name         string
+		requirements core.ResourceRequirements
+		expectErr    bool
+	}{
+		{
+			name: "valid pid limit only",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: false,
+		},
+		{
+			name: "requests.pid is forbidden even when equal to limits",
+			requirements: core.ResourceRequirements{
+				Limits:   core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+				Requests: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "requests.pid alone is forbidden",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pid below minimum (1024) rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("512")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pid above maximum (16384) rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("32768")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pid at minimum boundary (1024) valid",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("1024")},
+			},
+			expectErr: false,
+		},
+		{
+			name: "pid at maximum boundary (16384) valid",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("16384")},
+			},
+			expectErr: false,
+		},
+		{
+			name: "zero pid value rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("0")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "negative pid value rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("-1")},
+			},
+			expectErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reqs := tc.requirements
+			errs := validatePodResourceRequirements(&reqs, nil, path, PodValidationOptions{})
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected error, got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("expected no error, got: %v", errs)
+			}
+		})
+	}
+}
+
 func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -27880,76 +28014,162 @@ func TestValidateSleepAction(t *testing.T) {
 	}
 }
 
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to GA
 func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	testCases := []struct {
-		name        string
-		expectError bool
-		dnsConfig   *core.PodDNSConfig
+		name           string
+		expectError    bool
+		featureEnabled bool
+		dnsConfig      *core.PodDNSConfig
 	}{
 		{
-			name:        "beginswith underscore, contains underscore",
-			expectError: false,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			name:           "beginswith underscore, contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
 		},
 		{
-			name:        "contains underscore",
-			expectError: false,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+			name:           "contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
 		},
 		{
-			name:        "is dot",
-			expectError: false,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"."}},
+			name:           "is dot, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
 		},
 		{
-			name:        "two dots",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{".."}},
+			name:           "two dots, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
 		},
 		{
-			name:        "underscore and dot",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"_."}},
+			name:           "underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
 		},
 		{
-			name:        "dash and dot",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"-."}},
+			name:           "dash and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
 		},
 		{
-			name:        "two underscore and dot",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"__."}},
+			name:           "two underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
 		},
 		{
-			name:        "dot and two underscore",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{".__"}},
+			name:           "dot and two underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
 		},
 		{
-			name:        "dot and underscore",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"._"}},
+			name:           "dot and underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
 		},
 		{
-			name:        "lot of underscores",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"____________"}},
+			name:           "lot of underscores, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
 		},
 		{
-			name:        "a regular name",
-			expectError: false,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"example.com"}},
+			name:           "a regular name, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
 		},
 		{
-			name:        "unicode character",
-			expectError: true,
-			dnsConfig:   &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+			name:           "unicode character, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+		{
+			name:           "begins with underscore, contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{})
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{AllowRelaxedDNSSearchValidation: testCase.featureEnabled})
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
@@ -31035,5 +31255,80 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
 		}
+	}
+}
+
+func TestValidatePIDResource(t *testing.T) {
+	fldPath := field.NewPath("spec", "resources", "limits").Key("pid")
+
+	tests := []struct {
+		name      string
+		gateOn    bool
+		pidValue  string
+		expectErr bool
+	}{
+		{
+			name:      "pid allowed when gate is on, valid value",
+			gateOn:    true,
+			pidValue:  "2048",
+			expectErr: false,
+		},
+		{
+			name:      "pid rejected when gate is off",
+			gateOn:    false,
+			pidValue:  "2048",
+			expectErr: true,
+		},
+		{
+			name:      "pid at minimum boundary (1024)",
+			gateOn:    true,
+			pidValue:  "1024",
+			expectErr: false,
+		},
+		{
+			name:      "pid at maximum boundary (16384)",
+			gateOn:    true,
+			pidValue:  "16384",
+			expectErr: false,
+		},
+		{
+			name:      "pid below minimum rejected",
+			gateOn:    true,
+			pidValue:  "512",
+			expectErr: true,
+		},
+		{
+			name:      "pid above maximum rejected",
+			gateOn:    true,
+			pidValue:  "32768",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, tt.gateOn)
+
+			q := resource.MustParse(tt.pidValue)
+
+			errs := validatePodResourceName(core.ResourcePID, fldPath)
+			if !tt.gateOn {
+				if len(errs) == 0 {
+					t.Errorf("expected pid to be rejected when gate is off")
+				}
+				return
+			}
+			if len(errs) != 0 {
+				t.Errorf("expected no resource name errors with gate on, got: %v", errs)
+				return
+			}
+			rangeErrs := validatePIDResourceValue(core.ResourcePID, q, fldPath)
+			if tt.expectErr && len(rangeErrs) == 0 {
+				t.Errorf("expected range validation error for %v", q.String())
+			}
+			if !tt.expectErr && len(rangeErrs) != 0 {
+				t.Errorf("unexpected range validation error: %v", rangeErrs)
+			}
+		})
 	}
 }

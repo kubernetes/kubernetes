@@ -58,6 +58,7 @@ func TestIsStandardResource(t *testing.T) {
 		{"x.y.z", false},
 		{"hugepages-2Mi", true},
 		{"requests.hugepages-2Mi", true},
+		{"pid", true},
 	}
 	for i, tc := range testCases {
 		if IsStandardResourceName(core.ResourceName(tc.input)) != tc.output {
@@ -75,6 +76,7 @@ func TestIsStandardContainerResource(t *testing.T) {
 		{"memory", true},
 		{"disk", false},
 		{"hugepages-2Mi", true},
+		{"pid", false},
 	}
 	for i, tc := range testCases {
 		if IsStandardContainerResourceName(core.ResourceName(tc.input)) != tc.output {
@@ -290,6 +292,10 @@ func TestIsOvercommitAllowed(t *testing.T) {
 		},
 		{
 			name:    HugePageResourceName(resource.MustParse("2Mi")),
+			allowed: false,
+		},
+		{
+			name:    core.ResourcePID,
 			allowed: false,
 		},
 	}

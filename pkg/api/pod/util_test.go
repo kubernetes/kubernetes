@@ -7459,3 +7459,123 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestDropDisabledPodPIDLimitFields(t *testing.T) {
+	pidLimit := resource.MustParse("2048")
+
+	podWithPIDLimits := func() *api.PodSpec {
+		return &api.PodSpec{
+			Resources: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourcePID: pidLimit},
+			},
+			Containers: []api.Container{
+				{Name: "c1", Image: "img"},
+			},
+		}
+	}
+
+	podWithPIDLimitsAndRequests := func() *api.PodSpec {
+		return &api.PodSpec{
+			Resources: &api.ResourceRequirements{
+				Limits:   api.ResourceList{api.ResourcePID: pidLimit},
+				Requests: api.ResourceList{api.ResourcePID: pidLimit},
+			},
+			Containers: []api.Container{
+				{Name: "c1", Image: "img"},
+			},
+		}
+	}
+
+	podWithoutPID := func() *api.PodSpec {
+		return &api.PodSpec{
+			Resources: &api.ResourceRequirements{
+				Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+				Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+			},
+			Containers: []api.Container{
+				{Name: "c1", Image: "img"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name              string
+		gateOn            bool
+		podSpec           func() *api.PodSpec
+		oldPodSpec        func() *api.PodSpec
+		expectPIDLimit    bool
+		expectPIDRequest  bool
+	}{
+		{
+			name:             "gate on: pid limit preserved",
+			gateOn:           true,
+			podSpec:          podWithPIDLimits,
+			oldPodSpec:       func() *api.PodSpec { return nil },
+			expectPIDLimit:   true,
+			expectPIDRequest: false,
+		},
+		{
+			name:             "gate on: requests.pid always stripped even when gate is on",
+			gateOn:           true,
+			podSpec:          podWithPIDLimitsAndRequests,
+			oldPodSpec:       func() *api.PodSpec { return nil },
+			expectPIDLimit:   true,
+			expectPIDRequest: false,
+		},
+		{
+			name:             "gate off, no old pod: pid limit stripped",
+			gateOn:           false,
+			podSpec:          podWithPIDLimits,
+			oldPodSpec:       func() *api.PodSpec { return nil },
+			expectPIDLimit:   false,
+			expectPIDRequest: false,
+		},
+		{
+			name:             "gate off, old pod has pid limit: pid limit preserved",
+			gateOn:           false,
+			podSpec:          podWithPIDLimits,
+			oldPodSpec:       podWithPIDLimits,
+			expectPIDLimit:   true,
+			expectPIDRequest: false,
+		},
+		{
+			name:             "gate off, no pid in spec: unrelated fields untouched",
+			gateOn:           false,
+			podSpec:          podWithoutPID,
+			oldPodSpec:       func() *api.PodSpec { return nil },
+			expectPIDLimit:   false,
+			expectPIDRequest: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, tt.gateOn)
+
+			newSpec := tt.podSpec()
+			oldSpec := tt.oldPodSpec()
+			dropDisabledPodPIDLimitFields(newSpec, oldSpec)
+
+			_, hasPIDLimit := newSpec.Resources.Limits[api.ResourcePID]
+			if hasPIDLimit != tt.expectPIDLimit {
+				t.Errorf("expected pid in limits=%v, got %v", tt.expectPIDLimit, hasPIDLimit)
+			}
+			_, hasPIDRequest := newSpec.Resources.Requests[api.ResourcePID]
+			if hasPIDRequest != tt.expectPIDRequest {
+				t.Errorf("expected pid in requests=%v, got %v", tt.expectPIDRequest, hasPIDRequest)
+			}
+		})
+	}
+
+	t.Run("gate off, nil pod resources: no panic", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, false)
+		spec := &api.PodSpec{
+			Resources:  nil,
+			Containers: []api.Container{{Name: "c1", Image: "img"}},
+		}
+		dropDisabledPodPIDLimitFields(spec, nil)
+		if spec.Resources != nil {
+			t.Errorf("expected Resources to remain nil")
+		}
+	})
+}

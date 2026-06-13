@@ -28,10 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -60,6 +62,8 @@ type podContainerManagerImpl struct {
 	podContainerManager ContainerManager
 	// memoryReservationPolicy controls memory reservation protection behavior
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
+	// recorder is used to emit Kubernetes events
+	recorder record.EventRecorder
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -94,8 +98,28 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			Name:               podContainerName,
 			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
 		}
-		if m.podPidsLimit > 0 {
-			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+		effectivePidLimit := m.podPidsLimit
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PerPodPIDLimit) {
+			if podPid := getPodPIDLimit(pod); podPid > 0 {
+				if !libcontainercgroups.IsCgroup2UnifiedMode() {
+					return fmt.Errorf("per-pod PID limit requires cgroupsv2, but this node is running cgroupsv1; pod %s specifies spec.resources.limits.pid", pod.Name)
+				} else {
+					if podPid < effectivePidLimit || effectivePidLimit <= 0 {
+						effectivePidLimit = podPid
+					} else if podPid > effectivePidLimit {
+						logger.Info("Pod PID limit capped by node podPidsLimit", "pod", klog.KObj(pod), "requested", podPid, "effective", effectivePidLimit)
+						if m.recorder != nil {
+							m.recorder.Eventf(pod, v1.EventTypeWarning, "PIDLimitCapped",
+								"Requested PID limit %d exceeds node podPidsLimit %d; effective limit capped to %d",
+								podPid, effectivePidLimit, effectivePidLimit)
+						}
+					}
+					metrics.PodPIDLimitApplied.Inc()
+				}
+			}
+		}
+		if effectivePidLimit > 0 {
+			containerConfig.ResourceParameters.PidsLimit = &effectivePidLimit
 		}
 		if enforceMemoryQoS {
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
@@ -366,4 +390,16 @@ func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 
 func (m *podContainerManagerNoop) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {
 	return nil
+}
+
+// getPodPIDLimit extracts the pod-level PID limit from spec.resources.limits.pid.
+// It returns 0 if the pod does not specify a PID limit.
+func getPodPIDLimit(pod *v1.Pod) int64 {
+	if pod.Spec.Resources == nil {
+		return 0
+	}
+	if pid, ok := pod.Spec.Resources.Limits[v1.ResourcePID]; ok {
+		return pid.Value()
+	}
+	return 0
 }
