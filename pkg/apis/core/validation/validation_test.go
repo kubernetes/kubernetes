@@ -10478,6 +10478,9 @@ func TestValidatePodSpec(t *testing.T) {
 		"populate HostAliases with `foo.bar` hostnames": podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
 		),
+		"populate HostAliases with fqdn hostname": podtest.MakePod("",
+			podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"example.com.", "localhost.", "my-server."}}),
+		),
 		"populate HostAliases with HostNetwork": podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
 			podtest.SetSecurityContext(&core.PodSecurityContext{
@@ -10613,6 +10616,24 @@ func TestValidatePodSpec(t *testing.T) {
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
+		)},
+		"with hostAliases with bare dot": {pod: *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				HostNetwork: false,
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"."}}),
+		)},
+		"with hostAliases with double dot": {pod: *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				HostNetwork: false,
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{".."}}),
+		)},
+		"with hostAliases with double fqdn dot": {pod: *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				HostNetwork: false,
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"example.com.."}}),
 		)},
 		"bad supplementalGroups large than math.MaxInt32": {pod: *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
@@ -13083,6 +13104,24 @@ func TestValidatePod(t *testing.T) {
 				)),
 			),
 		},
+		"with hostAliases with trailing dot (gate disabled)": {
+			expectedError: "trailing dot requires feature gate HostAliasesAllowFQDN",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"example.com."}}),
+			),
+		},
+		"with hostAliases with bare dot (gate disabled)": {
+			expectedError: "a lowercase RFC 1123 subdomain must consist of",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"."}}),
+			),
+		},
+		"with hostAliases with double dot (gate disabled)": {
+			expectedError: "a lowercase RFC 1123 subdomain must consist of",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{".."}}),
+			),
+		},
 	}
 
 	for k, v := range errorCases {
@@ -13093,6 +13132,58 @@ func TestValidatePod(t *testing.T) {
 				t.Errorf("missing expectedError, got %q", errs.ToAggregate().Error())
 			} else if actualError := errs.ToAggregate().Error(); !strings.Contains(actualError, v.expectedError) {
 				t.Errorf("expected error to contain %q, got %q", v.expectedError, actualError)
+			}
+		})
+	}
+}
+
+func TestValidatePodCreateHostAliasesFQDN(t *testing.T) {
+	fldPath := field.NewPath("spec")
+
+	tests := []struct {
+		name            string
+		pod             *core.Pod
+		opts            PodValidationOptions
+		wantFieldErrors field.ErrorList
+	}{
+		{
+			name: "fqdn hostname with gate enabled",
+			pod: podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"example.com.", "localhost.", "my-server."}}),
+			),
+			opts: PodValidationOptions{AllowHostAliasesFQDN: true, ResourceIsPod: true},
+		},
+		{
+			name: "fqdn hostname with gate disabled",
+			pod: podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"example.com."}}),
+			),
+			opts: PodValidationOptions{ResourceIsPod: true},
+			wantFieldErrors: []*field.Error{
+				field.Forbidden(fldPath.Child("hostAliases").Index(0).Child("hostnames").Index(0), "trailing dot requires feature gate HostAliasesAllowFQDN"),
+			},
+		},
+		{
+			name: "regular hostname works regardless of gate",
+			pod: podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"example.com"}}),
+			),
+			opts: PodValidationOptions{ResourceIsPod: true},
+		},
+		{
+			name: "single-label fqdn with gate enabled",
+			pod: podtest.MakePod("test-pod",
+				podtest.SetHostAliases(core.HostAlias{IP: "10.10.10.10", Hostnames: []string{"my-server."}}),
+			),
+			opts: PodValidationOptions{AllowHostAliasesFQDN: true, ResourceIsPod: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidatePodCreate(tt.pod, tt.opts)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})
 	}
