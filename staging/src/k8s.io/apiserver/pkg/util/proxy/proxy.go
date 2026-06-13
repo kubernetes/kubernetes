@@ -178,6 +178,66 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port
 	}
 }
 
+// ResolveClusterWithReadiness resolves a service to a URL, ensuring that at least one ready endpoint exists.
+// This is similar to ResolveCluster but performs readiness checks before returning the service's cluster IP.
+// This is important for webhooks to avoid sending requests to pods that are not yet ready.
+func ResolveClusterWithReadiness(services listersv1.ServiceLister, endpointSlices EndpointSliceGetter, namespace, id string, port int32) (*url.URL, error) {
+	svc, err := services.Services(namespace).Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	switch {
+	case svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP == v1.ClusterIPNone:
+		return nil, fmt.Errorf(`cannot route to service with ClusterIP "None"`)
+	case svc.Spec.Type == v1.ServiceTypeExternalName:
+		return &url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort(svc.Spec.ExternalName, fmt.Sprintf("%d", port)),
+		}, nil
+	// For ClusterIP, LoadBalancer, and NodePort services, check if ready endpoints exist
+	case svc.Spec.Type == v1.ServiceTypeClusterIP, svc.Spec.Type == v1.ServiceTypeLoadBalancer, svc.Spec.Type == v1.ServiceTypeNodePort:
+		svcPort, err := findServicePort(svc, port)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if any ready endpoints exist for this service
+		slices, err := endpointSlices.GetEndpointSlices(namespace, svc.Name)
+		if err != nil {
+			// If we can't get endpoint slices (e.g., due to access issues), fall back to returning the cluster IP
+			// This maintains backward compatibility while attempting readiness checks when possible
+			return &url.URL{
+				Scheme: "https",
+				Host:   net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprintf("%d", svcPort.Port)),
+			}, nil
+		}
+
+		// Check if any endpoint has the correct port and is ready
+		for _, slice := range slices {
+			for i := range slice.Ports {
+				if slice.Ports[i].Name == nil || *slice.Ports[i].Name != svcPort.Name {
+					continue
+				}
+				// If we find the port with at least one ready endpoint, we can proceed
+				for _, ep := range slice.Endpoints {
+					if ep.Conditions.Ready != nil && *ep.Conditions.Ready {
+						return &url.URL{
+							Scheme: "https",
+							Host:   net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprintf("%d", svcPort.Port)),
+						}, nil
+					}
+				}
+			}
+		}
+
+		// No ready endpoints found
+		return nil, errors.NewServiceUnavailable(fmt.Sprintf("no ready endpoints available for service %q", id))
+	default:
+		return nil, fmt.Errorf("unsupported service type %q", svc.Spec.Type)
+	}
+}
+
 // NewRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
 func NewRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
 	newCtx := req.Context()
