@@ -277,7 +277,7 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 	const wardleBinaryVersion = "1.1"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	t.Cleanup(cancel)
+	defer cancel()
 
 	// Set the emulation version for the kube-apiserver testserver by mapping
 	// the wardle version to the kube version.
@@ -375,7 +375,10 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 	)
 
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
-	defer os.RemoveAll(wardleCertDir)
+	// Use t.Cleanup (not defer) so the cert dir is removed after defer cancel()
+	// runs. This ensures the wardle server receives the shutdown signal before
+	// its certificate files are deleted, preventing fsnotify errors.
+	t.Cleanup(func() { _ = os.RemoveAll(wardleCertDir) })
 
 	runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, false, true, wardleBinaryVersion, kubeConfig, withUID)
 	waitForWardleAPIServiceReady(ctx, t, kubeConfig, wardleCertDir, testNamespace)
@@ -405,7 +408,7 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 	const testNamespace = "kube-wardle"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	t.Cleanup(cancel)
+	defer cancel()
 
 	// set the emulation version for the kube-apiserver testserver by mapping
 	// the wardle version to the kube version.
@@ -419,7 +422,10 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 	kubeClientConfig := getKubeConfig(testKAS)
 
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
-	defer os.RemoveAll(wardleCertDir)
+	// Use t.Cleanup (not defer) so the cert dir is removed after defer cancel()
+	// runs. This ensures the wardle server receives the shutdown signal before
+	// its certificate files are deleted, preventing fsnotify errors.
+	t.Cleanup(func() { _ = os.RemoveAll(wardleCertDir) })
 
 	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, wardleEmulationVersionRaw, kubeClientConfig, false)
 
