@@ -899,6 +899,7 @@ var map_HTTPGetAction = map[string]string{
 	"host":        "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
 	"scheme":      "Scheme to use for connecting to the host. Defaults to HTTP.",
 	"httpHeaders": "Custom headers to set in the request. HTTP allows repeated headers.",
+	"protocol":    "Protocol selects the wire protocol for the probe connection. Nil defaults to HTTP/1.1.",
 }
 
 func (HTTPGetAction) SwaggerDoc() map[string]string {

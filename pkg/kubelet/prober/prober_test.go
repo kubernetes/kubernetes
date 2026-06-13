@@ -18,6 +18,7 @@ package prober
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -29,8 +30,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -362,6 +366,41 @@ func TestNewProber(t *testing.T) {
 	assert.NotNil(t, prober.tcp, "tcp probe initialized")
 	assert.NotNil(t, prober.grpc, "grpc probe initialized")
 
+}
+
+func TestRunProbeHTTPGetHTTP2ProtocolFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, false)
+
+	runner := &containertest.FakeContainerCommandRunner{}
+	recorder := &record.FakeRecorder{}
+	pb := newProber(runner, recorder)
+
+	http2 := v1.HTTPProtocolHTTP2
+	pod := &v1.Pod{}
+	status := v1.PodStatus{PodIP: "127.0.0.1"}
+	container := v1.Container{}
+	containerID := kubecontainer.ContainerID{Type: "docker", ID: "cid"}
+	p := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path:     "/healthz",
+				Port:     intstr.FromInt32(8080),
+				Scheme:   v1.URISchemeHTTP,
+				Protocol: &http2,
+			},
+		},
+	}
+
+	// Gate off: kubelet silently falls back to HTTP/1.1 rather than
+	// failing with a gate error. The probe will fail with a connection
+	// error (no server), but must NOT fail due to the feature gate.
+	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID)
+	if res == probe.Unknown {
+		t.Errorf("gate-off probe should fall back to HTTP/1.1, not return Unknown")
+	}
+	if err != nil && strings.Contains(err.Error(), "H2CContainerProbe") {
+		t.Errorf("gate-off probe should not mention the feature gate, got: %v", err)
+	}
 }
 
 func TestRecordContainerEventUnknownStatus(t *testing.T) {
