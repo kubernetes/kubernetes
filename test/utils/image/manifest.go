@@ -204,6 +204,8 @@ const (
 	VolumeNFSServer
 	// VolumeISCSIServer image
 	VolumeISCSIServer
+	// SampleDevicePlugin image
+	SampleDevicePlugin
 )
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
@@ -236,6 +238,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.14"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.6.0"}
 	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.7"}
+	configs[SampleDevicePlugin] = Config{list.PromoterE2eRegistry, "sample-device-plugin", "1.7"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
 	// but will be used via ReplaceRegistryInImageURL when deploying
