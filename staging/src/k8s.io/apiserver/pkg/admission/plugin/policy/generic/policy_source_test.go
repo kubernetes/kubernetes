@@ -23,8 +23,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
@@ -203,6 +206,7 @@ type FakeBinding struct {
 	metav1.ObjectMeta
 
 	PolicyName string
+	ParamRef   *v1.ParamRef
 }
 
 var _ generic.BindingAccessor = &FakeBinding{}
@@ -246,7 +250,7 @@ func (fb *FakeBinding) GetMatchResources() *v1.MatchResources {
 }
 
 func (fb *FakeBinding) GetParamRef() *v1.ParamRef {
-	return nil
+	return fb.ParamRef
 }
 
 func (fp *FakePolicy) DeepCopyObject() runtime.Object {
@@ -261,4 +265,220 @@ func (fb *FakeBinding) DeepCopyObject() runtime.Object {
 	newFB := &FakeBinding{}
 	*newFB = *fb
 	return newFB
+}
+
+// TestCollectParamsHandlesCacheMiss tests the race condition where a param
+// exists in the API server but hasn't propagated to the informer cache yet.
+// This can happen when Policy, Binding, and Param (e.g., ConfigMap) resources
+// are created in rapid succession. The test verifies that CollectParams falls
+// back to a direct API call when the cache returns NotFound.
+func TestCollectParamsHandlesCacheMiss(t *testing.T) {
+	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
+		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
+		func(fb *FakeBinding) generic.BindingAccessor { return fb },
+		func(fp *FakePolicy) generic.Evaluator { return nil },
+		makeTestDispatcher,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	defer testCancel()
+	require.NoError(t, testContext.Start())
+
+	// Create a ConfigMap directly in the dynamic client (simulating etcd)
+	// without going through the informer, to simulate the race condition
+	configMap := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name":      "test-param",
+				"namespace": "default",
+			},
+			"data": map[string]interface{}{
+				"maxReplicas": "3",
+			},
+		},
+	}
+
+	// Add ConfigMap directly to dynamic client's tracker (bypassing informer)
+	// This simulates the state where the object exists in etcd but the
+	// watch event hasn't reached the informer cache yet
+	ctx := context.Background()
+	_, err = testContext.DynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "configmaps",
+	}).Namespace("default").Create(ctx, configMap, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Now create policy and binding that reference this ConfigMap
+	policy := &FakePolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-policy",
+		},
+		ParamKind: &v1.ParamKind{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+	}
+
+	binding := &FakeBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-binding",
+		},
+		PolicyName: "test-policy",
+		ParamRef: &v1.ParamRef{
+			Name:      "test-param",
+			Namespace: "default",
+		},
+	}
+
+	// Create policy and binding through normal path (they'll be in informers)
+	require.NoError(t, testContext.UpdateAndWait(policy, binding))
+
+	// Get the param informer for ConfigMap
+	hooks := testContext.Source.Hooks()
+	require.Len(t, hooks, 1, "should have one policy hook")
+
+	hook := hooks[0]
+	require.NotNil(t, hook.ParamInformer, "param informer should be set")
+
+	// Call CollectParams - this should succeed via client fallback
+	// even though the ConfigMap isn't in the informer cache
+	params, err := generic.CollectParams(
+		policy.GetParamKind(),
+		hook.ParamInformer,
+		hook.ParamScope,
+		binding.GetParamRef(),
+		"default",
+		hook.DynamicClient,
+		hook.RESTMapper,
+	)
+
+	// With the client fallback fix: this should succeed
+	require.NoError(t, err, "CollectParams should succeed by falling back to direct client Get")
+	require.Len(t, params, 1, "should have retrieved the param")
+	require.NotNil(t, params[0], "param should not be nil")
+
+	// Without the client fallback fix: the above would fail with NotFound error
+	// because the informer cache doesn't have the ConfigMap yet
+}
+
+// TestCollectParamsHandlesMissingCRD verifies that when a paramKind references
+// a CR for a CRD that the RESTMapper does not know about, CollectParams treats
+// the param as missing and routes the binding through ParameterNotFoundAction
+// rather than returning an internal error.
+func TestCollectParamsHandlesMissingCRD(t *testing.T) {
+	testContext, testCancel, err := generic.NewPolicyTestContext(
+		t,
+		func(fp *FakePolicy) generic.PolicyAccessor { return fp },
+		func(fb *FakeBinding) generic.BindingAccessor { return fb },
+		func(fp *FakePolicy) generic.Evaluator { return nil },
+		makeTestDispatcher,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	defer testCancel()
+	require.NoError(t, testContext.Start())
+
+	// Bootstrap a hook with a known paramKind (ConfigMap) so we get a
+	// non-nil ParamInformer/RESTMapper/DynamicClient. The CollectParams
+	// calls below substitute a different paramKind that the RESTMapper
+	// cannot resolve, which is the scenario under test.
+	policy := &FakePolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-policy"},
+		ParamKind: &v1.ParamKind{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+	}
+	binding := &FakeBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-binding"},
+		PolicyName: "test-policy",
+		ParamRef: &v1.ParamRef{
+			Name:      "ignored",
+			Namespace: "default",
+		},
+	}
+	require.NoError(t, testContext.UpdateAndWait(policy, binding))
+
+	hooks := testContext.Source.Hooks()
+	require.Len(t, hooks, 1, "should have one policy hook")
+	hook := hooks[0]
+	require.NotNil(t, hook.ParamInformer, "param informer should be set")
+	require.NotNil(t, hook.RESTMapper, "restMapper should be set")
+	require.NotNil(t, hook.DynamicClient, "dynamicClient should be set")
+
+	missingParamKind := &v1.ParamKind{
+		APIVersion: "missing.example.com/v1",
+		Kind:       "MissingCRD",
+	}
+
+	t.Run("no ParameterNotFoundAction returns no params and no error", func(t *testing.T) {
+		paramRef := &v1.ParamRef{
+			Name:      "some-param",
+			Namespace: "default",
+		}
+
+		params, err := generic.CollectParams(
+			missingParamKind,
+			hook.ParamInformer,
+			meta.RESTScopeNamespace,
+			paramRef,
+			"default",
+			hook.DynamicClient,
+			hook.RESTMapper,
+		)
+
+		require.NoError(t, err, "an unknown paramKind must not surface as an internal error")
+		require.Empty(t, params, "no params should be returned when the paramKind cannot be resolved")
+	})
+
+	t.Run("ParameterNotFoundAction=Deny returns deny error", func(t *testing.T) {
+		denyAction := v1.DenyAction
+		paramRef := &v1.ParamRef{
+			Name:                    "some-param",
+			Namespace:               "default",
+			ParameterNotFoundAction: &denyAction,
+		}
+
+		params, err := generic.CollectParams(
+			missingParamKind,
+			hook.ParamInformer,
+			meta.RESTScopeNamespace,
+			paramRef,
+			"default",
+			hook.DynamicClient,
+			hook.RESTMapper,
+		)
+
+		require.Error(t, err, "Deny action should produce an error when the param is missing")
+		require.Contains(t, err.Error(), "no params found")
+		require.Empty(t, params)
+	})
+
+	t.Run("ParameterNotFoundAction=Allow returns no params and no error", func(t *testing.T) {
+		allowAction := v1.AllowAction
+		paramRef := &v1.ParamRef{
+			Name:                    "some-param",
+			Namespace:               "default",
+			ParameterNotFoundAction: &allowAction,
+		}
+
+		params, err := generic.CollectParams(
+			missingParamKind,
+			hook.ParamInformer,
+			meta.RESTScopeNamespace,
+			paramRef,
+			"default",
+			hook.DynamicClient,
+			hook.RESTMapper,
+		)
+
+		require.NoError(t, err, "Allow action should not produce an error when the param is missing")
+		require.Empty(t, params)
+	})
 }
