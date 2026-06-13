@@ -78,6 +78,8 @@ type FeatureGate interface {
 type RuntimeFeatures struct {
 	// UserNamespacesHostNetwork indicates if the runtime supports user namespaces with host network.
 	UserNamespacesHostNetwork bool
+	// ContainerUlimits indicates runtime support for per-container ulimits.
+	ContainerUlimits bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.

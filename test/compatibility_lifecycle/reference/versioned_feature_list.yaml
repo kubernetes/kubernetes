@@ -225,6 +225,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+- name: ContainerUlimits
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ContextualLogging
   versionedSpecs:
   - default: false

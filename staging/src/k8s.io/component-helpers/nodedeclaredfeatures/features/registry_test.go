@@ -54,6 +54,10 @@ func TestFeatureRequirementsConsistency(t *testing.T) {
 				discoverCfg.RuntimeFeatures = *reqs.RequiredRuntimeFeatures
 			}
 
+			if reqs.RequiredRuntimeFeatures != nil {
+				discoverCfg.RuntimeFeatures = *reqs.RequiredRuntimeFeatures
+			}
+
 			featureEnabled := registeredFeature.Discover(discoverCfg)
 			if !featureEnabled {
 				t.Fatalf("Discover should return true when all requirements are met for feature %s", registeredFeature.Name())
