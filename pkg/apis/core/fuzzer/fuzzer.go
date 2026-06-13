@@ -552,6 +552,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if j.Service == nil {
 				j.Service = &empty
 			}
+			switch c.Intn(3) {
+			case 0:
+				j.Mode = nil
+			case 1:
+				mode := core.GRPCProbeModePlaintext
+				j.Mode = &mode
+			default:
+				mode := core.GRPCProbeModeTLS
+				j.Mode = &mode
+			}
 		},
 		func(j *core.LoadBalancerStatus, c randfill.Continue) {
 			ipMode := core.LoadBalancerIPModeVIP

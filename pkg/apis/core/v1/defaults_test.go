@@ -3213,6 +3213,60 @@ func TestSetDefaultProbe(t *testing.T) {
 	}
 }
 
+func TestSetDefaultProbeGRPCMode(t *testing.T) {
+	tlsMode := v1.GRPCProbeModeTLS
+	plaintextMode := v1.GRPCProbeModePlaintext
+	tests := []struct {
+		name         string
+		grpc         *v1.GRPCAction
+		expectedMode *v1.GRPCProbeMode
+	}{
+		{
+			name: "mode TLS is preserved",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+				Mode: &tlsMode,
+			},
+			expectedMode: &tlsMode,
+		},
+		{
+			name: "mode Plaintext is preserved",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+				Mode: &plaintextMode,
+			},
+			expectedMode: &plaintextMode,
+		},
+		{
+			name: "nil mode stays nil",
+			grpc: &v1.GRPCAction{
+				Port: 8443,
+			},
+			expectedMode: nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								GRPC: tc.grpc,
+							},
+						},
+					}},
+				},
+			}
+			output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+			actualMode := output.Spec.Containers[0].LivenessProbe.GRPC.Mode
+			if (actualMode == nil) != (tc.expectedMode == nil) || (actualMode != nil && *actualMode != *tc.expectedMode) {
+				t.Errorf("expected Mode %v, got %v", tc.expectedMode, actualMode)
+			}
+		})
+	}
+}
+
 func TestSetDefaultSchedulerName(t *testing.T) {
 	pod := &v1.Pod{}
 

@@ -852,6 +852,7 @@ var map_GRPCAction = map[string]string{
 	"":        "GRPCAction specifies an action involving a GRPC service.",
 	"port":    "Port number of the gRPC service. Number must be in the range 1 to 65535.",
 	"service": "Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).\n\nIf this is not specified, the default behavior is defined by gRPC.",
+	"mode":    "mode specifies the connection mode for the gRPC health probe. Set to \"TLS\" to use TLS without certificate verification. Set to \"Plaintext\" to use a plaintext (insecure) connection explicitly. If not specified, the probe uses a plaintext (insecure) connection.",
 }
 
 func (GRPCAction) SwaggerDoc() map[string]string {

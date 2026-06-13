@@ -193,8 +193,9 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		if p.GRPC.Service != nil {
 			service = *p.GRPC.Service
 		}
-		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout)
-		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
+		useTLS := p.GRPC.Mode != nil && *p.GRPC.Mode == v1.GRPCProbeModeTLS
+		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout, "tls", useTLS)
+		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout, useTLS)
 
 	default:
 		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)
