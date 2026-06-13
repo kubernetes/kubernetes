@@ -666,15 +666,6 @@ message ScaleStatus {
   optional string targetSelector = 3;
 }
 
-// +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
-// +genclient:method=ApplyScale,verb=apply,subresource=scale,input=Scale,result=Scale
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.8
-// +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.16
-// +k8s:prerelease-lifecycle-gen:replacement=apps,v1,StatefulSet
 // DEPRECATED - This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for
 // more information.
 // StatefulSet represents a set of pods with consistent identities.
