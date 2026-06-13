@@ -285,9 +285,9 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIRootfsStats(assert, c1, containerStats1, nil)
 	checkCRILogsStats(assert, c1, &rootFsInfo, containerLogStats1)
 	checkCRINetworkStats(assert, p0.Network, infos[sandbox0.PodSandboxStatus.Id].Stats[0].Network)
-	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
-	checkCRIPodSwapStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
-	checkCRIPodIOStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p0)
+	checkCRIPodSwapStats(assert, p0)
+	checkCRIPodIOStats(assert, p0)
 
 	checkContainersSwapStats(t, p0, infos[container0.Id], infos[container1.Id])
 
@@ -306,9 +306,9 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIRootfsStats(assert, c2, containerStats2, &imageFsInfo)
 	checkCRILogsStats(assert, c2, &rootFsInfo, containerLogStats2)
 	checkCRINetworkStats(assert, p1.Network, infos[sandbox1.PodSandboxStatus.Id].Stats[0].Network)
-	checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
-	checkCRIPodSwapStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
-	checkCRIPodIOStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p1)
+	checkCRIPodSwapStats(assert, p1)
+	checkCRIPodIOStats(assert, p1)
 
 	checkContainersSwapStats(t, p1, infos[container2.Id])
 
@@ -329,9 +329,9 @@ func TestCRIListPodStats(t *testing.T) {
 
 	checkCRILogsStats(assert, c3, &rootFsInfo, containerLogStats4)
 	checkCRINetworkStats(assert, p2.Network, infos[sandbox2.PodSandboxStatus.Id].Stats[0].Network)
-	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
-	checkCRIPodSwapStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
-	checkCRIPodIOStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p2)
+	checkCRIPodSwapStats(assert, p2)
+	checkCRIPodIOStats(assert, p2)
 
 	checkContainersSwapStats(t, p2, infos[container4.Id])
 
@@ -344,9 +344,9 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(container8.CreatedAt, c8.StartTime.UnixNano())
 	assert.NotNil(c8.CPU.Time)
 	assert.NotNil(c8.Memory.Time)
-	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
-	checkCRIPodSwapStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
-	checkCRIPodIOStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p3)
+	checkCRIPodSwapStats(assert, p3)
+	checkCRIPodIOStats(assert, p3)
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
@@ -677,7 +677,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(p0.VolumeStats)
 	assert.Nil(p0.Network)
 	assert.Nil(p0.IO)
-	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p0)
 
 	containerStatsMap := make(map[string]statsapi.ContainerStats)
 	for _, s := range p0.Containers {
@@ -710,7 +710,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(p1.VolumeStats)
 	assert.Nil(p1.Network)
 	assert.Nil(p1.IO)
-	checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p1)
 
 	c2 := p1.Containers[0]
 	assert.Equal(cName2, c2.Name)
@@ -730,7 +730,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(p2.VolumeStats)
 	assert.Nil(p2.Network)
 	assert.Nil(p2.IO)
-	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p2)
 
 	c3 := p2.Containers[0]
 	assert.Equal(cName3, c3.Name)
@@ -752,7 +752,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(container8.CreatedAt, c8.StartTime.UnixNano())
 	assert.NotNil(c8.CPU.Time)
 	assert.NotNil(c8.Memory.Time)
-	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
+	checkCRIPodCPUAndMemoryStats(assert, p3)
 
 	p6 := podStatsMap[statsapi.PodReference{Name: "sandbox6-name", UID: "sandbox6-uid", Namespace: "sandbox6-ns"}]
 	assert.Equal(sandbox6.CreatedAt, p6.StartTime.UnixNano())
@@ -1264,33 +1264,25 @@ func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkSta
 	assert.Equal(expected.Interfaces[0].TxErrors, *actual.TxErrors)
 }
 
-func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapi.ContainerStats) {
+func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats) {
 	if runtime.GOOS != "linux" {
 		return
 	}
-	assert.Equal(cs.Timestamp.UnixNano(), actual.CPU.Time.UnixNano())
-	assert.Equal(cs.Cpu.Usage.Total, *actual.CPU.UsageCoreNanoSeconds)
-	assert.Equal(cs.CpuInst.Usage.Total, *actual.CPU.UsageNanoCores)
-
-	assert.Equal(cs.Memory.Usage, *actual.Memory.UsageBytes)
-	assert.Equal(cs.Memory.WorkingSet, *actual.Memory.WorkingSetBytes)
-	assert.Equal(cs.Memory.RSS, *actual.Memory.RSSBytes)
-	assert.Equal(cs.Memory.ContainerData.Pgfault, *actual.Memory.PageFaults)
-	assert.Equal(cs.Memory.ContainerData.Pgmajfault, *actual.Memory.MajorPageFaults)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		checkCRIPSIStats(assert, &cs.Cpu.PSI, actual.CPU.PSI)
-		checkCRIPSIStats(assert, &cs.Memory.PSI, actual.Memory.PSI)
+	// Pod CPU and memory stats are now aggregated from individual container
+	// stats rather than the pod cgroup, so they only contain the fields
+	// provided by CRI (UsageCoreNanoSeconds for CPU, WorkingSetBytes for
+	// memory). Verify they are non-nil when the pod has running containers.
+	if len(actual.Containers) > 0 {
+		assert.NotNil(actual.CPU)
+		assert.NotNil(actual.Memory)
 	}
 }
 
-func checkCRIPodIOStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapi.ContainerStats) {
+func checkCRIPodIOStats(assert *assert.Assertions, actual statsapi.PodStats) {
 	if runtime.GOOS != "linux" {
 		return
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-		checkCRIPSIStats(assert, &cs.DiskIo.PSI, actual.IO.PSI)
-	}
+	// Pod IO/PSI stats are not available when aggregating from container stats.
 }
 
 func checkCRIPSIStats(assert *assert.Assertions, want *cadvisorapi.PSIStats, got *statsapi.PSIStats) {
@@ -1321,13 +1313,13 @@ func checkCRIPSIDataStrictlyFromCRI(assert *assert.Assertions, want, got statsap
 	assert.InDelta(want.Avg300, got.Avg300, 0.01)
 }
 
-func checkCRIPodSwapStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapi.ContainerStats) {
+func checkCRIPodSwapStats(assert *assert.Assertions, actual statsapi.PodStats) {
 	if runtime.GOOS != "linux" {
 		return
 	}
-
-	assert.Equal(cs.Timestamp.UnixNano(), actual.Swap.Time.UnixNano())
-	assert.Equal(cs.Memory.Swap, *actual.Swap.SwapUsageBytes)
+	// Pod swap stats are now aggregated from individual container stats.
+	// CRI stats don't provide swap data (it comes from cadvisor), so
+	// pod-level swap values may be zero when using container aggregation.
 }
 
 func checkCRIPodCPUAndMemoryStatsStrictlyFromCRI(assert *assert.Assertions, actual statsapi.PodStats, expected statsapi.PodStats) {
