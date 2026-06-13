@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -98,6 +99,17 @@ func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
 	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID, "containerName", containerName)
 	logger.Info("Get Memory")
 	return []state.Block{}
+}
+
+// GetPodMemory returns the memory allocated by a pod from NUMA nodes
+func (m *fakeManager) GetPodMemory(podUID string) []state.Block {
+	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID)
+	logger.Info("Get Pod Memory")
+	return []state.Block{}
+}
+
+func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	return cmqos.ResourceIsolationContainer
 }
 
 // NewFakeManager creates empty/fake memory manager

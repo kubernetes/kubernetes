@@ -90,6 +90,11 @@ func (m *fakeManager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUS
 	return cpuset.New()
 }
 
+func (m *fakeManager) GetPodCPUs(podUID string) cpuset.CPUSet {
+	m.logger.Info("GetPodCPUs", "podUID", podUID)
+	return cpuset.New()
+}
+
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	m.logger.Info("Get Allocatable CPUs")
 	return cpuset.New()
