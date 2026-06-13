@@ -32,9 +32,10 @@ import (
 
 func TestComputePodQOS(t *testing.T) {
 	testCases := []struct {
-		pod                      *v1.Pod
-		expected                 v1.PodQOSClass
-		podLevelResourcesEnabled bool
+		pod                                        *v1.Pod
+		expected                                   v1.PodQOSClass
+		podLevelResourcesEnabled                   bool
+		podLevelResourcesFixKubeletQOSClassEnabled bool
 	}{
 		{
 			pod: newPod("guaranteed", []v1.Container{
@@ -197,9 +198,158 @@ func TestComputePodQOS(t *testing.T) {
 			expected:                 v1.PodQOSBurstable,
 			podLevelResourcesEnabled: true,
 		},
+		{
+			pod: newPodWithResources(
+				"empty-pod-level-resources-should-fallback-to-containers",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				&v1.ResourceRequirements{
+					Requests: v1.ResourceList{},
+					Limits:   v1.ResourceList{},
+				},
+			),
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"completely-empty-pod-level-resources-should-fallback-to-containers",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				&v1.ResourceRequirements{},
+			),
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"completely-empty-pod-level-resources-old-behavior",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				&v1.ResourceRequirements{},
+			),
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: false,
+		},
+		{
+			pod: newPodWithResources(
+				"nil-pod-level-resources-should-fallback-to-containers",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				nil,
+			),
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"zero-pod-level-resources-should-not-fallback-to-containers",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				&v1.ResourceRequirements{
+					Requests: getResourceList("0", "0"),
+					Limits:   getResourceList("0", "0"),
+				},
+			),
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"zero-pod-level-resources-should-not-fallback-to-containers-fix-disabled",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				&v1.ResourceRequirements{
+					Requests: getResourceList("0", "0"),
+					Limits:   getResourceList("0", "0"),
+				},
+			),
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: false,
+		}, {
+			pod: newPodWithResources(
+				"empty-pod-level-resources-old-behavior",
+				[]v1.Container{
+					newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+				},
+				&v1.ResourceRequirements{
+					Requests: v1.ResourceList{},
+					Limits:   v1.ResourceList{},
+				},
+			),
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: false,
+		},
+		{
+			pod: newPodWithResources(
+				"container-with-zero-requests-limits",
+				[]v1.Container{
+					newContainer("zero-container", getResourceList("0", "0"), getResourceList("0", "0")),
+				},
+				nil,
+			),
+			expected: v1.PodQOSBestEffort,
+		},
+		{
+			pod: newPodWithResources(
+				"guaranteed-with-pod-level-resources-and-hugepages",
+				[]v1.Container{
+					newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				},
+				&v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:                   resource.MustParse("10m"),
+						v1.ResourceMemory:                resource.MustParse("100Mi"),
+						v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:                   resource.MustParse("10m"),
+						v1.ResourceMemory:                resource.MustParse("100Mi"),
+						v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+					},
+				},
+			),
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"burstable-with-pod-level-resources-and-hugepages",
+				[]v1.Container{
+					newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				},
+				&v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:                   resource.MustParse("10m"),
+						v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+					},
+				},
+			),
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
 	}
 	for id, testCase := range testCases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixKubeletQOSClass, testCase.podLevelResourcesFixKubeletQOSClassEnabled)
 		if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
