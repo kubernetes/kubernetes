@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,6 +54,12 @@ type VerifyAssignments struct {
 type VerifyAssignedInOneDomain struct {
 	Pods        []string
 	TopologyKey string
+}
+
+type VerifyPodsSchedulingAttempts struct {
+	PodNames     []string
+	PodGroupName string
+	Attempts     int
 }
 
 type UpdatePod struct {
@@ -127,6 +134,8 @@ type Step struct {
 	CreateNodes []*v1.Node
 	// CreatePodGroup is use to create a pod group and wait for it to be ready.
 	CreatePodGroup *schedulingapi.PodGroup
+	// UpdatePodGroup is used to update an existing pod group and wait for it to propagate.
+	UpdatePodGroup *schedulingapi.PodGroup
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
 	// CreateWorkloads is use to create workloads in the cluster.
@@ -153,6 +162,8 @@ type Step struct {
 	VerifyAssignments *VerifyAssignments
 	// VerifyAssignedInOneDomain is use to verify that the pods are assigned to nodes in the same domain.
 	VerifyAssignedInOneDomain *VerifyAssignedInOneDomain
+	// VerifyPodSchedulingAttempts is used to check the scheduling attempts of a pods.
+	VerifyPodSchedulingAttempts *VerifyPodsSchedulingAttempts
 	// RunScheduleOne is use to run the scheduling once.
 	// This operation should be used only when the test is not deploying the scheduler's goroutine
 	// (testCtx.Scheduler.Run).
@@ -241,6 +252,38 @@ func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	)
 	if err != nil {
 		return fmt.Errorf("failed to wait for pod group %s to be discoverable by scheduler: %w", pgCopy.Name, err)
+	}
+	return nil
+}
+
+func updatePodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi.PodGroup) error {
+	cs := testCtx.ClientSet
+	pgCopy := pg.DeepCopy()
+	pgCopy.Namespace = ns
+
+	existing, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(testCtx.Ctx, pgCopy.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get existing pod group %s for update: %w", pgCopy.Name, err)
+	}
+	pgCopy.ResourceVersion = existing.ResourceVersion
+
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Update(testCtx.Ctx, pgCopy, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("failed to update pod group %s: %w", pgCopy.Name, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			listerPG, err := testCtx.InformerFactory.Scheduling().V1alpha3().PodGroups().Lister().PodGroups(ns).Get(pgCopy.Name)
+			if err != nil {
+				return false, err
+			}
+			if apiequality.Semantic.DeepEqual(listerPG.Spec.SchedulingPolicy, pgCopy.Spec.SchedulingPolicy) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pod group %s update to be discoverable by scheduler: %w", pgCopy.Name, err)
 	}
 	return nil
 }
@@ -434,6 +477,22 @@ func verifyAssignedInOneDomain(testCtx *testutils.TestContext, ns string, verify
 	return nil
 }
 
+func verifyPodSchedulingAttempts(testCtx *testutils.TestContext, ns string, check *VerifyPodsSchedulingAttempts) error {
+	podGroupName := check.PodGroupName
+	for _, podName := range check.PodNames {
+		pInfo, ok := testCtx.Scheduler.SchedulingQueue.GetPod(podName, ns, &v1.PodSchedulingGroup{
+			PodGroupName: &podGroupName,
+		})
+		if !ok {
+			return fmt.Errorf("pod %s not found in scheduling queue", podName)
+		}
+		if pInfo.Attempts != check.Attempts {
+			return fmt.Errorf("expected pod %s scheduling attempts to be %d, but got %d", podName, check.Attempts, pInfo.Attempts)
+		}
+	}
+	return nil
+}
+
 func runScheduleOne(testCtx *testutils.TestContext) {
 	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 }
@@ -455,6 +514,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = createPods(testCtx, ns, step.CreatePods)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
+		case step.UpdatePodGroup != nil:
+			err = updatePodGroup(testCtx, ns, step.UpdatePodGroup)
 		case step.CreateWorkloads != nil:
 			err = createWorkloads(testCtx, ns, step.CreateWorkloads)
 		case step.DeletePods != nil:
@@ -479,6 +540,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = verifyAssignments(testCtx, ns, step.VerifyAssignments)
 		case step.VerifyAssignedInOneDomain != nil:
 			err = verifyAssignedInOneDomain(testCtx, ns, step.VerifyAssignedInOneDomain)
+		case step.VerifyPodSchedulingAttempts != nil:
+			err = verifyPodSchedulingAttempts(testCtx, ns, step.VerifyPodSchedulingAttempts)
 		case step.RunScheduleOne:
 			runScheduleOne(testCtx)
 		default:

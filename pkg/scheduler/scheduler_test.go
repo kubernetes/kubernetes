@@ -1053,7 +1053,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
 				fwk.ResourceClaim:         fwk.All - fwk.Delete,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
-				fwk.PodGroup:              fwk.Add,
+				fwk.PodGroup:              fwk.Add | fwk.Update,
 			},
 			enableGangScheduling:            true,
 			enableInPlacePodVerticalScaling: true,
