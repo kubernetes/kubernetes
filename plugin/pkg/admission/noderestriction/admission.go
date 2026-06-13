@@ -91,7 +91,6 @@ type Plugin struct {
 	inspectedFeatureGates                          bool
 	expansionRecoveryEnabled                       bool
 	dynamicResourceAllocationEnabled               bool
-	allowInsecureKubeletCertificateSigningRequests bool
 	serviceAccountNodeAudienceRestriction          bool
 	podCertificateRequestsEnabled                  bool
 }
@@ -107,7 +106,6 @@ var (
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
 	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
-	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
 	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)
 	p.inspectedFeatureGates = true
@@ -238,9 +236,6 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return p.admitResourceSlice(nodeName, a)
 
 	case csrResource:
-		if p.allowInsecureKubeletCertificateSigningRequests {
-			return nil
-		}
 		return p.admitCSR(nodeName, a)
 	default:
 		return nil
