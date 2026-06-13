@@ -16,13 +16,15 @@
 #
 # Combining `performance` and `short` selects suitable workloads for a local
 # before/after comparisons with benchstat.
-
+#
 # ConsumableCapacity is a variant of
-# SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice that have two devices, 
-# one preallocate device slice and one basic device. Both allows multiple allocations and contain consumable capacity.
-# And, it creates a resource claim template with two requests.
-# Each requests half of this capacity for two count.
-# The first request checks distinctAttribute which the other checks matchAttribute.
+# SchedulingWithResourceClaimTemplate. For each node, it creates one ResourceSlice with four
+# shareable devices, each providing 10Gb of consumable bandwidth capacity.
+# It also creates a ResourceClaimTemplate with one request for two devices.
+# Each allocation requests 2500Mb of bandwidth, and the constraint requires the
+# selected devices to have distinct values for dra.example.com/index.
+#
+# This means eight pods fit onto one node.
 - name: ConsumableCapacity
   featureGates:
     DynamicResourceAllocation: true
@@ -33,18 +35,23 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
   - opcode: createAny
+    # one ResourceSlice with four shareable devices of 10Gb bandwidth
     templatePath: ../templates/resourceslice-consumablecapacity.yaml
-    countParam: $resourceSlices
+    countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/deviceclass-consumablecapacity.yaml
   - opcode: createAny
+    # A request for two distinct devices of 2500Mb bandwidth
     templatePath: ../templates/resourceclaimtemplate-consumablecapacity.yaml
     namespace: test
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate-consumablecapacity.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
   - opcode: createPods
     namespace: test
     countParam: $measurePods
@@ -58,11 +65,10 @@
     params:
       nodesWithDRA: 1
       nodesWithoutDRA: 1
-      resourceSlices: 1
+      initPods: 0
       measurePods: 1
       steadyState: false
       duration: 0s # unused
-      maxClaimsPerNode: 2
   - name: fast_with_DRAPartitionableDevices
     featureGates:
       DRAPartitionableDevices: true
@@ -71,17 +77,77 @@
     params:
       nodesWithDRA: 1
       nodesWithoutDRA: 1
-      resourceSlices: 1
+      initPods: 0
       measurePods: 1
       steadyState: false
       duration: 0s # unused
-      maxClaimsPerNode: 2
-  - name: 2000pods_100nodes
+  - name: empty_100nodes
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
-      resourceSlices: 2000
-      measurePods: 2000
+      initPods: 0
+      measurePods: 10
       steadyState: true
       duration: 10s
-      maxClaimsPerNode: 20
+  - name: half_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 400 # 50 nodes * 8 pods/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2000  # 250 nodes * 8 pods/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 3990  # 500 nodes * 8 pods/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initPods: 4000 # 500 nodes * 8 pods/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initPods: 7990 # 1000 nodes * 8 pods/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
