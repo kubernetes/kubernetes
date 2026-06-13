@@ -17,9 +17,7 @@ limitations under the License.
 package pleg
 
 import (
-	"fmt"
-	"reflect"
-	"strings"
+	"context"
 	"testing"
 	"time"
 
@@ -27,209 +25,224 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	critest "k8s.io/cri-api/pkg/apis/testing"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
-func newTestEventedPLEG() *EventedPLEG {
+var _ podLifecycleEventGeneratorHandler = (*fakeGenericPLEG)(nil)
+
+type fakeGenericPLEG struct {
+	watchCh           chan *PodLifecycleEvent
+	relistRequests    []types.UID
+	reinspectRequests []types.UID
+	relistCount       int
+}
+
+func newFakeGenericPLEG() *fakeGenericPLEG {
+	return &fakeGenericPLEG{
+		watchCh: make(chan *PodLifecycleEvent, 10),
+	}
+}
+
+func (f *fakeGenericPLEG) Start(ctx context.Context) {}
+
+func (f *fakeGenericPLEG) Watch() chan *PodLifecycleEvent {
+	return f.watchCh
+}
+
+func (f *fakeGenericPLEG) Healthy() (bool, error) {
+	return true, nil
+}
+
+func (f *fakeGenericPLEG) RequestReinspect(podUID types.UID) {
+	f.reinspectRequests = append(f.reinspectRequests, podUID)
+}
+
+func (f *fakeGenericPLEG) RequestRelist(logger klog.Logger, podUID types.UID) {
+	f.relistRequests = append(f.relistRequests, podUID)
+}
+
+func (f *fakeGenericPLEG) Stop() {}
+
+func (f *fakeGenericPLEG) Update(*RelistDuration) {}
+
+func (f *fakeGenericPLEG) Relist(ctx context.Context) {
+	f.relistCount++
+}
+
+func newTestEventedPLEG(t *testing.T, genericPleg *fakeGenericPLEG) *EventedPLEG {
+	t.Helper()
 	return &EventedPLEG{
-		runtime:        &containertest.FakeRuntime{},
-		clock:          testingclock.NewFakeClock(time.Time{}),
-		cache:          kubecontainer.NewCache(),
-		runtimeService: critest.NewFakeRuntimeService(),
-		eventChannel:   make(chan *PodLifecycleEvent, 100),
+		genericPleg:                 genericPleg,
+		eventedPlegMaxStreamRetries: 5,
 	}
 }
 
 func TestHealthyEventedPLEG(t *testing.T) {
-	metrics.Register()
-	pleg := newTestEventedPLEG()
+	pleg := newTestEventedPLEG(t, newFakeGenericPLEG())
 
-	_, _, events := createTestPodsStatusesAndEvents(100)
-	for _, event := range events[:5] {
-		pleg.eventChannel <- event
-	}
-
-	// test if healthy when event channel has 5 events
 	isHealthy, err := pleg.Healthy()
 	require.NoError(t, err)
 	assert.True(t, isHealthy)
-
-	// send remaining 95 events and make channel out of capacity
-	for _, event := range events[5:] {
-		pleg.eventChannel <- event
-	}
-	// pleg is unhealthy when channel is out of capacity
-	isHealthy, err = pleg.Healthy()
-	require.Error(t, err)
-	assert.False(t, isHealthy)
 }
 
-func TestUpdateRunningPodMetric(t *testing.T) {
-	metrics.Register()
-	logger, _ := ktesting.NewTestContext(t)
-	pleg := newTestEventedPLEG()
-
-	podStatuses := make([]*kubecontainer.PodStatus, 5)
-	for i := range podStatuses {
-		id := fmt.Sprintf("test-pod-%d", i)
-		podStatuses[i] = &kubecontainer.PodStatus{
-			ID: types.UID(id),
-			SandboxStatuses: []*v1.PodSandboxStatus{
-				{Id: id},
-			},
-			ContainerStatuses: []*kubecontainer.Status{
-				{ID: kubecontainer.ContainerID{ID: id}, State: kubecontainer.ContainerStateRunning},
-			},
-		}
-
-		pleg.updateRunningPodMetric(logger, podStatuses[i])
-		pleg.cache.Set(podStatuses[i].ID, podStatuses[i], nil, time.Now())
-
-	}
-	pleg.cache.UpdateTime(time.Now())
-
-	expectedMetric := `
-# HELP kubelet_running_pods [ALPHA] Number of pods that have a running pod sandbox
-# TYPE kubelet_running_pods gauge
-kubelet_running_pods 5
-`
-	testMetric(t, expectedMetric, metrics.RunningPodCount.FQName())
-
-	// stop sandbox containers for first 2 pods
-	for _, podStatus := range podStatuses[:2] {
-		podId := string(podStatus.ID)
-		newPodStatus := kubecontainer.PodStatus{
-			ID: podStatus.ID,
-			SandboxStatuses: []*v1.PodSandboxStatus{
-				{Id: podId},
-			},
-			ContainerStatuses: []*kubecontainer.Status{
-				// update state to container exited
-				{ID: kubecontainer.ContainerID{ID: podId}, State: kubecontainer.ContainerStateExited},
-			},
-		}
-
-		pleg.updateRunningPodMetric(logger, &newPodStatus)
-		pleg.cache.Set(newPodStatus.ID, &newPodStatus, nil, time.Now())
-	}
-	pleg.cache.UpdateTime(time.Now())
-
-	expectedMetric = `
-# HELP kubelet_running_pods [ALPHA] Number of pods that have a running pod sandbox
-# TYPE kubelet_running_pods gauge
-kubelet_running_pods 3
-`
-	testMetric(t, expectedMetric, metrics.RunningPodCount.FQName())
-}
-
-func testMetric(t *testing.T, expectedMetric string, metricName string) {
-	err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(expectedMetric), metricName)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestEventedPLEG_getPodIPs(t *testing.T) {
-	cache := kubecontainer.NewCache()
-	type args struct {
-		pid    types.UID
-		status *kubecontainer.PodStatus
-	}
+func TestProcessCRIEventsRequestsRelistOnlyForUnexpectedTermination(t *testing.T) {
 	tests := []struct {
-		name      string
-		args      args
-		oldstatus *kubecontainer.PodStatus
-		expected  []string
+		name       string
+		event      *v1.ContainerEventResponse
+		wantRelist []types.UID
 	}{
 		{
-			name: "status ips is not empty",
-			args: args{
-				pid: "62212",
-				status: &kubecontainer.PodStatus{
-					IPs: []string{"10.0.0.10", "10.23.0.1"},
-				},
-			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{"192.168.0.10", "192.168.0.1"},
-			},
-			expected: []string{"10.0.0.10", "10.23.0.1"},
+			name: "stopped non-zero exit requests relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 2,
+			}),
+			wantRelist: []types.UID{"pod1"},
 		},
 		{
-			name: "status ips is empty and SandboxStatuses has PodSandboxState_SANDBOX_READY state",
-			args: args{
-				pid: "62212",
-				status: &kubecontainer.PodStatus{
-					SandboxStatuses: []*v1.PodSandboxStatus{
-						{
-							Id:       "sandboxID2",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(1)},
-							State:    v1.PodSandboxState_SANDBOX_READY,
-						},
-						{
-							Id:       "sandboxID1",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(0)},
-							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
-						},
-					},
-				},
-			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{"192.168.0.10", "192.168.0.1"},
-			},
-			expected: nil,
+			name: "stopped OOMKilled requests relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 0,
+				Reason:   "OOMKilled",
+			}),
+			wantRelist: []types.UID{"pod1"},
 		},
 		{
-			name: "status and cache ips are empty",
-			args: args{
-				pid:    "62212",
-				status: &kubecontainer.PodStatus{},
-			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{},
-			},
-			expected: nil,
+			name: "stopped clean exit waits for generic relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 0,
+			}),
 		},
 		{
-			name: "sandbox state is no PodSandboxState_SANDBOX_READY",
-			args: args{
-				pid: "62212",
-				status: &kubecontainer.PodStatus{
-					SandboxStatuses: []*v1.PodSandboxStatus{
-						{
-							Id:       "sandboxID2",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(1)},
-							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
-						},
-						{
-							Id:       "sandboxID1",
-							Metadata: &v1.PodSandboxMetadata{Attempt: uint32(0)},
-							State:    v1.PodSandboxState_SANDBOX_NOTREADY,
-						},
-					},
+			name: "started event waits for generic relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STARTED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_RUNNING,
+				ExitCode: 2,
+			}),
+		},
+		{
+			name: "deleted event waits for generic relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_DELETED_EVENT, &v1.ContainerStatus{
+				Id:       "container1",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 2,
+			}),
+		},
+		{
+			name: "missing matching container status waits for generic relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT, &v1.ContainerStatus{
+				Id:       "container2",
+				State:    v1.ContainerState_CONTAINER_EXITED,
+				ExitCode: 2,
+			}),
+		},
+		{
+			name: "same container name unexpected non-event instance waits for generic relist",
+			event: newContainerEvent("pod1", "container2", v1.ContainerEventType_CONTAINER_STOPPED_EVENT,
+				&v1.ContainerStatus{
+					Id:       "container1",
+					Metadata: &v1.ContainerMetadata{Name: "c1"},
+					State:    v1.ContainerState_CONTAINER_EXITED,
+					ExitCode: 2,
 				},
+				&v1.ContainerStatus{
+					Id:       "container2",
+					Metadata: &v1.ContainerMetadata{Name: "c1"},
+					State:    v1.ContainerState_CONTAINER_EXITED,
+					ExitCode: 0,
+				},
+			),
+		},
+		{
+			name: "same container name unexpected event instance requests relist",
+			event: newContainerEvent("pod1", "container1", v1.ContainerEventType_CONTAINER_STOPPED_EVENT,
+				&v1.ContainerStatus{
+					Id:       "container1",
+					Metadata: &v1.ContainerMetadata{Name: "c1"},
+					State:    v1.ContainerState_CONTAINER_EXITED,
+					ExitCode: 2,
+				},
+				&v1.ContainerStatus{
+					Id:       "container2",
+					Metadata: &v1.ContainerMetadata{Name: "c1"},
+					State:    v1.ContainerState_CONTAINER_RUNNING,
+				},
+			),
+			wantRelist: []types.UID{"pod1"},
+		},
+		{
+			name: "missing sandbox metadata waits for generic relist",
+			event: &v1.ContainerEventResponse{
+				ContainerId:        "container1",
+				ContainerEventType: v1.ContainerEventType_CONTAINER_STOPPED_EVENT,
+				CreatedAt:          time.Now().UnixNano(),
+				ContainersStatuses: []*v1.ContainerStatus{{
+					Id:       "container1",
+					State:    v1.ContainerState_CONTAINER_EXITED,
+					ExitCode: 2,
+				}},
 			},
-			oldstatus: &kubecontainer.PodStatus{
-				IPs: []string{"192.168.0.10", "192.168.0.1"},
-			},
-			expected: []string{"192.168.0.10", "192.168.0.1"},
 		},
 	}
+
 	for _, test := range tests {
-		cache.Set(test.args.pid, test.oldstatus, nil, time.Time{})
-		e := &EventedPLEG{
-			cache: cache,
-		}
 		t.Run(test.name, func(t *testing.T) {
-			if got := e.getPodIPs(test.args.pid, test.args.status); !reflect.DeepEqual(got, test.expected) {
-				t.Errorf("EventedPLEG.getPodIPs() = %v, expected %v", got, test.expected)
+			genericPleg := newFakeGenericPLEG()
+			eventedPleg := newTestEventedPLEG(t, genericPleg)
+			logger := ktesting.NewLogger(t, ktesting.DefaultConfig)
+			eventsCh := make(chan *v1.ContainerEventResponse, 1)
+			eventsCh <- test.event
+			close(eventsCh)
+
+			eventedPleg.processCRIEvents(logger, eventsCh)
+
+			assert.Equal(t, test.wantRelist, genericPleg.relistRequests)
+			assert.Empty(t, genericPleg.reinspectRequests)
+			assert.Zero(t, genericPleg.relistCount)
+			select {
+			case event := <-genericPleg.watchCh:
+				t.Fatalf("EventedPLEG sent a pod lifecycle event directly: %#v", event)
+			default:
 			}
 		})
+	}
+}
+
+func TestEventedPLEGDelegatesToGenericPLEG(t *testing.T) {
+	genericPleg := newFakeGenericPLEG()
+	eventedPleg := newTestEventedPLEG(t, genericPleg)
+	logger := ktesting.NewLogger(t, ktesting.DefaultConfig)
+
+	assert.Equal(t, genericPleg.watchCh, eventedPleg.Watch())
+
+	eventedPleg.Relist(context.Background())
+	assert.Equal(t, 1, genericPleg.relistCount)
+
+	eventedPleg.RequestRelist(logger, "pod1")
+	assert.Equal(t, []types.UID{"pod1"}, genericPleg.relistRequests)
+
+	eventedPleg.RequestReinspect("pod2")
+	assert.Equal(t, []types.UID{"pod2"}, genericPleg.reinspectRequests)
+}
+
+func newContainerEvent(podUID types.UID, containerID string, eventType v1.ContainerEventType, statuses ...*v1.ContainerStatus) *v1.ContainerEventResponse {
+	return &v1.ContainerEventResponse{
+		ContainerId:        containerID,
+		ContainerEventType: eventType,
+		CreatedAt:          time.Now().UnixNano(),
+		PodSandboxStatus: &v1.PodSandboxStatus{
+			Metadata: &v1.PodSandboxMetadata{
+				Uid: string(podUID),
+			},
+		},
+		ContainersStatuses: statuses,
 	}
 }

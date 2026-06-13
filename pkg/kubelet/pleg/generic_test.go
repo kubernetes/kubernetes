@@ -627,6 +627,45 @@ func TestReinspect(t *testing.T) {
 	}
 }
 
+func TestUpdateCacheUsesPodTimestampWhenEventedPLEGIsActive(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.EventedPLEG, true)
+	setEventedPLEGUsage(true)
+	t.Cleanup(func() {
+		setEventedPLEGUsage(false)
+	})
+
+	ctx := context.Background()
+	podID := types.UID("test-pod")
+	cachedTimestamp := time.Unix(0, 20)
+	statusTimestamp := time.Unix(0, 10)
+	podTimestamp := time.Unix(0, 30)
+
+	runtimeMock := containertest.NewMockRuntime(t)
+	cache := kubecontainer.NewCache()
+	pleg := NewGenericPLEG(
+		runtimeMock,
+		make(chan *PodLifecycleEvent, largeChannelCap),
+		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 3 * time.Minute},
+		cache,
+		testingclock.NewFakeClock(time.Time{}),
+	).(*GenericPLEG)
+
+	cache.Set(podID, &kubecontainer.PodStatus{ID: podID}, nil, cachedTimestamp)
+
+	pod := &kubecontainer.Pod{ID: podID, Name: "name", Namespace: "ns", Timestamp: podTimestamp}
+	expectedStatus := &kubecontainer.PodStatus{ID: podID, TimeStamp: statusTimestamp}
+	runtimeMock.EXPECT().GetPodStatus(ctx, pod).Return(expectedStatus, nil)
+
+	status, updated, err := pleg.updateCache(ctx, pod, podID)
+	require.NoError(t, err)
+	assert.True(t, updated)
+	assert.Equal(t, expectedStatus, status)
+
+	cachedStatus, cachedErr := cache.Get(podID)
+	require.NoError(t, cachedErr)
+	assert.Equal(t, expectedStatus, cachedStatus)
+}
+
 // Test detecting sandbox state changes.
 func TestRelistingWithSandboxes(t *testing.T) {
 	tCtx := ktesting.Init(t)
