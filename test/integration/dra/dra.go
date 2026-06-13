@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -45,6 +44,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/features"
+	dratesting "k8s.io/kubernetes/pkg/registry/resource/testing"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -281,10 +281,9 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			sort.Strings(entries)
 			tCtx.Logf("Config: %s", strings.Join(entries, ","))
 
-			// We need to set emulation version for DynamicResourceAllocation feature gate, which is locked at 1.35.
-			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
+			// For features that are locked in previous versions, we need to emulate a previous version
+			// in order to test the feature being disabled.
+			dratesting.SetMinimumRequiredFeatureGateVersion(tCtx, tc.features)
 			featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, tc.features)
 
 			etcdOptions := framework.SharedEtcd()
