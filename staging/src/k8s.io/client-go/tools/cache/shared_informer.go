@@ -352,8 +352,8 @@ type SharedIndexInformerOptions struct {
 	// underlying Reflector's type description.
 	ObjectDescription string
 
-	// Identifier is used to identify the FIFO for metrics and logging purposes.
-	// If not set, metrics will not be published.
+	// Identifier is used to identify the informer for metrics and logging purposes.
+	// If not set, metrics will not be published and the reflector uses its default name.
 	Identifier InformerNameAndResource
 
 	// InformerMetricsProvider is the metrics provider for the FIFO queue.
@@ -732,6 +732,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform, s.identifier, s.informerMetricsProvider)
 
 		cfg := &Config{
+			Name:              s.identifier.Name(),
 			Queue:             fifo,
 			ListerWatcher:     s.listerWatcher,
 			ObjectType:        s.objectType,
