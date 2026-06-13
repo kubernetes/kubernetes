@@ -512,8 +512,9 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 	}
 
 	for {
+		timer := clock.NewTimer(delay())
 		select {
-		case <-clock.After(delay()):
+		case <-timer.C():
 			successful, err := verifyStatus()
 			if err != nil {
 				return err
@@ -522,6 +523,12 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 				return nil
 			}
 		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C():
+				default:
+				}
+			}
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("timed out waiting for external-attacher of %v CSI driver to %v volume %v", csiDriverName, strings.ToLower(operation), volumeHandle)
 		}
