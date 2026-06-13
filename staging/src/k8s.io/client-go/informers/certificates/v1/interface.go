@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// CertificateSigningRequests returns a CertificateSigningRequestInformer.
 	CertificateSigningRequests() CertificateSigningRequestInformer
+	// PodCertificateRequests returns a PodCertificateRequestInformer.
+	PodCertificateRequests() PodCertificateRequestInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // CertificateSigningRequests returns a CertificateSigningRequestInformer.
 func (v *version) CertificateSigningRequests() CertificateSigningRequestInformer {
 	return &certificateSigningRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// PodCertificateRequests returns a PodCertificateRequestInformer.
+func (v *version) PodCertificateRequests() PodCertificateRequestInformer {
+	return &podCertificateRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

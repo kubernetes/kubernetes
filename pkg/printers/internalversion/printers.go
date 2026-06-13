@@ -30,6 +30,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
@@ -425,12 +426,12 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podCertificateRequestColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "PodName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
-		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
-		{Name: "NodeName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
-		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
+		{Name: "PodName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
+		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
+		{Name: "NodeName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
 		{Name: "State", Type: "string", Description: "Is the request Pending, Issued, Denied, or Failed?"},
-		{Name: "UnverifiedUserAnnotations", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["unverifiedUserAnnotations"]},
+		{Name: "UnverifiedUserAnnotations", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["unverifiedUserAnnotations"]},
 	}
 	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequest)
 	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequestList)

@@ -88,6 +88,7 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 		"localsubjectaccessreviews.authorization.k8s.io",
 		"mutatingwebhookconfigurations.admissionregistration.k8s.io",
 		"namespaces",
+		"podcertificaterequests.certificates.k8s.io",
 		"prioritylevelconfigurations.flowcontrol.apiserver.k8s.io",
 		"resourcequotas",
 		"rolebindings.rbac.authorization.k8s.io",

@@ -85,6 +85,19 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource+"/approval"] = csrApprovalStorage
 	}
 
+	if resource := "podcertificaterequests"; apiResourceConfigSource.ResourceEnabled(certificatesapiv1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+			pcrStorage, pcrStatusStorage, err := podcertificaterequeststore.NewREST(restOptionsGetter, p.Authorizer, clock.RealClock{})
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = pcrStorage
+			storage[resource+"/status"] = pcrStatusStorage
+		} else {
+			klog.Warning("PodCertificateRequest storage is disabled because the PodCertificateRequest feature gate is disabled")
+		}
+	}
+
 	return storage, nil
 }
 

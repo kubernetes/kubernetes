@@ -34,8 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -73,7 +76,6 @@ func TestCreate(t *testing.T) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-
 	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -84,51 +86,20 @@ func TestCreate(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
-	_, _, ed25519PubPKIX2, ed25519Proof2 := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
 
-	test.TestCreate(
-		// Valid PCR
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:                "k8s.io/foo",
-				PodName:                   "pod-1",
-				PodUID:                    podUID1,
-				ServiceAccountName:        "sa-1",
-				ServiceAccountUID:         types.UID("sa-uid-1"),
-				NodeName:                  "node-1",
-				NodeUID:                   types.UID("node-uid-1"),
-				MaxExpirationSeconds:      ptr.To[int32](86400),
-				PKIXPublicKey:             ed25519PubPKIX1,
-				ProofOfPossession:         ed25519Proof1,
-				UnverifiedUserAnnotations: map[string]string{"test/foo": "bar"},
-			},
-		},
-		// Invalid PCR -- proof-of-possession signed wrong value
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:                "k8s.io/foo",
-				PodName:                   "pod-1",
-				PodUID:                    podUID1,
-				ServiceAccountName:        "sa-1",
-				ServiceAccountUID:         types.UID("sa-uid-1"),
-				NodeName:                  "node-1",
-				NodeUID:                   types.UID("node-uid-1"),
-				MaxExpirationSeconds:      ptr.To[int32](86400),
-				PKIXPublicKey:             ed25519PubPKIX2,
-				ProofOfPossession:         ed25519Proof2,
-				UnverifiedUserAnnotations: map[string]string{"test/foo": "bar"},
-			},
-		},
-	)
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	_, _, ed25519PubPKIX2, ed25519Proof2 := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
+	invalidPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	invalidPCRwithPKIX.Spec.PKIXPublicKey = ed25519PubPKIX2
+	invalidPCRwithPKIX.Spec.ProofOfPossession = ed25519Proof2
+	test.TestCreate(validPCRwithPKIX, invalidPCRwithPKIX)
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	invalidPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	invalidPCRwithPKCS10.Spec.StubPKCS10Request = []byte("invalid-csr-bytes")
+	test.TestCreate(validPCRwithPKCS10, invalidPCRwithPKCS10)
 }
 
 func TestUpdate(t *testing.T) {
@@ -145,45 +116,31 @@ func TestUpdate(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
-	test.TestUpdate(
-		// Valid PCR as a base
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:                "k8s.io/foo",
-				PodName:                   "pod-1",
-				PodUID:                    podUID1,
-				ServiceAccountName:        "sa-1",
-				ServiceAccountUID:         types.UID("sa-uid-1"),
-				NodeName:                  "node-1",
-				NodeUID:                   types.UID("node-uid-1"),
-				MaxExpirationSeconds:      ptr.To[int32](86400),
-				PKIXPublicKey:             ed25519PubPKIX1,
-				ProofOfPossession:         ed25519Proof1,
-				UnverifiedUserAnnotations: map[string]string{"test/foo": "bar"},
-			},
-		},
-		// Valid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			if pcr.ObjectMeta.Annotations == nil {
-				pcr.ObjectMeta.Annotations = map[string]string{}
-			}
-			pcr.ObjectMeta.Annotations["k8s.io/cool-annotation"] = "value"
-			return pcr
-		},
-		// Invalid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			pcr.Spec.SignerName = "test.k8s.io/new-signer"
-			return pcr
-		},
-	)
+	// Define update functions
+	validUpdate := func(object runtime.Object) runtime.Object {
+		pcr := object.(*certificates.PodCertificateRequest)
+		if pcr.ObjectMeta.Annotations == nil {
+			pcr.ObjectMeta.Annotations = map[string]string{}
+		}
+		pcr.ObjectMeta.Annotations["k8s.io/cool-annotation"] = "value"
+		return pcr
+	}
+	invalidUpdate := func(object runtime.Object) runtime.Object {
+		pcr := object.(*certificates.PodCertificateRequest)
+		pcr.Spec.SignerName = "test.k8s.io/new-signer"
+		return pcr
+	}
+
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	test.TestUpdate(validPCRwithPKIX, validUpdate, invalidUpdate)
+
+	clearStorage(t, storage.Store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestUpdate(validPCRwithPKCS10, validUpdate, invalidUpdate)
 }
 
 func TestUpdateStompsStatus(t *testing.T) {
@@ -200,38 +157,23 @@ func TestUpdateStompsStatus(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
-	test.TestUpdate(
-		// Valid PCR as a base
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:                "k8s.io/foo",
-				PodName:                   "pod-1",
-				PodUID:                    podUID1,
-				ServiceAccountName:        "sa-1",
-				ServiceAccountUID:         types.UID("sa-uid-1"),
-				NodeName:                  "node-1",
-				NodeUID:                   types.UID("node-uid-1"),
-				MaxExpirationSeconds:      ptr.To[int32](86400),
-				PKIXPublicKey:             ed25519PubPKIX1,
-				ProofOfPossession:         ed25519Proof1,
-				UnverifiedUserAnnotations: map[string]string{"test/foo": "bar"},
-			},
-		},
-		// Valid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			// The strategy should stomp status.
-			pcr.Status.NotAfter = ptr.To(metav1.NewTime(mustParseTime(t, "2025-01-01T00:00:00Z")))
-			return pcr
-		},
-	)
+	stompStatus := func(object runtime.Object) runtime.Object {
+		pcr := object.(*certificates.PodCertificateRequest)
+		// The strategy should stomp status.
+		pcr.Status.NotAfter = ptr.To(metav1.NewTime(mustParseTime(t, "2025-01-01T00:00:00Z")))
+		return pcr
+	}
 
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	test.TestUpdate(validPCRwithPKIX, stompStatus)
+
+	clearStorage(t, storage.Store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestUpdate(validPCRwithPKCS10, stompStatus)
 }
 
 func TestUpdateStatus(t *testing.T) {
@@ -249,55 +191,31 @@ func TestUpdateStatus(t *testing.T) {
 
 	caCertDER, caPrivKey := mustMakeCA(t)
 	podUID1 := types.UID("pod-uid-1")
-	_, ed25519Pub1, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
-	pod1Cert1 := mustSignCertForPublicKey(t, 24*time.Hour, ed25519Pub1, caCertDER, caPrivKey)
 
+	invalidUpdate := func(object runtime.Object) runtime.Object {
+		pcr := object.(*certificates.PodCertificateRequest)
+		pcr.Spec.SignerName = "test.k8s.io/new-signer"
+		return pcr
+	}
+
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, pubKeyPKIX := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	pod1CertPKIX := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKIX, caCertDER, caPrivKey)
 	test.TestUpdate(
-		// Valid PCR as a base
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
-		// Valid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			pcr.Status = certificates.PodCertificateRequestStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:               certificates.PodCertificateRequestConditionTypeIssued,
-						Status:             metav1.ConditionTrue,
-						Reason:             "Whatever",
-						Message:            "Foo message",
-						LastTransitionTime: metav1.NewTime(time.Now()),
-					},
-				},
-				CertificateChain: pod1Cert1,
-				NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
-				BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
-				NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
-			}
-			return pcr
-		},
-		// Invalid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			pcr.Spec.SignerName = "test.k8s.io/new-signer"
-			return pcr
-		},
+		validPCRwithPKIX,
+		makeStatusUpdate(t, pod1CertPKIX),
+		invalidUpdate,
+	)
+
+	clearStorage(t, statusStorage.store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, pubKeyPKCS10 := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	pod1CertPKCS10 := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKCS10, caCertDER, caPrivKey)
+	test.TestUpdate(
+		validPCRwithPKCS10,
+		makeStatusUpdate(t, pod1CertPKCS10),
+		invalidUpdate,
 	)
 }
 
@@ -315,36 +233,23 @@ func TestUpdateStatusStompsSpec(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
-	test.TestUpdate(
-		// Valid PCR as a base
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
-		// Valid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			// The stategy should stomp spec.
-			pcr.Spec.SignerName = "foo.com/bar"
-			return pcr
-		},
-	)
+	stompSpec := func(object runtime.Object) runtime.Object {
+		pcr := object.(*certificates.PodCertificateRequest)
+		// The strategy should stomp spec.
+		pcr.Spec.SignerName = "foo.com/bar"
+		return pcr
+	}
+
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	test.TestUpdate(validPCRwithPKIX, stompSpec)
+
+	clearStorage(t, statusStorage.store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestUpdate(validPCRwithPKCS10, stompSpec)
 }
 
 func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
@@ -362,57 +267,30 @@ func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 
 	caCertDER, caPrivKey := mustMakeCA(t)
 	podUID1 := types.UID("pod-uid-1")
-	_, ed25519Pub1, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
-	pod1Cert1 := mustSignCertForPublicKey(t, 24*time.Hour, ed25519Pub1, caCertDER, caPrivKey)
 
+	noopUpdate := func(object runtime.Object) runtime.Object {
+		return object
+	}
+
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, pubKeyPKIX := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	pod1CertPKIX := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKIX, caCertDER, caPrivKey)
 	test.TestUpdate(
-		// Valid PCR as a base
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
-		// Valid update function
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			return pcr
-		},
-		// Invalid update function -- normally a valid update, but above we have
-		// configured the authorizer to never return DecisionAllow.
-		func(object runtime.Object) runtime.Object {
-			pcr := object.(*certificates.PodCertificateRequest)
-			pcr.Status = certificates.PodCertificateRequestStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:               certificates.PodCertificateRequestConditionTypeIssued,
-						Status:             metav1.ConditionTrue,
-						Reason:             "Whatever",
-						Message:            "Foo message",
-						LastTransitionTime: metav1.NewTime(time.Now()),
-					},
-				},
-				CertificateChain: pod1Cert1,
-				NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
-				BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
-				NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
-			}
-			return pcr
-		},
+		validPCRwithPKIX,
+		noopUpdate,
+		makeStatusUpdate(t, pod1CertPKIX),
 	)
 
+	clearStorage(t, statusStorage.store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, pubKeyPKCS10 := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	pod1CertPKCS10 := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKCS10, caCertDER, caPrivKey)
+	test.TestUpdate(
+		validPCRwithPKCS10,
+		noopUpdate,
+		makeStatusUpdate(t, pod1CertPKCS10),
+	)
 }
 
 func TestDelete(t *testing.T) {
@@ -429,28 +307,16 @@ func TestDelete(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
-	test.TestDelete(
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
-	)
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	test.TestDelete(validPCRwithPKIX)
+
+	clearStorage(t, storage.Store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestDelete(validPCRwithPKCS10)
 }
 
 func TestGet(t *testing.T) {
@@ -467,28 +333,16 @@ func TestGet(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
-	test.TestGet(
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
-	)
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	test.TestGet(validPCRwithPKIX)
+
+	clearStorage(t, storage.Store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestGet(validPCRwithPKCS10)
 }
 
 func TestList(t *testing.T) {
@@ -505,28 +359,16 @@ func TestList(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
-	test.TestList(
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
-	)
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
+	test.TestList(validPCRwithPKIX)
+
+	clearStorage(t, storage.Store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestList(validPCRwithPKCS10)
 }
 
 func TestWatch(t *testing.T) {
@@ -543,27 +385,11 @@ func TestWatch(t *testing.T) {
 	})
 
 	podUID1 := types.UID("pod-uid-1")
-	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
+	// Test PCR with PKIXPublicKey and ProofOfPossession fields
+	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
 	test.TestWatch(
-		&certificates.PodCertificateRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: test.TestNamespace(),
-				Name:      "foo",
-			},
-			Spec: certificates.PodCertificateRequestSpec{
-				SignerName:           "k8s.io/foo",
-				PodName:              "pod-1",
-				PodUID:               podUID1,
-				ServiceAccountName:   "sa-1",
-				ServiceAccountUID:    types.UID("sa-uid-1"),
-				NodeName:             "node-1",
-				NodeUID:              types.UID("node-uid-1"),
-				MaxExpirationSeconds: ptr.To[int32](86400),
-				PKIXPublicKey:        ed25519PubPKIX1,
-				ProofOfPossession:    ed25519Proof1,
-			},
-		},
+		validPCRwithPKIX,
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -574,7 +400,7 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{
 				"metadata.namespace": test.TestNamespace(),
-				"metadata.name":      "foo",
+				"metadata.name":      "foo1",
 				"spec.signerName":    "k8s.io/foo",
 				"spec.nodeName":      "node-1",
 			},
@@ -583,7 +409,39 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{
 				"metadata.namespace": test.TestNamespace(),
-				"metadata.name":      "foo",
+				"metadata.name":      "foo1",
+				"spec.signerName":    "k8s.io/othersigner",
+				"spec.nodeName":      "node-1",
+			},
+		},
+	)
+
+	clearStorage(t, storage.Store, test.TestNamespace())
+
+	// Test PRC with StubPKCS10Request field
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	test.TestWatch(
+		validPCRwithPKCS10,
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
+		},
+		// matching fields
+		[]fields.Set{
+			{
+				"metadata.namespace": test.TestNamespace(),
+				"metadata.name":      "foo2",
+				"spec.signerName":    "k8s.io/foo",
+				"spec.nodeName":      "node-1",
+			},
+		},
+		// not matching fields
+		[]fields.Set{
+			{
+				"metadata.namespace": test.TestNamespace(),
+				"metadata.name":      "foo2",
 				"spec.signerName":    "k8s.io/othersigner",
 				"spec.nodeName":      "node-1",
 			},
@@ -661,4 +519,85 @@ func mustSignCertForPublicKey(t *testing.T, validity time.Duration, subjectPubli
 	})
 
 	return string(certPEM)
+}
+
+func mustMakePKCS10CSR(t *testing.T) (crypto.PublicKey, []byte) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("Error while generating ed25519 key: %v", err)
+	}
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "foo",
+		},
+	}
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, priv)
+	if err != nil {
+		t.Fatalf("Error while creating certificate request: %v", err)
+	}
+	return pub, csrDER
+}
+
+func makeValidPCR(t *testing.T, name string, namespace string, podUID types.UID, usePKCS10 bool) (*certificates.PodCertificateRequest, crypto.PublicKey) {
+	pcr := &certificates.PodCertificateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: certificates.PodCertificateRequestSpec{
+			SignerName:                "k8s.io/foo",
+			PodName:                   "pod-1",
+			PodUID:                    podUID,
+			ServiceAccountName:        "sa-1",
+			ServiceAccountUID:         types.UID("sa-uid-1"),
+			NodeName:                  "node-1",
+			NodeUID:                   types.UID("node-uid-1"),
+			MaxExpirationSeconds:      ptr.To[int32](86400),
+			UnverifiedUserAnnotations: map[string]string{"test/foo": "bar"},
+		},
+	}
+	var pubKey crypto.PublicKey
+	if usePKCS10 {
+		var validCSR []byte
+		pubKey, validCSR = mustMakePKCS10CSR(t)
+		pcr.Spec.StubPKCS10Request = validCSR
+	} else {
+		_, pubKeyPKIX, pubPKIX, sig := mustMakeEd25519KeyAndProof(t, []byte(podUID))
+		pcr.Spec.PKIXPublicKey = pubPKIX
+		pcr.Spec.ProofOfPossession = sig
+		pubKey = pubKeyPKIX
+	}
+	return pcr, pubKey
+}
+
+func clearStorage(t *testing.T, store *genericregistry.Store, namespace string) {
+	namespaces := []string{namespace, "bar1", "bar2", "bar3", "bar4"}
+	for _, ns := range namespaces {
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ns)
+		if _, err := store.DeleteCollection(ctx, rest.ValidateAllObjectFunc, nil, nil); err != nil {
+			t.Fatalf("unable to clear collection in namespace %s: %v", ns, err)
+		}
+	}
+}
+
+func makeStatusUpdate(t *testing.T, certChain string) func(runtime.Object) runtime.Object {
+	return func(object runtime.Object) runtime.Object {
+		pcr := object.(*certificates.PodCertificateRequest)
+		pcr.Status = certificates.PodCertificateRequestStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:               certificates.PodCertificateRequestConditionTypeIssued,
+					Status:             metav1.ConditionTrue,
+					Reason:             "Whatever",
+					Message:            "Foo message",
+					LastTransitionTime: metav1.NewTime(time.Now()),
+				},
+			},
+			CertificateChain: certChain,
+			NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+			BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+			NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+		}
+		return pcr
+	}
 }
