@@ -217,8 +217,28 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go le.config.Callbacks.OnStartedLeading(ctx)
+
+	finishedLeading := make(chan struct{})
+	go func() {
+		defer close(finishedLeading)
+		le.config.Callbacks.OnStartedLeading(ctx)
+	}()
+
 	le.renew(ctx)
+
+	if le.config.ReleaseOnCancel {
+		// Release only after OnStartedLeading returns, so we never give up the lease
+		// while guarded work still runs and break mutual exclusion. Bound the wait by
+		// LeaseDuration so a stuck callback cannot block shutdown.
+		cancel()
+		timer := le.clock.NewTimer(le.config.LeaseDuration)
+		defer timer.Stop()
+		select {
+		case <-finishedLeading:
+		case <-timer.C():
+		}
+		le.release(klog.FromContext(ctx))
+	}
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
@@ -304,11 +324,6 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		logger.Info("Failed to renew lease", "lock", desc, "err", err)
 		cancel()
 	}, le.config.RetryPeriod)
-
-	// if we hold the lease, give it up
-	if le.config.ReleaseOnCancel {
-		le.release(logger)
-	}
 }
 
 // release attempts to release the leader lease if we have acquired it.
