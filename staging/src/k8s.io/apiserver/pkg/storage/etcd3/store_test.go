@@ -749,6 +749,12 @@ func withDefaults(options *setupOptions) {
 	options.leaseConfig = newTestLeaseManagerConfig()
 }
 
+func withExternalEtcd(options *setupOptions) {
+	options.client = func(t testing.TB) *kubernetes.Client {
+		return testserver.RunExternalEtcd(t)
+	}
+}
+
 var _ setupOption = withDefaults
 
 func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kubernetes.Client) {
@@ -1026,6 +1032,7 @@ func BenchmarkStore_GetList(b *testing.B) {
 
 func BenchmarkStoreWriteThroughput(b *testing.B) {
 	klog.SetLogger(logr.Discard())
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 	dimensions := []struct {
 		namespaceCount       int
 		podPerNamespaceCount int
@@ -1039,7 +1046,7 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 	}
 	for _, dims := range dimensions {
 		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			ctx, store, _ := testSetup(b)
+			ctx, store, _ := testSetup(b, withExternalEtcd)
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			b.ResetTimer()
 			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false, nil)
@@ -1076,7 +1083,7 @@ func BenchmarkStoreList(b *testing.B) {
 			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
 			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
 				data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
-				ctx, store, _ := testSetup(b)
+				ctx, store, _ := testSetup(b, withExternalEtcd)
 				require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 				storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
 			})
@@ -1137,7 +1144,7 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
-	ctx, store, _ := testSetup(b)
+	ctx, store, _ := testSetup(b, withExternalEtcd)
 	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	storagetesting.RunBenchmarkStoreStats(ctx, b, store)
 }
@@ -1148,7 +1155,7 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	namespaceCount := 50
 	podPerNamespaceCount := 3_000
 	data := storagetesting.PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
-	ctx, store, _ := testSetup(b)
+	ctx, store, _ := testSetup(b, withExternalEtcd)
 	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	// List to fetch object sizes for statsCache.
 	listOut := &example.PodList{}
