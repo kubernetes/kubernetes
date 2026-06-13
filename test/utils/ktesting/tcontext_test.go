@@ -75,7 +75,7 @@ func TestNormalInit(t *testing.T) {
 	// The outcome depends on how the unit test was started.
 	// See below for deterministic deadline/no deadline testing.
 	expectDeadline, expectOK := t.Deadline()
-	expectDeadline = expectDeadline.Add(-ktesting.CleanupGracePeriod)
+	expectDeadline = expectDeadline.Add(-ktesting.DefaultCleanupGracePeriod)
 	tCtx := ktesting.Init(t)
 	actualDeadline, actualOK := tCtx.Deadline()
 	tCtx.Expect(actualOK).To(gomega.Equal(expectOK), "have deadline")
@@ -104,7 +104,7 @@ func TestDeadline(t *testing.T) {
 		tCtx := ktesting.Init(mockT)
 		actualDeadline, ok := tCtx.Deadline()
 		if ok {
-			expectDeadline := mockDeadline.Add(-ktesting.CleanupGracePeriod)
+			expectDeadline := mockDeadline.Add(-ktesting.DefaultCleanupGracePeriod)
 			tCtx.Expect(actualDeadline).To(gomega.BeTemporally("==", expectDeadline), "deadline")
 		} else {
 			tCtx.Error("Expected a deadline, got none")
