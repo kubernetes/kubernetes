@@ -377,6 +377,9 @@ The subcommand can accept the following flags:
 - `file_mode`: Path to print the mode bits of.
 - `file_perm`: Path to print the perms of.
 - `file_owner`: Path to print the owning UID and GID of.
+- `link_file_mode`: Path to print the link file mode bits of.
+- `link_file_perm`: Path to print the link file perms of.
+- `link_file_owner`: Path to print the link file owning UID and GID of.
 - `new_file_0644`: Path to write to and read from with perm 0644.
 - `new_file_0666`: Path to write to and read from with perm 0666.
 - `new_file_0660`: Path to write to and read from with perm 0660.
@@ -391,6 +394,7 @@ Usage:
 ```console
     kubectl exec test-agnhost -- /agnhost mounttest \
         [--fs_type <path>] [--file_mode <path>] [--file_perm <path>] [--file_owner <path>] \
+        [--link_file_mode <path>] [--link_file_perm <path>] [--link_file_owner <path>] \
         [--new_file_0644 <path>] [--new_file_0666 <path>] [--new_file_0660 <path>] [--new_file_0777 <path>] \
         [--file_content <path>] [--file_content_in_loop <path>] \
         [--retry_time <seconds>] [--break_on_expected_content <true_or_false>]
