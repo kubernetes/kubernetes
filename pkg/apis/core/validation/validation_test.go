@@ -16946,12 +16946,12 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name                string
-		tweakSvc            func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs             int
-		legacyIPs           bool
-		newTrafficDist      bool
-		relaxedServiceNames bool
+		name                       string
+		tweakSvc                   func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs                    int
+		legacyIPs                  bool
+		disableNewTrafficDist      bool
+		disableRelaxedServiceNames bool
 	}{{
 		name:     "default",
 		tweakSvc: func(s *core.Service) {},
@@ -18210,15 +18210,13 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
 			},
-			newTrafficDist: true,
-			numErrs:        0,
+			numErrs: 0,
 		}, {
 			name: "valid: trafficDistribution field set to PreferSameNode with feature gate",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
-			newTrafficDist: true,
-			numErrs:        0,
+			numErrs: 0,
 		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
@@ -18230,24 +18228,25 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
 			},
-			numErrs: 1,
+			numErrs:               1,
+			disableNewTrafficDist: true,
 		}, {
 			name: "invalid: trafficDistribution field set to PreferSameNode without feature gate",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
-			numErrs: 1,
+			numErrs:               1,
+			disableNewTrafficDist: true,
 		}, {
 
-			name:                "valid: service name begins with a digit feature gate enabled",
-			relaxedServiceNames: true,
+			name: "valid: service name begins with a digit feature gate enabled",
 			tweakSvc: func(s *core.Service) {
 				s.Name = "1-test-service"
 			},
 			numErrs: 0,
 		}, {
-			name:                "invalid: service name begins with a digit feature gate disabled",
-			relaxedServiceNames: false,
+			name:                       "invalid: service name begins with a digit feature gate disabled",
+			disableRelaxedServiceNames: true,
 			tweakSvc: func(s *core.Service) {
 				s.Name = "1-test-service"
 			},
@@ -18257,12 +18256,19 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.newTrafficDist {
+			if tc.disableNewTrafficDist {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
+
+			if tc.disableRelaxedServiceNames {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.RelaxedServiceNameValidation: false,
+				})
+			}
+
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.PreferSameTrafficDistribution: tc.newTrafficDist,
-				features.RelaxedServiceNameValidation:  tc.relaxedServiceNames,
+				features.PreferSameTrafficDistribution: !tc.disableNewTrafficDist,
 				features.StrictIPCIDRValidation:        !tc.legacyIPs,
 			})
 			svc := makeValidService()
@@ -19708,10 +19714,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name                string
-		tweakSvc            func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs             int
-		relaxedServiceNames bool
+		name                       string
+		tweakSvc                   func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs                    int
+		disableRelaxedServiceNames bool
 	}{{
 		name: "no change",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
@@ -20979,16 +20985,20 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Name = "1-test-service"
 				newSvc.Labels["foo"] = "bar"
 			},
-			relaxedServiceNames: false,
-			numErrs:             0,
+			disableRelaxedServiceNames: true,
+			numErrs:                    0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+
+			if tc.disableRelaxedServiceNames {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.StrictIPCIDRValidation:       true,
-				features.RelaxedServiceNameValidation: tc.relaxedServiceNames,
+				features.RelaxedServiceNameValidation: !tc.disableRelaxedServiceNames,
 			})
 
 			oldSvc := makeValidService()
