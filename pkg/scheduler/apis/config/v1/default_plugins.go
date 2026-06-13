@@ -41,6 +41,9 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 				{Name: names.VolumeRestrictions},
 				{Name: names.NodeVolumeLimits},
+				// Enabling VolumeBinding Score without regard to the VolumeCapacityPriority
+				// feature gate is an incorrect configuration pattern. This is intentionally
+				// retained for backward compatibility; see issue 113705.
 				{Name: names.VolumeBinding},
 				{Name: names.VolumeZone},
 				{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
