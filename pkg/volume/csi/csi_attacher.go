@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -492,7 +493,13 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 		jitter        = 0.1
 		clock         = &clock.RealClock{}
 	)
-	backoffMgr := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
+	delay := wait.Backoff{
+		Duration: initBackoff,
+		Cap:      maxBackoff,
+		Steps:    math.MaxInt,
+		Factor:   backoffFactor,
+		Jitter:   jitter,
+	}.DelayWithReset(clock, resetDuration)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -505,9 +512,8 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 	}
 
 	for {
-		t := backoffMgr.Backoff()
 		select {
-		case <-t.C():
+		case <-clock.After(delay()):
 			successful, err := verifyStatus()
 			if err != nil {
 				return err
@@ -516,7 +522,6 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 				return nil
 			}
 		case <-ctx.Done():
-			t.Stop()
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("timed out waiting for external-attacher of %v CSI driver to %v volume %v", csiDriverName, strings.ToLower(operation), volumeHandle)
 		}
