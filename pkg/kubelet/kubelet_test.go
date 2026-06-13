@@ -3186,7 +3186,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 func TestMissingSecretsNotReportedWithoutPullError(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	unexpectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets (missing); attempting to pull the image may not succeed."
+	unexpectedEvent := "FailedToRetrieveImagePullSecret"
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -3261,7 +3261,9 @@ func TestMissingSecretsNotReportedWithoutPullError(t *testing.T) {
 			done = true
 		}
 	}
-	assert.NotContains(t, events, unexpectedEvent)
+	for _, event := range events {
+		assert.NotContainsf(t, event, unexpectedEvent, "%s event must not be fired if the image pull succeeds, found event: %s", unexpectedEvent, event)
+	}
 }
 
 func TestSyncLabels(t *testing.T) {
