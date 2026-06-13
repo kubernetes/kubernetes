@@ -17,8 +17,11 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"encoding/json"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -276,4 +279,113 @@ func TestGetPodAndContainerForDevice(t *testing.T) {
 	// dev1 is a exist device
 	podUID, _ = podDevices.getPodAndContainerForDevice("dev1")
 	assert.Equal(t, "pod1", podUID)
+}
+
+func TestPodDevices(t *testing.T) {
+	// Test the core fix: podDevices() correctly aggregates devices from multiple containers
+	// without causing double-locking deadlock. This is the scenario that triggered the bug.
+	pdev := newPodDevices()
+	pdev.insert("pod1", "cont1", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		newContainerAllocateResponse(),
+	)
+	pdev.insert("pod1", "cont2", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		newContainerAllocateResponse(),
+	)
+
+	result := pdev.podDevices("pod1", "resource1")
+
+	assert.Equal(t, 4, result.Len())
+	assert.True(t, result.Has("dev1"))
+	assert.True(t, result.Has("dev2"))
+	assert.True(t, result.Has("dev3"))
+	assert.True(t, result.Has("dev4"))
+}
+
+func TestContainerDevices(t *testing.T) {
+	// Test basic functionality: containerDevices() returns correct device set
+	pdev := newPodDevices()
+	pdev.insert("pod1", "cont1", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}, 1: []string{"dev3"}},
+		newContainerAllocateResponse(),
+	)
+
+	result := pdev.containerDevices("pod1", "cont1", "resource1")
+
+	assert.NotNil(t, result)
+	assert.Equal(t, 3, result.Len())
+	assert.True(t, result.Has("dev1"))
+	assert.True(t, result.Has("dev2"))
+	assert.True(t, result.Has("dev3"))
+}
+
+func TestPodDevicesConcurrentAccess(t *testing.T) {
+	// Test concurrent read-write access to verify deadlock fix.
+	// Run with -race flag to detect data races: go test -race ./...
+	//
+	// Before the fix: podDevices() held RLock() and called containerDevices()
+	// which also tried to acquire RLock(). This could cause issues when a writer
+	// was waiting for the lock.
+	//
+	// The fix: containerDevicesLocked() assumes caller already holds the lock.
+	pdev := newPodDevices()
+
+	// Setup: pod with multiple containers using same resource
+	pdev.insert("pod1", "cont1", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		newContainerAllocateResponse(),
+	)
+	pdev.insert("pod1", "cont2", "resource1",
+		checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
+		newContainerAllocateResponse(),
+	)
+
+	const numReaders = 10
+	const numWriters = 5
+	var wg sync.WaitGroup
+	wg.Add(numReaders + numWriters)
+
+	// Start multiple readers calling podDevices() which triggers the fixed code path
+	for i := 0; i < numReaders; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				pdev.podDevices("pod1", "resource1")
+			}
+		}()
+	}
+
+	// Start writers that need write lock (competing with readers)
+	for i := 0; i < numWriters; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 50; j++ {
+				pdev.insert("pod2", "cont3", "resource2",
+					checkpoint.DevicesPerNUMA{0: []string{"dev5"}},
+					newContainerAllocateResponse(),
+				)
+				pdev.delete([]string{"pod2"})
+			}
+		}()
+	}
+
+	// Wait for all goroutines with timeout to detect deadlock
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		// All goroutines completed successfully
+	case <-ctx.Done():
+		t.Fatal("deadlock detected: concurrent access test timed out")
+	}
+
+	// Verify final state is consistent
+	result := pdev.podDevices("pod1", "resource1")
+	assert.Equal(t, 4, result.Len())
 }
