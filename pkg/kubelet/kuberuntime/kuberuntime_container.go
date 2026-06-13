@@ -1005,7 +1005,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 // Remove all init containers. Note that this function does not check the state
 // of the container because it assumes all init containers have been stopped
 // before the call happens.
-func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
 	initContainerNames := sets.New[string]()
 	for _, container := range pod.Spec.InitContainers {
@@ -1020,12 +1020,16 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 			count++
 			// Purge all init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
-			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.RemoveContainer, status.Name)
+			result.AddSyncResult(killContainerResult)
+			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil && !crierror.IsNotFound(err) {
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q for pod %q: %w; ", status.Name, format.Pod(pod), err))
+				killContainerResult.Fail(kubecontainer.ErrRemoveContainer, err.Error())
 				continue
 			}
 		}
 	}
+	return
 }
 
 // HasAnyRegularContainerCreated returns true if any regular container has been
