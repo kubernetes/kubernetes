@@ -438,6 +438,15 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 		return nil
 	}
 
+	requestedResources, err := getContainerRequestedResources(logger, pod, container)
+	if err != nil {
+		return err
+	}
+	if len(requestedResources) == 0 {
+		logger.V(5).Info("Exclusive memory allocation skipped, container requests no memory resources", "podUID", podUID, "containerName", container.Name)
+		return nil
+	}
+
 	logger.Info("Allocate")
 	// Container belongs in an exclusively allocated pool
 	metrics.MemoryManagerPinningRequestTotal.Inc()
@@ -457,11 +466,6 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
 	hint := p.affinity.GetAffinity(podUID, container.Name)
 	logger.Info("Got topology affinity", "hint", hint)
-
-	requestedResources, err := getContainerRequestedResources(logger, pod, container)
-	if err != nil {
-		return err
-	}
 
 	machineState := s.GetMachineState()
 	bestHint := &hint
@@ -839,6 +843,9 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	requestedResources, err := getContainerRequestedResources(logger, pod, container)
 	if err != nil {
 		logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", container.Name)
+		return nil
+	}
+	if len(requestedResources) == 0 {
 		return nil
 	}
 
