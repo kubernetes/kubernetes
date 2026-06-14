@@ -792,18 +792,23 @@ func TestPodLevelLimitsNoDefaultingWhenRequestsEmpty(t *testing.T) {
 	pod := newPod("plr-no-requests", []api.Container{
 		newContainer("c1", getResourceList("50m", "64Mi"), getResourceList("100m", "128Mi")),
 	})
-	// Only pod-level limits set, no pod-level requests — no candidates, so nothing to default.
+	// Only pod-level CPU limit set; no pod-level memory limit or requests.
 	pod.Spec.Resources = &api.ResourceRequirements{
 		Limits: getResourceList("200m", ""),
 	}
 
 	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
 
-	// Memory should NOT be defaulted — memory is not in pod-level requests
-	if _, ok := pod.Spec.Resources.Limits[api.ResourceMemory]; ok {
-		t.Errorf("expected memory limit to NOT be defaulted when not in pod-level requests, but it was set")
+	// Memory is not in the user-set pod-level limits, but containers have memory requests and limits.
+	// PrepareForCreate defaults pod-level memory request from containers (64Mi), then sets
+	// pod-level memory limit to max(container memory limit, pod memory request) = 128Mi.
+	wantMemLim := resource.MustParse("128Mi")
+	if gotMem, ok := pod.Spec.Resources.Limits[api.ResourceMemory]; !ok {
+		t.Errorf("expected memory limit to be defaulted via Rule 3 + Rule 1, but it was not set")
+	} else if gotMem.Cmp(wantMemLim) != 0 {
+		t.Errorf("expected memory limit %v, got %v", wantMemLim.String(), gotMem.String())
 	}
-	// CPU limit should be preserved as-is
+	// CPU limit should be preserved as-is (user-set, not modified by any rule).
 	wantCPU := resource.MustParse("200m")
 	if gotCPU := pod.Spec.Resources.Limits[api.ResourceCPU]; gotCPU.Cmp(wantCPU) != 0 {
 		t.Errorf("expected CPU limit preserved as %v, got %v", wantCPU.String(), gotCPU.String())
@@ -930,6 +935,216 @@ func TestPodLevelLimitsRaisedToPodRequestWhenAggrLimitLessThanRequest(t *testing
 	}
 	if gotMem, ok := pod.Spec.Resources.Limits[api.ResourceMemory]; !ok || gotMem.Cmp(expectedMemory) != 0 {
 		t.Errorf("expected pod-level memory limit to be raised to pod request 100Mi, got %v", pod.Spec.Resources.Limits[api.ResourceMemory])
+	}
+}
+
+// When pod-level limits are set but pod-level requests are not, PrepareForCreate
+// defaults pod-level requests to the sum of container requests.
+func TestPodLevelRequestsDefaultedFromContainerRequests(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	pod := newPod("plr-requests-default", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+		newContainer("c2", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Limits: getResourceList("500m", "512Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	// Pod-level requests = sum of container requests: cpu=200m, memory=256Mi.
+	wantCPU := resource.MustParse("200m")
+	wantMemory := resource.MustParse("256Mi")
+	if pod.Spec.Resources == nil {
+		t.Fatal("expected pod.Spec.Resources to be set")
+	}
+	if gotCPU, ok := pod.Spec.Resources.Requests[api.ResourceCPU]; !ok {
+		t.Errorf("expected pod-level CPU request to be defaulted from containers")
+	} else if gotCPU.Cmp(wantCPU) != 0 {
+		t.Errorf("expected pod-level CPU request %v, got %v", wantCPU.String(), gotCPU.String())
+	}
+	if gotMem, ok := pod.Spec.Resources.Requests[api.ResourceMemory]; !ok {
+		t.Errorf("expected pod-level memory request to be defaulted from containers")
+	} else if gotMem.Cmp(wantMemory) != 0 {
+		t.Errorf("expected pod-level memory request %v, got %v", wantMemory.String(), gotMem.String())
+	}
+}
+
+// When the gate is off, pod-level requests are not defaulted from containers in PrepareForCreate.
+func TestPodLevelRequestsNotDefaultedFromContainersWhenGateOff(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, false)
+
+	pod := newPod("plr-rule3-gate-off", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	pod.Spec.Resources = &api.ResourceRequirements{
+		Limits: getResourceList("500m", "512Mi"),
+	}
+
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+
+	// Gate off: pod-level requests are not touched; they stay unset.
+	if len(pod.Spec.Resources.Requests) != 0 {
+		t.Errorf("expected pod-level requests to remain unset when gate is off, got %v", pod.Spec.Resources.Requests)
+	}
+}
+
+// A client that omits spec.resources on update must not wipe the pod-level resources
+// that were established at creation time.
+func TestPrepareForUpdatePreservesPodLevelResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	oldPod := newPod("plr-update", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	oldPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+		Limits:   getResourceList("200m", "256Mi"),
+	}
+
+	// Client omits spec.resources entirely (nil).
+	newPod := newPod("plr-update", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	newPod.Spec.Resources = nil
+
+	Strategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+
+	if newPod.Spec.Resources == nil {
+		t.Fatal("expected pod-level resources to be preserved from old pod, got nil")
+	}
+	wantCPUReq := resource.MustParse("200m")
+	if gotCPU, ok := newPod.Spec.Resources.Requests[api.ResourceCPU]; !ok || gotCPU.Cmp(wantCPUReq) != 0 {
+		t.Errorf("expected preserved CPU request %v, got %v", wantCPUReq.String(), newPod.Spec.Resources.Requests[api.ResourceCPU])
+	}
+	wantCPULim := resource.MustParse("200m")
+	if gotCPU, ok := newPod.Spec.Resources.Limits[api.ResourceCPU]; !ok || gotCPU.Cmp(wantCPULim) != 0 {
+		t.Errorf("expected preserved CPU limit %v, got %v", wantCPULim.String(), newPod.Spec.Resources.Limits[api.ResourceCPU])
+	}
+}
+
+// When the gate is off, a nil spec.resources on update is left as-is (no preservation).
+func TestPrepareForUpdateDoesNotPreserveWhenGateOff(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, false)
+
+	oldPod := newPod("plr-update-gate-off", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	oldPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+		Limits:   getResourceList("200m", "256Mi"),
+	}
+
+	newPod := newPod("plr-update-gate-off", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	newPod.Spec.Resources = nil
+
+	Strategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+
+	if newPod.Spec.Resources != nil {
+		t.Errorf("expected spec.resources to remain nil when gate is off, got %v", newPod.Spec.Resources)
+	}
+}
+
+// When a client explicitly sends spec.resources on update, the values pass through unchanged.
+func TestPrepareForUpdatePLRAwareClientExplicitValues(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	oldPod := newPod("plr-update-aware", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	oldPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+		Limits:   getResourceList("200m", "256Mi"),
+	}
+
+	// Client explicitly sends spec.resources with new values.
+	newPod := newPod("plr-update-aware", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	newPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("300m", "512Mi"),
+		Limits:   getResourceList("300m", "512Mi"),
+	}
+
+	Strategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+
+	wantCPU := resource.MustParse("300m")
+	if gotCPU, ok := newPod.Spec.Resources.Requests[api.ResourceCPU]; !ok || gotCPU.Cmp(wantCPU) != 0 {
+		t.Errorf("expected explicit CPU request %v to be preserved, got %v", wantCPU.String(), newPod.Spec.Resources.Requests[api.ResourceCPU])
+	}
+}
+
+// When pod-level resources are set for the first time via the resize subresource
+// (old pod had none), defaults are applied just like at creation time.
+func TestResizeStrategyAppliesDefaultsWhenPodLevelResourcesAddedForFirstTime(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	oldPod := newPod("plr-resize", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	// Old pod has no pod-level resources.
+	oldPod.Spec.Resources = nil
+
+	// Resize request: user adds pod-level requests for the first time, no limits set.
+	newPod := newPod("plr-resize", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	newPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+	}
+
+	ResizeStrategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+
+	if newPod.Spec.Resources == nil {
+		t.Fatal("expected pod-level resources to be set after resize")
+	}
+	// Pod-level requests set by user — should be preserved.
+	wantReq := resource.MustParse("200m")
+	if got, ok := newPod.Spec.Resources.Requests[api.ResourceCPU]; !ok || got.Cmp(wantReq) != 0 {
+		t.Errorf("expected CPU request %v, got %v", wantReq.String(), newPod.Spec.Resources.Requests[api.ResourceCPU])
+	}
+	// Pod-level limits should be defaulted: all containers have limits (200m), max(pod req=200m, aggr=200m) = 200m.
+	wantLim := resource.MustParse("200m")
+	if got, ok := newPod.Spec.Resources.Limits[api.ResourceCPU]; !ok || got.Cmp(wantLim) != 0 {
+		t.Errorf("expected CPU limit defaulted to %v, got %v", wantLim.String(), newPod.Spec.Resources.Limits[api.ResourceCPU])
+	}
+}
+
+// When old pod already has pod-level resources, resize does not re-run defaulting.
+func TestResizeStrategySkipsDefaultsWhenPodLevelResourcesAlreadyExist(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+
+	oldPod := newPod("plr-resize-existing", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	oldPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("200m", "256Mi"),
+		Limits:   getResourceList("200m", "256Mi"),
+	}
+
+	// Resize request: user bumps pod-level requests, does not set limits.
+	newPod := newPod("plr-resize-existing", []api.Container{
+		newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+	})
+	newPod.Spec.Resources = &api.ResourceRequirements{
+		Requests: getResourceList("300m", "300Mi"),
+	}
+
+	ResizeStrategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+
+	// Old pod had resources — defaulting must NOT fire. Limits stay as submitted (nil/unset).
+	if _, ok := newPod.Spec.Resources.Limits[api.ResourceCPU]; ok {
+		t.Errorf("expected no CPU limit to be defaulted when old pod already had pod-level resources")
 	}
 }
 

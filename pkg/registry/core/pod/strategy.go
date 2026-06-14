@@ -92,7 +92,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod.Generation = 1
 
 	podutil.DropDisabledPodFields(pod, nil)
-	defaultPodLevelLimits(pod)
+	applyPodLevelResourceDefaults(pod)
 
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
@@ -110,6 +110,17 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+
+	// Preserve pod-level resources established at creation when a PLR-unaware client
+	// omits spec.resources entirely. Defaulting rules are intentionally not re-run here:
+	// pod-level fields should only change through an explicit request from a PLR-aware
+	// client (via the resize subresource), not be silently recomputed on unrelated updates.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }
@@ -420,6 +431,16 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
+
+	// When pod-level resources are being introduced for the first time via resize
+	// (old pod had none, new pod explicitly sets them), apply the same defaulting
+	// as PrepareForCreate so the new resources are complete and consistent.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		if newPod.Spec.Resources != nil && oldPod.Spec.Resources == nil {
+			applyPodLevelResourceDefaults(newPod)
+		}
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }
@@ -996,6 +1017,46 @@ func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
 	}
+}
+
+// applyPodLevelResourceDefaults runs all pod-level resource defaulting in dependency order,
+// called exclusively from PrepareForCreate after admission webhooks have run so the full
+// container list is visible.
+//
+// Order matters:
+//  1. Set pod-level hugepage limits from aggregated container hugepage limits.
+//  2. Default pod-level requests from aggregated container requests (also fills requests
+//     for any resource that has a pod-level limit but no pod-level request, including
+//     hugepage limits set in step 1).
+//  3. Default pod-level limits to max(pod-level requests, aggregated container limits)
+//     for resources where all containers have limits. Step 2 must run first so that
+//     pod-level requests are complete before the max() comparison.
+func applyPodLevelResourceDefaults(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		return
+	}
+
+	// Convert to v1 to call the v1-typed defaulting helpers.
+	// Include containers, init containers (which include sidecar containers), and the
+	// existing pod-level resources — everything the helpers need to compute defaults.
+	v1PodSpec := &apiv1.PodSpec{}
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     pod.Spec.Containers,
+		InitContainers: pod.Spec.InitContainers,
+		Resources:      pod.Spec.Resources,
+	}, v1PodSpec, nil); err != nil {
+		return
+	}
+	v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
+
+	// The generated conversion (autoConvert_core_PodSpec_To_v1_PodSpec) uses unsafe.Pointer
+	// for Resources, Containers, and InitContainers, meaning v1Pod.Spec.Resources shares the
+	// same memory as pod.Spec.Resources. Modifications made by ApplyPodLevelResourceDefaults
+	// are therefore directly visible in pod without any explicit copy-back.
+	corev1.ApplyPodLevelResourceDefaults(v1Pod)
+
+	// Default pod-level limits to max(pod-level requests, aggregated container limits).
+	defaultPodLevelLimits(pod)
 }
 
 // defaultPodLevelLimits sets pod-level limits equal to aggregated container
