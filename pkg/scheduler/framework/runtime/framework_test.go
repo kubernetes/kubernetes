@@ -476,6 +476,9 @@ var registry = func() Registry {
 	r.Register(placementGeneratePlugin, newTestPlacementGeneratePlugin)
 	r.Register(placementScorePlugin1, newPlacementScorePluginFactory(placementScorePlugin1))
 	r.Register(defaultPreemptionPlugin, newTestPlugin)
+	r.Register(names.GangScheduling, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return &mockGangSchedulingWithPlacementFeasible{}, nil
+	})
 	return r
 }()
 
@@ -693,7 +696,7 @@ func TestNewFramework_PlacementFeasible(t *testing.T) {
 			name:                   "GenericWorkload enabled, GangScheduling plugin not present",
 			genericWorkloadEnabled: true,
 			registerGangScheduling: false,
-			wantPlacementFeasible:  false,
+			wantErr:                "GenericWorkload is enabled, but GangScheduling plugin is not set",
 		},
 		{
 			name:                       "GenericWorkload enabled, GangScheduling fulfills PlacementFeasiblePlugin interface",
@@ -890,6 +893,11 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 					PostFilter: config.PluginSet{
 						Enabled: []config.Plugin{
 							{Name: defaultPreemptionPlugin},
+						},
+					},
+					MultiPoint: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: names.GangScheduling},
 						},
 					},
 				},
