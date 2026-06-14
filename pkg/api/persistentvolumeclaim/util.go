@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -98,14 +97,6 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
-		if !helper.ClaimContainsAllocatedResources(oldPVC) {
-			pvc.Status.AllocatedResources = nil
-		}
-		if !helper.ClaimContainsAllocatedResourceStatus(oldPVC) {
-			pvc.Status.AllocatedResourceStatuses = nil
-		}
-	}
 }
 
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
