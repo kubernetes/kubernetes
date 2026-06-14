@@ -105,6 +105,10 @@ type writer interface {
 	SetPodCPUAssignments(PodCPUAssignments)
 	// DeletePod deletes pod-level CPU assignments for specified pod
 	DeletePod(podUID string)
+	// Temporarily disables saving cache to checkpoint for all state modifying operations
+	HoldStore()
+	// Re-enables saving to checkpoint for all state modifying operations
+	Store()
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

@@ -422,6 +422,8 @@ func (p *staticPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Po
 
 	// 4. Allocate the entire CPU "bubble" for the pod using the hint from the Topology Manager.
 	hint := p.affinity.GetAffinity(podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	s.HoldStore()
+	defer s.Store()
 	podAllocation, err := p.allocateCPUs(logger, s, totalPodCPUs, hint.NUMANodeAffinity, cpuset.New())
 	if err != nil {
 		logger.Error(err, "Unable to allocate CPUs for pod", "totalPodCPUs", totalPodCPUs)
@@ -606,6 +608,8 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 	logger.Info("Topology Affinity", "affinity", hint)
 
 	// Allocate CPUs according to the NUMA affinity contained in the hint.
+	s.HoldStore()
+	defer s.Store()
 	cpuAllocation, err := p.allocateCPUs(logger, s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
 	if err != nil {
 		logger.Error(err, "Unable to allocate CPUs", "numCPUs", numCPUs)
@@ -643,6 +647,8 @@ func (p *staticPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID
 	if !ok {
 		return nil
 	}
+	s.HoldStore()
+	defer s.Store()
 	s.Delete(podUID, containerName)
 
 	// Check if this pod is managed with pod-level CPUs.

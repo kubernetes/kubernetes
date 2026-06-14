@@ -43,7 +43,16 @@ type stateCheckpoint struct {
 	checkpointManager checkpointmanager.CheckpointManager
 	checkpointName    string
 	initialContainers containermap.ContainerMap
+	storingHeld       storingHoldState
 }
+
+type storingHoldState int
+
+const (
+	storingEnabled storingHoldState = iota
+	storingHeldNoChanges
+	storingHeldUnsavedChanges
+)
 
 // NewCheckpointState creates new State for keeping track of CPU/pod assignment with checkpoint backend
 func NewCheckpointState(logger logr.Logger, stateDir, checkpointName, policyName string, initialContainers containermap.ContainerMap) (State, error) {
@@ -61,6 +70,7 @@ func NewCheckpointState(logger logr.Logger, stateDir, checkpointName, policyName
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
 		initialContainers: initialContainers,
+		storingHeld:       storingEnabled,
 	}
 
 	if err := stateCheckpoint.restoreState(); err != nil {
@@ -242,6 +252,9 @@ func (sc *stateCheckpoint) loadCheckpointV2() (*CPUManagerCheckpointV2, error) {
 
 // saves state to a checkpoint, caller is responsible for locking
 func (sc *stateCheckpoint) storeState() error {
+	if sc.storingHeld != storingEnabled {
+		return nil
+	}
 	checkpoint := newCPUManagerCheckpoint()
 	checkpoint.CheckpointData.PolicyName = sc.policyName
 	checkpoint.CheckpointData.DefaultCPUSet = sc.cache.GetDefaultCPUSet().String()
@@ -313,6 +326,7 @@ func (sc *stateCheckpoint) SetPodCPUAssignments(assignments PodCPUAssignments) {
 	defer sc.mux.Unlock()
 
 	sc.cache.SetPodCPUAssignments(assignments)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
@@ -331,6 +345,7 @@ func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset c
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetCPUSet(podUID, containerName, cset)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
@@ -342,6 +357,7 @@ func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetDefaultCPUSet(cset)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
@@ -353,6 +369,7 @@ func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetCPUAssignments(a)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
@@ -364,6 +381,7 @@ func (sc *stateCheckpoint) SetPodCPUSet(podUID string, cset cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetPodCPUSet(podUID, cset)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
@@ -375,6 +393,7 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.Delete(podUID, containerName)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
@@ -387,6 +406,7 @@ func (sc *stateCheckpoint) DeletePod(podUID string) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.DeletePod(podUID)
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint", "podUID", podUID)
@@ -398,8 +418,42 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.ClearState()
+	sc.stateChanged()
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// stateChanged stateChanged remembers that state was changed if storing is held, caller is responsible for locking
+func (sc *stateCheckpoint) stateChanged() {
+	if sc.storingHeld == storingHeldNoChanges {
+		sc.storingHeld = storingHeldUnsavedChanges
+	}
+}
+
+// HoldStore disables storing state to checkpoint file until Store is called
+func (sc *stateCheckpoint) HoldStore() {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	if sc.storingHeld == storingEnabled {
+		sc.storingHeld = storingHeldNoChanges
+	}
+}
+
+// Store enables storing state if HoldStore was called earlier and calls storeState if state has unsaved changes
+func (sc *stateCheckpoint) Store() {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+
+	switch sc.storingHeld {
+	case storingHeldNoChanges:
+		sc.storingHeld = storingEnabled
+	case storingHeldUnsavedChanges:
+		sc.storingHeld = storingEnabled
+		err := sc.storeState()
+		if err != nil {
+			sc.logger.Error(err, "Failed to store state to checkpoint")
+		}
 	}
 }
