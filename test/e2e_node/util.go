@@ -164,18 +164,23 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	return resp, nil
 }
 
+// deleteSyncPodsInTestNamespace deletes all pods in the framework test namespace and waits for removal.
+func deleteSyncPodsInTestNamespace(ctx context.Context, f *framework.Framework) {
+	l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	for _, p := range l.Items {
+		if p.Namespace != f.Namespace.Name {
+			continue
+		}
+		framework.Logf("Deleting pod: %s", p.Name)
+		e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	}
+}
+
 func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	ginkgo.AfterEach(func(ctx context.Context) {
 		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
-		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		for _, p := range l.Items {
-			if p.Namespace != f.Namespace.Name {
-				continue
-			}
-			framework.Logf("Deleting pod: %s", p.Name)
-			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-		}
+		deleteSyncPodsInTestNamespace(ctx, f)
 	})
 }
 
