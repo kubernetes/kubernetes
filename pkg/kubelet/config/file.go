@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,22 +60,27 @@ type sourceFile struct {
 }
 
 // NewSourceFile watches a config file for changes.
-func NewSourceFile(logger klog.Logger, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
+// The watcher stops and releases resources when ctx is canceled.
+func NewSourceFile(ctx context.Context, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
-	config := newSourceFile(path, nodeName, period, updates)
+	logger := klog.FromContext(ctx)
+	config := newSourceFile(ctx, path, nodeName, period, updates)
 	logger.V(1).Info("Watching path", "path", path)
-	config.run(logger)
+	config.run(ctx)
 }
 
-func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) *sourceFile {
+func newSourceFile(ctx context.Context, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
 			pods = append(pods, o.(*v1.Pod))
 		}
-		updates <- sourceUpdate{Pods: pods}
+		select {
+		case updates <- sourceUpdate{Pods: pods}:
+		case <-ctx.Done():
+		}
 	}
 	store := cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)
 	return &sourceFile{
@@ -88,16 +94,20 @@ func newSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 	}
 }
 
-func (s *sourceFile) run(logger klog.Logger) {
+func (s *sourceFile) run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	listTicker := time.NewTicker(s.period)
 
 	go func() {
+		defer listTicker.Stop()
 		// Read path immediately to speed up startup.
 		if err := s.listConfig(logger); err != nil {
 			logger.Error(err, "Unable to read config path", "path", s.path)
 		}
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-listTicker.C:
 				if err := s.listConfig(logger); err != nil {
 					logger.Error(err, "Unable to read config path", "path", s.path)
@@ -110,7 +120,7 @@ func (s *sourceFile) run(logger klog.Logger) {
 		}
 	}()
 
-	s.startWatch(logger)
+	s.startWatch(ctx)
 }
 
 func (s *sourceFile) applyDefaults(logger klog.Logger, pod *api.Pod, source string) error {
