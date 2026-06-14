@@ -1128,6 +1128,11 @@ const (
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
 
+	// owner: @maspinwall
+	//
+	// Gate for Attach/Detach Controller Reconciler to ensure that the Node object actually is unhealthy before force detaching.
+	VolumeControllerCircuitBreaker featuregate.Feature = "VolumeControllerCircuitBreaker"
+
 	// owner: @gnufied
 	// kep: https://kep.k8s.io/5030
 	//
@@ -2005,6 +2010,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	VolumeControllerCircuitBreaker: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	VolumeLimitScaling: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2580,6 +2589,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	UserNamespacesSupport: {},
 
 	VolumeAttributesClass: {},
+
+	VolumeControllerCircuitBreaker: {},
 
 	VolumeLimitScaling: {},
 
