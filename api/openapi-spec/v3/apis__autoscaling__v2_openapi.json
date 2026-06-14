@@ -54,11 +54,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "current",
-          "container"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.CrossVersionObjectReference": {
@@ -135,10 +130,6 @@
             "description": "metric identifies the target metric by name and selector"
           }
         },
-        "required": [
-          "metric",
-          "current"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.HPAScalingPolicy": {
@@ -299,7 +290,7 @@
           },
           "status": {
             "default": "",
-            "description": "status is the status of the condition (True, False, Unknown)",
+            "description": "status is the status of the condition, one of True, False, Unknown.",
             "type": "string"
           },
           "type": {
@@ -308,10 +299,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type",
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerList": {
@@ -449,9 +436,6 @@
             "type": "integer"
           }
         },
-        "required": [
-          "desiredReplicas"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.MetricIdentifier": {
@@ -579,9 +563,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "type"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.MetricTarget": {
@@ -715,11 +696,6 @@
             "description": "metric identifies the target metric by name and selector"
           }
         },
-        "required": [
-          "metric",
-          "current",
-          "describedObject"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.PodsMetricSource": {
@@ -772,10 +748,6 @@
             "description": "metric identifies the target metric by name and selector"
           }
         },
-        "required": [
-          "metric",
-          "current"
-        ],
         "type": "object"
       },
       "io.k8s.api.autoscaling.v2.ResourceMetricSource": {
@@ -820,10 +792,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "current"
-        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.api.resource.Quantity": {
