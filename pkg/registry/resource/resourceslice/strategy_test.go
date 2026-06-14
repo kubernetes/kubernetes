@@ -26,6 +26,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -951,6 +953,107 @@ func TestWarningsOnUpdate(t *testing.T) {
 				warnings = []string{}
 			}
 			require.Equal(t, tc.wantWarningMessages, warnings)
+		})
+	}
+}
+
+func TestMatch(t *testing.T) {
+	testCases := map[string]struct {
+		in            *resource.ResourceSlice
+		fieldSelector fields.Selector
+		expectMatch   bool
+	}{
+		"match-metadata-name": {
+			in: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=foo"),
+			expectMatch:   true,
+		},
+		"not-match-metadata-name": {
+			in: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=bar"),
+			expectMatch:   false,
+		},
+		"match-spec-driver": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Driver: "foo",
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.driver=foo"),
+			expectMatch:   true,
+		},
+		"not-match-spec-driver": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Driver: "foo",
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.driver=bar"),
+			expectMatch:   false,
+		},
+		"match-spec-node-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					NodeName: new("foo"),
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=foo"),
+			expectMatch:   true,
+		},
+		"not-match-spec-node-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					NodeName: new("foo"),
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=bar"),
+			expectMatch:   false,
+		},
+		"match-spec-pool-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Pool: resource.ResourcePool{
+						Name: "foo",
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.pool.name=foo"),
+			expectMatch:   true,
+		},
+		"not-match-spec-pool-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Pool: resource.ResourcePool{
+						Name: "foo",
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.pool.name=bar"),
+			expectMatch:   false,
+		},
+		"not-match-spec-pool-generation": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Pool: resource.ResourcePool{
+						Generation: 1,
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.pool.generation=1"),
+			expectMatch:   false,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			m := Match(labels.Everything(), testCase.fieldSelector)
+			result, err := m.Matches(testCase.in)
+			require.NoError(t, err)
+			assert.Equal(t, testCase.expectMatch, result, "selector: %s, resourceSlice: %+v", testCase.fieldSelector.String(), testCase.in)
 		})
 	}
 }
