@@ -331,6 +331,12 @@ func (m *managerImpl) processShutdownEvent(ctx context.Context) error {
 	activePods := m.getPods()
 
 	defer func() {
+		// Ensures Node.status.volumesInUse reflects the actual state (empty) before kubelet exits.
+		// Must be called before releasing the inhibit lock to prevent systemd from killing kubelet
+		// before the status update completes.
+		nodeStatusCtx := klog.NewContext(ctx, m.logger)
+		m.syncNodeStatus(nodeStatusCtx)
+
 		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		m.logger.V(1).Info("Shutdown manager completed processing shutdown event, node will shutdown shortly")
 	}()

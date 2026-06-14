@@ -775,3 +775,55 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	expectedLogMessage := "Failed while waiting for all the volumes belonging to Pods in this group to unmount"
 	assert.Contains(t, log, expectedLogMessage, "Expected log message not found")
 }
+
+func Test_processShutdownEvent_VolumeUnmount(t *testing.T) {
+	tCtx := testutilsktesting.Init(t)
+
+	var (
+		fakeRecorder = &record.FakeRecorder{}
+		nodeRef      = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+		fakeclock    = testingclock.NewFakeClock(time.Now())
+	)
+
+	fakeVolumeManager := volumemanager.NewFakeVolumeManager(
+		[]v1.UniqueVolumeName{"vol1"}, 0, nil, false,
+	)
+
+	volumesInUse := fakeVolumeManager.GetVolumesInUse()
+	assert.NotEmpty(t, volumesInUse)
+
+	var syncNodeStatusMux sync.Mutex
+	syncNodeStatus := func(context.Context) {
+		syncNodeStatusMux.Lock()
+		defer syncNodeStatusMux.Unlock()
+		volumesInUse = fakeVolumeManager.GetVolumesInUse()
+	}
+
+	logger := ktesting.NewLogger(t, ktesting.DefaultConfig)
+	m := &managerImpl{
+		logger:         logger,
+		recorder:       fakeRecorder,
+		nodeRef:        nodeRef,
+		getPods:        func() []*v1.Pod { return nil },
+		syncNodeStatus: syncNodeStatus,
+		dbusCon:        &fakeDbus{},
+		podManager: &podManager{
+			logger:        logger,
+			volumeManager: fakeVolumeManager,
+			shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
+				{
+					Priority:                   1,
+					ShutdownGracePeriodSeconds: 2,
+				},
+			},
+			killPodFunc: func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+				return nil
+			},
+			clock: fakeclock,
+		},
+	}
+
+	err := m.processShutdownEvent(tCtx)
+	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
+	assert.Empty(t, volumesInUse, "syncNodeStatus should be called after WaitForAllPodsUnmount")
+}
