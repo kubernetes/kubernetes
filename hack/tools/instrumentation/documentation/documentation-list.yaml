@@ -6397,6 +6397,58 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: placement_evaluation_duration_seconds
+  subsystem: scheduler
+  help: Latency in seconds of evaluating a single candidate placement when scheduling
+    pod groups, by result. 'feasible' means the pod group fit into the placement,
+    while 'infeasible' means it did not.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: placement_evaluations_total
+  subsystem: scheduler
+  help: Number of candidate placements evaluated when scheduling pod groups, by result.
+    'feasible' means the pod group fit into the placement, while 'infeasible' means
+    it did not.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: placement_total
+  subsystem: scheduler
+  help: Number of candidate placements generated when scheduling pod groups.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: plugin_execution_duration_seconds
   subsystem: scheduler
   help: Duration for running a plugin at a specific extension point.

@@ -23,6 +23,8 @@ var (
 	UnschedulableResult       = "unschedulable"
 	WaitingOnPreemptionResult = "waiting_on_preemption"
 	ErrorResult               = "error"
+	FeasibleResult            = "feasible"
+	InfeasibleResult          = "infeasible"
 )
 
 // PodScheduled can records a successful scheduling attempt and the duration
@@ -75,4 +77,17 @@ func PodGroupScheduleError(profile string, duration float64) {
 func observePodGroupScheduleAttemptAndLatency(result, profile string, duration float64) {
 	podGroupSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	podGroupScheduleAttempts.WithLabelValues(result, profile).Inc()
+}
+
+// PlacementsGenerated records the number of candidate placements generated for a
+// pod group in a single scheduling cycle.
+func PlacementsGenerated(profile string, count int) {
+	placementTotal.WithLabelValues(profile).Add(float64(count))
+}
+
+// PlacementEvaluated records a single candidate placement evaluation and the
+// duration, by result.
+func PlacementEvaluated(result, profile string, duration float64) {
+	placementEvaluations.WithLabelValues(result, profile).Inc()
+	placementEvaluationDuration.WithLabelValues(result, profile).Observe(duration)
 }

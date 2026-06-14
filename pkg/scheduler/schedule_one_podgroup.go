@@ -648,6 +648,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			status: status,
 		}
 	}
+	metrics.PlacementsGenerated(schedFwk.ProfileName(), len(placements))
 
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
@@ -662,11 +663,20 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		}
 		placementCycleState := framework.NewCycleState()
 		placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+		evaluationStart := time.Now()
 		result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, postFilterMode)
 		sched.nodeInfoSnapshot.ForgetPlacement()
 		if result.status.IsError() {
 			return result
 		}
+
+		// Errors are excluded by the early return above since they are internal
+		// faults, not feasibility results.
+		evaluationResult := metrics.InfeasibleResult
+		if result.status.IsSuccess() || result.waitingOnPreemption {
+			evaluationResult = metrics.FeasibleResult
+		}
+		metrics.PlacementEvaluated(evaluationResult, schedFwk.ProfileName(), metrics.SinceInSeconds(evaluationStart))
 
 		if anyResult == nil {
 			anyResult = &result
