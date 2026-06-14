@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/exec"
 )
 
 func TestGetURLParts(t *testing.T) {
@@ -274,6 +277,82 @@ func TestProbe(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+type blockingExecProber struct {
+	calls   atomic.Int32
+	started chan struct{}
+	release <-chan struct{}
+	result  probe.Result
+	output  string
+	err     error
+}
+
+func (p *blockingExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
+	if p.calls.Add(1) == 1 {
+		close(p.started)
+	}
+	<-p.release
+	return p.result, p.output, p.err
+}
+
+func TestRunProbeCoalescesConcurrentExecProbes(t *testing.T) {
+	ctx := ktesting.Init(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	execProber := &blockingExecProber{
+		started: started,
+		release: release,
+		result:  probe.Success,
+		output:  "ok",
+	}
+	prober := &prober{
+		exec: execProber,
+	}
+	probeSpec := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"cat", "/tmp/healthy"}},
+		},
+		TimeoutSeconds: 1,
+	}
+	pod := &v1.Pod{}
+	container := v1.Container{Name: "container"}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "container"}
+
+	results := make(chan error, 2)
+	run := func(probeType probeType, ready chan<- struct{}) {
+		if ready != nil {
+			close(ready)
+		}
+		result, output, err := prober.runProbe(ctx, probeType, probeSpec, pod, v1.PodStatus{}, container, containerID)
+		if err != nil {
+			results <- err
+			return
+		}
+		if result != probe.Success || output != "ok" {
+			results <- fmt.Errorf("expected success with output ok, got result=%v output=%q", result, output)
+			return
+		}
+		results <- nil
+	}
+
+	go run(liveness, nil)
+	<-started
+	readinessStarted := make(chan struct{})
+	go run(readiness, readinessStarted)
+	<-readinessStarted
+	time.Sleep(100 * time.Millisecond)
+	if got := execProber.calls.Load(); got != 1 {
+		t.Fatalf("expected one in-flight exec probe call, got %d", got)
+	}
+	close(release)
+
+	for i := 0; i < 2; i++ {
+		require.NoError(t, <-results)
+	}
+	if got := execProber.calls.Load(); got != 1 {
+		t.Fatalf("expected one exec probe call, got %d", got)
 	}
 }
 
