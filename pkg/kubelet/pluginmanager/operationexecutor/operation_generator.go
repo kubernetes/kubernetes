@@ -129,9 +129,31 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if err != nil {
 			logger.Error(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
-		if err := handler.RegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
+		registerErr := handler.RegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil)
+
+		// Re-dial the registration socket before sending the notification.
+		// handler.RegisterPlugin may block for an extended period (for example, a
+		// CSI driver's NodeGetInfo waiting on topology labels to propagate), during
+		// which the original gRPC connection established before GetInfo can become
+		// stale or be closed by the plugin side. A fresh connection guarantees that
+		// NotifyRegistrationStatus is reliably delivered regardless of how long
+		// registration took.
+		client, conn, redialErr := dial(ctx, socketPath, dialTimeoutDuration)
+		if redialErr != nil {
+			// The plugin socket disappeared while RegisterPlugin was running.
+			// Clean up local state and let the reconciler retry once the socket
+			// reappears.
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
-			return og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
+			if registerErr == nil {
+				handler.DeRegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint)
+			}
+			return fmt.Errorf("RegisterPlugin error -- failed to re-dial socket %s for notification after RegisterPlugin, err: %w", socketPath, redialErr)
+		}
+		defer func() { _ = conn.Close() }()
+
+		if registerErr != nil {
+			actualStateOfWorldUpdater.RemovePlugin(socketPath)
+			return og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", registerErr))
 		}
 
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
