@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -169,4 +170,32 @@ func (w *watchCacheStorage) ListKeys() []string {
 // List returns list of pointers to <store.Element> objects.
 func (w *watchCacheStorage) List() []interface{} {
 	return w.store.List()
+}
+
+// UpdateStoreLocked executes a mutation (Add, Update, Delete) on the underlying store.
+func (w *watchCacheStorage) UpdateStoreLocked(eventType watch.EventType, elem *store.Element) error {
+	switch eventType {
+	case watch.Added:
+		return w.store.Add(elem)
+	case watch.Modified:
+		return w.store.Update(elem)
+	case watch.Deleted:
+		return w.store.Delete(elem)
+	default:
+		return fmt.Errorf("unexpected event type: %v", eventType)
+	}
+}
+
+// AddSnapshotLocked collects a new snapshot if snapshotting is enabled.
+func (w *watchCacheStorage) AddSnapshotLocked(version uint64) {
+	if w.snapshots != nil && w.snapshottingEnabled.Load() {
+		w.snapshots.Add(version, w.store)
+	}
+}
+
+// CompactSnapshotsLocked prunes snapshots older than the oldest history version.
+func (w *watchCacheStorage) CompactSnapshotsLocked(oldestRV uint64) {
+	if w.snapshots != nil && w.snapshottingEnabled.Load() {
+		w.snapshots.RemoveLess(oldestRV)
+	}
 }
