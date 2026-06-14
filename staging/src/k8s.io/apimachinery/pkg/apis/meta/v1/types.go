@@ -1666,5 +1666,7 @@ type Condition struct {
 	// +required
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32768
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:maxLength=32768
 	Message string `json:"message" protobuf:"bytes,6,opt,name=message"`
 }
