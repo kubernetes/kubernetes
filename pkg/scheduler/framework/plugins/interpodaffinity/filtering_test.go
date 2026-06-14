@@ -1456,7 +1456,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
-			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, mustNewPodInfo(t, tt.pod), l)
+			podInfo := mustNewPodInfo(t, tt.pod)
+			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, podInfo.GetRequiredAffinityTerms(), podInfo.GetRequiredAntiAffinityTerms(), l)
 			if diff := cmp.Diff(tt.wantAffinityPodsMap, gotAffinityPodsMap); diff != "" {
 				t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
 			}

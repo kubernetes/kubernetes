@@ -853,6 +853,10 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	}
 	mockQueueSort.order[podA.Name] = 1
 
+	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+		t.Fatalf("Failed to wait for nodes in cache: %v", err)
+	}
+
 	// Start scheduler
 	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
 
@@ -879,6 +883,10 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 	// This time use the default bind plugin
 	testCtx, teardown := initSched()
 	defer teardown()
+
+	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+		t.Fatalf("Failed to wait for nodes in cache: %v", err)
+	}
 
 	// Start scheduler again
 	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)

@@ -218,6 +218,7 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	// This is a safety check in case any pod wasn't forgotten in the previous scheduling cycle.
 	nodeSnapshot.forgetAllAssumedPods(logger)
 
+	updateNodesHavePodsWithRequiredNonHostScopedAntiAffinity := false
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
 	for node := cache.headNode; node != nil; node = node.next {
@@ -241,6 +242,9 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			}
 			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
+			}
+			if (len(existing.PodsWithRequiredNonHostScopedAntiAffinity) > 0) != (len(clone.PodsWithRequiredNonHostScopedAntiAffinity) > 0) {
+				updateNodesHavePodsWithRequiredNonHostScopedAntiAffinity = true
 			}
 			if !updateUsedPVCSet {
 				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
@@ -272,7 +276,7 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		updateAllLists = true
 	}
 
-	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity || updateUsedPVCSet {
+	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity || updateNodesHavePodsWithRequiredNonHostScopedAntiAffinity || updateUsedPVCSet {
 		cache.updateNodeInfoSnapshotList(logger, nodeSnapshot, updateAllLists)
 	}
 
@@ -318,6 +322,7 @@ func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
 func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot *Snapshot, updateAll bool) {
 	snapshot.havePodsWithAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.usedPVCSet = sets.New[string]()
 	if updateAll {
 		// Take a snapshot of the nodes order in the tree
@@ -335,6 +340,9 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
+				if len(nodeInfo.PodsWithRequiredNonHostScopedAntiAffinity) > 0 {
+					snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, nodeInfo)
+				}
 				for key := range nodeInfo.PVCRefCounts {
 					snapshot.usedPVCSet.Insert(key)
 				}
@@ -349,6 +357,9 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 			}
 			if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
 				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+			}
+			if len(nodeInfo.GetPodsWithRequiredNonHostScopedAntiAffinity()) > 0 {
+				snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, nodeInfo)
 			}
 			for key := range nodeInfo.GetPVCRefCounts() {
 				snapshot.usedPVCSet.Insert(key)

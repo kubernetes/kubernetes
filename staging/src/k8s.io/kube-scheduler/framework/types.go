@@ -258,6 +258,8 @@ type NodeInfo interface {
 	GetPodsWithAffinity() []PodInfo
 	// GetPodsWithRequiredAntiAffinity returns the subset of pods with required anti-affinity.
 	GetPodsWithRequiredAntiAffinity() []PodInfo
+	// GetPodsWithRequiredNonHostScopedAntiAffinity returns the subset of pods with required anti-affinity that is non-hostname scoped.
+	GetPodsWithRequiredNonHostScopedAntiAffinity() []PodInfo
 	// GetUsedPorts returns the ports allocated on the node.
 	GetUsedPorts() HostPortInfo
 	// GetRequested returns total requested resources of all pods on this node. This includes assumed
