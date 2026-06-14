@@ -3417,6 +3417,16 @@
 - name: client_expiration_renew_errors
   subsystem: certificate_manager
   namespace: kubelet
+  help: Counter of certificate renewal errors. Deprecated in favor of kubelet_certificate_manager_client_expiration_renew_errors_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: client_expiration_renew_errors_total
+  subsystem: certificate_manager
+  namespace: kubelet
   help: Counter of certificate renewal errors.
   type: Counter
   stabilityLevel: ALPHA
@@ -3508,6 +3518,19 @@
 - name: container_aligned_compute_resources_failure_count
   subsystem: kubelet
   help: Cumulative number of failures to allocate aligned compute resources to containers
+    by alignment type. Deprecated in favor of kubelet_container_aligned_compute_resources_failure_total.
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - boundary
+  - scope
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: container_aligned_compute_resources_failure_total
+  subsystem: kubelet
+  help: Cumulative number of failures to allocate aligned compute resources to containers
     by alignment type.
   type: Counter
   stabilityLevel: ALPHA
@@ -3568,11 +3591,21 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: cpu_manager_exclusive_cpu_allocation_count
+- name: cpu_manager_exclusive_cpu_allocated
   subsystem: kubelet
   help: The total number of CPUs exclusively allocated to containers running on this
     node
   type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: cpu_manager_exclusive_cpu_allocation_count
+  subsystem: kubelet
+  help: The total number of CPUs exclusively allocated to containers running on this
+    node. Deprecated in favor of kubelet_cpu_manager_exclusive_cpu_allocated.
+  type: Gauge
+  deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
   componentEndpoints:
   - component: kubelet
@@ -3702,6 +3735,16 @@
 - name: evented_pleg_connection_error_count
   subsystem: kubelet
   help: The number of errors encountered during the establishment of streaming connection
+    with the CRI runtime. Deprecated in favor of kubelet_evented_pleg_connection_error_total.
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: evented_pleg_connection_error_total
+  subsystem: kubelet
+  help: The number of errors encountered during the establishment of streaming connection
     with the CRI runtime.
   type: Counter
   stabilityLevel: ALPHA
@@ -3729,6 +3772,16 @@
   - component: kubelet
     endpoint: /metrics
 - name: evented_pleg_connection_success_count
+  subsystem: kubelet
+  help: The number of times a streaming client was obtained to receive CRI Events.
+    Deprecated in favor of kubelet_evented_pleg_connection_success_total.
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: evented_pleg_connection_success_total
   subsystem: kubelet
   help: The number of times a streaming client was obtained to receive CRI Events.
   type: Counter
@@ -3760,6 +3813,18 @@
   - component: kubelet
     endpoint: /metrics
 - name: evictions
+  subsystem: kubelet
+  help: Cumulative number of pod evictions by eviction signal. Deprecated in favor
+    of kubelet_evictions_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - eviction_signal
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: evictions_total
   subsystem: kubelet
   help: Cumulative number of pod evictions by eviction signal
   type: Counter
@@ -4083,6 +4148,15 @@
     endpoint: /metrics
 - name: pleg_discard_events
   subsystem: kubelet
+  help: The number of discard events in PLEG. Deprecated in favor of kubelet_pleg_discard_events_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pleg_discard_events_total
+  subsystem: kubelet
   help: The number of discard events in PLEG.
   type: Counter
   stabilityLevel: ALPHA
@@ -4223,8 +4297,9 @@
 - name: pod_resources_endpoint_errors_get
   subsystem: kubelet
   help: Number of requests to the PodResource Get endpoint which returned error. Broken
-    down by server api version.
+    down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_errors_get_total
   type: Counter
+  deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
   labels:
   - server_api_version
@@ -4232,6 +4307,18 @@
   - component: kubelet
     endpoint: /metrics
 - name: pod_resources_endpoint_errors_get_allocatable
+  subsystem: kubelet
+  help: Number of requests to the PodResource GetAllocatableResources endpoint which
+    returned error. Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_errors_get_allocatable_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_resources_endpoint_errors_get_allocatable_total
   subsystem: kubelet
   help: Number of requests to the PodResource GetAllocatableResources endpoint which
     returned error. Broken down by server api version.
@@ -4242,7 +4329,30 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_resources_endpoint_errors_get_total
+  subsystem: kubelet
+  help: Number of requests to the PodResource Get endpoint which returned error. Broken
+    down by server api version.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_resources_endpoint_errors_list
+  subsystem: kubelet
+  help: Number of requests to the PodResource List endpoint which returned error.
+    Broken down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_errors_list_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_resources_endpoint_errors_list_total
   subsystem: kubelet
   help: Number of requests to the PodResource List endpoint which returned error.
     Broken down by server api version.
@@ -4256,8 +4366,9 @@
 - name: pod_resources_endpoint_requests_get
   subsystem: kubelet
   help: Number of requests to the PodResource Get endpoint. Broken down by server
-    api version.
+    api version. Deprecated in favor of kubelet_pod_resources_endpoint_requests_get_total
   type: Counter
+  deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
   labels:
   - server_api_version
@@ -4265,6 +4376,18 @@
   - component: kubelet
     endpoint: /metrics
 - name: pod_resources_endpoint_requests_get_allocatable
+  subsystem: kubelet
+  help: Number of requests to the PodResource GetAllocatableResources endpoint. Broken
+    down by server api version. Deprecated in favor of kubelet_pod_resources_endpoint_requests_get_allocatable_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_resources_endpoint_requests_get_allocatable_total
   subsystem: kubelet
   help: Number of requests to the PodResource GetAllocatableResources endpoint. Broken
     down by server api version.
@@ -4275,7 +4398,30 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_resources_endpoint_requests_get_total
+  subsystem: kubelet
+  help: Number of requests to the PodResource Get endpoint. Broken down by server
+    api version.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_resources_endpoint_requests_list
+  subsystem: kubelet
+  help: Number of requests to the PodResource List endpoint. Broken down by server
+    api version. Deprecated in favor of kubelet_pod_resources_endpoint_requests_list_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_resources_endpoint_requests_list_total
   subsystem: kubelet
   help: Number of requests to the PodResource List endpoint. Broken down by server
     api version.
@@ -4490,6 +4636,18 @@
     endpoint: /metrics
 - name: preemptions
   subsystem: kubelet
+  help: Cumulative number of pod preemptions by preemption resource. Deprecate in
+    favor of kubelet_preemptions_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  labels:
+  - preemption_signal
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: preemptions_total
+  subsystem: kubelet
   help: Cumulative number of pod preemptions by preemption resource
   type: Counter
   stabilityLevel: ALPHA
@@ -4607,6 +4765,15 @@
     endpoint: /metrics
 - name: server_expiration_renew_errors
   subsystem: kubelet
+  help: Counter of certificate renewal errors. Deprecated in favor of kubelet_server_expiration_renew_errors_total
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: server_expiration_renew_errors_total
+  subsystem: kubelet
   help: Counter of certificate renewal errors.
   type: Counter
   stabilityLevel: ALPHA
@@ -4713,8 +4880,10 @@
     endpoint: /metrics
 - name: topology_manager_admission_duration_ms
   subsystem: kubelet
-  help: Duration in milliseconds to serve a pod admission request.
+  help: Duration in milliseconds to serve a pod admission request. Deprecated in favor
+    of topology_manager_admission_duration_seconds
   type: Histogram
+  deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
   buckets:
   - 0.05
@@ -4732,6 +4901,30 @@
   - 204.8
   - 409.6
   - 819.2
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: topology_manager_admission_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to serve a pod admission request.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 5e-05
+  - 0.0001
+  - 0.0002
+  - 0.0004
+  - 0.0008
+  - 0.0016
+  - 0.0032
+  - 0.0064
+  - 0.0128
+  - 0.0256
+  - 0.0512
+  - 0.1024
+  - 0.2048
+  - 0.4096
+  - 0.8192
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics

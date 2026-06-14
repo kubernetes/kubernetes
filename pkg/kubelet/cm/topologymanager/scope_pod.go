@@ -120,6 +120,7 @@ func (s *podScope) checkAffinity(logger klog.Logger, pod *v1.Pod) (TopologyHint,
 		if IsAlignmentGuaranteed(s.policy) {
 			// Increment failure metric only if alignment was guaranteed.
 			metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
+			metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
 		}
 		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 
