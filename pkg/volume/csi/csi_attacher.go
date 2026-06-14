@@ -45,12 +45,27 @@ import (
 
 const globalMountInGlobalPath = "globalmount"
 
+var (
+	// Backoff parameters for waiting for volume attach/detach.
+	// This is approximately the duration between consecutive ticks after two minutes (CSI timeout).
+	defaultAttachDetachBackoffInit   = 500 * time.Millisecond
+	defaultAttachDetachBackoffMax    = 7 * time.Second
+	defaultAttachDetachBackoffReset  = time.Minute
+	defaultAttachDetachBackoffFactor = 1.05
+	defaultAttachDetachBackoffJitter = 0.1
+)
+
 type csiAttacher struct {
 	plugin       *csiPlugin
 	k8s          kubernetes.Interface
 	watchTimeout time.Duration
 
 	csiClient csiClient
+
+	// backoff is the backoff configuration for waiting on volume attach/detach.
+	backoff *wait.Backoff
+	// clock is used for backoff timing.
+	clock clock.Clock
 }
 
 // volume.Attacher methods
@@ -483,16 +498,7 @@ func (c *csiAttacher) waitForVolumeDetachmentWithLister(volumeHandle, attachID s
 }
 
 func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spec, volumeHandle, attachID string, timeout time.Duration, verifyStatus func() (bool, error), operation string) error {
-	var (
-		initBackoff = 500 * time.Millisecond
-		// This is approximately the duration between consecutive ticks after two minutes (CSI timeout).
-		maxBackoff    = 7 * time.Second
-		resetDuration = time.Minute
-		backoffFactor = 1.05
-		jitter        = 0.1
-		clock         = &clock.RealClock{}
-	)
-	backoffMgr := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
+	delayFunc := c.backoff.DelayWithReset(c.clock, defaultAttachDetachBackoffReset)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -505,9 +511,8 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 	}
 
 	for {
-		t := backoffMgr.Backoff()
 		select {
-		case <-t.C():
+		case <-c.clock.After(delayFunc()):
 			successful, err := verifyStatus()
 			if err != nil {
 				return err
@@ -516,7 +521,6 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 				return nil
 			}
 		case <-ctx.Done():
-			t.Stop()
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("timed out waiting for external-attacher of %v CSI driver to %v volume %v", csiDriverName, strings.ToLower(operation), volumeHandle)
 		}

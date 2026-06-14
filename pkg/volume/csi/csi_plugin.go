@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
@@ -937,6 +939,14 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 		plugin:       p,
 		k8s:          k8s,
 		watchTimeout: csiTimeout,
+		backoff: &wait.Backoff{
+			Duration: defaultAttachDetachBackoffInit,
+			Cap:      defaultAttachDetachBackoffMax,
+			Steps:    math.MaxInt32,
+			Factor:   defaultAttachDetachBackoffFactor,
+			Jitter:   defaultAttachDetachBackoffJitter,
+		},
+		clock: &clock.RealClock{},
 	}, nil
 }
 
