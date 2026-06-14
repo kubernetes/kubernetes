@@ -48,6 +48,10 @@ func TestIsNativeResource(t *testing.T) {
 			expectVal:    false,
 		},
 		{
+			resourceName: "mykubernetes.io/resource-foo",
+			expectVal:    false,
+		},
+		{
 			resourceName: "",
 			expectVal:    true,
 		},
