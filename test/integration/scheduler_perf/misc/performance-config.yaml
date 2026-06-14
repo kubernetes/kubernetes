@@ -88,6 +88,27 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
+  - name: 5kNodes_10kPods_LowQPSOnAPIServer_AsyncAPICallsDisabled
+    schedulerApiClientQPS: 100
+    schedulerApiClientBurst: 100
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+  - name: 5kNodes_10kPods_LowQPSOnAPIServer_AsyncAPICallsEnabled
+    schedulerApiClientQPS: 100
+    schedulerApiClientBurst: 100
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
 - name: SchedulingDaemonset
@@ -490,3 +511,65 @@
       nodesWithExtendedResource: 5000
       nodesWithoutExtendedResource: 0
       measurePods: 5000
+
+# This test simulates a limited QPS on connection to API server and a large number
+# of unschedulable pods circling between activeQ and backoffQ/unschedulable pool.
+- name: LowAPIServerQPSWithMultipleUnscheduledPods
+  schedulerApiClientQPS: 100
+  schedulerApiClientBurst: 100
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+  - opcode: createPods
+    namespace: test
+    countParam: $largePods
+    podTemplatePath: templates/pod-with-pod-affinity-large-resource.yaml
+    # These pods are unschedulable because they have required affinity to pods
+    # with label "blue", and those will get created in the second batch.
+    # Test cannot wait for completion of the step, because pods won't get scheduled.
+    skipWaitToCompletion: true
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-blue.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes_5Large_5Measure
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      largePods: 5
+      measurePods: 5
+  - name: 50Nodes_30Large_50Measure_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 50
+      largePods: 30
+      measurePods: 50
+  - name: 50Nodes_30Large_50Measure_AsyncAPICallsDisabled
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 50
+      largePods: 30
+      measurePods: 50
+  - name: 1kNodes_400Large_1kMeasure_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 1000
+      largePods: 400
+      measurePods: 1000
+  - name: 1kNodes_400Large_1kMeasure_AsyncAPICallsDisabled
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 1000
+      largePods: 400
+      measurePods: 1000
