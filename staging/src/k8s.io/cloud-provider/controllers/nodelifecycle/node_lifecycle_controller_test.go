@@ -525,11 +525,12 @@ func Test_NodesDeleted(t *testing.T) {
 
 			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
-				nodeLister:        nodeInformer.Lister(),
-				kubeClient:        clientset,
-				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
-				nodeMonitorPeriod: 1 * time.Second,
+				nodeLister:         nodeInformer.Lister(),
+				kubeClient:         clientset,
+				cloud:              testcase.fakeCloud,
+				recorder:           eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				nodeMonitorPeriod:  1 * time.Second,
+				nodeMonitorWorkers: 1,
 			}
 
 			w := eventBroadcaster.StartLogging(klog.Infof)
@@ -902,11 +903,12 @@ func Test_NodesShutdown(t *testing.T) {
 
 			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
-				nodeLister:        nodeInformer.Lister(),
-				kubeClient:        clientset,
-				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
-				nodeMonitorPeriod: 1 * time.Second,
+				nodeLister:         nodeInformer.Lister(),
+				kubeClient:         clientset,
+				cloud:              testcase.fakeCloud,
+				recorder:           eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				nodeMonitorPeriod:  1 * time.Second,
+				nodeMonitorWorkers: 1,
 			}
 
 			e := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
@@ -1063,7 +1065,8 @@ func Test_GetProviderID(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
-				cloud: testcase.fakeCloud,
+				cloud:              testcase.fakeCloud,
+				nodeMonitorWorkers: 1,
 			}
 
 			providerID, err := cloudNodeLifecycleController.getProviderID(ctx, testcase.existingNode)

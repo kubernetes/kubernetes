@@ -59,7 +59,7 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
 	fs.DurationVar(&o.NodeMonitorPeriod.Duration, "node-monitor-period", o.NodeMonitorPeriod.Duration,
-		fmt.Sprintf("The period for syncing NodeStatus in %s.", names.CloudNodeLifecycleController))
+		fmt.Sprintf("The period for syncing NodeStatus in %s. Deprecated: Use NodeLifecycleController.NodeMonitorPeriod instead.", names.CloudNodeLifecycleController))
 	fs.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "The instance prefix for the cluster.")
 	fs.StringVar(&o.ClusterCIDR, "cluster-cidr", o.ClusterCIDR, "CIDR Range for Pods in cluster. Only used when --allocate-node-cidrs=true; if false, this option will be ignored.")
 	fs.BoolVar(&o.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider. Requires --cluster-cidr.")
@@ -105,6 +105,10 @@ func (o *KubeCloudSharedOptions) Validate() []error {
 
 	errs := []error{}
 	errs = append(errs, o.CloudProvider.Validate()...)
+	//nolint:staticcheck // SA1019: Intentional read of deprecated KubeCloudShared.NodeMonitorPeriod for validation
+	if o.NodeMonitorPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("node-monitor-period must be greater than 0"))
+	}
 
 	return errs
 }

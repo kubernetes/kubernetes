@@ -32,6 +32,7 @@ func (in *CloudControllerManagerConfiguration) DeepCopyInto(out *CloudController
 	in.Generic.DeepCopyInto(&out.Generic)
 	out.KubeCloudShared = in.KubeCloudShared
 	out.NodeController = in.NodeController
+	out.NodeLifecycleController = in.NodeLifecycleController
 	out.ServiceController = in.ServiceController
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	in.Webhook.DeepCopyInto(&out.Webhook)
