@@ -25,14 +25,23 @@ import (
 	"sigs.k8s.io/knftables"
 )
 
+// nftClientBuilder creates a knftables.Interface for cleanup for the given family and table.
+type nftClientBuilder func(family knftables.Family, table string) (knftables.Interface, error)
+
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ctx context.Context) bool {
+	return cleanupLeftovers(ctx, func(family knftables.Family, table string) (knftables.Interface, error) {
+		return knftables.New(family, table)
+	})
+}
+
+func cleanupLeftovers(ctx context.Context, newClient nftClientBuilder) bool {
 	logger := klog.FromContext(ctx)
 	var encounteredError bool
 
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
-		nft, err := knftables.New(family, kubeProxyTable)
+		nft, err := newClient(family, kubeProxyTable)
 		if err != nil {
 			continue
 		}
