@@ -17,10 +17,13 @@ limitations under the License.
 package handlers
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -254,15 +257,21 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	flusher, ok := w.(http.Flusher)
+	httpFlusher, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
 		utilruntime.HandleErrorWithContext(req.Context(), err, "Unable to start watch")
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
+	wrw := newWatchResponseWriter(req, w, httpFlusher)
+	defer func() {
+		if err := wrw.Close(); err != nil {
+			utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to close watch response writer")
+		}
+	}()
 
-	framer := s.Framer.NewFrameWriter(w)
+	framer := s.Framer.NewFrameWriter(wrw)
 	if framer == nil {
 		// programmer error
 		err := fmt.Errorf("no stream framing support is available for media type %q", s.MediaType)
@@ -279,7 +288,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+	if err := wrw.Flush(); err != nil {
+		utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
+		return
+	}
 
 	gvr := s.Scope.Resource
 
@@ -294,6 +306,13 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	done := req.Context().Done()
 
 	span.AddEvent("About to start writing response")
+
+	var initEventCount int
+	var totalEncodeTime time.Duration
+	var totalFlushTime time.Duration
+	var initStart time.Time
+	isInitPhase := true
+
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -314,19 +333,46 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			if isInitPhase && initEventCount == 0 {
+				initStart = time.Now()
+			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
+			encodeStart := time.Now()
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
+			if isInitPhase {
+				totalEncodeTime += time.Since(encodeStart)
+				initEventCount++
+			}
 			recorder.RecordEvent()
 
 			if len(ch) == 0 {
-				flusher.Flush()
+				flushStart := time.Now()
+				if err := wrw.Flush(); err != nil {
+					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
+					return
+				}
+				if isInitPhase {
+					totalFlushTime += time.Since(flushStart)
+				}
 			}
 			if isWatchListLatencyRecordingRequired {
+				isInitPhase = false
+				sendingEvents := time.Since(initStart)
+				var setupTime time.Duration
+				if receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
+					setupTime = initStart.Sub(receivedTimestamp)
+				}
+				if sendingEvents+setupTime > 10*time.Second {
+					totalTime := setupTime + sendingEvents
+					otherTime := sendingEvents - totalEncodeTime - totalFlushTime
+					totalMB := float64(watchEncoder.totalBytes) / 1024 / 1024
+					klog.V(2).Infof("TRACE-WATCHLIST %s: events=%d bytes=%.0fMB total=%v setup=%v (PnF+watch init) sending=%v (event loop) encode=%v (%s) network=%v (write) flush=%v other=%v (chan+overhead)", req.URL.Path, initEventCount, totalMB, totalTime, setupTime, sendingEvents, watchEncoder.serializeTime, s.MediaType, watchEncoder.networkTime, totalFlushTime, otherTime)
+				}
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
 				if !ok {
@@ -442,4 +488,71 @@ func shouldRecordWatchListLatency(ctx context.Context, event watch.Event) bool {
 		return false
 	}
 	return hasAnnotation
+}
+
+type watchResponseWriter struct {
+	hw          http.ResponseWriter
+	httpFlusher http.Flusher
+	gw          *gzip.Writer
+	writer      io.Writer
+}
+
+func newWatchResponseWriter(req *http.Request, hw http.ResponseWriter, httpFlusher http.Flusher) *watchResponseWriter {
+	compressed := acceptsGzip(req) && req.URL.Query().Get("sendInitialEvents") == "true"
+	wrw := &watchResponseWriter{
+		hw:          hw,
+		httpFlusher: httpFlusher,
+		writer:      hw,
+	}
+	if compressed {
+		gw := gzipPool.Get().(*gzip.Writer)
+		gw.Reset(hw)
+		wrw.gw = gw
+		wrw.writer = gw
+		hw.Header().Set("Content-Encoding", "gzip")
+	}
+	return wrw
+}
+
+func (w *watchResponseWriter) Write(p []byte) (int, error) {
+	return w.writer.Write(p)
+}
+
+func (w *watchResponseWriter) Flush() error {
+	if w.gw != nil {
+		if err := w.gw.Flush(); err != nil {
+			return err
+		}
+	}
+	w.httpFlusher.Flush()
+	return nil
+}
+
+func (w *watchResponseWriter) Close() error {
+	if w.gw == nil {
+		return nil
+	}
+	err := w.gw.Close()
+	w.gw.Reset(nil)
+	gzipPool.Put(w.gw)
+	return err
+}
+
+var gzipPool = &sync.Pool{
+	New: func() interface{} {
+		gw, err := gzip.NewWriterLevel(nil, 1)
+		if err != nil {
+			panic(err)
+		}
+		return gw
+	},
+}
+
+func acceptsGzip(req *http.Request) bool {
+	for _, enc := range strings.Split(req.Header.Get("Accept-Encoding"), ",") {
+		if strings.TrimSpace(enc) == "gzip" {
+			return true
+		}
+	}
+	return false
 }

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
@@ -316,12 +317,48 @@ func handleList(ctx context.Context, r rest.Lister, scope *RequestScope, req *ht
 	defer span.End(500 * time.Millisecond)
 	req = req.WithContext(ctx)
 
+	listStart := time.Now()
 	result, err := r.List(ctx, &opts)
 	if err != nil {
 		return err
 	}
-	transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+	listDuration := time.Since(listStart)
+
+	bw := &byteCountingResponseWriter{ResponseWriter: w}
+	transformStart := time.Now()
+	transformResponseObject(ctx, scope, req, bw, http.StatusOK, outputMediaType, result)
+	transformDuration := time.Since(transformStart)
+
+	totalDuration := listDuration + transformDuration
+	if totalDuration > 10*time.Second {
+		totalMB := float64(bw.bytesWritten) / 1024 / 1024
+		itemCount := 0
+		if m, err := meta.ListAccessor(result); err == nil {
+			if items, err := meta.ExtractList(result); err == nil {
+				itemCount = len(items)
+			}
+			_ = m
+		}
+		serializeTime := transformDuration - bw.writeTime
+		contentEncoding := req.Header.Get("Accept-Encoding")
+		mediaType := outputMediaType.Accepted.MediaType
+		klog.V(2).Infof("TRACE-LIST %s: items=%d bytes=%.0fMB total=%v list=%v (watch cache) transform=%v (serialize+compress+write) network=%v (write) serialize=%v (encode) mediaType=%s acceptEncoding=%s", req.URL.Path, itemCount, totalMB, totalDuration, listDuration, transformDuration, bw.writeTime, serializeTime, mediaType, contentEncoding)
+	}
 	return nil
+}
+
+type byteCountingResponseWriter struct {
+	http.ResponseWriter
+	bytesWritten int64
+	writeTime    time.Duration
+}
+
+func (w *byteCountingResponseWriter) Write(p []byte) (int, error) {
+	start := time.Now()
+	n, err := w.ResponseWriter.Write(p)
+	w.writeTime += time.Since(start)
+	w.bytesWritten += int64(n)
+	return n, err
 }
 
 // isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
