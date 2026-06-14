@@ -48,8 +48,14 @@ import (
 )
 
 const (
-	maxConfigLength      = 10 * 1 << 20 // 10MB
-	nodeCriticalPriority = schedulingapi.SystemCriticalPriority + 1000
+	maxConfigLength             = 10 * 1 << 20 // 10MB
+	nodeCriticalPriority        = schedulingapi.SystemCriticalPriority + 1000
+	maxStaticPodWarningMessages = 1000
+)
+
+var (
+	// staticPodWarningCache is used to deduplicate static pod priority warning messages
+	staticPodWarningCache = newWarningCache(maxStaticPodWarningMessages)
 )
 
 // Generate a pod name that is unique among nodes by appending the nodeName.
@@ -158,7 +164,7 @@ func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) 
 	}
 
 	warning := getStaticPodPriorityWarning(newPod)
-	if warning != "" {
+	if warning != "" && staticPodWarningCache.addIfAbsent(warning) {
 		logger.Info(warning, "pod", klog.KObj(newPod))
 	}
 
