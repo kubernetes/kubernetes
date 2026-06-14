@@ -6447,6 +6447,79 @@ func TestDescribeNode(t *testing.T) {
 	}
 }
 
+func TestDescribeNodeEventsWithNullUID(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			UID:  "real-node-uid",
+		},
+	}
+	fake := fake.NewClientset(
+		node,
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-node",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+		},
+		&corev1.EventList{
+			Items: []corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-with-uid",
+						Namespace: "default",
+						UID:       "evt-1",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "test-node",
+						UID:  "test-node",
+					},
+					Message:        "Node test-node status is now: NodeHasSufficientMemory",
+					FirstTimestamp: metav1.NewTime(time.Date(2024, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2024, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           corev1.EventTypeNormal,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-null-uid",
+						Namespace: "default",
+						UID:       "evt-2",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "test-node",
+						// UID intentionally omitted (empty/null) —
+						// kubelet-emitted events on some clusters
+					},
+					Message:        "Node test-node status is now: NodeHasInsufficientMemory",
+					FirstTimestamp: metav1.NewTime(time.Date(2024, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2024, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           corev1.EventTypeWarning,
+				},
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("", "test-node", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Event with UID should always appear
+	if !strings.Contains(out, "NodeHasSufficientMemory") {
+		t.Errorf("expected event with UID to appear in output, got:\n%s", out)
+	}
+
+	// Event with null/empty UID should also appear
+	if !strings.Contains(out, "NodeHasInsufficientMemory") {
+		t.Errorf("expected event with null UID to appear in output, got:\n%s", out)
+	}
+}
+
 func TestDescribeNodeWithSidecar(t *testing.T) {
 	holderIdentity := "holder"
 	nodeCapacity := mergeResourceLists(
