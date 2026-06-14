@@ -300,7 +300,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.NFS, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a NFS volume type")
+	return nil, false, fmt.Errorf("spec does not reference a NFS volume type")
 }
 
 func getServerFromSource(source *v1.NFSVolumeSource) string {
