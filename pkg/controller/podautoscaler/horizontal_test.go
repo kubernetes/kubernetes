@@ -5368,7 +5368,9 @@ func TestMultipleHPAs(t *testing.T) {
 	testScaleClient := &scalefake.FakeScaleClient{}
 	testMetricsClient := &metricsfake.Clientset{}
 	hpaWatcher := watch.NewFake()
+	defer hpaWatcher.Stop()
 	podWatcher := watch.NewFake()
+	defer podWatcher.Stop()
 
 	testClient.AddWatchReactor("horizontalpodautoscalers", core.DefaultWatchReactor(hpaWatcher, nil))
 	testClient.AddWatchReactor("pods", core.DefaultWatchReactor(podWatcher, nil))
@@ -5616,7 +5618,19 @@ func TestMultipleHPAs(t *testing.T) {
 	hpaController.monitor = monitor.New()
 
 	informerFactory.Start(tCtx.Done())
-	go hpaController.Run(tCtx, 5)
+	// Use a separate context for the controller that we can cancel before the test ends
+	controllerCtx, cancelController := context.WithCancel(tCtx)
+	go hpaController.Run(controllerCtx, 5)
+	// Register cleanup to ensure controller shuts down gracefully
+	tCtx.Cleanup(func() {
+		// Cancel the controller context first
+		cancelController()
+		// Wait for the queue to be fully processed and shut down
+		// Give it some time to finish processing current items
+		_ = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			return hpaController.queue.Len() == 0, nil
+		})
+	})
 
 	timeoutTime := time.After(15 * time.Second)
 	timeout := false
