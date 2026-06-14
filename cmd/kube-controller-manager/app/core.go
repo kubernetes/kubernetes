@@ -363,7 +363,7 @@ func newEphemeralVolumeControllerDescriptor() *ControllerDescriptor {
 }
 
 func newEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("ephemeral-volume-controller")
+	client, err := controllerContext.NewClient(names.EphemeralVolumeController)
 	if err != nil {
 		return nil, err
 	}
@@ -469,12 +469,12 @@ func newResourceQuotaControllerDescriptor() *ControllerDescriptor {
 }
 
 func newResourceQuotaController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	resourceQuotaControllerClient, err := controllerContext.NewClient("resourcequota-controller")
+	resourceQuotaControllerClient, err := controllerContext.NewClient(names.ResourceQuotaController)
 	if err != nil {
 		return nil, err
 	}
 
-	resourceQuotaControllerDiscoveryClient, err := controllerContext.ClientBuilder.DiscoveryClient("resourcequota-controller")
+	resourceQuotaControllerDiscoveryClient, err := controllerContext.ClientBuilder.DiscoveryClient(names.ResourceQuotaController)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the discovery client: %w", err)
 	}
@@ -525,7 +525,7 @@ func newNamespaceController(ctx context.Context, controllerContext ControllerCon
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
-	nsKubeconfig, err := controllerContext.NewClientConfig("namespace-controller")
+	nsKubeconfig, err := controllerContext.NewClientConfig(names.NamespaceController)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +606,7 @@ func newTTLControllerDescriptor() *ControllerDescriptor {
 }
 
 func newTTLController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("ttl-controller")
+	client, err := controllerContext.NewClient(names.TTLController)
 	if err != nil {
 		return nil, err
 	}
@@ -770,7 +770,7 @@ func newVolumeAttributesClassProtectionControllerDescriptor() *ControllerDescrip
 }
 
 func newVolumeAttributesClassProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("volumeattributesclass-protection-controller")
+	client, err := controllerContext.NewClient(names.VolumeAttributesClassProtectionController)
 	if err != nil {
 		return nil, err
 	}
@@ -800,7 +800,7 @@ func newTTLAfterFinishedControllerDescriptor() *ControllerDescriptor {
 }
 
 func newTTLAfterFinishedController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("ttl-after-finished-controller")
+	client, err := controllerContext.NewClient(names.TTLAfterFinishedController)
 	if err != nil {
 		return nil, err
 	}

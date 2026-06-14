@@ -36,7 +36,7 @@ func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
 }
 
 func newEndpointSliceController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("endpointslice-controller")
+	client, err := controllerContext.NewClient(names.EndpointSliceController)
 	if err != nil {
 		return nil, err
 	}
