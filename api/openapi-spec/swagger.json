@@ -3379,9 +3379,6 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3537,9 +3534,6 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -3607,6 +3601,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "namespace"
+      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SubjectAccessReview": {
@@ -3633,9 +3630,6 @@
           "description": "status is filled in by the server and indicates whether the request is allowed or not"
         }
       },
-      "required": [
-        "spec"
-      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
