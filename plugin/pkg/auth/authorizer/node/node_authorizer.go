@@ -116,6 +116,11 @@ func (*NodeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Condit
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// AuthorizerName identifies the Node authorizer.
+func (*NodeAuthorizer) AuthorizerName() string {
+	return "authorizer.kubernetes.io/Node"
+}
+
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
