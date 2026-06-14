@@ -72,6 +72,7 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/value.go
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go
+  ./test/e2e/instrumentation/native_histograms.go
   ./hack/tools/instrumentation/main.go
   ./hack/tools/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
