@@ -987,6 +987,364 @@ func TestPlaintext(t *testing.T) {
 				checkContains("size of the widget"),
 			},
 		},
+		{
+			// Shows that fieldDetail renders default value after description
+			Name:        "FieldDefault",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"branchName": map[string]any{
+							"type":        "string",
+							"description": "Git branch name for building your app.",
+							"default":     "main",
+						},
+					},
+				},
+				"name":  "branchName",
+				"short": false,
+			},
+			Checks: []check{
+				checkContains("Git branch name for building your app."),
+				checkContains("DEFAULT: \"main\""),
+			},
+		},
+		{
+			// Shows that fieldDetail renders example value after description
+			Name:        "FieldExample",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"replicas": map[string]any{
+							"type":        "integer",
+							"description": "Number of desired pods.",
+							"example":     float64(3),
+						},
+					},
+				},
+				"name":  "replicas",
+				"short": false,
+			},
+			Checks: []check{
+				checkContains("Number of desired pods."),
+				checkContains("EXAMPLE: 3"),
+			},
+		},
+		{
+			// Shows that fieldDetail renders both default and example
+			Name:        "FieldDefaultAndExample",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"protocol": map[string]any{
+							"type":        "string",
+							"description": "Protocol for port.",
+							"default":     "TCP",
+							"example":     "UDP",
+						},
+					},
+				},
+				"name":  "protocol",
+				"short": false,
+			},
+			Checks: []check{
+				checkContains("Protocol for port."),
+				checkContains("DEFAULT: \"TCP\""),
+				checkContains("EXAMPLE: \"UDP\""),
+			},
+		},
+		{
+			// Shows that fieldDetail does not render default/example in short mode
+			Name:        "FieldDefaultExampleShort",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"branchName": map[string]any{
+							"type":        "string",
+							"description": "Git branch name.",
+							"default":     "main",
+							"example":     "develop",
+						},
+					},
+				},
+				"name":  "branchName",
+				"short": true,
+			},
+			Checks: []check{
+				checkEquals("branchName\t<string>\n"),
+			},
+		},
+		{
+			// Integration test: shows that example appears in top-level DESCRIPTION view
+			Name: "SchemaWithExample",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"example": map[string]any{
+									"apiVersion": "example.com/v1",
+									"kind":       "Widget",
+									"metadata": map[string]any{
+										"name": "my-widget",
+									},
+									"spec": map[string]any{
+										"size": float64(5),
+									},
+								},
+								"properties": map[string]any{
+									"apiVersion": map[string]any{
+										"type": "string",
+									},
+									"kind": map[string]any{
+										"type": "string",
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("DESCRIPTION:"),
+				checkContains("A widget is a thing."),
+				checkContains("EXAMPLE:"),
+				checkContains("\"apiVersion\": \"example.com/v1\""),
+				checkContains("\"kind\": \"Widget\""),
+				checkContains("\"name\": \"my-widget\""),
+			},
+		},
+		{
+			// Integration test: shows that default appears in top-level DESCRIPTION view
+			Name: "SchemaWithDefault",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/configs": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Config",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Config": map[string]any{
+								"type":        "object",
+								"description": "Configuration resource.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Config",
+									},
+								},
+								"default": map[string]any{
+									"logLevel": "info",
+									"retries":  float64(3),
+								},
+								"properties": map[string]any{
+									"logLevel": map[string]any{
+										"type": "string",
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "configs",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("DESCRIPTION:"),
+				checkContains("Configuration resource."),
+				checkContains("DEFAULT:"),
+				checkContains("\"logLevel\": \"info\""),
+				checkContains("\"retries\": 3"),
+			},
+		},
+		{
+			// Integration test: shows that example on a child field appears in field list
+			Name: "SchemaWithFieldExample",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"properties": map[string]any{
+									"name": map[string]any{
+										"type":        "string",
+										"description": "name of the widget",
+										"default":     "my-widget",
+										"example":     "production-widget",
+									},
+									"size": map[string]any{
+										"type":        "integer",
+										"description": "size of the widget",
+										"example":     float64(10),
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("FIELDS:"),
+				checkContains("name of the widget"),
+				checkContains("DEFAULT: \"my-widget\""),
+				checkContains("EXAMPLE: \"production-widget\""),
+				checkContains("size of the widget"),
+				checkContains("EXAMPLE: 10"),
+			},
+		},
+		{
+			// Integration test: shows that example/default render when navigating to a specific field
+			Name: "FieldPathWithExample",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"properties": map[string]any{
+									"spec": map[string]any{
+										"type":        "object",
+										"description": "Widget spec.",
+										"default": map[string]any{
+											"size": float64(1),
+										},
+										"example": map[string]any{
+											"size":  float64(5),
+											"color": "blue",
+										},
+										"properties": map[string]any{
+											"size": map[string]any{
+												"type":        "integer",
+												"description": "size of the widget",
+											},
+											"color": map[string]any{
+												"type":        "string",
+												"description": "color of the widget",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: []string{"spec"},
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("FIELD: spec"),
+				checkContains("DESCRIPTION:"),
+				checkContains("Widget spec."),
+				checkContains("DEFAULT:"),
+				checkContains("\"size\": 1"),
+				checkContains("EXAMPLE:"),
+				checkContains("\"color\": \"blue\""),
+				checkContains("FIELDS:"),
+			},
+		},
 	}
 
 	tmpl, err := v2.WithBuiltinTemplateFuncs(template.New("")).Parse(plaintextSource)
