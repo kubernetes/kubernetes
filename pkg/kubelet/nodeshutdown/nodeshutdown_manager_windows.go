@@ -21,6 +21,7 @@ package nodeshutdown
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
@@ -242,7 +244,7 @@ func (m *managerImpl) ShutdownStatus() error {
 	defer m.nodeShuttingDownMutex.Unlock()
 
 	if m.nodeShuttingDownNow {
-		return fmt.Errorf("node is shutting down")
+		return errors.New(nodeutil.NodeShutdownMessage)
 	}
 	return nil
 }

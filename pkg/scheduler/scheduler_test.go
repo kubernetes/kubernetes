@@ -966,7 +966,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[fwk.EventResource]fwk.ActionType{
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.UpdatePodScaleDown,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.UpdateNodeCondition | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -983,7 +983,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[fwk.EventResource]fwk.ActionType{
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
 				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.UpdateNodeCondition | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -1005,7 +1005,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.AssignedPod: fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:   fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
 				// NodeDeclaredFeatures adds fwk.UpdateNodeDeclaredFeature
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.UpdateNodeCondition | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -1042,7 +1042,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
 				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
 				fwk.UnscheduledPod:        fwk.Add,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.UpdateNodeCondition | fwk.Delete,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
