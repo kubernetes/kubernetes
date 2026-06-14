@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/manager"
 	"k8s.io/klog/v2"
@@ -87,6 +88,15 @@ type systemContainer struct {
 	// Manager for the cgroups of the external container.
 	manager cgroups.Manager
 }
+
+var (
+	getCgroupSubsystems = GetCgroupSubsystems
+	swapIsOn            = swap.IsSwapOn
+	pidlimitStats       = pidlimit.Stats
+	newDeviceManager    = func(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (devicemanager.Manager, error) {
+		return devicemanager.NewManagerImpl(topology, topologyAffinityStore)
+	}
+)
 
 func newSystemCgroups(containerName string) (*systemContainer, error) {
 	manager, err := createManager(containerName)
@@ -209,12 +219,12 @@ func validateSystemRequirements(logger klog.Logger, mountUtil mount.Interface) (
 func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	logger := klog.FromContext(ctx)
 
-	subsystems, err := GetCgroupSubsystems()
+	subsystems, err := getCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	isSwapOn, err := swap.IsSwapOn()
+	isSwapOn, err := swapIsOn()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if swap is on: %w", err)
 	}
@@ -245,7 +255,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	for k, v := range capacity {
 		internalCapacity[k] = v
 	}
-	pidlimits, err := pidlimit.Stats()
+	pidlimits, err := pidlimitStats()
 	if err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
 		internalCapacity[pidlimit.PIDs] = *resource.NewQuantity(
 			int64(*pidlimits.MaxPID),
@@ -295,8 +305,23 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		qosContainerManager: qosContainerManager,
 	}
 
+	topology := machineInfo.Topology
+	if len(nodeConfig.MemoryManagerReservedMemory) > 0 {
+		reservedNUMANodes, err := memorymanager.GetReservedMemoryNUMANodes(machineInfo, cm.GetNodeAllocatableReservation(), nodeConfig.MemoryManagerReservedMemory)
+		if err != nil {
+			return nil, err
+		}
+		if len(reservedNUMANodes) > 0 {
+			logger.Info("Excluding fully reserved NUMA nodes from topology hints", "numaNodes", reservedNUMANodes)
+			topology = filterNUMATopology(topology, reservedNUMANodes)
+			if len(topology) == 0 {
+				return nil, fmt.Errorf("all NUMA nodes excluded by --reserved-memory; at least one NUMA node must remain active")
+			}
+		}
+	}
+
 	cm.topologyManager, err = topologymanager.NewManager(
-		machineInfo.Topology,
+		topology,
 		nodeConfig.TopologyManagerPolicy,
 		nodeConfig.TopologyManagerScope,
 		nodeConfig.TopologyManagerPolicyOptions,
@@ -307,7 +332,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
+	cm.deviceManager, err = newDeviceManager(topology, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}

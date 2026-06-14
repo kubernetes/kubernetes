@@ -20,7 +20,7 @@ import (
 	"context"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -94,6 +94,12 @@ func (s *scope) GetAffinity(podUID string, containerName string) TopologyHint {
 
 func (s *scope) GetPolicy() Policy {
 	return s.policy
+}
+
+// GetNUMANodeIDs returns nil so hint providers fall back to their own topology view,
+// the filtered NUMA set lives on the top-level manager.
+func (s *scope) GetNUMANodeIDs() []int {
+	return nil
 }
 
 func (s *scope) AddHintProvider(h HintProvider) {

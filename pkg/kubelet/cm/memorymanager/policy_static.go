@@ -241,6 +241,11 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 		bestHint = *extendedHint
 	}
 
+	// TODO(#138495): TopologyManager best-effort may select a cross-NUMA hint (e.g. {0,1})
+	// that the static memory manager rejects here because one of those NUMA nodes already has a single-node allocation.
+	// This surfaces as UnexpectedAdmissionError even though resources exist.
+	// A proper fix needs the memory manager to participate in hint preference scoring or TopologyManager
+	// to re-evaluate on allocation failure. See tracking issue for details.
 	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
 		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
 	}
@@ -496,6 +501,9 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	// the best hint might violate the NUMA allocation rule on which
 	// NUMA node cannot have both single and cross NUMA node allocations
 	// https://kubernetes.io/blog/2021/08/11/kubernetes-1-22-feature-memory-manager-moves-to-beta/#single-vs-cross-numa-node-allocation
+	//
+	// TODO(#138495): Same best-effort-vs-strict mismatch as the pod-level
+	// path in allocatePod — see tracking issue.
 	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
 		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
 	}
@@ -885,11 +893,7 @@ func getContainerRequestedResources(logger logr.Logger, pod *v1.Pod, container *
 }
 
 func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
-	var numaNodes []int
-	for n := range machineState {
-		numaNodes = append(numaNodes, n)
-	}
-	sort.Ints(numaNodes)
+	numaNodes := p.getNUMANodesForTopologyHints(machineState)
 
 	// Initialize minAffinitySize to include all NUMA Cells.
 	minAffinitySize := len(numaNodes)
@@ -977,6 +981,37 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 	}
 
 	return hints
+}
+
+func (p *staticPolicy) getNUMANodesForTopologyHints(machineState state.NUMANodeMap) []int {
+	var topologyNUMANodes []int
+	for nodeID := range machineState {
+		topologyNUMANodes = append(topologyNUMANodes, nodeID)
+	}
+	sort.Ints(topologyNUMANodes)
+
+	if p.affinity == nil {
+		return topologyNUMANodes
+	}
+
+	hintNUMANodes := p.affinity.GetNUMANodeIDs()
+	if len(hintNUMANodes) == 0 {
+		return topologyNUMANodes
+	}
+
+	hintNodeSet := map[int]struct{}{}
+	for _, nodeID := range hintNUMANodes {
+		hintNodeSet[nodeID] = struct{}{}
+	}
+
+	var filteredNUMANodes []int
+	for _, nodeID := range topologyNUMANodes {
+		if _, ok := hintNodeSet[nodeID]; ok {
+			filteredNUMANodes = append(filteredNUMANodes, nodeID)
+		}
+	}
+
+	return filteredNUMANodes
 }
 
 func (p *staticPolicy) isHintPreferred(maskBits []int, minAffinitySize int) bool {
