@@ -284,6 +284,18 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 				},
 				{
+					Name: "invalid message",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakMessage(strings.Repeat("a", 32769)),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("message"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+					},
+				},
+				{
 					Name: "invalid status value: Unknown",
 					Conditions: []metav1.Condition{
 						meta.MkCondition(

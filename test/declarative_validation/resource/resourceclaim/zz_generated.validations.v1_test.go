@@ -196,6 +196,9 @@ func init() {
 			"status.devices[*].conditions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
+			"status.devices[*].conditions[*].message": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"status.devices[*].conditions[*].observedGeneration": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
