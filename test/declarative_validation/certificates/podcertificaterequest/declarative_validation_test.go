@@ -18,6 +18,7 @@ package podcertificaterequest
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,6 +82,24 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 						field.Duplicate(field.NewPath("status", "conditions").Index(1), map[string]interface{}{"type": certificates.PodCertificateRequestConditionTypeDenied, "status": "True", "reason": "Foo", "message": "Bar"}).MarkAlpha(),
 						// handwritten validation doesn't allow multiple known conditions and uses .[1] notation
 						field.Invalid(field.NewPath("status", "conditions").Child("[1]", "type"), certificates.PodCertificateRequestConditionTypeDenied, `There may be at most one condition with type "Issued", "Denied", or "Failed"`).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid empty message",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakMessage("")),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.Required(field.NewPath("status", "conditions").Index(0).Child("message"), "").MarkAlpha(),
+					},
+				},
+				{
+					Name: "invalid message too long",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)), meta.TweakMessage(strings.Repeat("a", 32769))),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("message"), "" /*unused*/, 32768).MarkAlpha(),
 					},
 				},
 				{
