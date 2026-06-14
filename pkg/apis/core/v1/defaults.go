@@ -192,8 +192,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 
 	// Pod Requests default values must be applied after container-level default values
-	// have been populated.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+	// have been populated. When PodLevelResourcesFixUpdateDefaulting is enabled, this
+	// defaulting is deferred to PrepareForCreate so it runs after admission webhooks
+	// have injected all containers, giving a complete view of the pod.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)
 	}
@@ -524,4 +527,15 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 	if len(podLims) > 0 {
 		pod.Spec.Resources.Limits = podLims
 	}
+}
+
+// ApplyPodLevelResourceDefaults sets pod-level hugepage limits from aggregated container
+// hugepage limits, then defaults pod-level requests from aggregated container requests.
+// Hugepage limits must be set first because the request defaulting pass also fills in
+// pod-level requests for any resource that has a pod-level limit but no pod-level request.
+// Called from the registry's PrepareForCreate so both steps see the complete, post-admission
+// container list.
+func ApplyPodLevelResourceDefaults(pod *v1.Pod) {
+	defaultHugePagePodLimits(pod)
+	defaultPodRequests(pod)
 }
