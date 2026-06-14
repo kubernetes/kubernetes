@@ -39,6 +39,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type FlowSchema
+	scheme.AddValidationFunc((*flowcontrolv1beta1.FlowSchema)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_FlowSchema(ctx, op, nil /* fldPath */, obj.(*flowcontrolv1beta1.FlowSchema), safe.Cast[*flowcontrolv1beta1.FlowSchema](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type PriorityLevelConfiguration
 	scheme.AddValidationFunc(
 		(*flowcontrolv1beta1.PriorityLevelConfiguration)(nil),
@@ -55,6 +63,51 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 			}
 		})
 	return nil
+}
+
+// Validate_FlowSchema validates an instance of FlowSchema according
+// to declarative validation rules in the API schema.
+func Validate_FlowSchema(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.FlowSchema) (errs field.ErrorList) {
+	// field flowcontrolv1beta1.FlowSchema.TypeMeta has no validation
+	// field flowcontrolv1beta1.FlowSchema.ObjectMeta has no validation
+
+	// field flowcontrolv1beta1.FlowSchema.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.FlowSchemaSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_FlowSchemaSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.FlowSchema) *flowcontrolv1beta1.FlowSchemaSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	// field flowcontrolv1beta1.FlowSchema.Status has no validation
+	return errs
+}
+
+// Validate_FlowSchemaSpec validates an instance of FlowSchemaSpec according
+// to declarative validation rules in the API schema.
+func Validate_FlowSchemaSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.FlowSchemaSpec) (errs field.ErrorList) {
+	// field flowcontrolv1beta1.FlowSchemaSpec.PriorityLevelConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.PriorityLevelConfigurationReference, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PriorityLevelConfigurationReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("priorityLevelConfiguration"), &obj.PriorityLevelConfiguration, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.FlowSchemaSpec) *flowcontrolv1beta1.PriorityLevelConfigurationReference {
+			return &oldObj.PriorityLevelConfiguration
+		}), oldObj != nil)...)
+
+	// field flowcontrolv1beta1.FlowSchemaSpec.MatchingPrecedence has no validation
+	// field flowcontrolv1beta1.FlowSchemaSpec.DistinguisherMethod has no validation
+	// field flowcontrolv1beta1.FlowSchemaSpec.Rules has no validation
+	return errs
 }
 
 // Validate_LimitResponse validates an instance of LimitResponse according
@@ -221,6 +274,31 @@ func Validate_PriorityLevelConfiguration(
 	}
 
 	// field flowcontrolv1beta1.PriorityLevelConfiguration.Status has no validation
+	return errs
+}
+
+// Validate_PriorityLevelConfigurationReference validates an instance of PriorityLevelConfigurationReference according
+// to declarative validation rules in the API schema.
+func Validate_PriorityLevelConfigurationReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta1.PriorityLevelConfigurationReference) (errs field.ErrorList) {
+	// field flowcontrolv1beta1.PriorityLevelConfigurationReference.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *flowcontrolv1beta1.PriorityLevelConfigurationReference) *string { return &oldObj.Name }), oldObj != nil)...)
+
 	return errs
 }
 
