@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/volumeattachment"
 )
@@ -94,6 +95,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	filesystemMode := core.PersistentVolumeFilesystem
+
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
@@ -118,6 +121,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		"immutable inline volume spec volumeMode": {
+			oldInput: mkValidVolumeAttachment(TweakInlineVolumeSpec(mkInlineVolumeSpec(&filesystemMode))),
+			newInput: mkValidVolumeAttachment(TweakInlineVolumeSpec(mkInlineVolumeSpec(nil))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -130,6 +140,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 func TweakAttacher(attacher string) func(obj *storage.VolumeAttachment) {
 	return func(obj *storage.VolumeAttachment) {
 		obj.Spec.Attacher = attacher
+	}
+}
+
+func TweakInlineVolumeSpec(spec *core.PersistentVolumeSpec) func(obj *storage.VolumeAttachment) {
+	return func(obj *storage.VolumeAttachment) {
+		// VolumeAttachmentSource is a union; clear PersistentVolumeName so the inline spec is selected.
+		obj.Spec.Source.PersistentVolumeName = nil
+		obj.Spec.Source.InlineVolumeSpec = spec
 	}
 }
 
@@ -151,4 +169,17 @@ func mkValidVolumeAttachment(tweaks ...func(obj *storage.VolumeAttachment)) stor
 		tweak(&obj)
 	}
 	return obj
+}
+
+func mkInlineVolumeSpec(volumeMode *core.PersistentVolumeMode) *core.PersistentVolumeSpec {
+	return &core.PersistentVolumeSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		PersistentVolumeSource: core.PersistentVolumeSource{
+			CSI: &core.CSIPersistentVolumeSource{
+				Driver:       "com.test.foo",
+				VolumeHandle: "valid-volume",
+			},
+		},
+		VolumeMode: volumeMode,
+	}
 }

@@ -422,6 +422,8 @@ type PersistentVolumeSpec struct {
 	// volumeMode defines if a volume is intended to be used with a formatted filesystem
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// nodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 	// This field influences the scheduling of pods that use this volume.
