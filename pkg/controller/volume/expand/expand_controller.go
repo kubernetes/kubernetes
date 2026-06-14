@@ -322,7 +322,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")
