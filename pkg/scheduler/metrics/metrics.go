@@ -222,6 +222,7 @@ func Register() {
 	})
 }
 
+// InitMetrics initializes all scheduler metrics variables.
 func InitMetrics() {
 	scheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -597,6 +598,7 @@ func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
+// UnschedulableReason returns the gauge metric for the given plugin and profile reflecting why a pod is unschedulable.
 func UnschedulableReason(plugin string, profile string) metrics.GaugeMetric {
 	return unschedulableReasons.With(metrics.Labels{"plugin": plugin, "profile": profile})
 }
