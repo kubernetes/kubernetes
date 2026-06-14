@@ -66,6 +66,19 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	containerMemReq := container.Resources.Requests.Memory().Value()
 
+	// Add DRA memory allocations to container memory request for OOM score calculation
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+			for _, cName := range claimStatus.Containers {
+				if cName == container.Name {
+					if memQuant, found := claimStatus.Resources[v1.ResourceMemory]; found {
+						containerMemReq += memQuant.Value()
+					}
+				}
+			}
+		}
+	}
+
 	var oomScoreAdjust, remainingReqPerContainer int64
 	// When PodLevelResources feature is enabled, the OOM score adjustment formula is modified
 	// to account for pod-level memory requests. Any extra pod memory request that's

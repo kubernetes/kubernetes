@@ -47,10 +47,12 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 
 func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Context, pod *v1.Pod) *runtimeapi.LinuxContainerResources {
 	logger := klog.FromContext(ctx)
+	// Use explicit flags for requests and limits to avoid accidental inflation.
 	opts := resourcehelper.PodResourcesOptions{
-		ExcludeOverhead: true,
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		ExcludeOverhead:                                     true,
+		SkipPodLevelResources:                               !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseDRANodeAllocatableResourceClaimStatus: false,
+		UseDRANodeAllocatableResourceClaimStatusForLimits:   utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	req := resourcehelper.PodRequests(pod, opts)
 	lim := resourcehelper.PodLimits(pod, opts)

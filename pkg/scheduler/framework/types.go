@@ -1056,7 +1056,7 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 			UseStatusResources: inPlacePodVerticalScalingEnabled,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:                    !podLevelResourcesEnabled,
+			SkipPodLevelResources:                   !podLevelResourcesEnabled,
 			NonMissingContainerRequests:              nonMissingContainerRequests,
 			UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
 		})

@@ -62,6 +62,8 @@ type PodResourcesOptions struct {
 	SkipContainerLevelResources bool
 	// Use node allocatable resource claim information from pod status to compute the effective pod resource request.
 	UseDRANodeAllocatableResourceClaimStatus bool
+	// Use node allocatable resource claim information from pod status to compute the effective pod resource limit.
+	UseDRANodeAllocatableResourceClaimStatusForLimits bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -467,6 +469,16 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	}
 
 	maxResourceList(limits, initContainerLimits)
+
+	// Add resources from node allocatable ResourceClaims
+	if opts.UseDRANodeAllocatableResourceClaimStatusForLimits && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+			for resName, resQty := range claimStatus.Resources {
+				addResourceList(limits, v1.ResourceList{resName: resQty})
+			}
+		}
+	}
+
 	return limits
 }
 
