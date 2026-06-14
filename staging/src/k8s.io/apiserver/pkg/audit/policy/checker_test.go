@@ -355,14 +355,7 @@ func TestUnionStages(t *testing.T) {
 		result := unionStages(tc.s1, tc.s2)
 		assert.Len(t, result, len(tc.exp))
 		for _, expStage := range tc.exp {
-			ok := false
-			for _, resultStage := range result {
-				if resultStage == expStage {
-					ok = true
-					break
-				}
-			}
-			assert.True(t, ok)
+			assert.Contains(t, result, expStage)
 		}
 	}
 }

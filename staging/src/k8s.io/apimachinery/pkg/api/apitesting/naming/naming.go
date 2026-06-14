@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,7 +71,7 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 	}
 
 	// Don't look at the same type multiple times
-	if containsType(parents, tp) {
+	if slices.Contains(parents, tp) {
 		return nil
 	}
 	parents = append(parents, tp)
@@ -111,7 +112,7 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 	}
 
 	// Don't look at the same type multiple times
-	if containsType(parents, tp) {
+	if slices.Contains(parents, tp) {
 		return nil
 	}
 	parents = append(parents, tp)
@@ -155,14 +156,4 @@ func fmtParentString(parents []reflect.Type) string {
 		str += fmt.Sprintf("%s%v\n", strings.Repeat(" ", i), tp)
 	}
 	return str
-}
-
-// containsType returns true if s contains t, false otherwise
-func containsType(s []reflect.Type, t reflect.Type) bool {
-	for _, u := range s {
-		if t == u {
-			return true
-		}
-	}
-	return false
 }

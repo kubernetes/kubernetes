@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -512,7 +513,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 		// Assert
 		t.Logf("\r\nmountArgs =%q\r\nmountArgsLogStr=%q", mountArgs, mountArgsLogStr)
 		for _, mountFlag := range v.mountFlags {
-			if found := mountArgsContainString(t, mountArgs, mountFlag); !found {
+			if !slices.Contains(mountArgs, mountFlag) {
 				t.Errorf("Expected mountFlag (%q) to exist in returned mountArgs (%q), but it does not", mountFlag, mountArgs)
 			}
 			if !strings.Contains(mountArgsLogStr, mountFlag) {
@@ -547,15 +548,6 @@ func TestHasSystemd(t *testing.T) {
 	if mounter.withSystemd == nil {
 		t.Error("Failed to run detectSystemd()")
 	}
-}
-
-func mountArgsContainString(t *testing.T, mountArgs []string, wanted string) bool {
-	for _, mountArg := range mountArgs {
-		if mountArg == wanted {
-			return true
-		}
-	}
-	return false
 }
 
 func mountArgsContainOption(t *testing.T, mountArgs []string, option string) bool {

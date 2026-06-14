@@ -19,6 +19,7 @@ package reconciliation
 import (
 	"fmt"
 	"reflect"
+	"slices"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -216,15 +217,6 @@ func computeReconciledRoleBinding(existing, expected RoleBinding, removeExtraSub
 	return result, nil
 }
 
-func contains(list []rbacv1.Subject, item rbacv1.Subject) bool {
-	for _, listItem := range list {
-		if listItem == item {
-			return true
-		}
-	}
-	return false
-}
-
 // diffSubjectLists returns lists containing the items unique to each provided list:
 //
 //	list1Only = list1 - list2
@@ -233,17 +225,13 @@ func contains(list []rbacv1.Subject, item rbacv1.Subject) bool {
 // if both returned lists are empty, the provided lists are equal
 func diffSubjectLists(list1 []rbacv1.Subject, list2 []rbacv1.Subject) (list1Only []rbacv1.Subject, list2Only []rbacv1.Subject) {
 	for _, list1Item := range list1 {
-		if !contains(list2, list1Item) {
-			if !contains(list1Only, list1Item) {
-				list1Only = append(list1Only, list1Item)
-			}
+		if !slices.Contains(list2, list1Item) && !slices.Contains(list1Only, list1Item) {
+			list1Only = append(list1Only, list1Item)
 		}
 	}
 	for _, list2Item := range list2 {
-		if !contains(list1, list2Item) {
-			if !contains(list2Only, list2Item) {
-				list2Only = append(list2Only, list2Item)
-			}
+		if !slices.Contains(list1, list2Item) && !slices.Contains(list2Only, list2Item) {
+			list2Only = append(list2Only, list2Item)
 		}
 	}
 	return

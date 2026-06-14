@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 
@@ -121,17 +122,6 @@ func (r *FakeImageService) makeFakeImage(image *runtimeapi.ImageSpec) *runtimeap
 	}
 }
 
-// stringInSlice returns true if s is in list
-func stringInSlice(s string, list []string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-
-	return false
-}
-
 // InjectError sets the error message for the FakeImageService.
 func (r *FakeImageService) InjectError(f string, err error) {
 	r.Lock()
@@ -166,7 +156,7 @@ func (r *FakeImageService) ListImages(_ context.Context, filter *runtimeapi.Imag
 	images := make([]*runtimeapi.Image, 0)
 	for _, img := range r.Images {
 		if filter != nil && filter.Image != nil {
-			if !stringInSlice(filter.Image.Image, img.RepoTags) {
+			if !slices.Contains(img.RepoTags, filter.Image.Image) {
 				continue
 			}
 		}

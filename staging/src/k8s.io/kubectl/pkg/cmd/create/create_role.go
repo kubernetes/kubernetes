@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -206,7 +207,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 			verbs = []string{"*"}
 			break
 		}
-		if !arrayContains(verbs, v) {
+		if !slices.Contains(verbs, v) {
 			verbs = append(verbs, v)
 		}
 	}
@@ -240,7 +241,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	// Remove duplicate resource names.
 	resourceNames := []string{}
 	for _, n := range o.ResourceNames {
-		if !arrayContains(resourceNames, n) {
+		if !slices.Contains(resourceNames, n) {
 			resourceNames = append(resourceNames, n)
 		}
 	}
@@ -299,7 +300,7 @@ func (o *CreateRoleOptions) Validate() error {
 	}
 
 	for _, v := range o.Verbs {
-		if !arrayContains(validResourceVerbs, v) {
+		if !slices.Contains(validResourceVerbs, v) {
 			fmt.Fprintf(o.ErrOut, "Warning: '%s' is not a standard resource verb\n", v)
 		}
 	}
@@ -389,15 +390,6 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 	return o.PrintObj(role)
 }
 
-func arrayContains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resources []ResourceOptions, resourceNames []string, nonResourceURLs []string) ([]rbacv1.PolicyRule, error) {
 	// groupResourceMapping is a apigroup-resource map. The key of this map is api group, while the value
 	// is a string array of resources under this api group.
@@ -418,7 +410,7 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 		if len(r.SubResource) > 0 {
 			resource.Resource = resource.Resource + "/" + r.SubResource
 		}
-		if !arrayContains(groupResourceMapping[resource.Group], resource.Resource) {
+		if !slices.Contains(groupResourceMapping[resource.Group], resource.Resource) {
 			groupResourceMapping[resource.Group] = append(groupResourceMapping[resource.Group], resource.Resource)
 		}
 	}

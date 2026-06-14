@@ -224,15 +224,6 @@ func NewRequirement(key string, op selection.Operator, vals []string, opts ...fi
 	return &Requirement{key: key, operator: op, strValues: vals}, allErrs.ToAggregate()
 }
 
-func (r *Requirement) hasValue(value string) bool {
-	for i := range r.strValues {
-		if r.strValues[i] == value {
-			return true
-		}
-	}
-	return false
-}
-
 // Matches returns true if the Requirement matches the input Labels.
 // There is a match in the following cases:
 //  1. The operator is Exists and Labels has the Requirement's key.
@@ -251,13 +242,13 @@ func (r *Requirement) Matches(ls Labels) bool {
 		if !exists {
 			return false
 		}
-		return r.hasValue(val)
+		return slices.Contains(r.strValues, val)
 	case selection.NotIn, selection.NotEquals:
 		val, exists := ls.Lookup(r.key)
 		if !exists {
 			return true
 		}
-		return !r.hasValue(val)
+		return !slices.Contains(r.strValues, val)
 	case selection.Exists:
 		return ls.Has(r.key)
 	case selection.DoesNotExist:
