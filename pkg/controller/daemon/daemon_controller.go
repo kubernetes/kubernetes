@@ -205,7 +205,7 @@ func NewDaemonSetsController(
 			KubeClient: kubeClient,
 		},
 		burstReplicas: BurstReplicas,
-		expectations:  controller.NewControllerExpectations(),
+		expectations:  controller.NewControllerExpectations(expectationsMetrics{}),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -1557,4 +1557,10 @@ func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, nodeName st
 	}
 
 	return nil
+}
+
+type expectationsMetrics struct{}
+
+func (expectationsMetrics) ObserveExpectationsWaiting(expType string) {
+	metrics.ExpectationsWaiting.WithLabelValues(expType).Inc()
 }
