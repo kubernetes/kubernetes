@@ -236,6 +236,8 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 // DeleteStatefulPod deletes a Pod. A NotFound is considered a successful response, since the
 // end result is the same: the pod is deleted.
 func (spc *StatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
+	// TODO: Consider using ResourceVersion preconditions to ensure we don't delete a pod that
+	// has been modified since our last cached read.
 	if err := spc.objectMgr.DeletePod(pod); err != nil {
 		if !apierrors.IsNotFound(err) {
 			spc.recordPodEvent("delete", set, pod, err)

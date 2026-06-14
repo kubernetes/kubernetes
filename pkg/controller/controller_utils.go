@@ -473,7 +473,7 @@ type PodControlInterface interface {
 	// CreatePodsWithGenerateName creates new pods according to the spec, sets object as the pod's controller and sets pod's generateName.
 	CreatePodsWithGenerateName(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error
 	// DeletePod deletes the pod identified by podID.
-	DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error
+	DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object, opts metav1.DeleteOptions) error
 	// PatchPod patches the pod.
 	PatchPod(ctx context.Context, namespace, name string, data []byte) error
 }
@@ -616,14 +616,14 @@ func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v
 	return nil
 }
 
-func (r RealPodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
+func (r RealPodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object, opts metav1.DeleteOptions) error {
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Deleting pod", "controller", accessor.GetName(), "pod", klog.KRef(namespace, podID))
-	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(ctx, podID, metav1.DeleteOptions{}); err != nil {
+	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(ctx, podID, opts); err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.V(4).Info("Pod has already been deleted.", "pod", klog.KRef(namespace, podID))
 			return err
@@ -679,7 +679,7 @@ func (f *FakePodControl) CreatePodsWithGenerateName(ctx context.Context, namespa
 	return nil
 }
 
-func (f *FakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
+func (f *FakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object, opts metav1.DeleteOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.DeletePodName = append(f.DeletePodName, podID)
