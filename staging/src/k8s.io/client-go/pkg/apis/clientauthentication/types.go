@@ -62,6 +62,12 @@ type ExecCredentialStatus struct {
 	// Token is a bearer token used by the client for request authentication.
 	// +optional
 	Token string `datapolicy:"token"`
+	// AuthProxyHeaders are HTTP headers used to authenticate to an authenticating
+	// proxy or gateway in front of the Kubernetes API server. These headers are not
+	// intended for Kubernetes API authentication, authorization, impersonation,
+	// routing, or transport controls.
+	// +optional
+	AuthProxyHeaders map[string]string `datapolicy:"token"`
 	// PEM-encoded client TLS certificate.
 	// +optional
 	ClientCertificateData string

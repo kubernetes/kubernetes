@@ -64911,7 +64911,7 @@ func schema_pkg_apis_clientauthentication_v1_ExecCredentialStatus(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ExecCredentialStatus holds credentials for the transport to use.\n\nToken and ClientKeyData are sensitive fields. This data should only be transmitted in-memory between client and exec plugin process. Exec plugin itself should at least be protected via file permissions.",
+				Description: "ExecCredentialStatus holds credentials for the transport to use.\n\nToken, AuthProxyHeaders, and ClientKeyData are sensitive fields. This data should only be transmitted in-memory between client and exec plugin process. Exec plugin itself should at least be protected via file permissions.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"expirationTimestamp": {
@@ -64925,6 +64925,21 @@ func schema_pkg_apis_clientauthentication_v1_ExecCredentialStatus(ref common.Ref
 							Description: "Token is a bearer token used by the client for request authentication.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"authProxyHeaders": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AuthProxyHeaders are HTTP headers used to authenticate to an authenticating proxy or gateway in front of the Kubernetes API server. Exec plugins must not use this field to set Kubernetes API authentication, authorization, impersonation, routing, transport, content negotiation, or audit headers.\n\nClients must reject Kubernetes-reserved or transport-sensitive header names.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
 						},
 					},
 					"clientCertificateData": {

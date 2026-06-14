@@ -53,15 +53,24 @@ type ExecCredentialSpec struct {
 
 // ExecCredentialStatus holds credentials for the transport to use.
 //
-// Token and ClientKeyData are sensitive fields. This data should only be
-// transmitted in-memory between client and exec plugin process. Exec plugin
-// itself should at least be protected via file permissions.
+// Token, AuthProxyHeaders, and ClientKeyData are sensitive fields. This data
+// should only be transmitted in-memory between client and exec plugin process.
+// Exec plugin itself should at least be protected via file permissions.
 type ExecCredentialStatus struct {
 	// ExpirationTimestamp indicates a time when the provided credentials expire.
 	// +optional
 	ExpirationTimestamp *metav1.Time `json:"expirationTimestamp,omitempty"`
 	// Token is a bearer token used by the client for request authentication.
 	Token string `json:"token,omitempty" datapolicy:"token"`
+	// AuthProxyHeaders are HTTP headers used to authenticate to an authenticating
+	// proxy or gateway in front of the Kubernetes API server. Exec plugins must not
+	// use this field to set Kubernetes API authentication, authorization,
+	// impersonation, routing, transport, content negotiation, or audit headers.
+	//
+	// Clients must reject Kubernetes-reserved or transport-sensitive header
+	// names.
+	// +optional
+	AuthProxyHeaders map[string]string `json:"authProxyHeaders,omitempty" datapolicy:"token"`
 	// PEM-encoded client TLS certificates (including intermediates, if any).
 	ClientCertificateData string `json:"clientCertificateData,omitempty"`
 	// PEM-encoded private key for the above certificate.

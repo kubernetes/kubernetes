@@ -106,6 +106,13 @@ func (in *ExecCredentialStatus) DeepCopyInto(out *ExecCredentialStatus) {
 		in, out := &in.ExpirationTimestamp, &out.ExpirationTimestamp
 		*out = (*in).DeepCopy()
 	}
+	if in.AuthProxyHeaders != nil {
+		in, out := &in.AuthProxyHeaders, &out.AuthProxyHeaders
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
