@@ -451,8 +451,35 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 
 		numPods := 2
 
-		if !l.driver.GetDriverInfo().Capabilities[storageframework.CapRWX] {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", l.driver.GetDriverInfo().Name, storageframework.CapRWX)
+		// Check if driver supports RWX and determine which volume modes are supported.
+		// Three capability patterns:
+		// 1. CapRWX only: supports RWX on all volume modes
+		// 2. CapRWXFilesystemOnly: supports RWX only on filesystem volumes (e.g. vSphere CSI file volumes)
+		// 3. CapRWXBlockOnly: supports RWX only on block volumes
+		supportsRWX := l.driver.GetDriverInfo().Capabilities[storageframework.CapRWX]
+		supportsRWXFilesystemOnly := l.driver.GetDriverInfo().Capabilities[storageframework.CapRWXFilesystemOnly]
+		supportsRWXBlockOnly := l.driver.GetDriverInfo().Capabilities[storageframework.CapRWXBlockOnly]
+
+		// Check if driver supports RWX at all
+		if !supportsRWX && !supportsRWXFilesystemOnly && !supportsRWXBlockOnly {
+			e2eskipper.Skipf("Driver %s doesn't support RWX -- skipping", l.driver.GetDriverInfo().Name)
+		}
+
+		// Skip if this is a block volume but driver only supports RWX on filesystem
+		if supportsRWXFilesystemOnly && pattern.VolMode == v1.PersistentVolumeBlock {
+			e2eskipper.Skipf("Driver %s only supports RWX on filesystem volumes, skipping block volume test", l.driver.GetDriverInfo().Name)
+		}
+
+		// Skip if this is a filesystem volume but driver only supports RWX on block
+		if supportsRWXBlockOnly && pattern.VolMode != v1.PersistentVolumeBlock {
+			e2eskipper.Skipf("Driver %s only supports RWX on block volumes, skipping filesystem volume test", l.driver.GetDriverInfo().Name)
+		}
+
+		// Filesystem RWX volumes (like NFS, vSphere file volumes) don't support specifying fsType
+		// because the filesystem format is pre-determined by the shared storage backend.
+		// Skip fsType tests for drivers with general RWX or filesystem-only RWX on filesystem volumes.
+		if pattern.VolMode != v1.PersistentVolumeBlock && (supportsRWX || supportsRWXFilesystemOnly) && pattern.FsType != "" {
+			e2eskipper.Skipf("RWX filesystem volumes don't support specifying fsType (%s) -- skipping", pattern.FsType)
 		}
 
 		// Check different-node test requirement
