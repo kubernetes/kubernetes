@@ -101,6 +101,10 @@ type watchCacheInterval struct {
 
 	// initialEventsEndBookmark will be sent after sending all events in cacheInterval
 	initialEventsEndBookmark *watchCacheEvent
+
+	// buildBuffer, when non-nil, lazily populates buffer on the first Next() call so a
+	// snapshot-backed interval can be built off the watchCache lock instead of under it.
+	buildBuffer func() (*watchCacheIntervalBuffer, error)
 }
 
 type indexerFunc func(int) *watchCacheEvent
@@ -123,7 +127,6 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
 func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 	if matchesSingle {
 		item, exists, err := indexer.GetByKey(key)
@@ -137,13 +140,41 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 	} else {
 		allItems = indexer.List()
 	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
-	for i, item := range allItems {
+	buffer, err := eventBufferFromElements(resourceVersion, allItems)
+	if err != nil {
+		return nil, err
+	}
+	return &watchCacheInterval{buffer: buffer, resourceVersion: resourceVersion}, nil
+}
+
+// newCacheIntervalFromSnapshot creates an interval that captures a snapshot reference
+// but delays the O(N) element traversal until the watcher's processInterval goroutine
+// calls Next() for the first time, this in turn ensure watch-cache hold time is O(1).
+func newCacheIntervalFromSnapshot(resourceVersion uint64, snapshot store.Snapshot, key string) *watchCacheInterval {
+	return &watchCacheInterval{
+		resourceVersion: resourceVersion,
+		buildBuffer: func() (*watchCacheIntervalBuffer, error) {
+			items, err := snapshot.OrderedListPrefix(key, "")
+			if err != nil {
+				return nil, err
+			}
+			return eventBufferFromElements(resourceVersion, items)
+		},
+	}
+}
+
+// eventBufferFromElements wraps store elements as synthetic Added events at the
+// given resourceVersion and returns a buffer pre-loaded with all of them.
+func eventBufferFromElements(resourceVersion uint64, items []interface{}) (*watchCacheIntervalBuffer, error) {
+	buffer := &watchCacheIntervalBuffer{}
+	events := make([]watchCacheEvent, len(items))
+	buffer.buffer = make([]*watchCacheEvent, len(items))
+	for i, item := range items {
 		elem, ok := item.(*store.Element)
 		if !ok {
 			return nil, fmt.Errorf("not a storeElement: %v", elem)
 		}
-		buffer.buffer[i] = &watchCacheEvent{
+		events[i] = watchCacheEvent{
 			Type:            watch.Added,
 			Object:          elem.Object,
 			ObjLabels:       elem.Labels,
@@ -151,23 +182,26 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 			Key:             elem.Key,
 			ResourceVersion: resourceVersion,
 		}
+		buffer.buffer[i] = &events[i]
 		buffer.endIndex++
 	}
-	ci := &watchCacheInterval{
-		startIndex: 0,
-		// Simulate that we already have all the events we're looking for.
-		endIndex:        0,
-		buffer:          buffer,
-		resourceVersion: resourceVersion,
-	}
-
-	return ci, nil
+	return buffer, nil
 }
 
 // Next returns the next item in the cache interval provided the cache
 // interval is still valid. An error is returned if the interval is
 // invalidated.
 func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
+	// A snapshot-backed interval materializes its buffer on first use, so the O(N)
+	// build runs here (off the watchCache lock) rather than at construction time.
+	if wci.buildBuffer != nil {
+		buffer, err := wci.buildBuffer()
+		if err != nil {
+			return nil, err
+		}
+		wci.buffer = buffer
+		wci.buildBuffer = nil
+	}
 	// if there are items in the buffer to return, return from
 	// the buffer.
 	if event, exists := wci.buffer.next(); exists {

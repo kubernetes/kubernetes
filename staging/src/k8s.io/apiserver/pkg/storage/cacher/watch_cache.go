@@ -730,6 +730,11 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 	_, matchesSingle := opts.Predicate.MatchesSingle()
 	matchesSingle = matchesSingle && !opts.Recursive
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		if !matchesSingle && w.snapshots != nil && w.snapshottingEnabled.Load() {
+			if snapshot, ok := w.snapshots.Latest(); ok {
+				return newCacheIntervalFromSnapshot(w.resourceVersion, snapshot, key), nil
+			}
+		}
 		return w.getIntervalFromStoreLocked(key, matchesSingle)
 	}
 
