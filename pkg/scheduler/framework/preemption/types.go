@@ -17,8 +17,7 @@ limitations under the License.
 package preemption
 
 import (
-	"maps"
-	"slices"
+	"fmt"
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -76,16 +75,36 @@ func (p *podGroupPreemptor) PreemptionPolicy() v1.PreemptionPolicy {
 	return p.preemptionPolicy
 }
 
-// domain represents the boundary or scope within which the preemption logic is evaluated.
-type domain struct {
+// Domain represents the boundary or scope within which the preemption logic is evaluated.
+// It abstracts the scheduling domain, which can range from a single Node (for standard Pod preemption)
+// to a group of Nodes or the entire Cluster (for PodGroup preemption).
+type Domain struct {
 	nodes              []fwk.NodeInfo
 	name               string
-	allPossibleVictims []*victim
+	allPossibleVictims []*DomainVictim
+}
+
+// Nodes returns a list of NodeInfo objects that belong to this domain.
+// The preemption logic uses this to check feasibility and resource availability
+// within the specific scope.
+func (d *Domain) Nodes() []fwk.NodeInfo {
+	return d.nodes
+}
+
+// GetAllPossibleVictims returns all potential victims running within this domain (individual Pods or PodGroups).
+func (d *Domain) GetAllPossibleVictims() []*DomainVictim {
+	return d.allPossibleVictims
+}
+
+// GetName returns a unique identifier for the domain.
+// This is primarily used for logging and debugging purposes.
+func (d *Domain) GetName() string {
+	return d.name
 }
 
 // getPodGroup checks if a pod specifies a scheduling group and returns the corresponding PodGroup object if found.
 func getPodGroup(p *v1.Pod, pgLister schedulinglisters.PodGroupLister) *schedulingapi.PodGroup {
-	if p.Spec.SchedulingGroup == nil {
+	if pgLister == nil || p.Spec.SchedulingGroup == nil {
 		return nil
 	}
 	pgName := p.Spec.SchedulingGroup.PodGroupName
@@ -101,6 +120,18 @@ func isDisruptionModeAll(pg *schedulingapi.PodGroup) bool {
 	return pg != nil && pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil
 }
 
+func createDomainVictims(snapshot fwk.SharedLister, victimMap map[types.UID]Victim) ([]*DomainVictim, error) {
+	var allPossibleVictims []*DomainVictim
+	for _, vi := range victimMap {
+		v, err := newDomainVictim(snapshot, vi.Pods(), vi.Priority())
+		if err != nil {
+			return nil, err
+		}
+		allPossibleVictims = append(allPossibleVictims, v)
+	}
+	return allPossibleVictims, nil
+}
+
 // newDomainForWorkloadPreemption creates a new domain for workload preemption.
 // The domain is the whole cluster and it contains victims that are computed based
 // on the pods and their scheduling groups.
@@ -108,90 +139,96 @@ func isDisruptionModeAll(pg *schedulingapi.PodGroup) bool {
 // together into a single victim. Otherwise, they are treated as individual victims.
 // In both cases, the priority of the victim is determined by the PodGroup priority
 // if the pod belongs to a PodGroup.
-func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, pgLister schedulinglisters.PodGroupLister, name string) *domain {
-	victimMap := map[types.UID]*victim{}
-	for _, node := range nodes {
-		for _, p := range node.GetPods() {
-			// TODO: Calling the lister here is not ideal given we do this
-			// for every pod in the cluster. Instead, we should be getting
-			// this information from the snapshot.
-			pg := getPodGroup(p.GetPod(), pgLister)
-			if pg == nil {
-				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, corev1helpers.PodPriority(p.GetPod()), []fwk.NodeInfo{node})
-				continue
-			}
-			if !isDisruptionModeAll(pg) {
-				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, util.PodGroupPriority(pg), []fwk.NodeInfo{node})
-				continue
-			}
-			victim, ok := victimMap[pg.UID]
-			if ok {
-				victim.pods = append(victim.pods, p)
-				victim.affectedNodes[node.Node().Name] = node
-				continue
-			}
-			victimMap[pg.UID] = newVictim([]fwk.PodInfo{p}, util.PodGroupPriority(pg), []fwk.NodeInfo{node})
-		}
+func newDomainForWorkloadPreemption(snapshot fwk.SharedLister, pgLister schedulinglisters.PodGroupLister, name string) (*Domain, error) {
+	nodes, err := snapshot.NodeInfos().List()
+	if err != nil {
+		return nil, err
 	}
 
-	allPossibleVictims := slices.Collect(maps.Values(victimMap))
-	return &domain{
+	allPossibleVictims, err := getCrossNodesVictims(snapshot, pgLister, nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Domain{
 		nodes:              nodes,
 		allPossibleVictims: allPossibleVictims,
 		name:               name,
+	}, nil
+}
+
+func getCrossNodesVictims(snapshot fwk.SharedLister, pgLister schedulinglisters.PodGroupLister, nodes []fwk.NodeInfo) ([]*DomainVictim, error) {
+	victimMap := map[types.UID]Victim{}
+
+	searchCrossNodesVictimPods := func(pg *schedulingapi.PodGroup, podInfo fwk.PodInfo) Victim {
+		pgState, err := snapshot.PodGroupStates().Get(podInfo.GetPod().GetNamespace(), pg.Name)
+		if err != nil {
+			// Assuming this is guaranteed to succeed if feature is on and pods exist.
+			// If it fails, we keep the local pods only.
+			return NewPodVictim(podInfo, pgLister)
+		}
+
+		pods := pgState.ScheduledPods()
+		podInfos := make([]fwk.PodInfo, len(pods))
+		for i, p := range pods {
+			// pods from ScheduledPods() already passed Filter/Reserve, and cannot error here.
+			podInfos[i], _ = framework.NewPodInfo(p)
+		}
+
+		// It can only return an error for empty podInfos, which is guaranteed not to be empty here.
+		victim, _ := NewVictim(podInfos, util.PodGroupPriority(pg))
+
+		return victim
 	}
-}
 
-// Nodes returns a list of NodeInfo objects that belong to this domain.
-func (d *domain) Nodes() []fwk.NodeInfo {
-	return d.nodes
-}
+	for _, node := range nodes {
+		for _, podInfo := range node.GetPods() {
+			p := podInfo.GetPod()
 
-// // GetAllPossibleVictims returns all potential victims running within this domain.
-func (d *domain) GetAllPossibleVictims() []*victim {
-	return d.allPossibleVictims
-}
+			// TODO: Calling the lister here is not ideal given we do this
+			// for every pod in the cluster. Instead, we should be getting
+			// this information from the snapshot.
+			pg := getPodGroup(p, pgLister)
+			if pg == nil || !isDisruptionModeAll(pg) {
+				victimMap[p.UID] = NewPodVictim(podInfo, pgLister)
+				continue
+			}
 
-// GetName returns a unique identifier for the domain.
-// This is primarily used for logging and debugging purposes.
-func (d *domain) GetName() string {
-	return d.name
+			victimMap[pg.UID] = searchCrossNodesVictimPods(pg, podInfo)
+		}
+	}
+
+	return createDomainVictims(snapshot, victimMap)
+
 }
 
 // victim represents an atomic entity that can be preempted (a victim).
 // It abstracts individual Pods and PodGroup, ensuring that
 // atomic entities are treated as a single unit during eviction.
+type Victim interface {
+	// Priority returns the priority of the preemption unit.
+	// For a single Pod, this is the Pod's priority.
+	// For a PodGroup, this is the priority of the PodGroup.
+	Priority() int32
+
+	// Pods returns the list of all Pods that belong to this preemption unit.
+	// Evicting this unit implies evicting all Pods in this list.
+	Pods() []fwk.PodInfo
+
+	// EarliestStartTime returns the earliest start time of all Pods in this preemption unit.
+	EarliestStartTime() *metav1.Time
+
+	// IsPodGroup returns true if the preemption unit represents a PodGroup.
+	IsPodGroup() bool
+}
+
 type victim struct {
 	pods              []fwk.PodInfo
 	priority          int32
-	affectedNodes     map[string]fwk.NodeInfo
 	earliestStartTime *metav1.Time
 }
 
-// newVictim creates a new Victim representing a set of Pods (or a PodGroup) that can be preempted together.
-// It calculates the earliest start time among all provided Pods and identifies all nodes
-// affected by the potential eviction of these Pods.
-func newVictim(pods []fwk.PodInfo, priority int32, nodeInfos []fwk.NodeInfo) *victim {
-	nodes := make(map[string]fwk.NodeInfo)
-	for _, node := range nodeInfos {
-		nodes[node.Node().Name] = node
-	}
-
-	var earliest *metav1.Time
-	for _, pInfo := range pods {
-		t := util.GetPodStartTime(pInfo.GetPod())
-		if earliest == nil || (t != nil && t.Before(earliest)) {
-			earliest = t
-		}
-	}
-
-	return &victim{
-		affectedNodes:     nodes,
-		priority:          priority,
-		pods:              pods,
-		earliestStartTime: earliest,
-	}
-}
+var _ Victim = &victim{}
 
 // Pods returns the list of all Pods that belong to this preemption unit.
 // Evicting this unit implies evicting all Pods in this list.
@@ -206,13 +243,6 @@ func (v *victim) Priority() int32 {
 	return v.priority
 }
 
-// AffectedNodes returns a map of Node names to NodeInfo for all nodes
-// where members of this preemption unit are currently running.
-// This allows the preemption logic to identify the blast radius of evicting this unit.
-func (v *victim) AffectedNodes() map[string]fwk.NodeInfo {
-	return v.affectedNodes
-}
-
 // EarliestStartTime returns the earliest start time of all Pods in this victim.
 func (v *victim) EarliestStartTime() *metav1.Time {
 	return v.earliestStartTime
@@ -220,7 +250,81 @@ func (v *victim) EarliestStartTime() *metav1.Time {
 
 // IsPodGroup returns true if the preemption unit represents a PodGroup.
 func (v *victim) IsPodGroup() bool {
-	return v.pods[0].GetPod().Spec.SchedulingGroup != nil
+	return len(v.pods) > 0 && v.pods[0].GetPod().Spec.SchedulingGroup != nil
+}
+
+// NewPodVictim creates a new Victim representing a single Pod.
+// It calculates the priority of the pod, taking into account its scheduling group if applicable.
+// It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
+func NewPodVictim(podInfo fwk.PodInfo, pgLister schedulinglisters.PodGroupLister) Victim {
+	priority := GetPodPriority(podInfo.GetPod(), pgLister)
+	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority)
+	return vi
+}
+
+// NewVictim creates a new Victim representing a set of Pods (or a PodGroup) that can be preempted together.
+// It calculates the earliest start time among all provided Pods
+func NewVictim(pods []fwk.PodInfo, priority int32) (Victim, error) {
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("no pods provided")
+	}
+
+	var earliest *metav1.Time
+	for _, pInfo := range pods {
+		t := util.GetPodStartTime(pInfo.GetPod())
+		if earliest == nil || (t != nil && t.Before(earliest)) {
+			earliest = t
+		}
+	}
+
+	return &victim{
+		priority:          priority,
+		pods:              pods,
+		earliestStartTime: earliest,
+	}, nil
+}
+
+// DomainVictim extends Victim to include information about the nodes affected by its eviction.
+// It represents a preemption unit within a specific scheduling domain and allows
+// the preemption logic to understand the blast radius of the eviction across multiple nodes.
+type DomainVictim struct {
+	Victim
+	affectedNodes map[string]fwk.NodeInfo
+}
+
+// AffectedNodes returns a map of all nodes currently hosting Pods that belong to this victim.
+func (dv *DomainVictim) AffectedNodes() map[string]fwk.NodeInfo {
+	return dv.affectedNodes
+}
+
+// newDomainVictim creates a DomainVictim from the given pods and priority.
+// It retrieves the NodeInfo for each pod from the snapshot and stores
+// in the affectedNodes map to represent the nodes affected by evicting these pods.
+func newDomainVictim(snapshot fwk.SharedLister, pods []fwk.PodInfo, priority int32) (*DomainVictim, error) {
+	nodeSnapshot := snapshot.NodeInfos()
+	nodes := make(map[string]fwk.NodeInfo)
+	for _, pInfo := range pods {
+		nodeName := pInfo.GetPod().Spec.NodeName
+		if _, ok := nodes[nodeName]; ok {
+			continue
+		}
+
+		nodeInfo, err := nodeSnapshot.Get(nodeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get node info for node %q from snapshot: %w", nodeName, err)
+		}
+		nodes[nodeName] = nodeInfo
+	}
+
+	victim, err := NewVictim(pods, priority)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DomainVictim{
+		Victim:        victim,
+		affectedNodes: nodes,
+	}, nil
 }
 
 // Candidate represents a nominated node on which the preemptor can be scheduled,

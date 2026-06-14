@@ -24,7 +24,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -211,6 +216,12 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+
+			logger, ctx := ktesting.NewTestContext(t)
+			snapshot := internalcache.NewSnapshot(tt.pods, tt.nodes)
+			cache := internalcache.New(ctx, nil, true)
+
 			nodeInfos := make(map[string]fwk.NodeInfo)
 			for _, node := range tt.nodes {
 				ni := framework.NewNodeInfo()
@@ -224,15 +235,27 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 				}
 			}
 
-			var domainNodes []fwk.NodeInfo
 			for _, node := range tt.nodes {
-				if ni, ok := nodeInfos[node.Name]; ok {
-					domainNodes = append(domainNodes, ni)
+				cache.AddNode(logger, node)
+			}
+
+			for _, p := range tt.pods {
+				if err := cache.AddPod(logger, p); err != nil {
+					t.Fatalf("Failed to add pod: %v", err)
+				}
+				if p.Spec.SchedulingGroup != nil && p.Spec.SchedulingGroup.PodGroupName != nil {
+					cache.AddPodGroupMember(p)
 				}
 			}
 
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
 			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			domain := newDomainForWorkloadPreemption(domainNodes, pgLister, tt.domainName)
+			domain, err := newDomainForWorkloadPreemption(snapshot, pgLister, tt.domainName)
+			if err != nil {
+				t.Fatalf("Failed to create domain: %v", err)
+			}
 
 			if domain.GetName() != tt.domainName {
 				t.Errorf("expected domain name %q, got %q", tt.domainName, domain.GetName())
