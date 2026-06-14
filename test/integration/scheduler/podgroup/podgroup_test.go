@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -843,5 +844,158 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.count)
+	}
+}
+
+// blockingPreBindPlugin blocks every pod in the PreBind phase until its release
+// channel is closed. It is used to hold a whole gang in the binding cycle so the
+// test can observe the binding-cycle state (e.g. NominatedNodeName) of the gang
+// pods before binding actually completes.
+type blockingPreBindPlugin struct {
+	release <-chan struct{}
+}
+
+func (p *blockingPreBindPlugin) Name() string {
+	return "BlockingPreBind"
+}
+
+func (p *blockingPreBindPlugin) PreBindPreFlight(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeName string) (*framework.PreBindPreFlightResult, *framework.Status) {
+	return &framework.PreBindPreFlightResult{AllowParallel: true}, nil
+}
+
+func (p *blockingPreBindPlugin) PreBind(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	select {
+	case <-ctx.Done():
+		return framework.NewStatus(framework.Error, "context cancelled")
+	case <-p.release:
+		return nil
+	}
+}
+
+// TestPodGroupBindingAndNominatedNodeName verifies the binding path of gang
+// (PodGroup) scheduling. Pod-by-pod scheduling already has dedicated integration
+// tests for binding (TestDefaultBinder) and for NominatedNodeName, but gang
+// scheduling reuses the same binding operation without a dedicated test of its
+// own. This test guards that path in case the two binding operations diverge by
+// checking that, for a gang:
+//   - NominatedNodeName is set on every pod while it is held in the binding cycle,
+//   - none of the pods are bound while PreBind is blocked,
+//   - the whole gang is bound once PreBind is released, and
+//   - NominatedNodeName is cleared on every pod after binding completes.
+func TestPodGroupBindingAndNominatedNodeName(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                       true,
+		features.GangScheduling:                        true,
+		features.NominatedNodeNameForExpectation:       true,
+		features.ClearingNominatedNodeNameAfterBinding: true,
+	})
+
+	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+
+	workload := st.MakeWorkload().Name("workload").
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
+	pg := st.MakePodGroup().Name("pg1").TemplateRef("t1", "workload").Priority(100).MinCount(3).Obj()
+
+	gangPods := []*v1.Pod{
+		st.MakePod().Name("gang-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Name("gang-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+		st.MakePod().Name("gang-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
+	}
+
+	// release unblocks the PreBind plugin so that binding can complete.
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	closeRelease := func() { releaseOnce.Do(func() { close(release) }) }
+	defer closeRelease()
+
+	registry := frameworkruntime.Registry{
+		"BlockingPreBind": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+			return &blockingPreBindPlugin{release: release}, nil
+		},
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				PreBind: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: "BlockingPreBind"},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-binding",
+		// disable backoff
+		scheduler.WithPodMaxBackoffSeconds(0),
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithProfiles(cfg.Profiles...),
+	)
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	if _, err := cs.SchedulingV1alpha3().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create workload: %v", err)
+	}
+
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	for _, p := range gangPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 1. The whole gang passes Permit together and enters the binding cycle, where
+	// it is held by the blocking PreBind plugin. While held, every gang pod should
+	// have its NominatedNodeName set (NNN is set before binding for the whole gang).
+	for _, p := range gangPods {
+		if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, p); err != nil {
+			t.Errorf("NominatedNodeName was not set for gang pod %s during binding: %v", p.Name, err)
+		}
+	}
+
+	// 2. None of the gang pods should be bound yet, since PreBind is still blocking.
+	for _, p := range gangPods {
+		pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get pod %s: %v", p.Name, err)
+		}
+		if pod.Spec.NodeName != "" {
+			t.Errorf("gang pod %s was bound to %s before PreBind was released", p.Name, pod.Spec.NodeName)
+		}
+	}
+
+	// 3. Release PreBind and verify the whole gang gets bound.
+	closeRelease()
+	for _, p := range gangPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Errorf("gang pod %s was not bound after PreBind was released: %v", p.Name, err)
+		}
+	}
+
+	// 4. After binding completes, NominatedNodeName should be cleared on every gang pod.
+	for _, p := range gangPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(ctx context.Context) (bool, error) {
+				pod, err := cs.CoreV1().Pods(ns).Get(ctx, p.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return pod.Status.NominatedNodeName == "", nil
+			}); err != nil {
+			t.Errorf("NominatedNodeName was not cleared for gang pod %s after binding: %v", p.Name, err)
+		}
 	}
 }
