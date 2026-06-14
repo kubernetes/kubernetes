@@ -211,14 +211,30 @@ func (c *Controller) electionNeeded(candidates []*v1beta1.LeaseCandidate, leaseN
 		return true, nil
 	}
 
-	// every 15min enforce an election to update all candidates. Every 30min we garbage collect.
+	// Filter out non-responsive candidates: those that were pinged, the election
+	// window has passed, and they never acknowledged. This prevents dead candidates
+	// whose LeaseCandidate objects persist (up to 30min GC window) from defeating
+	// the fast path and causing no-op election cycles every 5 seconds.
+	now := c.clock.Now()
+	var responsiveCandidates []*v1beta1.LeaseCandidate
 	for _, candidate := range candidates {
-		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(leaseCandidateValidDuration/2).Before(c.clock.Now()) {
+		if candidate.Spec.PingTime != nil &&
+			candidate.Spec.PingTime.Add(electionDuration).Before(now) &&
+			candidate.Spec.RenewTime.Before(candidate.Spec.PingTime) {
+			klog.V(5).Infof("Filtering non-responsive candidate %s (pinged at %v, last renew at %v)", candidate.Name, candidate.Spec.PingTime.Time, candidate.Spec.RenewTime.Time)
+			continue
+		}
+		responsiveCandidates = append(responsiveCandidates, candidate)
+	}
+
+	// every 15min enforce an election to update all candidates. Every 30min we garbage collect.
+	for _, candidate := range responsiveCandidates {
+		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(leaseCandidateValidDuration/2).Before(now) {
 			return true, nil
 		}
 	}
 
-	prelimStrategy, err := pickBestStrategy(candidates)
+	prelimStrategy, err := pickBestStrategy(responsiveCandidates)
 	if err != nil {
 		return false, err
 	}
@@ -227,7 +243,7 @@ func (c *Controller) electionNeeded(candidates []*v1beta1.LeaseCandidate, leaseN
 		return false, nil
 	}
 
-	prelimElectee := pickBestLeaderOldestEmulationVersion(candidates)
+	prelimElectee := pickBestLeaderOldestEmulationVersion(responsiveCandidates)
 	if prelimElectee == nil {
 		return false, nil
 	} else if lease != nil && lease.Spec.HolderIdentity != nil && prelimElectee.Name == *lease.Spec.HolderIdentity {
@@ -266,14 +282,12 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	}
 
 	now := c.clock.Now()
-	canVoteYet := true
+	sendingPings := false
 	g, gCtx := errgroup.WithContext(ctx)
 	for _, candidate := range candidates {
 		if candidate.Spec.PingTime != nil && candidate.Spec.PingTime.Add(electionDuration).After(now) &&
 			candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Before(candidate.Spec.PingTime) {
-
-			// continue waiting for the election to timeout
-			canVoteYet = false
+			// Still waiting for this candidate to ack
 			continue
 		}
 		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(electionDuration).After(now) {
@@ -290,42 +304,53 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 				_, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(gCtx, clone, metav1.UpdateOptions{})
 				return err
 			})
-			canVoteYet = false
+			sendingPings = true
 		}
 	}
 	if err := g.Wait(); err != nil {
 		return defaultRequeueInterval, err
 	}
-	if !canVoteYet {
+	if sendingPings {
+		// We just sent pings; wait for candidates to respond before proceeding.
 		return defaultRequeueInterval, nil
 	}
 
-	// election is ongoing as long as unexpired PingTimes exist
+	// Collect acked candidates and check if we still need to wait for others.
+	var ackedCandidates []*v1beta1.LeaseCandidate
+	waitingForAck := false
 	for _, candidate := range candidates {
+		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(electionDuration).After(now) {
+			ackedCandidates = append(ackedCandidates, candidate)
+			continue
+		}
 		if candidate.Spec.PingTime == nil {
-			continue // shouldn't be the case after the above
+			continue
 		}
-
 		if candidate.Spec.RenewTime != nil && !candidate.Spec.RenewTime.Before(candidate.Spec.PingTime) {
-			continue // this has renewed already
+			continue // already renewed
 		}
-
-		// If a candidate has a PingTime within the election duration, they have not acked
-		// and we should wait until we receive their response
 		if candidate.Spec.PingTime.Add(electionDuration).After(now) {
-			// continue waiting for the election to timeout
+			waitingForAck = true
+		}
+	}
+
+	if len(ackedCandidates) == 0 {
+		if waitingForAck {
 			return noRequeue, nil
 		}
+		return noRequeue, fmt.Errorf("no available candidates")
 	}
 
-	var ackedCandidates []*v1beta1.LeaseCandidate
-	for _, candidate := range candidates {
-		if candidate.Spec.RenewTime.Add(electionDuration).After(now) {
-			ackedCandidates = append(ackedCandidates, candidate)
+	// If we're still waiting for some candidates to ack, check whether the
+	// best overall candidate has already responded. If so, we know the winner
+	// and can skip waiting for worse candidates.
+	if waitingForAck {
+		bestOverall := pickBestLeaderOldestEmulationVersion(candidates)
+		bestAcked := pickBestLeaderOldestEmulationVersion(ackedCandidates)
+		if bestOverall == nil || bestAcked == nil || bestOverall.Name != bestAcked.Name {
+			return noRequeue, nil // best candidate hasn't acked yet, keep waiting
 		}
-	}
-	if len(ackedCandidates) == 0 {
-		return noRequeue, fmt.Errorf("no available candidates")
+		klog.V(4).Infof("Best candidate %s already acked, proceeding with election without waiting for remaining candidates", bestAcked.Name)
 	}
 
 	strategy, err := pickBestStrategy(ackedCandidates)
