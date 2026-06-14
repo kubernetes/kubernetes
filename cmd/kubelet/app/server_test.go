@@ -28,8 +28,10 @@ import (
 	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -115,6 +117,7 @@ func TestMergeKubeletConfigurations(t *testing.T) {
 		cliArgs                 []string
 		name                    string
 		expectMergeError        string
+		expectValidationError   string
 		expectedSkippedFiles    []string
 	}{
 		{
@@ -238,6 +241,17 @@ readOnlyPort: 10255
 				"--read-only-port=10256",
 			},
 			name: "cli args override kubelet.conf.d",
+		},
+		{
+			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{},
+			cliArgs: []string{
+				"--dra-manager-reconcile-period=0s",
+			},
+			name:                  "cli args set zero DRA reconcile period and validation rejects it",
+			expectValidationError: "invalid configuration: draManagerReconcilePeriod 0s must be greater than zero",
+			overwrittenConfigFields: map[string]interface{}{
+				"DRAManagerReconcilePeriod": metav1.Duration{Duration: 0},
+			},
 		},
 		{
 			kubeletConfig: &kubeletconfiginternal.KubeletConfiguration{
@@ -444,6 +458,12 @@ port: [this is not valid
 				value := reflect.ValueOf(kubeletConfig).Elem()
 				field := value.FieldByName(fieldName)
 				require.Equal(t, expectedValue, field.Interface(), "Field mismatch: "+fieldName)
+			}
+
+			if test.expectValidationError != "" {
+				err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig, utilfeature.DefaultFeatureGate)
+				require.Error(t, err)
+				require.ErrorContains(t, err, test.expectValidationError)
 			}
 		})
 	}
