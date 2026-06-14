@@ -153,7 +153,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
-		"A list of CIDR ranges that contain valid node IPs, or alternatively, the single string 'primary'. If set to a list of CIDRs, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If set to 'primary', NodePort services will only be accepted on the node's primary IP(s) according to the Node object. If unset, NodePort connections will be accepted on all local IPs. This parameter is ignored if a config file is specified by --config.")
+		"A list of CIDR ranges that contain valid node IPs, optionally combined with the keywords 'primary', 'localhost', and 'all'. Connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. 'primary' resolves to the node's primary IP(s) according to the Node object, 'localhost' to the node's loopback addresses, and 'all' to all addresses. If unset, NodePort connections will be accepted on all local IPs. This parameter is ignored if a config file is specified by --config.")
 
 	fs.Int32Var(o.config.Linux.OOMScoreAdj, "oom-score-adj", ptr.Deref(o.config.Linux.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
 	fs.Int32Var(o.config.Linux.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Linux.Conntrack.MaxPerCore,

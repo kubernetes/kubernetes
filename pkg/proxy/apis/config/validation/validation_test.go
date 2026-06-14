@@ -657,6 +657,18 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		"primary": {
 			addresses: []string{kubeproxyconfig.NodePortAddressesPrimary},
 		},
+		"localhost": {
+			addresses: []string{kubeproxyconfig.NodePortAddressesLocalhost},
+		},
+		"all": {
+			addresses: []string{kubeproxyconfig.NodePortAddressesAll},
+		},
+		"primary combined with localhost": {
+			addresses: []string{kubeproxyconfig.NodePortAddressesPrimary, kubeproxyconfig.NodePortAddressesLocalhost},
+		},
+		"keyword combined with CIDR": {
+			addresses: []string{kubeproxyconfig.NodePortAddressesPrimary, "127.0.0.1/32"},
+		},
 		"invalid foo address": {
 			addresses:    []string{"foo"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "foo", "must be a valid CIDR")},
@@ -681,14 +693,6 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		"invalid ipv6 ip format": {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[2]"), "2001:db8:xyz/64", "must be a valid CIDR")},
-		},
-		"invalid primary/CIDR mix 1": {
-			addresses:    []string{"primary", "127.0.0.1/32"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "primary", "can't use both 'primary' and CIDRs")},
-		},
-		"invalid primary/CIDR mix 2": {
-			addresses:    []string{"127.0.0.1/32", "primary"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "primary", "can't use both 'primary' and CIDRs")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
