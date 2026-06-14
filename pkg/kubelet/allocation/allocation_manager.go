@@ -158,10 +158,9 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 
 	stateImpl, err := state.NewStateCheckpoint(checkpointDirectory, checkpointName)
 	if err != nil {
-		// This is a critical, non-recoverable failure.
-		logger.Error(err, "Failed to initialize allocation checkpoint manager",
+		logger.Error(err, "Failed to initialize allocation checkpoint manager, starting with empty state",
 			"checkpointPath", filepath.Join(checkpointDirectory, checkpointName))
-		panic(err)
+		return state.NewStateMemory(nil)
 	}
 
 	return stateImpl

@@ -157,6 +157,45 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 	}
 }
 
+func Test_stateCheckpoint_corruptCheckpoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "invalid JSON",
+			content: `not valid json at all`,
+		},
+		{
+			name:    "valid JSON but wrong checksum",
+			content: `{"data":"{\"entries\":{}}","checksum":999999}`,
+		},
+		{
+			name:    "truncated JSON with null bytes",
+			content: `{"data":"{\"entries\":{\"pod1\":{\"Contai` + "\x00\x00\x00\x00\x00",
+		},
+		{
+			name:    "empty file",
+			content: ``,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDir := getTestDir(t)
+			checkpointPath := filepath.Join(testDir, testCheckpoint)
+
+			require.NoError(t, os.WriteFile(checkpointPath, []byte(tt.content), 0644))
+
+			sc, err := NewStateCheckpoint(testDir, testCheckpoint)
+			require.NoError(t, err, "corrupt checkpoint should not cause an error")
+
+			actual := sc.GetPodResourceInfoMap()
+			require.Empty(t, actual, "corrupt checkpoint should result in empty state")
+		})
+	}
+}
+
 func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	// Based on the PodResourceAllocationInfo struct, it's mostly possible that new field will be added
