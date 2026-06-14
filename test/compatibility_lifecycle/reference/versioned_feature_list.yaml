@@ -147,6 +147,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: ClusterTrustBundleProjection
   versionedSpecs:
   - default: false
@@ -157,6 +161,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.37"
 - name: ComponentFlagz
   versionedSpecs:
   - default: false

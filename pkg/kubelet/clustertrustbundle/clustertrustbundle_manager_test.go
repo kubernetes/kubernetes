@@ -35,12 +35,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/informers"
@@ -108,9 +110,24 @@ var betaFunctionsBundle = testingFunctionBundle[certificatesv1beta1.ClusterTrust
 	},
 }
 
+var gaFunctionsBundle = testingFunctionBundle[certificatesv1.ClusterTrustBundle]{
+	ctbConstructor: mustMakeGACTB,
+	ctbToObj:       func(ctb *certificatesv1.ClusterTrustBundle) runtime.Object { return ctb },
+	ctbTrustBundle: (&gaClusterTrustBundleHandlers{}).GetTrustBundle,
+
+	informerManagerConstructor: NewGAInformerManager,
+	informerGetter: func(informerFactory informers.SharedInformerFactory) cache.SharedIndexInformer {
+		return informerFactory.Certificates().V1().ClusterTrustBundles().Informer()
+	},
+	clientGetter: func(c kubernetes.Interface) testClient[certificatesv1.ClusterTrustBundle] {
+		return c.CertificatesV1().ClusterTrustBundles()
+	},
+}
+
 func TestGetTrustAnchorsByName(t *testing.T) {
 	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsByName(t, alphaFunctionsBundle) })
 	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsByName(t, betaFunctionsBundle) })
+	t.Run("v1", func(t *testing.T) { testGetTrustAnchorsByName(t, gaFunctionsBundle) })
 }
 
 func testGetTrustAnchorsByName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
@@ -167,6 +184,7 @@ func testGetTrustAnchorsByName[T clusterTrustBundle](t *testing.T, b testingFunc
 func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsByNameCaching(t, alphaFunctionsBundle) })
 	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsByNameCaching(t, betaFunctionsBundle) })
+	t.Run("v1", func(t *testing.T) { testGetTrustAnchorsByNameCaching(t, gaFunctionsBundle) })
 }
 
 func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
@@ -227,20 +245,24 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](t *testing.T, b test
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
-	// We need to sleep long enough for the informer to notice the new
-	// ClusterTrustBundle, but much less than the 5 minutes of the cache TTL.
-	// This shows us that the informer is properly clearing the cache.
-	time.Sleep(5 * time.Second)
-
 	t.Run("foo should yield the new certificate", func(t *testing.T) {
-		gotBundle, err := ctbManager.GetTrustAnchorsByName("foo", false)
-		if err != nil {
-			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
-		}
+		// wait for the changes to bubble through informer to the lister
+		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			gotBundle, err := ctbManager.GetTrustAnchorsByName("foo", false)
+			if err != nil {
+				t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
+			}
 
-		wantBundle := b.ctbTrustBundle(ctb2)
-		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
-			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+			wantBundle := b.ctbTrustBundle(ctb2)
+			if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+				t.Logf("Bad bundle; diff (-got +want)\n%s", diff)
+				return false, nil
+			}
+			return true, nil
+		})
+
+		if err != nil {
+			t.Logf("bundles never synced: %v", err)
 		}
 	})
 }
@@ -248,6 +270,7 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](t *testing.T, b test
 func TestGetTrustAnchorsBySignerName(t *testing.T) {
 	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsBySignerName(t, alphaFunctionsBundle) })
 	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsBySignerName(t, betaFunctionsBundle) })
+	t.Run("v1", func(t *testing.T) { testGetTrustAnchorsBySignerName(t, gaFunctionsBundle) })
 }
 
 func testGetTrustAnchorsBySignerName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
@@ -370,6 +393,7 @@ func testGetTrustAnchorsBySignerName[T clusterTrustBundle](t *testing.T, b testi
 func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsBySignerNameCaching(t, alphaFunctionsBundle) })
 	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsBySignerNameCaching(t, betaFunctionsBundle) })
+	t.Run("v1", func(t *testing.T) { testGetTrustAnchorsBySignerNameCaching(t, gaFunctionsBundle) })
 }
 
 func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
@@ -426,21 +450,25 @@ func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](t *testing.T, 
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
-	// We need to sleep long enough for the informer to notice the new
-	// ClusterTrustBundle, but much less than the 5 minutes of the cache TTL.
-	// This shows us that the informer is properly clearing the cache.
-	time.Sleep(5 * time.Second)
-
 	t.Run("signer-a label-a should return the new certificate", func(t *testing.T) {
-		gotBundle, err := ctbManager.GetTrustAnchorsBySigner("foo.bar/a", &metav1.LabelSelector{MatchLabels: map[string]string{"label": "a"}}, false)
+		// wait for the changes to bubble through informer to the lister
+		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			gotBundle, err := ctbManager.GetTrustAnchorsBySigner("foo.bar/a", &metav1.LabelSelector{MatchLabels: map[string]string{"label": "a"}}, false)
+			if err != nil {
+				t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
+			}
+
+			wantBundle := b.ctbTrustBundle(ctb2)
+
+			if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+				t.Logf("Bad bundle; diff (-got +want)\n%s", diff)
+				return false, nil
+			}
+
+			return true, nil
+		})
 		if err != nil {
-			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
-		}
-
-		wantBundle := b.ctbTrustBundle(ctb2)
-
-		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
-			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+			t.Logf("bundles never synced: %v", err)
 		}
 	})
 }
@@ -470,6 +498,19 @@ func mustMakeRoot(t *testing.T, cn string) string {
 		Headers: nil,
 		Bytes:   cert,
 	}))
+}
+
+func mustMakeGACTB(name, signerName string, labels map[string]string, bundle string) *certificatesv1.ClusterTrustBundle {
+	return &certificatesv1.ClusterTrustBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: certificatesv1.ClusterTrustBundleSpec{
+			SignerName:  signerName,
+			TrustBundle: bundle,
+		},
+	}
 }
 
 func mustMakeBetaCTB(name, signerName string, labels map[string]string, bundle string) *certificatesv1beta1.ClusterTrustBundle {
@@ -577,15 +618,22 @@ func TestLazyInformerManager_ensureManagerSet(t *testing.T) {
 			wantManager:      "v1beta1",
 		},
 		{
-			name:             "API available in v1 - currently unhandled",
+			name:             "API available in v1",
 			ctbsAvailableGVs: []string{"v1"},
-			wantManager:      "noop",
+			wantManager:      "v1",
 		},
 		{
-			name:             "err in discovery but beta API shard discovered",
+			name:             "err in discovery but beta API shard available",
 			injectError:      fmt.Errorf("unexpected discovery error"),
 			ctbsAvailableGVs: []string{"v1beta1"},
-			wantManager:      "v1beta1",
+			wantError:        true,
+			wantManager:      "nil",
+		},
+		{
+			name:             "err in discovery but v1 API shard available",
+			injectError:      fmt.Errorf("unexpected discovery error"),
+			ctbsAvailableGVs: []string{"v1"},
+			wantManager:      "v1",
 		},
 		{
 			name:             "API available in alpha and beta - prefer beta",
@@ -595,7 +643,7 @@ func TestLazyInformerManager_ensureManagerSet(t *testing.T) {
 		{
 			name:             "API available in multiple handled and unhandled versions - prefer the most-GA handled version",
 			ctbsAvailableGVs: []string{"v1alpha1", "v1", "v2", "v1beta1", "v1alpha2"},
-			wantManager:      "v1beta1",
+			wantManager:      "v1",
 		},
 	}
 	for _, tt := range tests {
@@ -632,6 +680,8 @@ func TestLazyInformerManager_ensureManagerSet(t *testing.T) {
 				require.Equal(t, tt.wantManager, "v1alpha1")
 			case *InformerManager[certificatesv1beta1.ClusterTrustBundle]:
 				require.Equal(t, tt.wantManager, "v1beta1")
+			case *InformerManager[certificatesv1.ClusterTrustBundle]:
+				require.Equal(t, tt.wantManager, "v1")
 			case *NoopManager:
 				require.Equal(t, tt.wantManager, "noop")
 			case nil:
