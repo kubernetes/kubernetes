@@ -5342,6 +5342,7 @@ func ValidateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.
 			} else if localhostProfile == "" {
 				allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when AppArmor type is Localhost"))
 			}
+			allErrs = append(allErrs, validatePathNoBacksteps(*profile.LocalhostProfile, fldPath.Child("localhostProfile"))...)
 
 			const maxLocalhostProfileLength = 4095 // PATH_MAX - 1
 			if len(*profile.LocalhostProfile) > maxLocalhostProfileLength {
@@ -5391,6 +5392,10 @@ func ValidateAppArmorProfileFormat(profile string) error {
 	}
 	if !strings.HasPrefix(profile, v1.DeprecatedAppArmorBetaProfileNamePrefix) {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
+	}
+	profilePath := strings.TrimPrefix(profile, v1.DeprecatedAppArmorBetaProfileNamePrefix)
+	if errs := validatePathNoBacksteps(profilePath, field.NewPath("localhostProfile")); len(errs) > 0 {
+		return fmt.Errorf("invalid AppArmor profile name: %q, must not contain '..'", profile)
 	}
 	return nil
 }
