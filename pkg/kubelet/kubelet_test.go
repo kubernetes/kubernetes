@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2733,6 +2734,34 @@ func (a *testPodAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmit
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 
+// countingRejectPodAdmitHandler fails the first rejectN Admit calls for a single pod UID.
+type countingRejectPodAdmitHandler struct {
+	mu       sync.Mutex
+	rejectN  int
+	attempts int
+	uid      types.UID
+}
+
+func (a *countingRejectPodAdmitHandler) Attempts() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.attempts
+}
+
+func (a *countingRejectPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if attrs.Pod.UID != a.uid {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+	a.mu.Lock()
+	a.attempts++
+	attempt := a.attempts
+	a.mu.Unlock()
+	if attempt <= a.rejectN {
+		return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "temporary denial for test"}
+	}
+	return lifecycle.PodAdmitResult{Admit: true}
+}
+
 // Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.
 func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -2777,6 +2806,51 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
+func TestStaticPodAdmissionRetryAfterDeny(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	staticUID := types.UID("static-pod-admission-retry")
+	admitHandler := &countingRejectPodAdmitHandler{rejectN: 1, uid: staticUID}
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{admitHandler})
+
+	staticPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       staticUID,
+			Name:      "staticPod",
+			Namespace: "kube-system",
+			Annotations: map[string]string{
+				kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource,
+			},
+		},
+		Spec: v1.PodSpec{
+			HostNetwork: true,
+		},
+	}
+
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{staticPod})
+	require.Equal(t, 1, admitHandler.Attempts())
+	checkPodStatus(t, kl, staticPod, v1.PodFailed)
+
+	kl.tryAdmitPendingStaticPods(tCtx)
+	require.Equal(t, 2, admitHandler.Attempts())
+	status, found := kl.statusManager.GetPodStatus(staticUID)
+	require.True(t, found)
+	require.NotEqual(t, v1.PodFailed, status.Phase, "pod should leave Failed after admission retry")
 }
 
 func TestPodResourceAllocationReset(t *testing.T) {
