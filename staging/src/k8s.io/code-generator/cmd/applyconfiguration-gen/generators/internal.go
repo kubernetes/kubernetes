@@ -17,6 +17,8 @@ limitations under the License.
 package generators
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 
 	yaml "go.yaml.in/yaml/v2"
@@ -24,6 +26,7 @@ import (
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/kube-openapi/pkg/schemaconv"
+	yamlutil "sigs.k8s.io/yaml"
 )
 
 // utilGenerator generates the ForKind() utility function.
@@ -68,13 +71,21 @@ func (g *internalGenerator) GenerateType(c *generator.Context, _ *types.Type, w 
 	if err != nil {
 		return err
 	}
+	schemaJSON, err := yamlutil.YAMLToJSON(schemaYAML)
+	if err != nil {
+		return err
+	}
+	var schemaJSONBuffer bytes.Buffer
+	if err := json.Indent(&schemaJSONBuffer, schemaJSON, "", "  "); err != nil {
+		return err
+	}
 	sw.Do(schemaBlock, map[string]interface{}{
-		"schemaYAML":   string(schemaYAML),
-		"smdParser":    smdParser,
-		"smdNewParser": smdNewParser,
-		"fmtSprintf":   fmtSprintf,
-		"syncOnce":     syncOnce,
-		"yamlObject":   yamlObject,
+		"schemaJSON":    schemaJSONBuffer.String(),
+		"smdParser":     smdParser,
+		"smdSchema":     smdSchema,
+		"jsonUnmarshal": jsonUnmarshal,
+		"fmtSprintf":    fmtSprintf,
+		"syncOnce":      syncOnce,
 	})
 
 	return sw.Error()
@@ -83,16 +94,16 @@ func (g *internalGenerator) GenerateType(c *generator.Context, _ *types.Type, w 
 var schemaBlock = `
 func Parser() *{{.smdParser|raw}} {
 	parserOnce.Do(func() {
-		var err error
-		parser, err = {{.smdNewParser|raw}}(schemaYAML)
-		if err != nil {
+		var schemaDef {{.smdSchema|raw}}
+		if err := {{.jsonUnmarshal|raw}}([]byte(schemaJSON), &schemaDef); err != nil {
 			panic({{.fmtSprintf|raw}}("Failed to parse schema: %v", err))
 		}
+		parser = &{{.smdParser|raw}}{Schema: schemaDef}
 	})
 	return parser
 }
 
 var parserOnce {{.syncOnce|raw}}
 var parser *{{.smdParser|raw}}
-var schemaYAML = {{.yamlObject|raw}}(` + "`{{.schemaYAML}}`" + `)
+var schemaJSON = ` + "`{{.schemaJSON}}`" + `
 `

@@ -19,351 +19,656 @@ limitations under the License.
 package internal
 
 import (
+	json "encoding/json"
 	fmt "fmt"
 	sync "sync"
 
+	schema "sigs.k8s.io/structured-merge-diff/v6/schema"
 	typed "sigs.k8s.io/structured-merge-diff/v6/typed"
 )
 
 func Parser() *typed.Parser {
 	parserOnce.Do(func() {
-		var err error
-		parser, err = typed.NewParser(schemaYAML)
-		if err != nil {
+		var schemaDef schema.Schema
+		if err := json.Unmarshal([]byte(schemaJSON), &schemaDef); err != nil {
 			panic(fmt.Sprintf("Failed to parse schema: %v", err))
 		}
+		parser = &typed.Parser{Schema: schemaDef}
 	})
 	return parser
 }
 
 var parserOnce sync.Once
 var parser *typed.Parser
-var schemaYAML = typed.YAMLObject(`types:
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: fieldsType
-      type:
-        scalar: string
-    - name: fieldsV1
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
-    - name: manager
-      type:
-        scalar: string
-    - name: operation
-      type:
-        scalar: string
-    - name: subresource
-      type:
-        scalar: string
-    - name: time
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-  map:
-    fields:
-    - name: annotations
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: creationTimestamp
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: deletionGracePeriodSeconds
-      type:
-        scalar: numeric
-    - name: deletionTimestamp
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: finalizers
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: associative
-    - name: generateName
-      type:
-        scalar: string
-    - name: generation
-      type:
-        scalar: numeric
-    - name: labels
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: managedFields
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
-          elementRelationship: atomic
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-    - name: ownerReferences
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
-          elementRelationship: associative
-          keys:
-          - uid
-    - name: resourceVersion
-      type:
-        scalar: string
-    - name: selfLink
-      type:
-        scalar: string
-    - name: uid
-      type:
-        scalar: string
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-      default: ""
-    - name: blockOwnerDeletion
-      type:
-        scalar: boolean
-    - name: controller
-      type:
-        scalar: boolean
-    - name: kind
-      type:
-        scalar: string
-      default: ""
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: uid
-      type:
-        scalar: string
-      default: ""
-    elementRelationship: atomic
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-  scalar: untyped
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec
-      default: {}
-    - name: status
-      type:
-        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus
-      default: {}
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition
-  map:
-    fields:
-    - name: lastTransitionTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: message
-      type:
-        scalar: string
-    - name: reason
-      type:
-        scalar: string
-    - name: status
-      type:
-        scalar: string
-      default: ""
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec
-  map:
-    fields:
-    - name: caBundle
-      type:
-        scalar: string
-    - name: group
-      type:
-        scalar: string
-    - name: groupPriorityMinimum
-      type:
-        scalar: numeric
-      default: 0
-    - name: insecureSkipTLSVerify
-      type:
-        scalar: boolean
-    - name: service
-      type:
-        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference
-    - name: version
-      type:
-        scalar: string
-    - name: versionPriority
-      type:
-        scalar: numeric
-      default: 0
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition
-          elementRelationship: associative
-          keys:
-          - type
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-    - name: port
-      type:
-        scalar: numeric
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec
-      default: {}
-    - name: status
-      type:
-        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus
-      default: {}
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition
-  map:
-    fields:
-    - name: lastTransitionTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: message
-      type:
-        scalar: string
-    - name: reason
-      type:
-        scalar: string
-    - name: status
-      type:
-        scalar: string
-      default: ""
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec
-  map:
-    fields:
-    - name: caBundle
-      type:
-        scalar: string
-    - name: group
-      type:
-        scalar: string
-    - name: groupPriorityMinimum
-      type:
-        scalar: numeric
-      default: 0
-    - name: insecureSkipTLSVerify
-      type:
-        scalar: boolean
-    - name: service
-      type:
-        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.ServiceReference
-    - name: version
-      type:
-        scalar: string
-    - name: versionPriority
-      type:
-        scalar: numeric
-      default: 0
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition
-          elementRelationship: associative
-          keys:
-          - type
-- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.ServiceReference
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-    - name: port
-      type:
-        scalar: numeric
-- name: __untyped_atomic_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-- name: __untyped_deduced_
-  scalar: untyped
-  list:
-    elementType:
-      namedType: __untyped_atomic_
-    elementRelationship: atomic
-  map:
-    elementType:
-      namedType: __untyped_deduced_
-    elementRelationship: separable
-`)
+var schemaJSON = `{
+  "types": [
+    {
+      "map": {
+        "elementType": {
+          "list": {
+            "elementRelationship": "atomic",
+            "elementType": {
+              "namedType": "__untyped_atomic_"
+            }
+          },
+          "map": {
+            "elementRelationship": "separable",
+            "elementType": {
+              "namedType": "__untyped_deduced_"
+            }
+          },
+          "scalar": "untyped"
+        }
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "fieldsType",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "fieldsV1",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+            }
+          },
+          {
+            "name": "manager",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "operation",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "subresource",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "time",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "annotations",
+            "type": {
+              "map": {
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "creationTimestamp",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "deletionGracePeriodSeconds",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "deletionTimestamp",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "finalizers",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "generateName",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "generation",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "labels",
+            "type": {
+              "map": {
+                "elementType": {
+                  "scalar": "string"
+                }
+              }
+            }
+          },
+          {
+            "name": "managedFields",
+            "type": {
+              "list": {
+                "elementRelationship": "atomic",
+                "elementType": {
+                  "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                }
+              }
+            }
+          },
+          {
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "namespace",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "ownerReferences",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                },
+                "keys": [
+                  "uid"
+                ]
+              }
+            }
+          },
+          {
+            "name": "resourceVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "selfLink",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "uid",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+    },
+    {
+      "map": {
+        "elementRelationship": "atomic",
+        "fields": [
+          {
+            "default": "",
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "blockOwnerDeletion",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "controller",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "default": "",
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "uid",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+    },
+    {
+      "name": "io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+      "scalar": "untyped"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": {},
+            "name": "metadata",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+            }
+          },
+          {
+            "default": {},
+            "name": "spec",
+            "type": {
+              "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec"
+            }
+          },
+          {
+            "default": {},
+            "name": "status",
+            "type": {
+              "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIService"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "lastTransitionTime",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "message",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "status",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "caBundle",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "group",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": 0,
+            "name": "groupPriorityMinimum",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "insecureSkipTLSVerify",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "service",
+            "type": {
+              "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference"
+            }
+          },
+          {
+            "name": "version",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": 0,
+            "name": "versionPriority",
+            "type": {
+              "scalar": "numeric"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "conditions",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceCondition"
+                },
+                "keys": [
+                  "type"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceStatus"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "namespace",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "port",
+            "type": {
+              "scalar": "numeric"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "apiVersion",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": {},
+            "name": "metadata",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+            }
+          },
+          {
+            "default": {},
+            "name": "spec",
+            "type": {
+              "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec"
+            }
+          },
+          {
+            "default": {},
+            "name": "status",
+            "type": {
+              "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "lastTransitionTime",
+            "type": {
+              "namedType": "io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            }
+          },
+          {
+            "name": "message",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "status",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": "",
+            "name": "type",
+            "type": {
+              "scalar": "string"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "caBundle",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "group",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": 0,
+            "name": "groupPriorityMinimum",
+            "type": {
+              "scalar": "numeric"
+            }
+          },
+          {
+            "name": "insecureSkipTLSVerify",
+            "type": {
+              "scalar": "boolean"
+            }
+          },
+          {
+            "name": "service",
+            "type": {
+              "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.ServiceReference"
+            }
+          },
+          {
+            "name": "version",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "default": 0,
+            "name": "versionPriority",
+            "type": {
+              "scalar": "numeric"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceSpec"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "conditions",
+            "type": {
+              "list": {
+                "elementRelationship": "associative",
+                "elementType": {
+                  "namedType": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceCondition"
+                },
+                "keys": [
+                  "type"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIServiceStatus"
+    },
+    {
+      "map": {
+        "fields": [
+          {
+            "name": "name",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "namespace",
+            "type": {
+              "scalar": "string"
+            }
+          },
+          {
+            "name": "port",
+            "type": {
+              "scalar": "numeric"
+            }
+          }
+        ]
+      },
+      "name": "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.ServiceReference"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "name": "__untyped_atomic_",
+      "scalar": "untyped"
+    },
+    {
+      "list": {
+        "elementRelationship": "atomic",
+        "elementType": {
+          "namedType": "__untyped_atomic_"
+        }
+      },
+      "map": {
+        "elementRelationship": "separable",
+        "elementType": {
+          "namedType": "__untyped_deduced_"
+        }
+      },
+      "name": "__untyped_deduced_",
+      "scalar": "untyped"
+    }
+  ]
+}`
