@@ -2677,7 +2677,6 @@ func Test_SelectHost(t *testing.T) {
 		name             string
 		list             []fwk.NodePluginScores
 		expectedNodeList []fwk.NodePluginScores
-		wantError        error
 	}{
 		{
 			name: "unique properly ordered scores",
@@ -2722,15 +2721,10 @@ func Test_SelectHost(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var err error
-			var scoreList = []fwk.NodePluginScores{}
-			h := newSortedNodeScores(test.list)
+			var scoreList []fwk.NodePluginScores
+			h := framework.NewSortedScoredNodes(test.list)
 			for range len(test.list) {
-				gotNode := h.PopScore()
-				scoreList = append(scoreList, gotNode)
-			}
-			if !errors.Is(err, test.wantError) {
-				t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
+				scoreList = append(scoreList, h.Pop())
 			}
 			if !cmp.Equal(test.expectedNodeList, scoreList) {
 				t.Errorf("Unexpected scoreList: %v", scoreList)
