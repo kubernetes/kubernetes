@@ -18,6 +18,7 @@ package meta
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -57,6 +58,22 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 			ExpectedErrs: field.ErrorList{
 				field.Required(fldPath.Index(0).Child("type"), "").MarkAlpha(),
+			},
+		},
+		{
+			Name: "valid empty message",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakMessage("")),
+			},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
+			Name: "invalid message too long",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakMessage(strings.Repeat("a", 32769))),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Index(0).Child("message"), "" /*unused*/, 32768).MarkAlpha(),
 			},
 		},
 	}
@@ -101,5 +118,11 @@ func TweakType(condType string) func(*metav1.Condition) {
 func TweakStatus(status metav1.ConditionStatus) func(*metav1.Condition) {
 	return func(c *metav1.Condition) {
 		c.Status = status
+	}
+}
+
+func TweakMessage(msg string) func(*metav1.Condition) {
+	return func(c *metav1.Condition) {
+		c.Message = msg
 	}
 }
