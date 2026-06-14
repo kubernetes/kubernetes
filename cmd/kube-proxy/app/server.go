@@ -530,8 +530,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 	go wait.UntilWithContext(ctx, fn, 5*time.Second)
 }
 
-// Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
-// TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
+// Run runs the specified ProxyServer until the context is canceled or a fatal error occurs.
 func (s *ProxyServer) Run(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	// To help debugging, immediately log version
@@ -612,13 +611,13 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
 		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
 		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
-		go serviceCIDRConfig.Run(wait.NeverStop)
+		go serviceCIDRConfig.Run(ctx.Done())
 	}
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
-	informerFactory.Start(wait.NeverStop)
-	endpointSliceInformerFactory.Start(wait.NeverStop)
-	serviceInformerFactory.Start(wait.NeverStop)
+	informerFactory.Start(ctx.Done())
+	endpointSliceInformerFactory.Start(ctx.Done())
+	serviceInformerFactory.Start(ctx.Done())
 
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
 	if s.NodeManager != nil {
@@ -627,7 +626,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 		nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
 		nodeTopologyConfig.RegisterEventHandler(s.Proxier)
 
-		go nodeConfig.Run(wait.NeverStop)
+		go nodeConfig.Run(ctx.Done())
 	}
 
 	// Birth Cry after the birth is successful
@@ -636,6 +635,8 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	go s.Proxier.SyncLoop()
 
 	select {
+	case <-ctx.Done():
+		return nil
 	case err = <-healthzErrCh:
 		s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeWarning, "FailedToStartProxierHealthcheck", "StartKubeProxy", err.Error())
 	case err = <-metricsErrCh:
