@@ -186,7 +186,6 @@ func TestUntilErrorCondition(t *testing.T) {
 }
 
 func TestUntilWithSync(t *testing.T) {
-	// FIXME: test preconditions
 	tt := []struct {
 		name             string
 		lw               cache.ListerWatcher
@@ -286,6 +285,76 @@ func TestUntilWithSync(t *testing.T) {
 			},
 			expectedErr:   nil,
 			expectedEvent: &watch.Event{Type: watch.Added, Object: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		},
+		{
+			name: "precondition returns false and error",
+			lw: func() cache.ListerWatcher {
+				fakeclient := fakeclient.NewSimpleClientset(
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{Name: "first"},
+					},
+				)
+
+				return toListWatcherWithUnSupportedWatchListSemantics(
+					&cache.ListWatch{
+						ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+							return fakeclient.CoreV1().Secrets("").List(
+								context.TODO(),
+								options,
+							)
+						},
+						WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+							return fakeclient.CoreV1().Secrets("").Watch(
+								context.TODO(),
+								options,
+							)
+						},
+					},
+				)
+			}(),
+			preconditionFunc: func(store cache.Store) (bool, error) {
+				return false, errors.New("precondition failed")
+			},
+			conditionFunc: func(e watch.Event) (bool, error) {
+				return true, errors.New("should never reach this")
+			},
+			expectedErr:   errors.New("precondition failed"),
+			expectedEvent: nil,
+		},
+		{
+			name: "precondition returns true and error",
+			lw: func() cache.ListerWatcher {
+				fakeclient := fakeclient.NewSimpleClientset(
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{Name: "first"},
+					},
+				)
+
+				return toListWatcherWithUnSupportedWatchListSemantics(
+					&cache.ListWatch{
+						ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+							return fakeclient.CoreV1().Secrets("").List(
+								context.TODO(),
+								options,
+							)
+						},
+						WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+							return fakeclient.CoreV1().Secrets("").Watch(
+								context.TODO(),
+								options,
+							)
+						},
+					},
+				)
+			}(),
+			preconditionFunc: func(store cache.Store) (bool, error) {
+				return true, errors.New("precondition failed")
+			},
+			conditionFunc: func(e watch.Event) (bool, error) {
+				return true, errors.New("should never reach this")
+			},
+			expectedErr:   errors.New("precondition failed"),
+			expectedEvent: nil,
 		},
 	}
 
