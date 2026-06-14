@@ -17,12 +17,14 @@ limitations under the License.
 package oom
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/google/cadvisor/utils/oomparser"
@@ -38,6 +40,31 @@ func (fs *fakeStreamer) StreamOoms(outStream chan<- *oomparser.OomInstance) {
 	for _, oomInstance := range fs.oomInstancesToStream {
 		outStream <- oomInstance
 	}
+}
+
+type fakeCheckPointManager struct {
+	timestamp time.Time
+}
+
+func (c fakeCheckPointManager) CreateCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
+	return nil
+}
+
+func (c fakeCheckPointManager) GetCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
+	s := Checkpoint{LastProcessedTimestamp: c.timestamp}
+	res, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	return checkpoint.UnmarshalCheckpoint(res)
+}
+
+func (c fakeCheckPointManager) RemoveCheckpoint(checkpointKey string) error {
+	return nil
+}
+
+func (c fakeCheckPointManager) ListCheckpoints() ([]string, error) {
+	return []string{}, nil
 }
 
 // TestWatcherRecordsEventsForOomEvents ensures that our OomInstances coming
@@ -65,6 +92,10 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
+		checkPoint: &Checkpoint{
+			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
+		},
+		checkPointManager: fakeCheckPointManager{},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
@@ -72,21 +103,69 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	assert.Len(t, eventsRecorded, numExpectedOomEvents)
 }
 
+func TestWatcherIgnoreOutOfOrderEvents(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	oomInstancesToStream := []*oomparser.OomInstance{
+		{
+			Pid:                 1000,
+			ProcessName:         "fakeProcess-1",
+			TimeOfDeath:         time.Now().Add(1 * time.Hour),
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
+		},
+		{
+			Pid:                 1001,
+			ProcessName:         "fakeProcess-2",
+			TimeOfDeath:         time.Now().Add(2 * time.Hour),
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
+		},
+		{
+			Pid:                 1002,
+			ProcessName:         "fakeProcess-3",
+			TimeOfDeath:         time.Now().Add(-2 * time.Hour),
+			ContainerName:       recordEventContainerName + "some-container",
+			VictimContainerName: recordEventContainerName,
+		},
+	}
+	numExpectedOomEvents := 1 // Since the current time is set +90 min from now, the first and third messages will be discarded
+
+	fakeStreamer := &fakeStreamer{
+		oomInstancesToStream: oomInstancesToStream,
+	}
+
+	fakeRecorder := record.NewFakeRecorder(numExpectedOomEvents)
+	node := &v1.ObjectReference{}
+
+	oomWatcher := &realWatcher{
+		recorder:    fakeRecorder,
+		oomStreamer: fakeStreamer,
+		checkPoint:  &Checkpoint{},
+		checkPointManager: fakeCheckPointManager{
+			timestamp: time.Now().Add(90 * time.Minute),
+		},
+	}
+
+	require.NoError(t, oomWatcher.Start(tCtx, node))
+
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
+	assert.Len(t, eventsRecorded, 1)
+}
+
 func getRecordedEvents(fakeRecorder *record.FakeRecorder, numExpectedOomEvents int) []string {
 	eventsRecorded := []string{}
 
-	select {
-	case event := <-fakeRecorder.Events:
-		eventsRecorded = append(eventsRecorded, event)
-
-		if len(eventsRecorded) == numExpectedOomEvents {
-			break
+loop:
+	for {
+		select {
+		case event := <-fakeRecorder.Events:
+			eventsRecorded = append(eventsRecorded, event)
+		case <-time.After(500 * time.Millisecond):
+			break loop
 		}
-	case <-time.After(10 * time.Second):
-		break
 	}
-
 	return eventsRecorded
+
 }
 
 // TestWatcherRecordsEventsForOomEventsCorrectContainerName verifies that we
@@ -125,6 +204,10 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
+		checkPoint: &Checkpoint{
+			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
+		},
+		checkPointManager: fakeCheckPointManager{},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
@@ -162,6 +245,10 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 	oomWatcher := &realWatcher{
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
+		checkPoint: &Checkpoint{
+			LastProcessedTimestamp: time.Now().Add(-1 * time.Hour),
+		},
+		checkPointManager: fakeCheckPointManager{},
 	}
 	require.NoError(t, oomWatcher.Start(tCtx, node))
 
