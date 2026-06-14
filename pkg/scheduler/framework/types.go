@@ -583,6 +583,10 @@ type QueuedEntityInfo interface {
 	SetBackoffExpiration(t time.Time)
 	// SetGatingPlugin sets the GatingPlugin in QueueingParams.
 	SetGatingPlugin(gatingPlugin string, gatingEvents []fwk.ClusterEvent)
+	// GetFlushTimestamp returns the FlushTimestamp in QueueingParams.
+	GetFlushTimestamp() time.Time
+	// SetFlushTimestamp sets the FlushTimestamp in QueueingParams.
+	SetFlushTimestamp(t time.Time)
 }
 
 // QueueingParams holds parameters related to the queueing status and history of an entity
@@ -621,6 +625,8 @@ type QueueingParams struct {
 	// indicate queueing hint misconfigurations or event handling bugs.
 	// This flag is cleared when the entity returns to the queue for any reason.
 	WasFlushedFromUnschedulable bool
+	// FlushTimestamp tracks the last time this entity was flushed from the unschedulable queue.
+	FlushTimestamp time.Time
 	// The time when the entity is added to the active queue for the first time. The entity may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -682,10 +688,19 @@ func (qp *QueueingParams) GetGatingPluginEvents() []fwk.ClusterEvent {
 	return qp.GatingPluginEvents
 }
 
+func (qp *QueueingParams) GetFlushTimestamp() time.Time {
+	return qp.FlushTimestamp
+}
+
+func (qp *QueueingParams) SetFlushTimestamp(t time.Time) {
+	qp.FlushTimestamp = t
+}
+
 // DeepCopy returns a deep copy of the QueueingParams object.
 func (qp *QueueingParams) DeepCopy() *QueueingParams {
 	return &QueueingParams{
 		Timestamp:                   qp.Timestamp,
+		FlushTimestamp:              qp.FlushTimestamp,
 		Attempts:                    qp.Attempts,
 		UnschedulableCount:          qp.UnschedulableCount,
 		InitialAttemptTimestamp:     qp.InitialAttemptTimestamp,
