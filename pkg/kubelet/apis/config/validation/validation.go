@@ -72,6 +72,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.EventBurst < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: eventBurst (--event-burst) %v must not be a negative number", kc.EventBurst))
 	}
+	if kc.EventSpamBurst < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: eventSpamBurst (--event-spam-burst) %v must not be a negative number", kc.EventSpamBurst))
+	}
 	if kc.EventRecordQPS < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: eventRecordQPS (--event-qps) %v must not be a negative number", kc.EventRecordQPS))
 	}
