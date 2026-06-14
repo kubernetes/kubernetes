@@ -25,7 +25,7 @@ kube::golang::setup_env
 kube::util::require-jq
 kube::util::ensure_clean_working_dir
 
-PUBLISHED_RELEASES=$(curl -sL 'http://api.github.com/repos/kubernetes-sigs/kustomize/releases?per_page=100' | jq '[ .[] | select(.draft == false and .prerelease == false) | { "tag_name": .tag_name, "published_at": .published_at } ]')
+PUBLISHED_RELEASES=$(curl -sL 'https://api.github.com/repos/kubernetes-sigs/kustomize/releases?per_page=100' | jq '[ .[] | select(.draft == false and .prerelease == false) | { "tag_name": .tag_name, "published_at": .published_at } ]')
 
 LATEST_KYAML=$(echo "${PUBLISHED_RELEASES}" | jq -r '[ .[] | select(.tag_name | startswith("kyaml/v")) ] | sort_by(.published_at) | last | .tag_name | scan("\/(v[\\d.]+)") | .[0]')
 LATEST_CONFIG=$(echo "${PUBLISHED_RELEASES}" | jq -r '[ .[] | select(.tag_name | startswith("cmd/config/v")) ] | sort_by(.published_at) | last | .tag_name | scan("\/(v[\\d.]+)") | .[0]')
