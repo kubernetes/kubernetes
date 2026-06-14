@@ -200,6 +200,7 @@ func MachineInfo(nodeName string,
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
+	runningInUserNSFunc func() *bool, // typically Kubelet.runningInUserNS
 	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(ctx context.Context, node *v1.Node) error {
@@ -287,6 +288,10 @@ func MachineInfo(nodeName string,
 				node.Status.NodeInfo.Swap = &v1.NodeSwapStatus{
 					Capacity: ptr.To(int64(info.SwapCapacity)),
 				}
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
+				node.Status.NodeInfo.RunningInUserNamespace = runningInUserNSFunc()
 			}
 		}
 

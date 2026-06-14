@@ -111,7 +111,8 @@
       "architecture": "architectureValue",
       "swap": {
         "capacity": 1
-      }
+      },
+      "runningInUserNamespace": true
     },
     "images": [
       {
