@@ -57,7 +57,7 @@ func TestMutationDetector(t *testing.T) {
 		},
 	}
 	informer.cacheMutationDetector = detector
-	go informer.Run(stopCh)
+	go informer.RunWithContext(wait.ContextForChannel(stopCh))
 
 	fakeWatch.Add(pod)
 
