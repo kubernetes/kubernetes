@@ -133,10 +133,6 @@ func createPodGroupStates(pods []*v1.Pod) map[podGroupKey]*podGroupStateSnapshot
 	return podGroupStates
 }
 
-// RestoreSnapshot is a function that can be used to restore the snapshot to the state
-// before the backup was taken.
-type RestoreSnapshot func()
-
 // BackupSnapshot provides a way to temporarily backup the snapshot's state
 // and returns a restore function. This is primarily used in workload-aware
 // preemption to simulate pod group preemption by mutating deep copies of NodeInfos.
@@ -144,7 +140,7 @@ type RestoreSnapshot func()
 // the snapshot first.
 // Restoring backup when the placement is set is not supported and can lead to
 // undefined behavior.
-func (s *Snapshot) BackupSnapshot() (RestoreSnapshot, error) {
+func (s *Snapshot) BackupSnapshot() (fwk.RestoreSnapshot, error) {
 	if s.hasBackup {
 		return nil, fmt.Errorf("cannot stack backups")
 	}
