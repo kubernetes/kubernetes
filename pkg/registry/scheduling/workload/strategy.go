@@ -130,6 +130,7 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		dropDisabledDisruptionModeField(template, oldTemplate)
 		dropDisabledPriorityClassNameField(template, oldTemplate)
 		dropDisabledPriorityField(template, oldTemplate)
+		dropDisabledPreemptionPolicyField(template, oldTemplate)
 	}
 }
 
@@ -181,6 +182,16 @@ func dropDisabledPriorityField(template, oldTemplate *scheduling.PodGroupTemplat
 	template.Priority = nil
 }
 
+// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field from a template unless it is
+// already used in the old template.
+func dropDisabledPreemptionPolicyField(template, oldTemplate *scheduling.PodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || preemptionPolicyInUse(oldTemplate) {
+		// No need to drop anything.
+		return
+	}
+	template.PreemptionPolicy = nil
+}
+
 func schedulingConstraintsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.SchedulingConstraints != nil
 }
@@ -199,4 +210,8 @@ func priorityClassNameInUse(pgt *scheduling.PodGroupTemplate) bool {
 
 func priorityInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.Priority != nil
+}
+
+func preemptionPolicyInUse(pgt *scheduling.PodGroupTemplate) bool {
+	return pgt != nil && pgt.PreemptionPolicy != nil
 }

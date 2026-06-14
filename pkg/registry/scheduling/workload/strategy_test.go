@@ -55,11 +55,15 @@ var (
 		},
 	}
 
-	fieldImmutableError = "field is immutable"
-	minCountError       = "must be greater than or equal to 1"
-	tooManyItemsError   = "must have at most 1 item"
-	requiredError       = "Required value"
-	subdomainNameError  = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	preemptNever         = scheduling.PreemptNever
+	preemptLowerPriority = scheduling.PreemptLowerPriority
+
+	fieldImmutableError    = "field is immutable"
+	minCountError          = "must be greater than or equal to 1"
+	tooManyItemsError      = "must have at most 1 item"
+	requiredError          = "Required value"
+	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	supportedPoliciesError = `supported values: "Never", "PreemptLowerPriority"`
 )
 
 func TestWorkloadStrategy(t *testing.T) {
@@ -231,6 +235,50 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			enableWorkloadAwarePreemption: true,
 			expectValidationError:         subdomainNameError,
+		},
+		"workload aware preemption disabled - drop preemptionPolicy": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptNever
+				return w
+			}(),
+			expectObj: workload,
+		},
+		"workload aware preemption enabled - preserve preemptionPolicy (Never)": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptNever
+				return w
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptNever
+				return w
+			}(),
+		},
+		"workload aware preemption enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptLowerPriority
+				return w
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptLowerPriority
+				return w
+			}(),
+		},
+		"workload aware preemption enabled - invalid preemptionPolicy": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				invalidPolicy := scheduling.PreemptionPolicy("Invalid")
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &invalidPolicy
+				return w
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         supportedPoliciesError,
 		},
 	}
 
@@ -524,6 +572,33 @@ func TestStrategyUpdate(t *testing.T) {
 			newObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "low-priority"
+				return w
+			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         fieldImmutableError,
+		},
+		"preemptionPolicy update, workload aware preemption disabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptNever
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptLowerPriority
+				return w
+			}(),
+			expectValidationError: fieldImmutableError,
+		},
+		"preemptionPolicy update, workload aware preemption enabled": {
+			oldObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptNever
+				return w
+			}(),
+			newObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptLowerPriority
 				return w
 			}(),
 			enableWorkloadAwarePreemption: true,

@@ -1672,6 +1672,12 @@ func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
 	return wrapper
 }
 
+// PreemptionPolicy sets the preemption policy of the inner PodGroup.
+func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingapi.PreemptionPolicy) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.PreemptionPolicy = &policy
+	return wrapper
+}
+
 // WorkloadWrapper wraps a Workload inside.
 type WorkloadWrapper struct{ schedulingapi.Workload }
 
@@ -1746,5 +1752,11 @@ func (wrapper *PodGroupTemplateWrapper) DisruptionModeAll() *PodGroupTemplateWra
 // DisruptionModeSingle sets the disruption mode of the inner PodGroupTemplate to Single.
 func (wrapper *PodGroupTemplateWrapper) DisruptionModeSingle() *PodGroupTemplateWrapper {
 	wrapper.PodGroupTemplate.DisruptionMode = &schedulingapi.DisruptionMode{Single: &schedulingapi.SingleDisruptionMode{}}
+	return wrapper
+}
+
+// PreemptionPolicy sets the preemption policy of the inner PodGroupTemplate.
+func (wrapper *PodGroupTemplateWrapper) PreemptionPolicy(policy schedulingapi.PreemptionPolicy) *PodGroupTemplateWrapper {
+	wrapper.PodGroupTemplate.PreemptionPolicy = &policy
 	return wrapper
 }

@@ -40,6 +40,7 @@ spec:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue
       workloadName: workloadNameValue
+  preemptionPolicy: preemptionPolicyValue
   priority: 7
   priorityClassName: priorityClassNameValue
   resourceClaims:

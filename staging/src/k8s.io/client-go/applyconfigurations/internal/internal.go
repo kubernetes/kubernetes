@@ -14839,6 +14839,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podGroupTemplateRef
       type:
         namedType: io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference
+    - name: preemptionPolicy
+      type:
+        scalar: string
+      default: PreemptLowerPriority
     - name: priority
       type:
         scalar: numeric
@@ -14889,6 +14893,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: preemptionPolicy
+      type:
+        scalar: string
     - name: priority
       type:
         scalar: numeric

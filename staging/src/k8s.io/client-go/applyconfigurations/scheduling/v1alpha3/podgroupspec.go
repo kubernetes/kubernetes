@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+)
+
 // PodGroupSpecApplyConfiguration represents a declarative configuration of the PodGroupSpec type for use
 // with apply.
 //
@@ -71,6 +75,13 @@ type PodGroupSpecApplyConfiguration struct {
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	Priority *int32 `json:"priority,omitempty"`
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	PreemptionPolicy *schedulingv1alpha3.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -137,5 +148,13 @@ func (b *PodGroupSpecApplyConfiguration) WithPriorityClassName(value string) *Po
 // If called multiple times, the Priority field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithPriority(value int32) *PodGroupSpecApplyConfiguration {
 	b.Priority = &value
+	return b
+}
+
+// WithPreemptionPolicy sets the PreemptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreemptionPolicy field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithPreemptionPolicy(value schedulingv1alpha3.PreemptionPolicy) *PodGroupSpecApplyConfiguration {
+	b.PreemptionPolicy = &value
 	return b
 }

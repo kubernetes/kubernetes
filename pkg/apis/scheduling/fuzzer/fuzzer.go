@@ -38,6 +38,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if s.Spec.DisruptionMode == nil {
 				s.Spec.DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 			}
+			if s.Spec.PreemptionPolicy == nil {
+				preemptLowerPriority := scheduling.PreemptLowerPriority
+				s.Spec.PreemptionPolicy = &preemptLowerPriority
+			}
 		},
 	}
 }

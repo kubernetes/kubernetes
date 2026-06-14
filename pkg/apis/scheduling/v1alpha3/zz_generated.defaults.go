@@ -43,6 +43,10 @@ func SetObjectDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
 			panic(err)
 		}
 	}
+	if in.Spec.PreemptionPolicy == nil {
+		var ptrVar1 schedulingv1alpha3.PreemptionPolicy = "PreemptLowerPriority"
+		in.Spec.PreemptionPolicy = &ptrVar1
+	}
 }
 
 func SetObjectDefaults_PodGroupList(in *schedulingv1alpha3.PodGroupList) {
