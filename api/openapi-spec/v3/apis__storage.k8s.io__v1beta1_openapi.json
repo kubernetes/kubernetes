@@ -35,7 +35,8 @@
           }
         },
         "required": [
-          "driverName"
+          "driverName",
+          "parameters"
         ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
