@@ -40,6 +40,10 @@ func init() {
 
 type FeatureOverrides = map[featuregate.Feature]bool
 
+type queriedResetter interface {
+	ResetFeatureQueriedForTest(featuregate.Feature)
+}
+
 // SetFeatureGateDuringTest sets the specified gate to the specified value for duration of the test.
 // Fails when it detects second call to the same flag or is unable to set or restore feature flag.
 // When disabling a feature, this automatically disables all dependents.
@@ -150,6 +154,11 @@ func SetFeatureGatesDuringTest(tb TB, gate featuregate.FeatureGate, features Fea
 				tb.Errorf("error resetting %s: %v", f, err)
 			}
 		}
+		if mux, ok := gate.(queriedResetter); ok {
+			for f := range gate.(featuregate.MutableFeatureGate).GetAll() {
+				mux.ResetFeatureQueriedForTest(f)
+			}
+		}
 	})
 }
 
@@ -242,12 +251,24 @@ func SetFeatureGateVersionsDuringTest(tb TB, gate featuregate.FeatureGate, emuVe
 	if err := setEmulationVersionAndMinCompatibilityVersion(logger, gate, emuVer, minCompatVer); err != nil {
 		tb.Fatalf("failed to set versions (emu=%s, min=%s) during test: %v", emuVer.String(), minCompatVer.String(), err)
 	}
+	// This clears queries made during the version change validation, ensuring the actual test logic starts with a clean gate.
+	if mux, ok := gate.(queriedResetter); ok {
+		for f := range gate.(featuregate.MutableFeatureGate).GetAll() {
+			mux.ResetFeatureQueriedForTest(f)
+		}
+	}
 
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
 		if err := setEmulationVersionAndMinCompatibilityVersion(logger, gate, originalEmuVer, originalMinCompatVer); err != nil {
 			tb.Fatalf("failed to restore versions (emu=%s, min=%s) during test: %v", originalEmuVer.String(), originalMinCompatVer.String(), err)
+		}
+
+		if mux, ok := gate.(queriedResetter); ok {
+			for f := range gate.(featuregate.MutableFeatureGate).GetAll() {
+				mux.ResetFeatureQueriedForTest(f)
+			}
 		}
 	})
 }
