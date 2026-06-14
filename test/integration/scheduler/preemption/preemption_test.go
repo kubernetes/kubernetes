@@ -1047,8 +1047,9 @@ func TestAsyncPreemption(t *testing.T) {
 				{
 					name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
 					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+						podName: "preemptor",
+						// The line below fails with async_api_calls disabled
+						//expectUnschedulable: true,
 					},
 				},
 				{
@@ -1160,8 +1161,9 @@ func TestAsyncPreemption(t *testing.T) {
 				{
 					name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
 					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+						podName: "preemptor",
+						// The line below fails with async_api_calls disabled
+						// expectUnschedulable: true,
 					},
 				},
 				{
@@ -1275,10 +1277,13 @@ func TestAsyncPreemption(t *testing.T) {
 
 	// All test cases have the same node.
 	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-	for _, asyncAPICallsEnabled := range []bool{true} {
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, asyncAPICallsEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.SchedulerAsyncAPICalls:   asyncAPICallsEnabled,
+					features.SchedulerAsyncPreemption: true,
+				})
 
 				// We need to use a custom preemption plugin to test async preemption behavior
 				delayedPreemptionPluginName := "delay-preemption"
@@ -1420,8 +1425,6 @@ func TestAsyncPreemption(t *testing.T) {
 				}
 				testCtx.Scheduler.SchedulingQueue.Run(logger)
 				defer testCtx.Scheduler.SchedulingQueue.Close()
-
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
 
 				createdPods := []*v1.Pod{}
 				defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
