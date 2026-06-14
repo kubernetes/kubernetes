@@ -303,6 +303,16 @@ func (*WebhookAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Con
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// AuthorizerName returns the name assigned to this webhook (e.g. via the API server's
+// AuthorizationConfiguration). Falls back to a generic webhook identifier when the
+// webhook was constructed without a configured name.
+func (w *WebhookAuthorizer) AuthorizerName() string {
+	if w.name == "" {
+		return "authorizer.kubernetes.io/Webhook"
+	}
+	return w.name
+}
+
 func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {
 	ret := &authorizationv1.ResourceAttributes{
 		Namespace:   attr.GetNamespace(),

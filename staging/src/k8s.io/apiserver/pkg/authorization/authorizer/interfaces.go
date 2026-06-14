@@ -18,6 +18,7 @@ package authorizer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -115,7 +116,17 @@ type Authorizer interface {
 	// An authorizer who does not support conditions should fail closed and
 	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
+
+	// AuthorizerName specifies a name of the authorizer. This is used to correlate authored conditions
+	// during ConditionsAwareAuthorize to the correct authorizer in EvaluateConditions when unioned.
+	// Validated as a Kubernetes label key.
+	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+	AuthorizerName() string
 }
+
+// ErrorConditionEvaluationNotSupported is returned by authorizer implementations
+// that do not support condition evaluation.
+var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not supported")
 
 // AuthorizerFunc implements Authorizer
 var _ Authorizer = AuthorizerFunc(nil)
@@ -132,6 +143,10 @@ func (f AuthorizerFunc) ConditionsAwareAuthorize(ctx context.Context, a Attribut
 
 func (f AuthorizerFunc) EvaluateConditions(_ context.Context, _ ConditionsAwareDecision, _ ConditionsData) (Decision, string, error) {
 	return DecisionDeny, "", ErrorConditionEvaluationNotSupported
+}
+
+func (f AuthorizerFunc) AuthorizerName() string {
+	return "authorizer.kubernetes.io/AuthorizerFunc"
 }
 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
@@ -242,4 +257,10 @@ func (d Decision) String() string {
 	default:
 		return fmt.Sprintf("Unknown (%d)", int(d))
 	}
+}
+
+// ConditionsData is an enum type for various evaluation targets conditions
+// can be written against.
+// TODO(luxas): Implement this in the follow-up PR.
+type ConditionsData struct {
 }

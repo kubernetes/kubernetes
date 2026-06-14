@@ -544,6 +544,10 @@ func (*mockAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Condit
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+func (*mockAuthorizer) AuthorizerName() string {
+	return "test-mockAuthorizer"
+}
+
 type testGetterStorage struct {
 	Version string
 }

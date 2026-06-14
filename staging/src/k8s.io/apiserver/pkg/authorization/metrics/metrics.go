@@ -131,3 +131,11 @@ func (a *instrumentedAuthorizer) EvaluateConditions(ctx context.Context, unevalu
 	}
 	return decision, reason, err
 }
+
+// AuthorizerName returns the name configured for this authorizer in the API server's
+// AuthorizationConfiguration. Each configured entry (Node, RBAC, ABAC, AlwaysAllow,
+// AlwaysDeny, Webhook) is wrapped by InstrumentedAuthorizer with its configured name,
+// so this is the surface through which the union authorizer learns the per-entry name.
+func (a *instrumentedAuthorizer) AuthorizerName() string {
+	return a.authorizerName
+}
