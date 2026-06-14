@@ -13045,6 +13045,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.CounterSet
           elementRelationship: atomic
+    - name: sharingAffinity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.SharingAffinityExtractor
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.SharingAffinityExtractor
+  map:
+    fields:
+    - name: cel
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: selector
+      type:
+        namedType: io.k8s.api.resource.v1.DeviceSelector
 - name: io.k8s.api.resource.v1alpha3.DeviceTaint
   map:
     fields:
@@ -13919,6 +13936,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.CounterSet
           elementRelationship: atomic
+    - name: sharingAffinity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.SharingAffinityExtractor
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.SharingAffinityExtractor
+  map:
+    fields:
+    - name: cel
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: selector
+      type:
+        namedType: io.k8s.api.resource.v1beta1.DeviceSelector
 - name: io.k8s.api.resource.v1beta2.AllocatedDeviceStatus
   map:
     fields:
@@ -14688,6 +14722,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.CounterSet
           elementRelationship: atomic
+    - name: sharingAffinity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.SharingAffinityExtractor
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.SharingAffinityExtractor
+  map:
+    fields:
+    - name: cel
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: selector
+      type:
+        namedType: io.k8s.api.resource.v1beta2.DeviceSelector
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:

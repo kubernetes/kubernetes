@@ -126,6 +126,8 @@ func (m *ResourceSliceList) Reset() { *m = ResourceSliceList{} }
 
 func (m *ResourceSliceSpec) Reset() { *m = ResourceSliceSpec{} }
 
+func (m *SharingAffinityExtractor) Reset() { *m = SharingAffinityExtractor{} }
+
 func (m *AllocatedDeviceStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -2537,6 +2539,20 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.SharingAffinity) > 0 {
+		for iNdEx := len(m.SharingAffinity) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.SharingAffinity[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x4a
+		}
+	}
 	if len(m.SharedCounters) > 0 {
 		for iNdEx := len(m.SharedCounters) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -2615,6 +2631,65 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Driver)))
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *SharingAffinityExtractor) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SharingAffinityExtractor) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SharingAffinityExtractor) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.CEL) > 0 {
+		keysForCEL := make([]string, 0, len(m.CEL))
+		for k := range m.CEL {
+			keysForCEL = append(keysForCEL, string(k))
+		}
+		sort.Strings(keysForCEL)
+		for iNdEx := len(keysForCEL) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.CEL[string(keysForCEL[iNdEx])]
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
+			i = encodeVarintGenerated(dAtA, i, uint64(len(v)))
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCEL[iNdEx])
+			copy(dAtA[i:], keysForCEL[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCEL[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if m.Selector != nil {
+		{
+			size, err := m.Selector.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -3569,6 +3644,33 @@ func (m *ResourceSliceSpec) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if len(m.SharingAffinity) > 0 {
+		for _, e := range m.SharingAffinity {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *SharingAffinityExtractor) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Selector != nil {
+		l = m.Selector.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.CEL) > 0 {
+		for k, v := range m.CEL {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + len(v) + sovGenerated(uint64(len(v)))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
 	return n
 }
 
@@ -4289,6 +4391,11 @@ func (this *ResourceSliceSpec) String() string {
 		repeatedStringForSharedCounters += strings.Replace(strings.Replace(f.String(), "CounterSet", "CounterSet", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForSharedCounters += "}"
+	repeatedStringForSharingAffinity := "[]SharingAffinityExtractor{"
+	for _, f := range this.SharingAffinity {
+		repeatedStringForSharingAffinity += strings.Replace(strings.Replace(f.String(), "SharingAffinityExtractor", "SharingAffinityExtractor", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForSharingAffinity += "}"
 	s := strings.Join([]string{`&ResourceSliceSpec{`,
 		`Driver:` + fmt.Sprintf("%v", this.Driver) + `,`,
 		`Pool:` + strings.Replace(strings.Replace(this.Pool.String(), "ResourcePool", "ResourcePool", 1), `&`, ``, 1) + `,`,
@@ -4298,6 +4405,28 @@ func (this *ResourceSliceSpec) String() string {
 		`Devices:` + repeatedStringForDevices + `,`,
 		`PerDeviceNodeSelection:` + valueToStringGenerated(this.PerDeviceNodeSelection) + `,`,
 		`SharedCounters:` + repeatedStringForSharedCounters + `,`,
+		`SharingAffinity:` + repeatedStringForSharingAffinity + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SharingAffinityExtractor) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForCEL := make([]string, 0, len(this.CEL))
+	for k := range this.CEL {
+		keysForCEL = append(keysForCEL, k)
+	}
+	sort.Strings(keysForCEL)
+	mapStringForCEL := "map[string]string{"
+	for _, k := range keysForCEL {
+		mapStringForCEL += fmt.Sprintf("%v: %v,", k, this.CEL[k])
+	}
+	mapStringForCEL += "}"
+	s := strings.Join([]string{`&SharingAffinityExtractor{`,
+		`Selector:` + strings.Replace(this.Selector.String(), "DeviceSelector", "DeviceSelector", 1) + `,`,
+		`CEL:` + mapStringForCEL + `,`,
 		`}`,
 	}, "")
 	return s
@@ -11919,6 +12048,253 @@ func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 			if err := m.SharedCounters[len(m.SharedCounters)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SharingAffinity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SharingAffinity = append(m.SharingAffinity, SharingAffinityExtractor{})
+			if err := m.SharingAffinity[len(m.SharingAffinity)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SharingAffinityExtractor) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SharingAffinityExtractor: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SharingAffinityExtractor: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Selector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Selector == nil {
+				m.Selector = &DeviceSelector{}
+			}
+			if err := m.Selector.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CEL", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.CEL == nil {
+				m.CEL = make(map[string]string)
+			}
+			var mapkey string
+			var mapvalue string
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var stringLenmapvalue uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapvalue |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapvalue := int(stringLenmapvalue)
+					if intStringLenmapvalue < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+					if postStringIndexmapvalue < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapvalue > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
+					iNdEx = postStringIndexmapvalue
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.CEL[mapkey] = mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

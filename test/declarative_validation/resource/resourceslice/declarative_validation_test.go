@@ -263,6 +263,33 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkAlpha(),
 					},
 				},
+				// spec.sharingAffinity (maxItems)
+				"valid: at limit sharing affinity entries": {
+					input: mkResourceSliceWithSharingAffinity(tweakSharingAffinityEntries(resource.SharingAffinityMaxEntries)),
+				},
+				"invalid: too many sharing affinity entries": {
+					input: mkResourceSliceWithSharingAffinity(tweakSharingAffinityEntries(resource.SharingAffinityMaxEntries + 1)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "sharingAffinity"), resource.SharingAffinityMaxEntries+1, resource.SharingAffinityMaxEntries).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
+				// spec.sharingAffinity[*].cel (maxProperties)
+				"valid: at limit sharing affinity cel keys": {
+					input: mkResourceSliceWithSharingAffinity(tweakSharingAffinityCEL(resource.SharingAffinityCELMaxKeys)),
+				},
+				"invalid: too many sharing affinity cel keys": {
+					input: mkResourceSliceWithSharingAffinity(tweakSharingAffinityCEL(resource.SharingAffinityCELMaxKeys + 1)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), resource.SharingAffinityCELMaxKeys+1, resource.SharingAffinityCELMaxKeys).WithOrigin("maxProperties").MarkAlpha(),
+					},
+				},
+				// spec.sharingAffinity[*].cel (required)
+				"invalid: sharing affinity cel not set": {
+					input: mkResourceSliceWithSharingAffinity(tweakSharingAffinityCEL(0)),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), "").MarkAlpha(),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
@@ -501,6 +528,38 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
 					},
 				},
+				// spec.sharingAffinity (maxItems)
+				"valid update: at limit sharing affinity entries": {
+					old:    mkResourceSliceWithSharingAffinity(),
+					update: mkResourceSliceWithSharingAffinity(tweakSharingAffinityEntries(resource.SharingAffinityMaxEntries)),
+				},
+				"invalid update: too many sharing affinity entries": {
+					old:    mkResourceSliceWithSharingAffinity(),
+					update: mkResourceSliceWithSharingAffinity(tweakSharingAffinityEntries(resource.SharingAffinityMaxEntries + 1)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec").Child("sharingAffinity"), resource.SharingAffinityMaxEntries+1, resource.SharingAffinityMaxEntries).WithOrigin("maxItems").MarkAlpha(),
+					},
+				},
+				// spec.sharingAffinity[*].cel (maxProperties)
+				"valid update: at limit sharing affinity cel keys": {
+					old:    mkResourceSliceWithSharingAffinity(),
+					update: mkResourceSliceWithSharingAffinity(tweakSharingAffinityCEL(resource.SharingAffinityCELMaxKeys)),
+				},
+				"invalid update: too many sharing affinity cel keys": {
+					old:    mkResourceSliceWithSharingAffinity(),
+					update: mkResourceSliceWithSharingAffinity(tweakSharingAffinityCEL(resource.SharingAffinityCELMaxKeys + 1)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), resource.SharingAffinityCELMaxKeys+1, resource.SharingAffinityCELMaxKeys).WithOrigin("maxProperties").MarkAlpha(),
+					},
+				},
+				// spec.sharingAffinity[*].cel (required)
+				"invalid update: sharing affinity cel not set": {
+					old:    mkResourceSliceWithSharingAffinity(),
+					update: mkResourceSliceWithSharingAffinity(tweakSharingAffinityCEL(0)),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "sharingAffinity").Index(0).Child("cel"), "").MarkAlpha(),
+					},
+				},
 			}
 			for k, tc := range testCases {
 
@@ -572,6 +631,69 @@ func mkResourceSliceWithSharedCounters(mutators ...func(*resource.ResourceSlice)
 		mutate(&rs)
 	}
 	return rs
+}
+
+// mkResourceSliceWithSharingAffinity builds a baseline ResourceSlice that
+// sets only SharingAffinity. Devices and SharedCounters are left nil to
+// respect +zeroOrOneOf=ResourceSliceType. Mutators passed to this helper
+// MUST NOT set Devices or SharedCounters; doing so would trigger an
+// unrelated zeroOrOneOf failure that masks the rule under test.
+func mkResourceSliceWithSharingAffinity(mutators ...func(*resource.ResourceSlice)) resource.ResourceSlice {
+	rs := resource.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-slice",
+		},
+		Spec: resource.ResourceSliceSpec{
+			Driver:   "test.driver.io",
+			NodeName: ptr.To("test-node"),
+			Pool: resource.ResourcePool{
+				Name:               "test-pool",
+				ResourceSliceCount: 5,
+			},
+			SharingAffinity: []resource.SharingAffinityExtractor{
+				{
+					CEL: map[string]string{
+						"affinity-key": "'affinity-value'",
+					},
+				},
+			},
+		},
+	}
+	for _, mutate := range mutators {
+		mutate(&rs)
+	}
+	return rs
+}
+
+func tweakSharingAffinityEntries(count int) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		var extractors []resource.SharingAffinityExtractor
+		for i := 0; i < count; i++ {
+			extractors = append(extractors, resource.SharingAffinityExtractor{
+				CEL: map[string]string{
+					fmt.Sprintf("affinity-key-%d", i): fmt.Sprintf("'affinity-value-%d'", i),
+				},
+			})
+		}
+		rs.Spec.SharingAffinity = extractors
+	}
+}
+
+func tweakSharingAffinityCEL(keyCount int) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		var cel map[string]string
+		if keyCount > 0 {
+			cel = make(map[string]string, keyCount)
+			for i := 0; i < keyCount; i++ {
+				cel[fmt.Sprintf("affinity-key-%d", i)] = fmt.Sprintf("'affinity-value-%d'", i)
+			}
+		}
+		rs.Spec.SharingAffinity = []resource.SharingAffinityExtractor{
+			{
+				CEL: cel,
+			},
+		}
+	}
 }
 
 func tweakBindingFailureConditions(count int) func(*resource.ResourceSlice) {

@@ -1032,6 +1032,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.ResourceSlice{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceSlice(ref),
 		resourcev1.ResourceSliceList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceList(ref),
 		resourcev1.ResourceSliceSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceSpec(ref),
+		resourcev1.SharingAffinityExtractor{}.OpenAPIModelName():                                                        schema_k8sio_api_resource_v1_SharingAffinityExtractor(ref),
 		v1alpha3.CELDeviceSelector{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
 		v1alpha3.DeviceSelector{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
 		v1alpha3.DeviceTaint{}.OpenAPIModelName():                                                                       schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
@@ -1089,6 +1090,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.ResourceSlice{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceSlice(ref),
 		resourcev1beta1.ResourceSliceList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_ResourceSliceList(ref),
 		resourcev1beta1.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref),
+		resourcev1beta1.SharingAffinityExtractor{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1beta1_SharingAffinityExtractor(ref),
 		resourcev1beta2.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref),
 		resourcev1beta2.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_AllocationResult(ref),
 		resourcev1beta2.CELDeviceSelector{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref),
@@ -1138,6 +1140,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSlice{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceSlice(ref),
 		resourcev1beta2.ResourceSliceList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceList(ref),
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
+		resourcev1beta2.SharingAffinityExtractor{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1beta2_SharingAffinityExtractor(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
 		schedulingv1alpha3.AllDisruptionMode{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_AllDisruptionMode(ref),
@@ -48448,7 +48451,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -48473,7 +48476,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -48484,12 +48487,67 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							},
 						},
 					},
+					"sharingAffinity": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "SharingAffinity carries CEL extractors for a metadata-only ResourceSlice. Each extractor evaluates against an in-scope request configuration object from the claim to derive an affinity value the scheduler uses to keep allocations on the same device compatible.\n\nA metadata-only ResourceSlice carries SharingAffinity instead of Devices or SharedCounters. At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.\n\nThe maximum number of extractors is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1.SharingAffinityExtractor{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.CounterSet{}.OpenAPIModelName(), resourcev1.Device{}.OpenAPIModelName(), resourcev1.ResourcePool{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.CounterSet{}.OpenAPIModelName(), resourcev1.Device{}.OpenAPIModelName(), resourcev1.ResourcePool{}.OpenAPIModelName(), resourcev1.SharingAffinityExtractor{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_SharingAffinityExtractor(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SharingAffinityExtractor publishes one group of CEL extractors that pull affinity keys out of in-scope request configuration objects.\n\nIf multiple applicable extractors produce non-empty values for the same affinity key for a single request, they must produce the same value. If they produce different values, the request is self-inconsistent and is not eligible for sharing-affinity matching; the Pod stays Pending and an Event explains the conflict.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selector, if set, limits this extractor to Device objects in the same pool that match the selector. When nil, the extractor applies to every Device object in the pool.",
+							Ref:         ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
+						},
+					},
+					"cel": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CEL maps an affinity key name to a CEL expression. Each CEL expression evaluates against an in-scope request configuration object from the claim and returns the string affinity value for its key.\n\nThe maximum number of keys is 8.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"cel"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -51296,7 +51354,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51321,7 +51379,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51332,12 +51390,67 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"sharingAffinity": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "SharingAffinity carries CEL extractors for a metadata-only ResourceSlice. Each extractor evaluates against an in-scope request configuration object from the claim to derive an affinity value the scheduler uses to keep allocations on the same device compatible.\n\nA metadata-only ResourceSlice carries SharingAffinity instead of Devices or SharedCounters. At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.\n\nThe maximum number of extractors is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta1.SharingAffinityExtractor{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.CounterSet{}.OpenAPIModelName(), resourcev1beta1.Device{}.OpenAPIModelName(), resourcev1beta1.ResourcePool{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.CounterSet{}.OpenAPIModelName(), resourcev1beta1.Device{}.OpenAPIModelName(), resourcev1beta1.ResourcePool{}.OpenAPIModelName(), resourcev1beta1.SharingAffinityExtractor{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_SharingAffinityExtractor(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SharingAffinityExtractor publishes one group of CEL extractors that pull affinity keys out of in-scope request configuration objects.\n\nIf multiple applicable extractors produce non-empty values for the same affinity key for a single request, they must produce the same value. If they produce different values, the request is self-inconsistent and is not eligible for sharing-affinity matching; the Pod stays Pending and an Event explains the conflict.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selector, if set, limits this extractor to Device objects in the same pool that match the selector. When nil, the extractor applies to every Device object in the pool.",
+							Ref:         ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
+						},
+					},
+					"cel": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CEL maps an affinity key name to a CEL expression. Each CEL expression evaluates against an in-scope request configuration object from the claim and returns the string affinity value for its key.\n\nThe maximum number of keys is 8.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"cel"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -53770,7 +53883,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -53795,7 +53908,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices, SharedCounters, and SharingAffinity can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -53806,12 +53919,67 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"sharingAffinity": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "SharingAffinity carries CEL extractors for a metadata-only ResourceSlice. Each extractor evaluates against an in-scope request configuration object from the claim to derive an affinity value the scheduler uses to keep allocations on the same device compatible.\n\nA metadata-only ResourceSlice carries SharingAffinity instead of Devices or SharedCounters. At most one of Devices, SharedCounters, and SharingAffinity may be set in a ResourceSlice.\n\nThe maximum number of extractors is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta2.SharingAffinityExtractor{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.CounterSet{}.OpenAPIModelName(), resourcev1beta2.Device{}.OpenAPIModelName(), resourcev1beta2.ResourcePool{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.CounterSet{}.OpenAPIModelName(), resourcev1beta2.Device{}.OpenAPIModelName(), resourcev1beta2.ResourcePool{}.OpenAPIModelName(), resourcev1beta2.SharingAffinityExtractor{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_SharingAffinityExtractor(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SharingAffinityExtractor publishes one group of CEL extractors that pull affinity keys out of in-scope request configuration objects.\n\nIf multiple applicable extractors produce non-empty values for the same affinity key for a single request, they must produce the same value. If they produce different values, the request is self-inconsistent and is not eligible for sharing-affinity matching; the Pod stays Pending and an Event explains the conflict.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selector, if set, limits this extractor to Device objects in the same pool that match the selector. When nil, the extractor applies to every Device object in the pool.",
+							Ref:         ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
+						},
+					},
+					"cel": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CEL maps an affinity key name to a CEL expression. Each CEL expression evaluates against an in-scope request configuration object from the claim and returns the string affinity value for its key.\n\nThe maximum number of keys is 8.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"cel"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
