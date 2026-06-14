@@ -1058,15 +1058,8 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("expected volume %s to be not found in asw.GetMountedVolumesForPod", volumeSpec1.Name())
 	}
 
-	possiblyMountedVolumes := asw.GetPossiblyMountedVolumesForPod(podName1)
-	volumeFound = false
-	for _, volume := range possiblyMountedVolumes {
-		if volume.InnerVolumeSpecName == volumeSpec1.Name() {
-			volumeFound = true
-		}
-	}
-	if !volumeFound {
-		t.Fatalf("expected volume %s to be found in aws.GetPossiblyMountedVolumesForPod", volumeSpec1.Name())
+	if !asw.PodHasPossiblyMountedVolumes(podName1) {
+		t.Fatalf("expected pod %s to have possibly mounted volumes in asw", podName1)
 	}
 
 	volExists, _, _ := asw.PodExistsInVolume(logger, podName1, generatedVolumeName1, resource.Quantity{}, "")
