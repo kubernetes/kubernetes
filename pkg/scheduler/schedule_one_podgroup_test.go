@@ -1119,37 +1119,32 @@ func (p *orderedPlacementPlugin) GeneratePlacements(ctx context.Context, state f
 }
 
 func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:         true,
+		features.WorkloadAwarePreemption: true,
+		features.GangScheduling:          true,
+	})
+
 	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
-	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
-	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
-	p3 := st.MakePod().Name("p3").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
-
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
+	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p3 := st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
 	testPodGroup := &schedulingv1alpha3.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
-	podGroupInfo := &framework.QueuedPodGroupInfo{
-		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			UnscheduledPods: []*v1.Pod{p1, p2, p3},
-		},
-	}
-
 	tests := []struct {
-		name             string
-		existingPodGroup *schedulingv1alpha3.PodGroup
-		algorithmResult  podGroupAlgorithmResult
-		expectBound      sets.Set[string]
-		expectPreempting sets.Set[string]
-		expectFailed     sets.Set[string]
-		expectCondition  *metav1.Condition
+		name                     string
+		existingPodGroup         *schedulingv1alpha3.PodGroup
+		algorithmResult          podGroupAlgorithmResult
+		expectBound              sets.Set[string]
+		expectPreempting         sets.Set[string]
+		expectFailed             sets.Set[string]
+		expectCondition          *metav1.Condition
+		expectInActiveQ          sets.Set[string]
+		expectPreservedTimestamp bool
 	}{
 		{
 			name: "All pods feasible",
@@ -1218,6 +1213,8 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				Status: metav1.ConditionTrue,
 				Reason: "Scheduled",
 			},
+			expectInActiveQ:          sets.New("p2"),
+			expectPreservedTimestamp: true,
 		},
 		{
 			name: "All pods require preemption",
@@ -1621,12 +1618,13 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
+			schedulingQueue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc())
 			sched := &Scheduler{
 				client:          client,
 				podGroupLister:  podGroupLister,
 				Cache:           cache,
 				Profiles:        profile.Map{"test-scheduler": schedFwk},
-				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				SchedulingQueue: schedulingQueue,
 				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 					lock.Lock()
 					if ni != nil && ni.NominatedNodeName != "" {
@@ -1635,8 +1633,22 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 						failedPods.Insert(p.Pod.Name)
 					}
 					lock.Unlock()
+					_ = schedulingQueue.AddUnschedulablePodIfNotPresent(klog.FromContext(ctx), p, schedulingQueue.SchedulingCycle())
 				},
 			}
+
+			// Add the pods to queue and pop the group to set up internal queue state correctly
+			schedulingQueue.Add(ctx, p1)
+			schedulingQueue.Add(ctx, p2)
+			schedulingQueue.Add(ctx, p3)
+
+			entity, err := schedulingQueue.Pop(klog.FromContext(ctx))
+			if err != nil {
+				t.Fatalf("Failed to pop pod group: %v", err)
+			}
+			podGroupInfo := entity.(*framework.QueuedPodGroupInfo)
+
+			oldTimestamp := podGroupInfo.Timestamp
 
 			podGroupCycleState := framework.NewCycleState()
 
@@ -1666,6 +1678,28 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			}
 			if !tt.expectFailed.Equal(failedPods) {
 				t.Errorf("Expected failed pods: %v, but got: %v", tt.expectFailed, failedPods)
+			}
+
+			// CHECK IF POD IS REQUEUED INTO PENDING PODS (ActiveQ/BackoffQ)
+			if tt.expectInActiveQ != nil {
+				activePods := sched.SchedulingQueue.PodsInActiveQ()
+				activePodNames := sets.New[string]()
+				for _, pod := range activePods {
+					activePodNames.Insert(pod.Name)
+				}
+				if diff := cmp.Diff(tt.expectInActiveQ, activePodNames); diff != "" {
+					t.Errorf("Unexpected pods in active queue (-want, +got):\n%s", diff)
+				}
+			}
+
+			// CHECK IF POD GROUP PRESERVED ITS EXACT TIMESTAMP
+			if tt.expectPreservedTimestamp {
+				queuedPgInfo, ok := sched.SchedulingQueue.GetPodGroup("pg", "default")
+				if !ok {
+					t.Errorf("Expected pod group pg to be requeued, but it was not found in the scheduling queue")
+				} else if !queuedPgInfo.Timestamp.Equal(oldTimestamp) {
+					t.Errorf("Expected timestamp to be preserved exactly for pod group. Original: %v, Requeued: %v", oldTimestamp, queuedPgInfo.Timestamp)
+				}
 			}
 
 			updatedPodGroup, err := client.SchedulingV1alpha3().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
