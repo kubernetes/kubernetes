@@ -1141,14 +1141,14 @@ func (m *manager) syncBatch(ctx context.Context, all bool) int {
 
 	for _, update := range updatedStatuses {
 		logger.V(5).Info("Sync pod status", "podUID", update.podUID, "statusUID", update.statusUID, "version", update.status.version)
-		m.syncPod(ctx, update.podUID, update.status)
+		m.syncPod(ctx, update.podUID, update.statusUID, update.status)
 	}
 
 	return len(updatedStatuses)
 }
 
 // syncPod syncs the given status with the API server. The caller must not hold the status lock.
-func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPodStatus) {
+func (m *manager) syncPod(ctx context.Context, uid types.UID, statusUID kubetypes.MirrorPodUID, status versionedPodStatus) {
 	logger := klog.FromContext(ctx)
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(ctx, status.podName, metav1.GetOptions{})
@@ -1158,6 +1158,11 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 			"pod", klog.KRef(status.podNamespace, status.podName))
 		// If the Pod is deleted the status will be cleared in
 		// RemoveOrphanedStatuses, so we just ignore the update here.
+		// Mark this version as synced to avoid retrying on every sync cycle,
+		// which would cause unnecessary API server load in degraded situations
+		// (e.g., when the local filesystem have some hardware issues (like changed to read-only) and pod cleanup cannot
+		// complete). A new status update (version bump) will still trigger a retry.
+		m.apiStatusVersions[statusUID] = status.version
 		return
 	}
 	if err != nil {
@@ -1175,6 +1180,9 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 			"oldPodUID", uid,
 			"podUID", translatedUID)
 		m.deletePodStatus(uid)
+		// Clean up the old version tracking so that if the pod is re-added
+		// (e.g., via SetPodStatus), the new status will be synced.
+		delete(m.apiStatusVersions, statusUID)
 		return
 	}
 
