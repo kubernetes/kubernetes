@@ -340,6 +340,11 @@ var (
 	// PodLevelResources feature gate to be enabled.
 	PodLevelResources = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResources"))
 
+	// owner: sig-node
+	// Marks tests that require both PodLevelResources and
+	// PodLevelResourcesFixUpdateDefaulting feature gates to be enabled.
+	PodLevelResourcesFixUpdateDefaulting = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResourcesFixUpdateDefaulting"))
+
 	// Owner: sig-node
 	// Marks tests that require a cluster with PodLogsQuerySplitStreams
 	// (used for testing specific log stream <https://kep.k8s.io/3288>)
