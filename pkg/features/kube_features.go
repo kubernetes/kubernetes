@@ -500,6 +500,11 @@ const (
 	// access for different tenants.
 	KubeletEnsureSecretPulledImages featuregate.Feature = "KubeletEnsureSecretPulledImages"
 
+	// owner: @hoskeri
+	//
+	// Enables the kubelet to use a custom namespace for events.
+	KubeletEventsNamespace featuregate.Feature = "KubeletEventsNamespace"
+
 	// owner: @vinayakankugoyal
 	// kep: http://kep.k8s.io/2862
 	//
@@ -1518,6 +1523,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletEnsureSecretPulledImages: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	KubeletEventsNamespace: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	KubeletFineGrainedAuthz: {
