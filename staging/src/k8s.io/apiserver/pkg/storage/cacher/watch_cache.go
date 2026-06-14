@@ -432,7 +432,7 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 	} else {
 		listRV, err = c.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 		if err != nil {
-			return listResp{}, "", err
+			return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 		}
 	}
 	obj, exists, readResourceVersion, err := c.WaitUntilFreshAndGet(ctx, listRV, key)
@@ -463,7 +463,7 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
 	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return listResp{}, "", err
+		return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
@@ -592,7 +592,7 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion u
 func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	version, err := w.config.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resourceVersion: %v", err))
 	}
 
 	toReplace := make([]interface{}, 0, len(objs))
