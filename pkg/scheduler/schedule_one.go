@@ -1215,7 +1215,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		metrics.PodScheduleError(podFwk.ProfileName(), metrics.SinceInSeconds(start))
 	}
 
-	pod := podInfo.Pod
+	// Keep the popped PodInfo stable until Done removes the pod from in-flight
+	// tracking, where queue events are collected for this scheduling attempt.
+	podInfoForQueue := podInfo.DeepCopy()
+	pod := podInfoForQueue.Pod
 	err := status.AsError()
 	errMsg := status.Message()
 
@@ -1223,13 +1226,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// These fields will be repopulated below for FitError cases.
 	// We clear them here (rather than at Pop) because we sometimes want to use them
 	// for logging when a pod schedules successfully (e.g., after being flushed).
-	podInfo.ClearRejectorPlugins()
+	podInfoForQueue.ClearRejectorPlugins()
 
 	if err == ErrNoNodesAvailable {
 		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
 	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
-		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
-		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
+		podInfoForQueue.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
+		podInfoForQueue.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else if errors.Is(err, errPodGroupUnschedulable) {
 		logger.V(2).Info("Unable to schedule pod belonging to a pod group; waiting", "pod", klog.KObj(pod), "err", errMsg)
@@ -1257,9 +1260,9 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
-			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
-			pod = podInfo.Pod
-			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+			podInfoForQueue.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
+			pod = podInfoForQueue.Pod
+			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfoForQueue, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
 			calledDone = true
@@ -1271,7 +1274,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
+		sched.SchedulingQueue.AddNominatedPod(logger, podInfoForQueue.PodInfo, nominatingInfo)
 	}
 
 	if err == nil {

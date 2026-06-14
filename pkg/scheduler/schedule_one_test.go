@@ -1387,6 +1387,102 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 	}
 }
 
+func TestHandleSchedulingFailureDoesNotMutatePoppedPodInfo(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	queuedPod := st.MakePod().Name("foo").Namespace("ns").UID("uid").SchedulerName(testSchedulerName).Annotation("source", "queue").Obj()
+	cachedPod := queuedPod.DeepCopy()
+	cachedPod.Annotations = map[string]string{"source": "informer"}
+
+	client := clientsetfake.NewClientset(cachedPod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+	sched := &Scheduler{
+		client:          client,
+		SchedulingQueue: queue,
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	queue.Add(ctx, queuedPod)
+	popped, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop: %v", err)
+	}
+
+	poppedPod := popped.(*framework.QueuedPodInfo)
+	originalPodInfo := poppedPod.PodInfo
+	originalPod := poppedPod.Pod
+	poppedPod.UnschedulablePlugins = sets.New("previous")
+	poppedPod.PendingPlugins = sets.New("previous-pending")
+
+	fitErr := &framework.FitError{
+		Pod:         queuedPod,
+		NumAllNodes: 1,
+		Diagnosis: framework.Diagnosis{
+			UnschedulablePlugins: sets.New("current-unschedulable"),
+			PendingPlugins:       sets.New("current-pending"),
+		},
+	}
+	status := fwk.NewStatus(fwk.Unschedulable).WithError(fitErr)
+
+	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, status, nominatingInfo, time.Now())
+
+	if poppedPod.PodInfo != originalPodInfo {
+		t.Fatalf("expected popped PodInfo to remain unchanged")
+	}
+	if poppedPod.Pod != originalPod {
+		t.Fatalf("expected popped Pod to remain unchanged")
+	}
+	if diff := cmp.Diff(map[string]string{"source": "queue"}, poppedPod.Pod.Annotations); diff != "" {
+		t.Fatalf("unexpected popped pod annotations (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("previous"), poppedPod.UnschedulablePlugins); diff != "" {
+		t.Fatalf("unexpected popped pod unschedulable plugins (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("previous-pending"), poppedPod.PendingPlugins); diff != "" {
+		t.Fatalf("unexpected popped pod pending plugins (-want,+got):\n%s", diff)
+	}
+
+	requeuedPodInfo, ok := queue.GetPod(cachedPod.Name, cachedPod.Namespace, nil)
+	if !ok {
+		t.Fatalf("expected pod to be requeued")
+	}
+	if requeuedPodInfo.PodInfo == originalPodInfo {
+		t.Fatalf("expected requeued PodInfo to be a copy")
+	}
+	if diff := cmp.Diff(map[string]string{"source": "informer"}, requeuedPodInfo.Pod.Annotations); diff != "" {
+		t.Fatalf("unexpected requeued pod annotations (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("current-unschedulable"), requeuedPodInfo.UnschedulablePlugins); diff != "" {
+		t.Fatalf("unexpected requeued pod unschedulable plugins (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("current-pending"), requeuedPodInfo.PendingPlugins); diff != "" {
+		t.Fatalf("unexpected requeued pod pending plugins (-want,+got):\n%s", diff)
+	}
+}
+
 type constSigPluginConfig struct {
 	name       string
 	signature  []fwk.SignFragment
