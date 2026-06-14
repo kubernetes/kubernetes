@@ -3168,6 +3168,9 @@ const (
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// PodResizeUnschedulable means that a deferred pod resize request cannot proceed
+	// due to insufficient capacity and cannot benefit from scheduler-side preemption.
+	PodResizeUnschedulable PodConditionType = "PodResizeUnschedulable"
 )
 
 // PodCondition represents pod's condition
@@ -5497,6 +5500,18 @@ type NodeSpec struct {
 	// see: https://issues.k8s.io/61966
 	// +optional
 	DoNotUseExternalID string
+
+	// PreemptionPolicy controls the node-level preemption behaviors.
+	// +optional
+	PreemptionPolicy *NodePreemptionPolicy
+}
+
+// NodePreemptionPolicy defines the node-level policies governing preemption on this node.
+type NodePreemptionPolicy struct {
+	// DisablePodResizePreemption lists the owners (e.g., autoscalers, operators, administrators)
+	// that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
+	// If this list is non-empty, resize-induced preemption is disabled on this node.
+	DisablePodResizePreemption []string
 }
 
 // Deprecated: NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.

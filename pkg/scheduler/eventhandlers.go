@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	resourcehelper "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -41,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -133,6 +136,9 @@ func (sched *Scheduler) addPod(obj interface{}) {
 
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
+		if resourcehelper.IsPodResizeDeferred(pod) && responsibleForPod(pod, sched.Profiles) {
+			sched.addPodToSchedulingQueue(pod)
+		}
 	} else if responsibleForPod(pod, sched.Profiles) {
 		sched.addPodToSchedulingQueue(pod)
 	}
@@ -153,6 +159,41 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
+		if responsibleForPod(newPod, sched.Profiles) {
+			oldDeferred := resourcehelper.IsPodResizeDeferred(oldPod)
+			newDeferred := resourcehelper.IsPodResizeDeferred(newPod)
+
+			if !oldDeferred && newDeferred {
+				sched.addPodToSchedulingQueue(newPod)
+			} else if oldDeferred && !newDeferred {
+				sched.deletePodFromSchedulingQueue(oldPod, false)
+				hasResizeCond := false
+				for _, cond := range newPod.Status.Conditions {
+					if cond.Type == v1.PodResizeUnschedulable {
+						hasResizeCond = true
+						break
+					}
+				}
+				if hasResizeCond {
+					podStatusCopy := newPod.Status.DeepCopy()
+					var newConditions []v1.PodCondition
+					for _, cond := range podStatusCopy.Conditions {
+						if cond.Type != v1.PodResizeUnschedulable {
+							newConditions = append(newConditions, cond)
+						}
+					}
+					podStatusCopy.Conditions = newConditions
+					if err := schedutil.PatchPodStatus(context.Background(), sched.client, newPod.Name, newPod.Namespace, &newPod.Status, podStatusCopy); err != nil {
+						utilruntime.HandleErrorWithLogger(logger, err, "Failed to clear PodResizeUnschedulable condition", "pod", klog.KObj(newPod))
+					}
+				}
+			} else if oldDeferred && newDeferred {
+				sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
+				if podRequestsChanged(oldPod, newPod) {
+					sched.SchedulingQueue.Activate(logger, map[string]*v1.Pod{string(newPod.UID): newPod})
+				}
+			}
+		}
 	} else if assignedPod(newPod) {
 		// This update means binding operation. We can treat it as adding the pod to a cache
 		// (addition to the cache will handle this binding appropriately).
@@ -177,6 +218,9 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		pod = t
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
+			if resourcehelper.IsPodResizeDeferred(pod) && responsibleForPod(pod, sched.Profiles) {
+				sched.deletePodFromSchedulingQueue(pod, false)
+			}
 		} else if responsibleForPod(pod, sched.Profiles) {
 			// Passing "false" means that removal from the scheduling queue is caused by
 			// removal of the pod from the cluster, not by a binding event.
@@ -709,4 +753,24 @@ type AdmissionResult struct {
 	Name                 string
 	Reason               string
 	InsufficientResource *noderesources.InsufficientResource
+}
+
+func podRequestsChanged(oldPod, newPod *v1.Pod) bool {
+	if len(oldPod.Spec.Containers) != len(newPod.Spec.Containers) {
+		return true
+	}
+	for i := range oldPod.Spec.Containers {
+		if !equality.Semantic.DeepEqual(oldPod.Spec.Containers[i].Resources.Requests, newPod.Spec.Containers[i].Resources.Requests) {
+			return true
+		}
+	}
+	if len(oldPod.Spec.InitContainers) != len(newPod.Spec.InitContainers) {
+		return true
+	}
+	for i := range oldPod.Spec.InitContainers {
+		if !equality.Semantic.DeepEqual(oldPod.Spec.InitContainers[i].Resources.Requests, newPod.Spec.InitContainers[i].Resources.Requests) {
+			return true
+		}
+	}
+	return false
 }

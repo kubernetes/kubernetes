@@ -41,6 +41,8 @@ type NodeSpecApplyConfiguration struct {
 	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
 	// see: https://issues.k8s.io/61966
 	DoNotUseExternalID *string `json:"externalID,omitempty"`
+	// PreemptionPolicy controls the node-level preemption behaviors.
+	PreemptionPolicy *NodePreemptionPolicyApplyConfiguration `json:"preemptionPolicy,omitempty"`
 }
 
 // NodeSpecApplyConfiguration constructs a declarative configuration of the NodeSpec type for use with
@@ -109,5 +111,13 @@ func (b *NodeSpecApplyConfiguration) WithConfigSource(value *NodeConfigSourceApp
 // If called multiple times, the DoNotUseExternalID field is set to the value of the last call.
 func (b *NodeSpecApplyConfiguration) WithDoNotUseExternalID(value string) *NodeSpecApplyConfiguration {
 	b.DoNotUseExternalID = &value
+	return b
+}
+
+// WithPreemptionPolicy sets the PreemptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreemptionPolicy field is set to the value of the last call.
+func (b *NodeSpecApplyConfiguration) WithPreemptionPolicy(value *NodePreemptionPolicyApplyConfiguration) *NodeSpecApplyConfiguration {
+	b.PreemptionPolicy = value
 	return b
 }

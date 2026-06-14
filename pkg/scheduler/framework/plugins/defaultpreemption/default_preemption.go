@@ -89,10 +89,16 @@ type DefaultPreemption struct {
 
 var _ fwk.PostFilterPlugin = &DefaultPreemption{}
 var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
+var _ fwk.ResizeInterestedPlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
 	return Name
+}
+
+// ShouldHandleDeferredResize returns true because DefaultPreemption is interested in evaluating deferred-resize pods.
+func (pl *DefaultPreemption) ShouldHandleDeferredResize(ctx context.Context, pod *v1.Pod, nodeName string) bool {
+	return true
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.

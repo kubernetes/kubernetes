@@ -577,6 +577,11 @@ func (in NodeList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodePreemptionPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodePreemptionPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeProxyOptions) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeProxyOptions"
 }
