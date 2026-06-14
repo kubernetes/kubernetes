@@ -63,7 +63,8 @@ import (
 type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
-	VolumePlugins             []vol.VolumePlugin
+	VolumePlugins             []vol.VolumePlugin // subset: provisionable/deletable/recyclable only
+	MetricsVolumePlugins      []vol.VolumePlugin // full set: all PV plugins, used for plugin_name metric label
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
 	ClassInformer             storageinformers.StorageClassInformer
@@ -102,6 +103,14 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 	// Prober is nil because PV is not aware of Flexvolume.
 	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, nil /* prober */, controller); err != nil {
 		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
+	}
+
+	metricsPlugins := p.MetricsVolumePlugins
+	if len(metricsPlugins) == 0 {
+		metricsPlugins = p.VolumePlugins
+	}
+	if err := controller.metricsPluginMgr.InitPlugins(metricsPlugins, nil /* prober */, controller); err != nil {
+		return nil, fmt.Errorf("could not initialize metrics volume plugins for PersistentVolume Controller: %w", err)
 	}
 
 	p.VolumeInformer.Informer().AddEventHandler(
@@ -330,7 +339,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	}
 
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
-	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
+	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.metricsPluginMgr)
 
 	wg.Go(func() {
 		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
