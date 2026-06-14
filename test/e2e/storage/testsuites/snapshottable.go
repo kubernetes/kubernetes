@@ -396,6 +396,133 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 
 				deleteVolumeSnapshot(ctx, f, dc, sr, pattern, vscontent)
 			})
+
+			ginkgo.It("should verify that deleting snapshot does not delete the source volume (persistent)", func(ctx context.Context) {
+				if pattern.VolType == storageframework.GenericEphemeralVolume {
+					e2eskipper.Skipf("volume type %q is ephemeral", pattern.VolType)
+				}
+				init(ctx)
+
+				pvc = volumeResource.Pvc
+				sc = volumeResource.Sc
+
+				// The pod should be in the Success state.
+				ginkgo.By("[init] check pod success")
+				pod, err = cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to fetch pod: %v", err)
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
+				// Sync the pod to know additional fields.
+				pod, err = cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to fetch pod: %v", err)
+
+				ginkgo.By("[init] checking the claim")
+				err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
+				framework.ExpectNoError(err)
+				// Get new copy of the claim.
+				pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+
+				// Get the bound PV.
+				ginkgo.By("[init] checking the PV")
+				pv, err := cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+
+				// Store the original PV name for later verification
+				originalPVName := pv.Name
+
+				// Delete the pod to force NodeUnpublishVolume.
+				ginkgo.By("[init] deleting the pod")
+				StopPod(ctx, cs, pod)
+
+				// Get node name
+				nodeName := pod.Spec.NodeName
+				gomega.Expect(nodeName).NotTo(gomega.BeEmpty(), "pod.Spec.NodeName must not be empty")
+
+				// Snapshot tests are only executed for CSI drivers. When CSI drivers
+				// are attached to the node they use VolumeHandle instead of the pv.Name.
+				volumeName := pv.Spec.PersistentVolumeSource.CSI.VolumeHandle
+
+				// Wait for volume to be fully detached from the node
+				ginkgo.By(fmt.Sprintf("[init] waiting until the node=%s is not using the volume=%s", nodeName, volumeName))
+				success := storageutils.WaitUntil(framework.Poll, f.Timeouts.PVDelete, func() bool {
+					node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+					framework.ExpectNoError(err)
+					volumesInUse := node.Status.VolumesInUse
+					framework.Logf("current volumes in use: %+v", volumesInUse)
+					for i := 0; i < len(volumesInUse); i++ {
+						if strings.HasSuffix(string(volumesInUse[i]), volumeName) {
+							return false
+						}
+					}
+					return true
+				})
+				if !success {
+					framework.Failf("timed out waiting for node=%s to not use the volume=%s", nodeName, volumeName)
+				}
+
+				// Take the snapshot.
+				ginkgo.By("creating a volume snapshot")
+				parameters := map[string]string{}
+				sr := storageframework.CreateSnapshotResource(ctx, sDriver, config, pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				ginkgo.DeferCleanup(sr.CleanupResource, f.Timeouts)
+				vs := sr.Vs
+
+				// Get the snapshot and check SnapshotContent properties
+				vscontent := checkSnapshot(ctx, dc, sr, pattern)
+
+				// Delete the snapshot
+				ginkgo.By("deleting the volume snapshot")
+				err = storageutils.DeleteSnapshotWithoutWaiting(ctx, dc, vs.GetNamespace(), vs.GetName())
+				framework.ExpectNoError(err)
+
+				// Wait for the Snapshot to be actually deleted from API server
+				ginkgo.By("waiting for the snapshot to be deleted")
+				err = storageutils.WaitForNamespacedGVRDeletion(ctx, dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
+				framework.ExpectNoError(err)
+
+				// Verify snapshot content deletion according to deletion policy
+				if pattern.SnapshotDeletionPolicy == storageframework.DeleteSnapshot {
+					ginkgo.By("checking the SnapshotContent has been deleted")
+					err = storageutils.EnsureGVRDeletion(ctx, dc, storageutils.SnapshotContentGVR, vscontent.GetName(), framework.Poll, f.Timeouts.SnapshotDelete, "")
+					framework.ExpectNoError(err)
+				}
+
+				// Wait for backend snapshot deletion to complete
+				ginkgo.By("waiting for backend snapshot deletion to complete")
+				time.Sleep(1 * time.Minute)
+
+				// Verify that the original PVC and PV still exist
+				ginkgo.By("verifying the source PVC still exists after snapshot deletion")
+				pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "source PVC should still exist after snapshot deletion")
+				gomega.Expect(pvc.Status.Phase).To(gomega.Equal(v1.ClaimBound), "source PVC should still be in Bound state")
+
+				ginkgo.By("verifying the source PV still exists after snapshot deletion")
+				pv, err = cs.CoreV1().PersistentVolumes().Get(ctx, originalPVName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "source PV should still exist after snapshot deletion")
+				gomega.Expect(pv.Name).To(gomega.Equal(originalPVName), "source PV name should match the original")
+
+				// Create a pod to verify data integrity and volume writability
+				ginkgo.By("creating a pod to verify the original volume")
+				verifyPod := StartInPodWithVolume(ctx, cs, pvc.Namespace, pvc.Name, "pvc-verify-tester", "sleep 300", config.ClientNodeSelection)
+				ginkgo.DeferCleanup(StopPod, cs, verifyPod)
+
+				// Wait for pod to be running
+				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, verifyPod.Name, verifyPod.Namespace, f.Timeouts.PodStartSlow))
+
+				// Verify original data still exists
+				ginkgo.By("verifying original data still exists in the volume")
+				readCmd := e2evolume.GenerateReadFileCmd(datapath)
+				_, err = e2eoutput.LookForStringInPodExec(verifyPod.Namespace, verifyPod.Name, readCmd, originalMntTestData, time.Minute)
+				framework.ExpectNoError(err, "original data should still be present in the volume")
+
+				// Write new data to verify volume is writable
+				ginkgo.By("writing new data to verify volume is writable")
+				newMntTestData := fmt.Sprintf("new hello from %s namespace", pvc.GetNamespace())
+				writeCmd := fmt.Sprintf("echo '%s' > %s_new; sync", newMntTestData, datapath)
+				_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, config.Framework, verifyPod.Name, writeCmd)
+				framework.ExpectNoError(err, "failed to write new data to volume")
+			})
 		})
 	})
 }
