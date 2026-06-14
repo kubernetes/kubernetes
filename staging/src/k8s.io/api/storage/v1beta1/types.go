@@ -75,7 +75,6 @@ type StorageClass struct {
 
 	// volumeBindingMode indicates how PersistentVolumeClaims should be
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
-	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:immutable
 	// +k8s:alpha(since: "1.36")=+k8s:optional
@@ -84,7 +83,6 @@ type StorageClass struct {
 	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
 	// Each volume plugin defines its own supported topology specifications.
 	// An empty TopologySelectorTerm list means there is no topology restriction.
-	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
 	// +listType=atomic
 	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
