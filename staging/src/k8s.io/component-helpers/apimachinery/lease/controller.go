@@ -77,6 +77,12 @@ type controller struct {
 
 	reconcilingLock sync.Mutex
 	stopCalled      atomic.Bool
+
+	// cancelSyncLock protects cancelSync.
+	cancelSyncLock sync.Mutex
+	// cancelSync cancels the Run context so Stop can interrupt an in-flight sync
+	// before waiting on reconcilingLock.
+	cancelSync context.CancelFunc
 }
 
 // NewController constructs and returns a controller
@@ -116,7 +122,14 @@ func (c *controller) Start(stopCh <-chan struct{}) error {
 		klog.FromContext(ctx).Error(err, "error deleting old lease", "lease", klog.KRef(c.leaseNamespace, c.leaseName))
 	}
 
-	go c.Run(wait.ContextForChannel(stopCh))
+	runCtx, cancel := context.WithCancel(wait.ContextForChannel(stopCh))
+	c.cancelSyncLock.Lock()
+	c.cancelSync = cancel
+	if c.stopCalled.Load() {
+		cancel()
+	}
+	c.cancelSyncLock.Unlock()
+	go c.Run(runCtx)
 	return nil
 }
 
@@ -127,6 +140,11 @@ func (c *controller) Stop() {
 	}
 
 	c.stopCalled.Store(true)
+	c.cancelSyncLock.Lock()
+	if c.cancelSync != nil {
+		c.cancelSync()
+	}
+	c.cancelSyncLock.Unlock()
 	// Ensure that there will be no race condition with the sync.
 	c.reconcilingLock.Lock()
 	defer c.reconcilingLock.Unlock()
