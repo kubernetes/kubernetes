@@ -14,52 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validatingadmissionpolicy
+package mutatingadmissionpolicy
 
 import (
-	"testing"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	registry "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy"
+	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
+	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
+	registry "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingadmissionpolicy"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
+	"testing"
 )
 
-func TestDeclarativeValidateStatusUpdate(t *testing.T) {
-	for _, apiVersion := range apiVersions {
-		t.Run(apiVersion, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:    "admissionregistration.k8s.io",
-				APIVersion:  apiVersion,
-				Resource:    "validatingadmissionpolicies",
-				Subresource: "status",
-			})
+// TODO: remove this apiVersions variable once coverage tests are generated for this package.
+var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
 
-			strategy := registry.NewStatusStrategy(registry.NewStrategy(nil, nil))
-			meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &admissionregistration.ValidatingAdmissionPolicy{}, strategy, func(obj *admissionregistration.ValidatingAdmissionPolicy, c []metav1.Condition) {
-				*obj = admissionregistration.ValidatingAdmissionPolicy{
-					ObjectMeta: metav1.ObjectMeta{Name: "valid-policy", ResourceVersion: "1"},
-					Spec:       admissionregistration.ValidatingAdmissionPolicySpec{},
-					Status: admissionregistration.ValidatingAdmissionPolicyStatus{
-						Conditions: c,
-					},
-				}
-			})
-		})
-	}
-}
-
-// Helper function to create a baseline valid ValidatingAdmissionPolicy with optional tweaks
-func mkValidatingAdmissionPolicy(tweaks ...func(*admissionregistration.ValidatingAdmissionPolicy)) admissionregistration.ValidatingAdmissionPolicy {
+// Helper function to create a baseline valid MutatingAdmissionPolicy with optional tweaks
+func mkMutatingAdmissionPolicy(tweaks ...func(*admissionregistration.MutatingAdmissionPolicy)) admissionregistration.MutatingAdmissionPolicy {
 	fp := admissionregistration.Fail
+	rp := admissionregistration.NeverReinvocationPolicy
 	mp := admissionregistration.Equivalent
-	obj := admissionregistration.ValidatingAdmissionPolicy{
+	obj := admissionregistration.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-resource-name",
 		},
-		Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+		Spec: admissionregistration.MutatingAdmissionPolicySpec{
 			FailurePolicy: &fp,
 			MatchConstraints: &admissionregistration.MatchResources{
 				MatchPolicy:       &mp,
@@ -80,11 +59,15 @@ func mkValidatingAdmissionPolicy(tweaks ...func(*admissionregistration.Validatin
 					},
 				},
 			},
-			Validations: []admissionregistration.Validation{
+			Mutations: []admissionregistration.Mutation{
 				{
-					Expression: "true",
+					PatchType: admissionregistration.PatchTypeJSONPatch,
+					JSONPatch: &admissionregistration.JSONPatch{
+						Expression: `[JSONPatch{op: "add", path: "/spec/replicas", value: 3}]`,
+					},
 				},
 			},
+			ReinvocationPolicy: rp,
 		},
 	}
 	for _, tweak := range tweaks {
@@ -104,12 +87,12 @@ func TestDeclarativeValidate(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "admissionregistration.k8s.io",
 				APIVersion:        apiVersion,
-				Resource:          "validatingadmissionpolicies",
+				Resource:          "mutatingadmissionpolicies",
 				Namespace:         namespace,
 				IsResourceRequest: true,
 				Verb:              "create",
 			})
-			obj := mkValidatingAdmissionPolicy(func(o *admissionregistration.ValidatingAdmissionPolicy) {
+			obj := mkMutatingAdmissionPolicy(func(o *admissionregistration.MutatingAdmissionPolicy) {
 				o.Namespace = namespace
 			})
 			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy)
@@ -128,12 +111,12 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 				APIGroup:          "admissionregistration.k8s.io",
 				APIVersion:        apiVersion,
-				Resource:          "validatingadmissionpolicies",
+				Resource:          "mutatingadmissionpolicies",
 				Namespace:         namespace,
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			obj := mkValidatingAdmissionPolicy(func(o *admissionregistration.ValidatingAdmissionPolicy) {
+			obj := mkMutatingAdmissionPolicy(func(o *admissionregistration.MutatingAdmissionPolicy) {
 				o.Namespace = namespace
 			})
 			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, strategy)
