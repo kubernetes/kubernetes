@@ -328,6 +328,7 @@ var disallowedAuthProxyHeaderNames = sets.New[string](
 	"Upgrade",
 	"User-Agent",
 	"X-Remote-User",
+	"X-Remote-Uid",
 	"X-Remote-Group",
 	transport.ImpersonateUserHeader,
 	transport.ImpersonateUIDHeader,

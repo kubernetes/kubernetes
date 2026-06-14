@@ -496,6 +496,24 @@ func TestRefreshCreds(t *testing.T) {
 			wantErrSubstr: `exec plugin returned unsupported auth proxy header "X-Remote-User"`,
 		},
 		{
+			name: "v1-auth-proxy-header-requestheader-uid-is-rejected",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"authProxyHeaders": {
+						"X-Remote-Uid": "uid"
+					}
+				}
+			}`,
+			wantErr:       true,
+			wantErrSubstr: `exec plugin returned unsupported auth proxy header "X-Remote-Uid"`,
+		},
+		{
 			name: "v1-auth-proxy-header-hop-by-hop-is-rejected",
 			config: api.ExecConfig{
 				APIVersion:      "client.authentication.k8s.io/v1",
