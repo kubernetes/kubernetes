@@ -35,11 +35,14 @@ import (
 
 	"golang.org/x/term"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/features"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/install"
 	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
@@ -54,6 +57,7 @@ import (
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
+const maxExecStatusErrorStdoutLen = 1024 * 1024
 const installHintVerboseHelp = `
 
 It looks like you are trying to use a client-go credential plugin that is not installed.
@@ -65,6 +69,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 func init() {
+	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Group: "", Version: "v1"})
 	install.Install(scheme)
 }
 
@@ -471,7 +476,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 	err = cmd.Run()
 	incrementCallsMetric(err)
 	if err != nil {
-		return a.wrapCmdRunErrorLocked(err)
+		return a.wrapCmdRunErrorLocked(err, stdout.Bytes())
 	}
 
 	_, gvk, err := codecs.UniversalDecoder(a.group).Decode(stdout.Bytes(), nil, cred)
@@ -482,7 +487,6 @@ func (a *Authenticator) refreshCredsLocked() error {
 		return fmt.Errorf("exec plugin is configured to use API version %s, plugin returned version %s",
 			a.group, schema.GroupVersion{Group: gvk.Group, Version: gvk.Version})
 	}
-
 	if cred.Status == nil {
 		return fmt.Errorf("exec plugin didn't return a status field")
 	}
@@ -545,7 +549,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 // for when the exec plugin's binary fails to Run().
 //
 // It must be called while holding the Authenticator's mutex.
-func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
+func (a *Authenticator) wrapCmdRunErrorLocked(err error, stdoutBytes []byte) error {
 	switch err.(type) {
 	case *exec.Error: // Binary does not exist (see exec.Error).
 		builder := strings.Builder{}
@@ -562,6 +566,16 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 
 	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
 		e := err.(*exec.ExitError)
+		if features.FeatureGates().Enabled(features.ExecPluginStatusError) && len(stdoutBytes) > 0 {
+			metav1Status, decodeErr := decodeMetaV1Status(stdoutBytes)
+			if decodeErr == nil {
+				return &apierrors.StatusError{
+					ErrStatus: *metav1Status,
+				}
+			}
+			klog.V(2).Infof("failed to decode metav1.Status from exec plugin %s: %v", a.cmd, decodeErr)
+		}
+
 		return fmt.Errorf(
 			"exec: executable %s failed with exit code %d",
 			a.cmd,
@@ -571,6 +585,33 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 	default:
 		return fmt.Errorf("exec: %v", err)
 	}
+}
+
+func decodeMetaV1Status(b []byte) (*metav1.Status, error) {
+	b = bytes.TrimSpace(b)
+	if bl := len(b); bl == 0 || bl > maxExecStatusErrorStdoutLen {
+		return nil, fmt.Errorf("invalid stdout length of %d, should be non-zero and less then 1MiB", bl)
+	}
+
+	statusError := metav1.Status{}
+	_, gvk, err := codecs.UniversalDecoder(metav1.SchemeGroupVersion).Decode(b, nil, &statusError)
+	if err != nil {
+		return nil, err
+	}
+
+	if gvk.Kind != "Status" || (gvk.Group != "" && gvk.Group != metav1.GroupName) || gvk.Version != "v1" {
+		return nil, fmt.Errorf("expected metav1.Status in output, got %s", gvk.String())
+	}
+
+	if statusError.Message == "" {
+		return nil, fmt.Errorf("status message must be non-empty")
+	}
+
+	if statusError.Status != metav1.StatusFailure {
+		return nil, fmt.Errorf("status status must be %q, got %q", metav1.StatusFailure, statusError.Status)
+	}
+
+	return &statusError, nil
 }
 
 // `updateCommandAndCheckAllowlistLocked` determines whether or not the specified executable may run
