@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -370,6 +371,135 @@ apiserver_storage_list_total{group="",index="",resource="pods",storage="etcd"} 1
 		"apiserver_storage_list_returned_objects_total",
 	); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func podKeySet(list *example.PodList) map[string]struct{} {
+	out := make(map[string]struct{}, len(list.Items))
+	for i := range list.Items {
+		out[list.Items[i].Namespace+"/"+list.Items[i].Name] = struct{}{}
+	}
+	return out
+}
+
+func seedPods(ctx context.Context, t *testing.T, store *store, count, namespaces int) map[string]struct{} {
+	t.Helper()
+	want := make(map[string]struct{}, count)
+	for i := range count {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+			Namespace: fmt.Sprintf("ns-%d", i%namespaces),
+			Name:      fmt.Sprintf("pod-%04d", i),
+		}}
+		if err := store.Create(ctx, computePodKey(pod), pod, &example.Pod{}, 0); err != nil {
+			t.Fatalf("failed to create pod: %v", err)
+		}
+		want[pod.Namespace+"/"+pod.Name] = struct{}{}
+	}
+	return want
+}
+
+// freshFeatureSupportChecker isolates the global checker so a MarkUnsupported in
+// one test (RangeStream stays unsupported for minutes) can't leak into others.
+func freshFeatureSupportChecker(t *testing.T) {
+	t.Helper()
+	orig := etcdfeature.DefaultFeatureSupportChecker
+	etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
+	t.Cleanup(func() { etcdfeature.DefaultFeatureSupportChecker = orig })
+}
+
+// TestGetListRangeStream runs each list scenario through both the unary paginated
+// path and the RangeStream path and checks they return the same result. The gate is
+// pinned per mode, so the table keeps covering both paths even after the feature
+// defaults on; new list-path features extend the table instead of adding a test.
+func TestGetListRangeStream(t *testing.T) {
+	modes := []struct {
+		name        string
+		rangeStream bool
+	}{
+		{name: "paginated", rangeStream: false},
+		{name: "rangeStream", rangeStream: true},
+	}
+
+	fullList := storage.ListOptions{Predicate: storage.Everything, Recursive: true}
+	pagedList := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{Label: labels.Everything(), Field: fields.Everything(), Limit: 5},
+		Recursive: true,
+	}
+
+	testCases := []struct {
+		name                string
+		seedCount           int
+		seedNamespaces      int
+		opts                storage.ListOptions
+		streamUnimplemented bool
+		wantLen             int // 0 means the full seeded set
+	}{
+		{name: "full list across chunks", seedCount: 100, seedNamespaces: 5, opts: fullList},
+		{name: "empty result", seedCount: 0, seedNamespaces: 1, opts: fullList},
+		{name: "unsupported server falls back", seedCount: 30, seedNamespaces: 3, opts: fullList, streamUnimplemented: true},
+		{name: "paginated request", seedCount: 10, seedNamespaces: 1, opts: pagedList, wantLen: 5},
+	}
+
+	for _, mode := range modes {
+		for _, tc := range testCases {
+			t.Run(mode.name+"/"+tc.name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, mode.rangeStream)
+				freshFeatureSupportChecker(t)
+				ctx, store, _ := testSetup(t)
+
+				want := seedPods(ctx, t, store, tc.seedCount, tc.seedNamespaces)
+
+				// Wrap KV after seeding so the counters only cover the list below.
+				kvWrapper := newEtcdClientKVWrapper(store.client.KV)
+				kvWrapper.streamUnimplemented = tc.streamUnimplemented
+				store.client.KV = kvWrapper
+
+				out := &example.PodList{}
+				if err := store.GetList(ctx, "/pods/", tc.opts, out); err != nil {
+					t.Fatalf("GetList failed: %v", err)
+				}
+
+				eligible := tc.opts.Recursive && tc.opts.Predicate.Limit == 0 && len(tc.opts.Predicate.Continue) == 0
+				streamAttempted := mode.rangeStream && eligible
+				streamServed := streamAttempted && !tc.streamUnimplemented
+
+				wantGetStream := 0
+				if streamAttempted {
+					wantGetStream = 1
+				}
+				if kvWrapper.getStreamCallCounter != wantGetStream {
+					t.Errorf("GetStream calls = %d, want %d", kvWrapper.getStreamCallCounter, wantGetStream)
+				}
+				if streamServed && kvWrapper.getCallCounter != 0 {
+					t.Errorf("unary Get/List used %d times, want 0 (stream served the list)", kvWrapper.getCallCounter)
+				}
+				if !streamServed && kvWrapper.getCallCounter == 0 {
+					t.Error("unary Get/List was not used to serve the list")
+				}
+				if streamAttempted && tc.streamUnimplemented && etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream) {
+					t.Error("RangeStream should be marked unsupported after an Unimplemented response")
+				}
+
+				got := podKeySet(out)
+				if tc.wantLen > 0 {
+					if len(out.Items) != tc.wantLen {
+						t.Errorf("returned %d items, want %d", len(out.Items), tc.wantLen)
+					}
+					for k := range got {
+						if _, ok := want[k]; !ok {
+							t.Errorf("returned key %q not in the seeded set", k)
+						}
+					}
+					return
+				}
+				if len(out.Items) != len(want) {
+					t.Errorf("returned %d items, want %d (possible duplicates)", len(out.Items), len(want))
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("returned set != seeded set (-want +got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
