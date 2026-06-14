@@ -2051,6 +2051,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: WatchListCompression
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: WebhookRoundTripLoadBalancing
   versionedSpecs:
   - default: true

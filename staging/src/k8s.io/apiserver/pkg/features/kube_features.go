@@ -277,6 +277,11 @@ const (
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
 
+	// owner: @p0lyn0mial
+	//
+	// Enables compression for WatchList responses
+	WatchListCompression featuregate.Feature = "WatchListCompression"
+
 	// owner: @aojea
 	// beta: v1.37
 	//
@@ -459,6 +464,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WatchListCompression: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WebhookRoundTripLoadBalancing: {
