@@ -21,9 +21,24 @@ import (
 	"math"
 	"strconv"
 
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
 )
+
+// HasTag recursively checks if a tag with given name exists in the tag tree.
+func HasTag(tags []codetags.Tag, name string) bool {
+	for _, tag := range tags {
+		if tag.Name == name {
+			return true
+		}
+		// Also check conditional tags value
+		if tag.ValueTag != nil && HasTag([]codetags.Tag{*tag.ValueTag}, name) {
+			return true
+		}
+	}
+	return false
+}
 
 // GetMemberByJSON returns the child member of the type that has the given JSON
 // name. It returns nil if no such member exists.

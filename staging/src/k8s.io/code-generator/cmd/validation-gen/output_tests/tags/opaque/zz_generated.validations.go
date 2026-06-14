@@ -38,6 +38,36 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type BaseStruct
+	scheme.AddValidationFunc(
+		(*BaseStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_BaseStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*BaseStruct),
+					safe.Cast[*BaseStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type OpaqueAliasWithValidation
+	scheme.AddValidationFunc(
+		(*OpaqueAliasWithValidation)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_OpaqueAliasWithValidation(
+					ctx, op, nil, /* fldPath */
+					obj.(*OpaqueAliasWithValidation),
+					safe.Cast[*OpaqueAliasWithValidation](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type OpaqueFieldsStruct
 	scheme.AddValidationFunc(
 		(*OpaqueFieldsStruct)(nil),
@@ -68,6 +98,21 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type OpaqueStructWithValidation
+	scheme.AddValidationFunc(
+		(*OpaqueStructWithValidation)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_OpaqueStructWithValidation(
+					ctx, op, nil, /* fldPath */
+					obj.(*OpaqueStructWithValidation),
+					safe.Cast[*OpaqueStructWithValidation](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type OtherString
 	scheme.AddValidationFunc(
 		(*OtherString)(nil),
@@ -93,6 +138,21 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 					ctx, op, nil, /* fldPath */
 					obj.(*OtherStruct),
 					safe.Cast[*OtherStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type ParentWithOpaqueAliasWithValidation
+	scheme.AddValidationFunc(
+		(*ParentWithOpaqueAliasWithValidation)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ParentWithOpaqueAliasWithValidation(
+					ctx, op, nil, /* fldPath */
+					obj.(*ParentWithOpaqueAliasWithValidation),
+					safe.Cast[*ParentWithOpaqueAliasWithValidation](oldObj))
 			}
 			return field.ErrorList{
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
@@ -146,6 +206,52 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_BaseStruct validates an instance of BaseStruct according
+// to declarative validation rules in the API schema.
+func Validate_BaseStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *BaseStruct) (errs field.ErrorList) {
+
+	{ // field BaseStruct.Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field BaseStruct.Field"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *BaseStruct) *string {
+				return &oldObj.Field
+			})
+		errs = append(errs, fn(fldPath.Child("field"), &obj.Field, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_OpaqueAliasWithValidation validates an instance of OpaqueAliasWithValidation according
+// to declarative validation rules in the API schema.
+func Validate_OpaqueAliasWithValidation(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *OpaqueAliasWithValidation) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OpaqueAliasWithValidation"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_OpaqueFieldsStruct validates an instance of OpaqueFieldsStruct according
 // to declarative validation rules in the API schema.
 func Validate_OpaqueFieldsStruct(
@@ -180,6 +286,19 @@ func Validate_OpaqueNoValidationFieldsStruct(
 	// field OpaqueNoValidationFieldsStruct.OpaqueSliceField has no validation
 	// field OpaqueNoValidationFieldsStruct.OpaqueMapField has no validation
 	// field OpaqueNoValidationFieldsStruct.IsolatedOpaqueStructField has no validation
+	return errs
+}
+
+// Validate_OpaqueStructWithValidation validates an instance of OpaqueStructWithValidation according
+// to declarative validation rules in the API schema.
+func Validate_OpaqueStructWithValidation(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *OpaqueStructWithValidation) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OpaqueStructWithValidation"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	return errs
 }
 
@@ -228,6 +347,39 @@ func Validate_OtherStruct(
 				return &oldObj.StringField
 			})
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_ParentWithOpaqueAliasWithValidation validates an instance of ParentWithOpaqueAliasWithValidation according
+// to declarative validation rules in the API schema.
+func Validate_ParentWithOpaqueAliasWithValidation(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ParentWithOpaqueAliasWithValidation) (errs field.ErrorList) {
+
+	// field ParentWithOpaqueAliasWithValidation.TypeMeta has no validation
+
+	{ // field ParentWithOpaqueAliasWithValidation.Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *OpaqueAliasWithValidation,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_OpaqueAliasWithValidation(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ParentWithOpaqueAliasWithValidation) *OpaqueAliasWithValidation {
+				return &oldObj.Field
+			})
+		errs = append(errs, fn(fldPath.Child("field"), &obj.Field, oldVal, oldObj != nil)...)
 	}
 
 	return errs
