@@ -219,10 +219,8 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 // original state.
 // The function used for evaluating feasibility of pod group scheduling is
 // scheduler.podGroupSchedulingAlgorithm run without any post filters.
-func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	// Default preemption should be the only pod group post filter registered plugin.
-	plugins := schedFwk.PodGroupPostFilterPlugins()
-	if len(plugins) == 0 {
+func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	if !schedFwk.HasPodGroupPostFilterPlugins() {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled")
 	}
 
@@ -240,14 +238,14 @@ func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk
 	}
 	defer restoreFn()
 
-	var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+	var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
 		return &fwk.PodGroupAssignments{
 			// We do not fill the Placement struct, because we do not need it.
 			ProposedAssignments: makeProposedAssignments(&res),
 		}, res.status
 	}
-	return plugins[0].PodGroupPostFilter(ctx, pg, podGroupInfo.UnscheduledPods, pgSchedulingFunc)
+	return schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupInfo.PodGroupInfo, podGroupInfo.UnscheduledPods, pgSchedulingFunc)
 }
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.

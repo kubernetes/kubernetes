@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
@@ -165,18 +166,21 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 
 	if profile.Plugins != nil {
 		stagesToPluginSet := map[string]config.PluginSet{
-			"preEnqueue": profile.Plugins.PreEnqueue,
-			"queueSort":  profile.Plugins.QueueSort,
-			"preFilter":  profile.Plugins.PreFilter,
-			"filter":     profile.Plugins.Filter,
-			"postFilter": profile.Plugins.PostFilter,
-			"preScore":   profile.Plugins.PreScore,
-			"score":      profile.Plugins.Score,
-			"reserve":    profile.Plugins.Reserve,
-			"permit":     profile.Plugins.Permit,
-			"preBind":    profile.Plugins.PreBind,
-			"bind":       profile.Plugins.Bind,
-			"postBind":   profile.Plugins.PostBind,
+			"preEnqueue":         profile.Plugins.PreEnqueue,
+			"queueSort":          profile.Plugins.QueueSort,
+			"preFilter":          profile.Plugins.PreFilter,
+			"filter":             profile.Plugins.Filter,
+			"postFilter":         profile.Plugins.PostFilter,
+			"preScore":           profile.Plugins.PreScore,
+			"score":              profile.Plugins.Score,
+			"reserve":            profile.Plugins.Reserve,
+			"permit":             profile.Plugins.Permit,
+			"preBind":            profile.Plugins.PreBind,
+			"bind":               profile.Plugins.Bind,
+			"postBind":           profile.Plugins.PostBind,
+			"placementGenerate":  profile.Plugins.PlacementGenerate,
+			"placementScore":     profile.Plugins.PlacementScore,
+			"podGroupPostFilter": profile.Plugins.PodGroupPostFilter,
 		}
 
 		pluginsPath := path.Child("plugins")
