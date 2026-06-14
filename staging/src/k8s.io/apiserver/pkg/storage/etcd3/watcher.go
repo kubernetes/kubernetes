@@ -89,6 +89,7 @@ type watcher struct {
 	client                   *clientv3.Client
 	codec                    runtime.Codec
 	newFunc                  func() runtime.Object
+	reverseKeyFunc           storage.ReverseKeyFunc
 	objectType               string
 	groupResource            schema.GroupResource
 	versioner                storage.Versioner
@@ -786,7 +787,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(string(e.key)))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -801,7 +802,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(string(e.key)))
 		if err != nil {
 			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 		}
