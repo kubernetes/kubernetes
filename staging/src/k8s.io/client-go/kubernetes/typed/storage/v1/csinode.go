@@ -41,6 +41,7 @@ type CSINodeInterface interface {
 	Create(ctx context.Context, cSINode *storagev1.CSINode, opts metav1.CreateOptions) (*storagev1.CSINode, error)
 	Update(ctx context.Context, cSINode *storagev1.CSINode, opts metav1.UpdateOptions) (*storagev1.CSINode, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*storagev1.CSINode, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*storagev1.CSINodeList, error)

@@ -41,6 +41,7 @@ type EndpointsInterface interface {
 	Create(ctx context.Context, endpoints *corev1.Endpoints, opts metav1.CreateOptions) (*corev1.Endpoints, error)
 	Update(ctx context.Context, endpoints *corev1.Endpoints, opts metav1.UpdateOptions) (*corev1.Endpoints, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.Endpoints, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*corev1.EndpointsList, error)
