@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
@@ -36,6 +37,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -84,6 +86,73 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, executor *Execu
 	}
 }
 
+// evaluate determines victims for preemption, without actuation.
+func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (bestCandidate Candidate, fitErrorResult *fwk.PostFilterResult, status *fwk.Status) {
+	logger := klog.FromContext(ctx)
+	startTime := time.Now()
+	defer func() {
+		metrics.PreemptionEvaluationDuration.WithLabelValues("pod", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	// 0) Fetch the latest version of <pod>.
+	// It's safe to directly fetch pod here. Because the informer cache has already been
+	// initialized when creating the Scheduler obj.
+	// However, tests may need to manually initialize the shared pod informer.
+	podNamespace, podName := pod.Namespace, pod.Name
+	pod, err := ev.PodLister.Pods(podNamespace).Get(podName)
+	if err != nil {
+		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
+		return nil, nil, fwk.AsStatus(err)
+	}
+
+	// 1) Ensure the preemptor is eligible to preempt other pods.
+	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
+	if ok, msg := ev.PodEligibleToPreemptOthers(ctx, pod, nominatedNodeStatus); !ok {
+		logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
+		return nil, nil, fwk.NewStatus(fwk.Unschedulable, msg)
+	}
+
+	// 2) Find all preemption candidates.
+	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		return nil, nil, fwk.AsStatus(err)
+	}
+	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, allNodes, pod, m)
+	if err != nil && len(candidates) == 0 {
+		return nil, nil, fwk.AsStatus(err)
+	}
+
+	// Return a FitError only when there are no candidates that fit the pod.
+	if len(candidates) == 0 {
+		logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj(pod))
+		fitError := &framework.FitError{
+			Pod:         pod,
+			NumAllNodes: len(allNodes),
+			Diagnosis: framework.Diagnosis{
+				NodeToStatus: nodeToStatusMap,
+				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
+			},
+		}
+		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
+		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
+		return nil, framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
+	}
+
+	// 3) Interact with registered Extenders to filter out some candidates if needed.
+	candidates, status = ev.callExtenders(logger, pod, candidates)
+	if !status.IsSuccess() {
+		return nil, nil, status
+	}
+
+	// 4) Find the best candidate.
+	bestCandidate = ev.SelectCandidate(ctx, candidates)
+	if bestCandidate == nil || len(bestCandidate.Name()) == 0 {
+		return nil, nil, fwk.NewStatus(fwk.Unschedulable, "no candidate node for preemption")
+	}
+
+	return bestCandidate, nil, fwk.NewStatus(fwk.Success)
+}
+
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
 // The semantics of returned <PostFilterResult, Status> varies on different scenarios:
 //
@@ -103,60 +172,9 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, executor *Execu
 func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
-	// 0) Fetch the latest version of <pod>.
-	// It's safe to directly fetch pod here. Because the informer cache has already been
-	// initialized when creating the Scheduler obj.
-	// However, tests may need to manually initialize the shared pod informer.
-	podNamespace, podName := pod.Namespace, pod.Name
-	pod, err := ev.PodLister.Pods(pod.Namespace).Get(pod.Name)
-	if err != nil {
-		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
-		return nil, fwk.AsStatus(err)
-	}
-
-	// 1) Ensure the preemptor is eligible to preempt other pods.
-	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
-	if ok, msg := ev.PodEligibleToPreemptOthers(ctx, pod, nominatedNodeStatus); !ok {
-		logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
-		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
-	}
-
-	// 2) Find all preemption candidates.
-	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
-	if err != nil {
-		return nil, fwk.AsStatus(err)
-	}
-	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, state, allNodes, pod, m)
-	if err != nil && len(candidates) == 0 {
-		return nil, fwk.AsStatus(err)
-	}
-
-	// Return a FitError only when there are no candidates that fit the pod.
-	if len(candidates) == 0 {
-		logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj(pod))
-		fitError := &framework.FitError{
-			Pod:         pod,
-			NumAllNodes: len(allNodes),
-			Diagnosis: framework.Diagnosis{
-				NodeToStatus: nodeToStatusMap,
-				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
-			},
-		}
-		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
-		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
-		return framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
-	}
-
-	// 3) Interact with registered Extenders to filter out some candidates if needed.
-	candidates, status := ev.callExtenders(logger, pod, candidates)
+	bestCandidate, fitErrorResult, status := ev.evaluate(ctx, state, pod, m)
 	if !status.IsSuccess() {
-		return nil, status
-	}
-
-	// 4) Find the best candidate.
-	bestCandidate := ev.SelectCandidate(ctx, candidates)
-	if bestCandidate == nil || len(bestCandidate.Name()) == 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "no candidate node for preemption")
+		return fitErrorResult, status
 	}
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))

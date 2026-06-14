@@ -179,6 +179,13 @@ var (
 	DRABindingConditionsAllocationsTotal *metrics.CounterVec
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
+	WorkloadPreemptionAttempts    *metrics.CounterVec
+	WorkloadPreemptionVictims     *metrics.Histogram
+	PreemptionWorkloadDisruptions *metrics.HistogramVec
+	PreemptionEvaluationDuration  *metrics.HistogramVec
+	PreemptionExecutionDuration   *metrics.HistogramVec
+	PreemptionPDBViolations       *metrics.CounterVec
+
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
 )
@@ -211,6 +218,16 @@ func Register() {
 				podGroupScheduleAttempts,
 				podGroupSchedulingLatency,
 				PodGroupSchedulingAlgorithmLatency,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+			RegisterMetrics(
+				WorkloadPreemptionAttempts,
+				WorkloadPreemptionVictims,
+				PreemptionWorkloadDisruptions,
+				PreemptionEvaluationDuration,
+				PreemptionExecutionDuration,
+				PreemptionPDBViolations,
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) {
@@ -262,7 +279,7 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "preemption_victims",
-			Help:      "Number of selected preemption victims",
+			Help:      "Number of selected preemption victims for preemption initiated by a single pod",
 			// we think #victims>64 is pretty rare, therefore [64, +Inf) is considered a single bucket.
 			Buckets:        metrics.ExponentialBuckets(1, 2, 7),
 			StabilityLevel: metrics.STABLE,
@@ -530,6 +547,59 @@ func InitMetrics() {
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15), // TBD: Correct buckets
 			StabilityLevel: metrics.ALPHA,
 		})
+
+	// Workload preemption
+	WorkloadPreemptionAttempts = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "workload_preemption_attempts_total",
+			Help:           "Total preemption attempts initiated by workload (including pod groups) in the cluster till now",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"result"})
+	WorkloadPreemptionVictims = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "workload_preemption_victims",
+			Help:      "Number of pod preemption victims caused by workload preemption",
+			// Start with 1 with the last bucket being [1024, Inf)
+			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
+			StabilityLevel: metrics.ALPHA,
+		})
+	PreemptionWorkloadDisruptions = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "preemption_workload_disruptions",
+			Help:      "Number of pod preemption victims that disrupted a workload",
+			// Start with 1 with the last bucket being [1024, Inf)
+			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"preemptor"})
+	PreemptionEvaluationDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "preemption_evaluation_duration",
+			Help:      "Duration in seconds for determining the final victims in preemption",
+			// Start with 1ms with the last bucket being [~65.5s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 17),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"preemptor", "result"})
+	PreemptionExecutionDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "preemption_execution_duration",
+			Help:      "Duration in seconds for preempting the final victims in preemption",
+			// Start with 10ms with the last bucket being [~88m, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"preemptor", "result"})
+	PreemptionPDBViolations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "preemption_pdb_violations_total",
+			Help:           "Total number of pod disruption budget violations caused by preemption",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"preemptor"},
+	)
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
