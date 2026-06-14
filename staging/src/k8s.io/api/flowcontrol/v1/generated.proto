@@ -146,6 +146,7 @@ message FlowSchemaSpec {
   // if it is an empty slice, there will be no requests matching the FlowSchema.
   // +listType=atomic
   // +optional
+  // +k8s:optional
   repeated PolicyRulesWithSubjects rules = 4;
 }
 
@@ -286,6 +287,7 @@ message PolicyRulesWithSubjects {
   // A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
   // +listType=atomic
   // Required.
+  // +k8s:required
   repeated Subject subjects = 1;
 
   // `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
@@ -508,10 +510,14 @@ message Subject {
   // `kind` indicates which one of the other fields is non-empty.
   // Required
   // +unionDiscriminator
+  // +k8s:required
   optional string kind = 1;
 
   // `user` matches based on username.
+  // +unionMember=User
+  // +k8s:unionMember(memberName: "User")
   // +optional
+  // +k8s:optional
   optional UserSubject user = 2;
 
   // `group` matches based on user group name.
@@ -527,6 +533,8 @@ message Subject {
 message UserSubject {
   // `name` is the username that matches, or "*" to match all usernames.
   // Required.
+  // +required
+  // +k8s:required
   optional string name = 1;
 }
 
