@@ -211,6 +211,7 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		ready := endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready
 		serving := endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving
 		terminating := endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating
+		processing := endpoint.Conditions.Processing == nil || *endpoint.Conditions.Processing
 
 		var zoneHints, nodeHints sets.Set[string]
 		if endpoint.Hints != nil {
@@ -230,7 +231,7 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 
 		endpointIP := utilnet.ParseIPSloppy(endpoint.Addresses[0]).String()
 		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
-			ready, serving, terminating, zoneHints, nodeHints)
+			ready, serving, terminating, processing, zoneHints, nodeHints)
 
 		// If an Endpoint gets moved from one slice to another, we may temporarily
 		// see it in both slices. Ideally we want to prefer the Endpoint from the
@@ -245,7 +246,9 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		// terminating one. (If there are multiple non-terminating pods with the
 		// same podIP, then the result is undefined.)
 		if _, exists := endpointSet[endpointInfo.String()]; !exists || !terminating {
-			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
+			if serving || processing {
+				endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
+			}
 		}
 	}
 

@@ -164,6 +164,7 @@ func autoConvert_v1_EndpointConditions_To_discovery_EndpointConditions(in *disco
 	out.Ready = (*bool)(unsafe.Pointer(in.Ready))
 	out.Serving = (*bool)(unsafe.Pointer(in.Serving))
 	out.Terminating = (*bool)(unsafe.Pointer(in.Terminating))
+	out.Processing = (*bool)(unsafe.Pointer(in.Processing))
 	return nil
 }
 
@@ -176,6 +177,7 @@ func autoConvert_discovery_EndpointConditions_To_v1_EndpointConditions(in *disco
 	out.Ready = (*bool)(unsafe.Pointer(in.Ready))
 	out.Serving = (*bool)(unsafe.Pointer(in.Serving))
 	out.Terminating = (*bool)(unsafe.Pointer(in.Terminating))
+	out.Processing = (*bool)(unsafe.Pointer(in.Processing))
 	return nil
 }
 
