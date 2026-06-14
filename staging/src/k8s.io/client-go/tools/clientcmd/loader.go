@@ -300,7 +300,8 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return err
 		}
 
-		if sourceInfo, err := os.Stat(source); err != nil {
+		sourceInfo, err := os.Stat(source)
+		if err != nil {
 			if os.IsNotExist(err) || os.IsPermission(err) {
 				// if the source file doesn't exist or we can't access it, there's no work to do.
 				continue
@@ -316,8 +317,8 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 		if err != nil {
 			return err
 		}
-		// destination is created with mode 0666 before umask
-		err = os.WriteFile(destination, data, 0666)
+		// destination is created with source perm (before umask)
+		err = os.WriteFile(destination, data, sourceInfo.Mode().Perm())
 		if err != nil {
 			return err
 		}
