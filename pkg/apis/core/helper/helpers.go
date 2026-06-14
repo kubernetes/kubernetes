@@ -529,3 +529,7 @@ func HasInvalidLabelValueInNodeSelectorTerms(terms []core.NodeSelectorTerm) bool
 	}
 	return false
 }
+
+// AllowedEmptyDirMountOptions is the set of VFS-level mount options permitted
+// on emptyDir volumes. Shared between API validation and kubelet enforcement.
+var AllowedEmptyDirMountOptions = sets.New("noexec", "nodev", "nosuid")

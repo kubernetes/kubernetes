@@ -5090,6 +5090,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: medium
       type:
         scalar: string
+    - name: mountOptions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: sizeLimit
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity

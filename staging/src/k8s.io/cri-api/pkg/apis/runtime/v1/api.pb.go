@@ -1128,7 +1128,11 @@ type Mount struct {
 	// not empty and does not exist in the image, then runtimes should fail and
 	// return an error.
 	// Introduced in the Image Volume Source KEP beta graduation: https://kep.k8s.io/4639
-	ImageSubPath  string `protobuf:"bytes,10,opt,name=image_sub_path,json=imageSubPath,proto3" json:"image_sub_path,omitempty"`
+	ImageSubPath string `protobuf:"bytes,10,opt,name=image_sub_path,json=imageSubPath,proto3" json:"image_sub_path,omitempty"`
+	// MountOptions specifies additional mount options (e.g., noexec, nodev,
+	// nosuid) that the runtime MUST apply when mounting this volume into the
+	// container. These are passed as OCI mount options.
+	MountOptions  []string `protobuf:"bytes,11,rep,name=mount_options,json=mountOptions,proto3" json:"mount_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1231,6 +1235,13 @@ func (x *Mount) GetImageSubPath() string {
 		return x.ImageSubPath
 	}
 	return ""
+}
+
+func (x *Mount) GetMountOptions() []string {
+	if x != nil {
+		return x.MountOptions
+	}
+	return nil
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -11562,7 +11573,7 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\bprotocol\x18\x01 \x01(\x0e2\x14.runtime.v1.ProtocolR\bprotocol\x12%\n" +
 	"\x0econtainer_port\x18\x02 \x01(\x05R\rcontainerPort\x12\x1b\n" +
 	"\thost_port\x18\x03 \x01(\x05R\bhostPort\x12\x17\n" +
-	"\ahost_ip\x18\x04 \x01(\tR\x06hostIp\"\xc5\x03\n" +
+	"\ahost_ip\x18\x04 \x01(\tR\x06hostIp\"\xea\x03\n" +
 	"\x05Mount\x12%\n" +
 	"\x0econtainer_path\x18\x01 \x01(\tR\rcontainerPath\x12\x1b\n" +
 	"\thost_path\x18\x02 \x01(\tR\bhostPath\x12\x1a\n" +
@@ -11574,7 +11585,8 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x13recursive_read_only\x18\b \x01(\bR\x11recursiveReadOnly\x12+\n" +
 	"\x05image\x18\t \x01(\v2\x15.runtime.v1.ImageSpecR\x05image\x12$\n" +
 	"\x0eimage_sub_path\x18\n" +
-	" \x01(\tR\fimageSubPath\"_\n" +
+	" \x01(\tR\fimageSubPath\x12#\n" +
+	"\rmount_options\x18\v \x03(\tR\fmountOptions\"_\n" +
 	"\tIDMapping\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\rR\x06hostId\x12!\n" +
 	"\fcontainer_id\x18\x02 \x01(\rR\vcontainerId\x12\x16\n" +

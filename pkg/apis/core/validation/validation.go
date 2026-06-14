@@ -550,6 +550,17 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 		}
+		if len(source.EmptyDir.MountOptions) > 0 {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("mountOptions"), "mount options require the EmptyDirMountOptions feature gate to be enabled"))
+			} else {
+				for j, opt := range source.EmptyDir.MountOptions {
+					if !helper.AllowedEmptyDirMountOptions.Has(opt) {
+						allErrs = append(allErrs, field.NotSupported(fldPath.Child("emptyDir").Child("mountOptions").Index(j), opt, sets.List(helper.AllowedEmptyDirMountOptions)))
+					}
+				}
+			}
+		}
 	}
 	if source.HostPath != nil {
 		if numVolumes > 0 {

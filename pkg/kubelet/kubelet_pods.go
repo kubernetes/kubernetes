@@ -415,6 +415,16 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 			return nil, cleanupAction, fmt.Errorf("recursive read-only mount needs feature gate %q to be enabled", features.RecursiveReadOnlyMounts)
 		}
 
+		var mountOptions []string
+		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) {
+			for _, v := range pod.Spec.Volumes {
+				if v.Name == mount.Name && v.EmptyDir != nil {
+					mountOptions = v.EmptyDir.MountOptions
+					break
+				}
+			}
+		}
+
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:              mount.Name,
 			ContainerPath:     containerPath,
@@ -425,6 +435,7 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 			RecursiveReadOnly: rro,
 			SELinuxRelabel:    relabelVolume,
 			Propagation:       propagation,
+			MountOptions:      mountOptions,
 		})
 	}
 	if mountEtcHostsFile {
