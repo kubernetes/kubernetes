@@ -175,6 +175,11 @@ linters:
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
       
       
+      # noreferences: Legacy 'Reference' fields retained for backward compatibility
+      - text: 'noreferences: naming convention "reference-to-ref": field (SerializedReference|ImageVolumeSource).Reference: field names should use ''Ref'' instead of ''Reference'''
+        path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      
       # optionalfields - Ignore optionalfields issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "optionalfields: field .* should (?:be a pointer|have the omitempty tag)\\."
@@ -405,6 +410,7 @@ linters:
               - "duplicatemarkers" #Prevent identical markers from being present on types and fields
               - "dependenttags" # Ensure markers dependent on other markers are present.
               - "nodurations" # Ensure duration types are not used.
+              - "noreferences" # Ensure field names use 'Ref'/'Refs' instead of 'Reference'/'References'.
           lintersConfig:
             conditions:
               isFirstField: Ignore
