@@ -776,6 +776,11 @@ const (
 	// Enable users to specify when a Pod is ready for scheduling.
 	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
 
+	// owner: @Huutomerkki, @peppi-lotta
+	//
+	// Enables pods starting in the order of their priorities
+	PodStartingOrderByPriority featuregate.Feature = "PodStartingOrderByPriority"
+
 	// owner: @munnerz
 	// kep: https://kep.k8s.io/4742
 	// alpha: v1.33
@@ -1739,6 +1744,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
 	},
 
+	PodStartingOrderByPriority: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodTopologyLabelsAdmission: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2472,6 +2481,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodReadyToStartContainersCondition: {},
 
 	PodSchedulingReadiness: {},
+
+	PodStartingOrderByPriority: {},
 
 	PodTopologyLabelsAdmission: {},
 

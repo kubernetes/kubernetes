@@ -17,6 +17,8 @@ limitations under the License.
 package sliceutils
 
 import (
+	"sort"
+
 	v1 "k8s.io/api/core/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -49,3 +51,50 @@ func (a ByImageSize) Less(i, j int) bool {
 }
 func (a ByImageSize) Len() int      { return len(a) }
 func (a ByImageSize) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+// PodsByPriority makes an array of pods sortable by their priority
+// in descending order, and then by their creation timestamps in
+// ascending order
+type PodsByPriority []*v1.Pod
+
+func (s PodsByPriority) Len() int {
+	return len(s)
+}
+
+func (s PodsByPriority) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s PodsByPriority) Less(i, j int) bool {
+	iPrio := getPodPriority(s[i])
+	jPrio := getPodPriority(s[j])
+
+	if iPrio == jPrio {
+		return s[i].CreationTimestamp.Before(&s[j].CreationTimestamp)
+	}
+	return iPrio > jPrio
+}
+
+func getPodPriority(pod *v1.Pod) int32 {
+	if pod == nil || pod.Spec.Priority == nil {
+		return 0
+	}
+	return *pod.Spec.Priority
+}
+
+// SortPodsByPreviouslyRunningThenPriority sorts pods so that previously-running
+// pods come before new pods, and within each group pods are sorted by priority
+// (descending) then creation timestamp (ascending). This ensures that after a
+// kubelet restart, pods that were already running on the node are restored
+// before new pods are considered for admission.
+func SortPodsByPriorityAndPreviouslyRunningStatus(pods []*v1.Pod, wasPreviouslyRunning func(*v1.Pod) bool) {
+	sort.Sort(PodsByPriority(pods))
+	sort.SliceStable(pods, func(i, j int) bool {
+		iRunning := wasPreviouslyRunning(pods[i])
+		jRunning := wasPreviouslyRunning(pods[j])
+		if iRunning != jRunning {
+			return iRunning
+		}
+		return false
+	})
+}
