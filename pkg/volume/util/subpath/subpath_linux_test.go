@@ -26,12 +26,20 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 )
+
+func removeAll(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.RemoveAll(dir); err != nil {
+		t.Errorf("failed to remove %q: %v", dir, err)
+	}
+}
 
 func TestSafeMakeDir(t *testing.T) {
 	defaultPerm := os.FileMode(0750) + os.ModeDir
@@ -260,7 +268,7 @@ func TestSafeMakeDir(t *testing.T) {
 			if err != nil {
 				t.Fatal(err.Error())
 			}
-			defer os.RemoveAll(base)
+			defer removeAll(t, base)
 			test.prepare(base)
 			pathToCreate := filepath.Join(base, test.path)
 			err = doSafeMakeDir(pathToCreate, base, test.perm)
@@ -825,7 +833,11 @@ func TestBindSubPath(t *testing.T) {
 			name: "subpath-mount-already-exists",
 			prepare: func(base string) ([]string, string, string, error) {
 				volpath, subpathMount := getTestPaths(base)
-				mounts := []string{subpathMount}
+				// Do NOT list subpathMount as a mount point: the intent of this
+				// test is that the bind target directory already exists on disk,
+				// not that a mismatching mount is present.  Listing it as mounted
+				// would trigger the lazyUnmountFn path which fails on a plain dir.
+				mounts := []string{}
 				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
@@ -947,8 +959,17 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 				subpath := filepath.Join(volpath, "dir0")
 				return mounts, volpath, subpath, os.MkdirAll(subpath, defaultPerm)
 			},
+			// lazyUnmountFn is injected via modifyMounter below; mounter.Unmount
+			// is no longer called for the mismatching-mount path.
+			modifyMounter: func(fm *mount.FakeMounter, bindPathTarget string) {
+				origLazyUnmountFn := lazyUnmountFn
+				lazyUnmountFn = func(path string) error {
+					lazyUnmountFn = origLazyUnmountFn
+					return nil
+				}
+			},
 			expectError:  false,
-			expectAction: []mount.FakeAction{{Action: "unmount"}},
+			expectAction: []mount.FakeAction{},
 			mountExists:  false,
 		},
 		{
@@ -1033,7 +1054,7 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		defer os.RemoveAll(base)
+		defer removeAll(t, base)
 
 		mounts, volPath, subPath, err := test.prepare(base)
 		if err != nil {
@@ -1106,6 +1127,165 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestPrepareSubpathTargetDifferentDevice(t *testing.T) {
+	defaultPerm := os.FileMode(0750)
+
+	base, err := os.MkdirTemp("", "different-device-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer removeAll(t, base)
+
+	volPath, subpathMount := getTestPaths(base)
+	if err := os.MkdirAll(filepath.Dir(subpathMount), defaultPerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(volPath, defaultPerm); err != nil {
+		t.Fatal(err)
+	}
+
+	// Bind-mount target exists as a regular file (simulates an existing bind mount).
+	if err := os.WriteFile(subpathMount, []byte{}, 0640); err != nil {
+		t.Fatal(err)
+	}
+
+	// Source is a distinct file, different inode, not a hard-link to the target.
+	sourceFile := filepath.Join(volPath, "file-different")
+	if err := os.WriteFile(sourceFile, []byte{}, 0640); err != nil {
+		t.Fatal(err)
+	}
+
+	// FakeMounter lists subpathMount as a mount point so IsMountPoint returns true.
+	fm := setupFakeMounter([]string{subpathMount})
+
+	subpath := Subpath{
+		VolumeMountIndex: testSubpath,
+		Path:             sourceFile,
+		VolumeName:       testVol,
+		VolumePath:       volPath,
+		PodDir:           filepath.Join(base, "pod0"),
+		ContainerName:    testContainer,
+	}
+
+	// Inject a spy for lazyUnmountFn; mounter.Unmount must NOT be called.
+	lazyUnmountCalled := false
+	origLazyUnmountFn := lazyUnmountFn
+	defer func() { lazyUnmountFn = origLazyUnmountFn }()
+	lazyUnmountFn = func(path string) error {
+		lazyUnmountCalled = true
+		return nil
+	}
+
+	alreadyMounted, gotTarget, err := prepareSubpathTarget(fm, subpath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if alreadyMounted {
+		t.Errorf("expected alreadyMounted=false after stale-device remount, got true")
+	}
+	if gotTarget != subpathMount {
+		t.Errorf("expected target %q, got %q", subpathMount, gotTarget)
+	}
+	if !lazyUnmountCalled {
+		t.Errorf("expected lazyUnmountFn to be called when source and bind-target have different inodes/devices")
+	}
+	// mounter.Unmount must NOT have been called, only lazyUnmountFn.
+	if actions := fm.GetLog(); len(actions) != 0 {
+		t.Errorf("expected no mounter.Unmount actions (must use lazyUnmountFn), got %v", actions)
+	}
+}
+
+func TestSubpathStaleBindMountRemount(t *testing.T) {
+	defaultPerm := os.FileMode(0750)
+
+	setup := func(t *testing.T) (base, volPath, subpathMount, sourceFile string) {
+		t.Helper()
+		var err error
+		base, err = os.MkdirTemp("", "stale-remount-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		volPath, subpathMount = getTestPaths(base)
+		if err = os.MkdirAll(filepath.Dir(subpathMount), defaultPerm); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.MkdirAll(volPath, defaultPerm); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(subpathMount, []byte{}, 0640); err != nil {
+			t.Fatal(err)
+		}
+		sourceFile = filepath.Join(volPath, "file-stale")
+		if err = os.WriteFile(sourceFile, []byte{}, 0640); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+
+	t.Run("lazyUnmount-error-propagated", func(t *testing.T) {
+		base, volPath, subpathMount, sourceFile := setup(t)
+		defer removeAll(t, base)
+
+		fm := setupFakeMounter([]string{subpathMount})
+		subpath := Subpath{
+			VolumeMountIndex: testSubpath,
+			Path:             sourceFile,
+			VolumeName:       testVol,
+			VolumePath:       volPath,
+			PodDir:           filepath.Join(base, "pod0"),
+			ContainerName:    testContainer,
+		}
+
+		origLazyUnmountFn := lazyUnmountFn
+		defer func() { lazyUnmountFn = origLazyUnmountFn }()
+		lazyUnmountFn = func(string) error {
+			return fmt.Errorf("MNT_DETACH failed: device busy")
+		}
+
+		_, _, err := prepareSubpathTarget(fm, subpath)
+		if err == nil {
+			t.Fatal("expected error when lazyUnmountFn fails, got nil")
+		}
+		if !strings.Contains(err.Error(), "MNT_DETACH failed") {
+			t.Errorf("expected error to contain 'MNT_DETACH failed', got: %v", err)
+		}
+	})
+
+	t.Run("lazyUnmount-success-bind-mount-recreated", func(t *testing.T) {
+		base, volPath, subpathMount, sourceFile := setup(t)
+		defer removeAll(t, base)
+
+		fm := setupFakeMounter([]string{subpathMount})
+		subpath := Subpath{
+			VolumeMountIndex: testSubpath,
+			Path:             sourceFile,
+			VolumeName:       testVol,
+			VolumePath:       volPath,
+			PodDir:           filepath.Join(base, "pod0"),
+			ContainerName:    testContainer,
+		}
+
+		origLazyUnmountFn := lazyUnmountFn
+		defer func() { lazyUnmountFn = origLazyUnmountFn }()
+		lazyUnmountFn = func(string) error { return nil }
+
+		alreadyMounted, gotTarget, err := prepareSubpathTarget(fm, subpath)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if alreadyMounted {
+			t.Errorf("expected alreadyMounted=false so bind mount is recreated, got true")
+		}
+		if gotTarget != subpathMount {
+			t.Errorf("expected target %q, got %q", subpathMount, gotTarget)
+		}
+		// mounter.Unmount must NOT have been called.
+		if actions := fm.GetLog(); len(actions) != 0 {
+			t.Errorf("expected no mounter.Unmount actions, got %v", actions)
+		}
+	})
 }
 
 func TestSafeOpen(t *testing.T) {
