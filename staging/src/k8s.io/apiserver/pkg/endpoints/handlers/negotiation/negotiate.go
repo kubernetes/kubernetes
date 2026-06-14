@@ -59,6 +59,10 @@ func NegotiateOutputMediaType(req *http.Request, ns runtime.NegotiatedSerializer
 	if (mediaType.Pretty || isPrettyPrint(req)) && info.PrettySerializer != nil {
 		info.Serializer = info.PrettySerializer
 	}
+	// Applied last so dropping managedFields takes precedence over pretty-printing.
+	if mediaType.DropManagedFields && info.ExcludeManagedFieldsSerializer != nil {
+		info.Serializer = info.ExcludeManagedFieldsSerializer
+	}
 	return mediaType, info, nil
 }
 
@@ -69,7 +73,14 @@ func NegotiateOutputMediaTypeStream(req *http.Request, ns runtime.NegotiatedSeri
 		_, supported := MediaTypesForSerializer(ns)
 		return runtime.SerializerInfo{}, NewNotAcceptableError(supported)
 	}
-	return mediaType.Accepted, nil
+	info := mediaType.Accepted
+	// Swap the embedded-object serializer so each watch event's object is encoded
+	// without managedFields. The StreamSerializer encodes only the WatchEvent
+	// envelope, which has none, so it is left unchanged.
+	if mediaType.DropManagedFields && info.ExcludeManagedFieldsSerializer != nil {
+		info.Serializer = info.ExcludeManagedFieldsSerializer
+	}
+	return info, nil
 }
 
 // NegotiateInputSerializer returns the input serializer for the provided request.
@@ -168,6 +179,12 @@ type MediaTypeOptions struct {
 	// has set
 	Export bool
 
+	// DropManagedFields is true if the client requested that metadata.managedFields
+	// be omitted from the response via the "drop=metadata.managedFields" Accept
+	// parameter. It is only honored when the ManagedFieldsOptOut feature is enabled
+	// and the negotiated serializer provides an ExcludeManagedFields variant.
+	DropManagedFields bool
+
 	// profile controls the discovery profile (e.g., "local" for local (non peer-aggregated) discovery)
 	Profile string
 
@@ -177,6 +194,10 @@ type MediaTypeOptions struct {
 	// the accepted media type from the client
 	Accepted runtime.SerializerInfo
 }
+
+// dropManagedFieldsTarget is the only target currently recognized by the "drop"
+// Accept parameter (e.g. "Accept: application/json;drop=metadata.managedFields").
+const dropManagedFieldsTarget = "metadata.managedFields"
 
 // acceptMediaTypeOptions returns an options object that matches the provided media type params. If
 // it returns false, the provided options are not allowed and the media type must be skipped.  These
@@ -225,6 +246,18 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 		// or which fit the default behavior.
 		case "export":
 			options.Export = v == "1"
+
+		// if specified, the server should drop the listed fields from the
+		// returned output. Targets are separated by "+". Currently only
+		// "metadata.managedFields" is recognized (and only when the
+		// ManagedFieldsOptOut feature is enabled); unknown targets are silently
+		// ignored for forward compatibility.
+		case "drop":
+			for target := range strings.SplitSeq(v, "+") {
+				if target == dropManagedFieldsTarget && utilfeature.DefaultFeatureGate.Enabled(features.ManagedFieldsOptOut) {
+					options.DropManagedFields = true
+				}
+			}
 
 		// if specified, the pretty serializer will be used
 		case "pretty":
