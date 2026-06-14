@@ -304,12 +304,27 @@ func (m *manager) AllocatePod(pod *v1.Pod) error {
 
 func (m *manager) AddContainer(logger logr.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
 	m.Lock()
-	defer m.Unlock()
-	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
-		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
-	}
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
-	logger.V(4).Info("Added Container", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "containerID", containerID)
+	cset, hasDedicatedCPUs := m.state.GetCPUSet(string(pod.UID), container.Name)
+	m.Unlock()
+
+	// Write the dedicated cpuset to the container's cgroup before it starts.
+	// Without this, the container inherits the pod-level cpuset and the
+	// reconciler may not correct it (see lastUpdateState below).
+	if hasDedicatedCPUs && !cset.IsEmpty() {
+		ctx := context.TODO()
+		logger.V(2).Info("Applying dedicated cpuset before container start", "pod", klog.KObj(pod), "containerName", container.Name, "cpuSet", cset, "containerID", containerID)
+		if err := m.updateContainerCPUSet(ctx, containerID, cset); err != nil {
+			logger.Error(err, "Failed to apply cpuset before container start", "containerID", containerID, "cpuSet", cset)
+		} else {
+			// Record the successful write so the reconciler knows the
+			// current cgroup state matches the desired state.
+			m.Lock()
+			m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+			m.Unlock()
+		}
+	}
+	logger.V(4).Info("AddContainer completed", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "containerID", containerID)
 }
 
 func (m *manager) RemoveContainer(logger logr.Logger, containerID string) error {
