@@ -488,8 +488,26 @@ func NewMainKubelet(ctx context.Context,
 		}))
 		nodeInformer = kubeInformers.Core().V1().Nodes()
 		nodeLister = nodeInformer.Lister()
+		// nodeHasSyncedOnce latches to true once the node is found in
+		// the informer cache, preventing re-evaluation after that point.
+		var nodeHasSyncedOnce bool
 		nodeHasSynced = func() bool {
-			return kubeInformers.Core().V1().Nodes().Informer().HasSynced()
+			if !kubeInformers.Core().V1().Nodes().Informer().HasSynced() {
+				return false
+			}
+			if nodeHasSyncedOnce {
+				return true
+			}
+			// The informer's HasSynced can return true with an empty cache
+			// if the initial list completed before the node was registered,
+			// leading to pod admission failures (NodeAffinity) when the
+			// kubelet falls back to a minimal initialNode object.
+			// Wait until the node is actually present in the cache.
+			if _, err := nodeLister.Get(string(nodeName)); err == nil {
+				nodeHasSyncedOnce = true
+				return true
+			}
+			return false
 		}
 		kubeInformers.Start(wait.NeverStop)
 		logger.Info("Attempting to sync node with API server")
