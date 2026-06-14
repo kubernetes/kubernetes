@@ -224,7 +224,11 @@ func (c *CloudNodeLifecycleController) getProviderID(ctx context.Context, node *
 // shutdownInCloudProvider returns true if the node is shutdown on the cloud provider
 func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Context, node *v1.Node) (bool, error) {
 	if instanceV2, ok := c.cloud.InstancesV2(); ok {
-		return instanceV2.InstanceShutdown(ctx, node)
+		shutdown, err := instanceV2.InstanceShutdown(ctx, node)
+		if err != nil && errors.Is(err, cloudprovider.InstanceNotFound) {
+			return false, nil
+		}
+		return shutdown, err
 	}
 
 	instances, ok := c.cloud.Instances()
@@ -251,7 +255,11 @@ func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Conte
 // ensureNodeExistsByProviderID checks if the instance exists by the provider id,
 func (c *CloudNodeLifecycleController) ensureNodeExistsByProviderID(ctx context.Context, node *v1.Node) (bool, error) {
 	if instanceV2, ok := c.cloud.InstancesV2(); ok {
-		return instanceV2.InstanceExists(ctx, node)
+		exists, err := instanceV2.InstanceExists(ctx, node)
+		if err != nil && errors.Is(err, cloudprovider.InstanceNotFound) {
+			return false, nil
+		}
+		return exists, err
 	}
 
 	instances, ok := c.cloud.Instances()
