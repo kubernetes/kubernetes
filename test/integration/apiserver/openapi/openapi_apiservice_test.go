@@ -189,7 +189,7 @@ type testClient interface {
 
 var _ testClient = testClientSet{}
 
-func (t testClientSet) Discovery() discovery.DiscoveryInterface {
+func (t testClientSet) Discovery() discovery.DiscoveryInterfaces {
 	return t.kubeClientSet.Discovery()
 }
 
