@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsv1api "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	"github.com/spf13/cobra"
@@ -194,10 +195,10 @@ func (o TopPodOptions) RunTopPod() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	if !metricsAPIAvailable {
+	if metricsAPIAvailable == "" {
 		return errors.New("Metrics API not available")
 	}
-	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector)
+	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector, metricsAPIAvailable)
 	if err != nil {
 		return err
 	}
@@ -229,11 +230,32 @@ func (o TopPodOptions) RunTopPod() error {
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
 }
 
-func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector) (*metricsapi.PodMetricsList, error) {
+func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector, metricsAPIAvailable string) (*metricsapi.PodMetricsList, error) {
 	var err error
 	ns := metav1.NamespaceAll
 	if !allNamespaces {
 		ns = namespace
+	}
+	if metricsAPIAvailable == "v1" {
+		versionedMetrics := &metricsv1api.PodMetricsList{}
+		if resourceName != "" {
+			m, err := metricsClient.MetricsV1().PodMetricses(ns).Get(context.TODO(), resourceName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			versionedMetrics.Items = []metricsv1api.PodMetrics{*m}
+		} else {
+			versionedMetrics, err = metricsClient.MetricsV1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String(), FieldSelector: fieldSelector.String()})
+			if err != nil {
+				return nil, err
+			}
+		}
+		metrics := &metricsapi.PodMetricsList{}
+		err = metricsv1api.Convert_v1_PodMetricsList_To_metrics_PodMetricsList(versionedMetrics, metrics, nil)
+		if err != nil {
+			return nil, err
+		}
+		return metrics, nil
 	}
 	versionedMetrics := &metricsv1beta1api.PodMetricsList{}
 	if resourceName != "" {
