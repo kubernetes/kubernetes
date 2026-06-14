@@ -137,6 +137,101 @@ func Test_Controller(t *testing.T) {
 	}
 }
 
+// Test_NamespaceLabels verifies that system namespaces are created with the correct labels
+func Test_NamespaceLabels(t *testing.T) {
+	tests := []struct {
+		name             string
+		systemNamespaces []string
+		existingNamespaces []string
+		expectedLabels   map[string]map[string]string // namespace -> expected labels
+	}{
+		{
+			name:             "kube-system gets system label",
+			systemNamespaces: []string{metav1.NamespaceSystem},
+			existingNamespaces: []string{},
+			expectedLabels: map[string]map[string]string{
+				metav1.NamespaceSystem: {
+					NamespaceRoleLabel: NamespaceRoleSystem,
+				},
+			},
+		},
+		{
+			name:             "multiple system namespaces get system label",
+			systemNamespaces: []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
+			existingNamespaces: []string{},
+			expectedLabels: map[string]map[string]string{
+				metav1.NamespaceSystem: {
+					NamespaceRoleLabel: NamespaceRoleSystem,
+				},
+				metav1.NamespacePublic: {
+					NamespaceRoleLabel: NamespaceRoleSystem,
+				},
+				metav1.NamespaceDefault: {
+					NamespaceRoleLabel: NamespaceRoleSystem,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			objs := []runtime.Object{}
+			for _, ns := range test.existingNamespaces {
+				objs = append(objs,
+					&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: ns,
+						},
+					},
+				)
+			}
+			clientset := fake.NewSimpleClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+			namespaceInformer := informerFactory.Core().V1().Namespaces()
+			for _, obj := range objs {
+				namespaceInformer.Informer().GetIndexer().Add(obj)
+			}
+
+			controller := NewController(test.systemNamespaces, clientset, namespaceInformer)
+
+			// Capture created namespaces to verify labels
+			var createdNamespaces []*v1.Namespace
+			clientset.PrependReactor("create", "namespaces", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				create := action.(k8stesting.CreateAction)
+				ns := create.GetObject().(*v1.Namespace)
+				createdNamespaces = append(createdNamespaces, ns)
+				namespaceInformer.Informer().GetIndexer().Add(ns)
+				return true, ns, nil
+			})
+
+			controller.sync()
+
+			// Verify all expected namespaces were created with correct labels
+			for nsName, expectedLabels := range test.expectedLabels {
+				found := false
+				for _, ns := range createdNamespaces {
+					if ns.Name == nsName {
+						found = true
+						for key, value := range expectedLabels {
+							if ns.Labels == nil {
+								t.Errorf("Namespace %s has no labels, expected %s=%s", nsName, key, value)
+								continue
+							}
+							if actualValue, ok := ns.Labels[key]; !ok || actualValue != value {
+								t.Errorf("Namespace %s label %s: expected %s, got %s", nsName, key, value, actualValue)
+							}
+						}
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected namespace %s to be created, but it was not found in created namespaces", nsName)
+				}
+			}
+		})
+	}
+}
+
 func expectAction(t *testing.T, actions []k8stesting.Action, expected [][]string) {
 	t.Helper()
 	if len(actions) != len(expected) {
