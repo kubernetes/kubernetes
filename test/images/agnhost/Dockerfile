@@ -47,7 +47,7 @@ ARG TARGETARCH
 # - util-linux-misc: includes ipcs used in SELinux tests
 # from iperf image
 # install necessary packages: iperf, bash
-RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc && rm -rf /var/cache/apk/* \
+RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc socat && rm -rf /var/cache/apk/* \
     && ln -s /usr/bin/iperf /usr/local/bin/iperf \
     && ls -altrh /usr/local/bin/iperf
 
