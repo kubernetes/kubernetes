@@ -21180,6 +21180,80 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 		},
 		expectedErrors: []string{"must be greater than or equal to aggregate container requests", "must be greater than or equal to aggregate container requests"},
 	}, {
+		name: "pod requests exceed aggregate container limits when pod limits not set",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("3"),
+				core.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("1Gi"),
+					},
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("1Gi"),
+					},
+				},
+			},
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1.5"),
+						core.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				},
+			},
+		},
+		expectedErrors: []string{
+			"must be less than or equal to aggregate container limits",
+			"must be less than or equal to aggregate container limits",
+		},
+	}, {
+		name: "pod requests equal aggregate container limits when pod limits not set",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("2.5"),
+				core.ResourceMemory: resource.MustParse("500Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1"),
+						core.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("1.5"),
+						core.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				},
+			},
+		},
+	}, {
 		name: "container requests with resources unsupported at pod-level",
 		podResources: core.ResourceRequirements{
 			Requests: core.ResourceList{
@@ -21350,7 +21424,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 				Resources:  &tc.podResources,
 				Containers: tc.containers,
 			}
-			errs := validatePodResourceConsistency(&spec, path)
+			errs := validatePodResourceConsistency(&spec, path, PodValidationOptions{})
 			if len(errs) != len(tc.expectedErrors) {
 				t.Errorf("expected %d errors, got %d errors, got errors: %v", len(tc.expectedErrors), len(errs), errs)
 			}

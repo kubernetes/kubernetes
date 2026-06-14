@@ -4483,6 +4483,10 @@ type PodValidationOptions struct {
 	// Indicates whether InPlacePodLevelResourcesVerticalScaling feature is enabled
 	// or disabled.
 	InPlacePodLevelResourcesVerticalScalingEnabled bool
+	// ValidateAsPodResize indicates validation is running in the context of ValidatePodResize,
+	// where aggregate container limits may temporarily be lower than pod-level requests
+	// during in-place vertical scaling.
+	ValidateAsPodResize bool
 	// Allow sidecar containers resize policy for backward compatibility
 	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
@@ -4775,14 +4779,15 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
 	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts)...)
-	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath)...)
+	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath, opts)...)
 	return allErrs
 }
 
 // validatePodResourceConsistency checks if aggregate container-level requests are
-// less than or equal to pod-level requests, and individual container-level limits
-// are less than or equal to pod-level limits.
-func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+// less than or equal to pod-level requests, pod-level requests do not exceed
+// aggregate container limits when pod-level limits are unset, and individual
+// container-level limits are less than or equal to pod-level limits.
+func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// Convert the *core.PodSpec to *v1.PodSpec to satisfy the call to
@@ -4803,6 +4808,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// to the AggregateContainerRequests method to facilitate proper resource
 	// calculation without modifying AggregateContainerRequests method.
 	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
@@ -4818,6 +4824,31 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 		}
 	}
 
+	// When pod-level limits are not set for a supported resource, effective limits are
+	// derived from the aggregate of container limits (see resource.PodLimits). Pod-level
+	// requests must not exceed those effective limits.
+	//
+	// Skip during ValidatePodResize: in-place vertical scaling may apply new container
+	// limits in a separate step while pod-level requests are unchanged.
+	if !opts.ValidateAsPodResize {
+		for resourceName, podReq := range spec.Resources.Requests {
+			v1ResName := v1.ResourceName(resourceName)
+			if !resourcehelper.IsSupportedPodLevelResource(v1ResName) {
+				continue
+			}
+			if _, podLimitSet := spec.Resources.Limits[resourceName]; podLimitSet {
+				continue
+			}
+			ctrLim, ok := aggrContainerLims[v1ResName]
+			if !ok {
+				continue
+			}
+			if podReq.Cmp(ctrLim) > 0 {
+				allErrs = append(allErrs, field.Invalid(reqPath.Key(string(resourceName)), podReq.String(), fmt.Sprintf("must be less than or equal to aggregate container limits of %s when pod limits are not set", ctrLim.String())))
+			}
+		}
+	}
+
 	// Pod level hugepage limits must be always equal or greater than the aggregated
 	// container level hugepage limits, this is due to the hugepage resources being
 	// treated as a non overcommitable resource (request and limit must be equal)
@@ -4825,7 +4856,6 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// This is also why hugepages overcommitment is not allowed in pod level resources,
 	// the pod cgroup values must reflect the request/limit set at pod level, and the
 	// container level cgroup values must be within that limit.
-	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
 	for resourceName, ctrLims := range aggrContainerLims {
 		if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
 			continue
@@ -6321,7 +6351,9 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	resizeOpts := opts
+	resizeOpts.ValidateAsPodResize = true
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, resizeOpts)...)
 
 	// static pods cannot be resized.
 	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
