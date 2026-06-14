@@ -539,16 +539,20 @@ func deleteDevice(deviceName string) error {
 // deleteDevices tries to remove all the block devices and multipath map devices
 // associated with a given iscsi device
 func deleteDevices(c iscsiDiskUnmounter) error {
-	lunNumber, err := strconv.Atoi(c.iscsiDisk.Lun)
+	return deleteDevicesForDisk(c.iscsiDisk, c.exec, c.deviceUtil)
+}
+
+func deleteDevicesForDisk(disk *iscsiDisk, exec utilexec.Interface, deviceUtil volumeutil.DeviceUtil) error {
+	lunNumber, err := strconv.Atoi(disk.Lun)
 	if err != nil {
-		klog.Errorf("iscsi delete devices: lun is not a number: %s\nError: %v", c.iscsiDisk.Lun, err)
+		klog.Errorf("iscsi delete devices: lun is not a number: %s\nError: %v", disk.Lun, err)
 		return err
 	}
 	// Enumerate the devices so we can delete them
-	deviceNames, err := c.deviceUtil.FindDevicesForISCSILun(c.iscsiDisk.Iqn, lunNumber)
+	deviceNames, err := deviceUtil.FindDevicesForISCSILun(disk.Iqn, lunNumber)
 	if err != nil {
 		klog.Errorf("iscsi delete devices: could not get devices associated with LUN %d on target %s\nError: %v",
-			lunNumber, c.iscsiDisk.Iqn, err)
+			lunNumber, disk.Iqn, err)
 		return err
 	}
 	// Find the multipath device path(s)
@@ -556,13 +560,13 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 	for _, deviceName := range deviceNames {
 		path := "/dev/" + deviceName
 		// check if the dev is using mpio and if so mount it via the dm-XX device
-		if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
+		if mappedDevicePath := deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
 			mpathDevices[mappedDevicePath] = true
 		}
 	}
 	// Flush any multipath device maps
 	for mpathDevice := range mpathDevices {
-		_, err = c.exec.Command("multipath", "-f", mpathDevice).CombinedOutput()
+		_, err = exec.Command("multipath", "-f", mpathDevice).CombinedOutput()
 		if err != nil {
 			klog.Warningf("Failed to flush multipath device map: %s: %v", mpathDevice, err)
 			// Fall through -- keep deleting the block devices
@@ -704,6 +708,12 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	klog.V(5).Infof("iscsi: devicePath: %s", devicePath)
 	if _, err = os.Stat(devicePath); err != nil {
 		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
+	}
+
+	// Delete all the scsi devices and any multipath devices after unmapping
+	if err = deleteDevicesForDisk(c.iscsiDisk, c.exec, c.deviceUtil); err != nil {
+		klog.Warningf("iscsi detach disk: failed to delete devices\nError: %v", err)
+		// Fall through -- even if deleting fails, a logout may fix problems
 	}
 
 	// Lock the target while we determine if we can safely log out or not
