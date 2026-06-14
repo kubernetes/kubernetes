@@ -21,6 +21,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
@@ -46,6 +48,7 @@ import (
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -621,6 +624,78 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("DaemonSet pod should be running on node %s but isn't", nodeName))
 			framework.ExpectNoError(e2edaemonset.CheckDaemonStatus(ctx, f, daemonSet.Name))
 		})
+	})
+
+	f.It("control plane creates ResourceClaims from ResourceClaimTemplates", func(ctx context.Context) {
+		tCtx := f.TContext(ctx)
+		driver := drautils.NewDriverInstance(tCtx)
+		b := drautils.NewBuilderNow(tCtx, driver)
+		// The driver intentionally doesn't get started, so the pod
+		// will remain pending because no devices get published.
+
+		pod, template := b.PodInline()
+		ref := pod.Spec.ResourceClaims[0]
+		ref.Name += "-2"
+		ref.ResourceClaimTemplateName = new(*ref.ResourceClaimTemplateName + "-2")
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, ref)
+		template2 := template.DeepCopy()
+		template2.Name += "-2"
+		b.Create(tCtx, pod, template)
+
+		// Wait for first ResourceClaim to be created. This does not update the pod status yet.
+		// Instead, syncing the pod fails and emits an event about the missing template.
+		// We don't check the event here because event delivery is not guaranteed.
+		// What we can check is the existence of the ResourceClaim.
+		tCtx.Eventually(f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).List).WithArguments(metav1.ListOptions{}).
+			Should(gomega.HaveField("Items", gomega.HaveLen(1)))
+
+		// Now create the second template and wait again.
+		// This time the pod status gets updated.
+		//
+		// This was meant to trigger https://github.com/kubernetes/kubernetes/issues/138407
+		// but didn't. Still, it's good to try a more complex flow.
+		b.Create(tCtx, template2)
+		tCtx.Eventually(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get).WithArguments(pod.Name, metav1.GetOptions{}).
+			Should(gomega.HaveField("Status.ResourceClaimStatuses", gomega.ConsistOf(
+				gstruct.MatchAllFields(gstruct.Fields{
+					"Name":              gomega.Equal(pod.Spec.ResourceClaims[0].Name),
+					"ResourceClaimName": gomega.Not(gomega.BeNil()),
+				}),
+				gstruct.MatchAllFields(gstruct.Fields{
+					"Name":              gomega.Equal(pod.Spec.ResourceClaims[1].Name),
+					"ResourceClaimName": gomega.Not(gomega.BeNil()),
+				}),
+			)))
+
+		// Now check the ResourceClaims again. There's a small risk that the controller
+		// didn't have the newly created first ResourceClaim in its cache and then created
+		// another one, leading to one extra orphaned ResourceClaim. That's harmless (nothing
+		// uses it and it gets garbage-collected together with the pod), but we don't expect
+		// that to happen in practice and want the the test to fail if it does, so let's
+		// check for two claims.
+		claims, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		tCtx.ExpectNoError(err, "list ResourceClaims")
+		tCtx.Expect(claims.Items).To(gomega.HaveLen(2), "claims")
+
+		// Also check pod status.
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get pod")
+		tCtx.Expect(pod.Status.ResourceClaimStatuses).To(gomega.HaveLen(2), "claim statuses")
+		for i, ref := range pod.Spec.ResourceClaims {
+			tCtx := tCtx.WithStep(fmt.Sprintf("checking pod ResourceClaim #%d", i))
+			claimName, mustCheckOwner, err := resourceclaim.Name(pod, &ref)
+			tCtx.ExpectNoError(err, "get ResourceClaimName from Pod status")
+			if !mustCheckOwner {
+				tCtx.Error("mustCheckOwner should have been true and wasn't")
+			}
+			tCtx.Expect(claimName).NotTo(gomega.BeNil(), "claim name")
+			index := slices.IndexFunc(claims.Items, func(claim resourceapi.ResourceClaim) bool { return claim.Name == *claimName })
+			tCtx.Expect(index).To(gomega.BeNumerically(">=", 0), "index of claim")
+			claim := claims.Items[index]
+			if err := resourceclaim.IsForPod(pod, &claim, false); err != nil {
+				tCtx.Errorf("claim should have been owned by pod: %v\n%s\n%s", err, format.Object(claim, 1), format.Object(pod, 1))
+			}
+		}
 	})
 
 	// ResourcePoolStatusRequest tests with network resources — no kubelet needed.
