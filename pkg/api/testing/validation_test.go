@@ -78,14 +78,21 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "autoscaling", Version: "v2", Kind: "Scale"}:      "scale",
 	}
 
-	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
-	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
-
+	iters := *roundtrip.FuzzIters
+	testedGKs := map[schema.GroupKind]bool{}
 	for _, gv := range typesWithDeclarativeValidation {
 		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
+			gk := gvk.GroupKind()
+			if testedGKs[gk] {
+				continue
+			}
+			testedGKs[gk] = true
 			t.Run(gvk.String(), func(t *testing.T) {
-				for i := 0; i < fuzzIters; i++ {
+				t.Parallel()
+				// maximum value for maxItem is 1000, so we use 1005 to fuzz test maxItems.
+				f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs).NumElements(0, 1005)
+				for i := 0; i < iters; i++ {
 					obj, err := legacyscheme.Scheme.New(gvk)
 					if err != nil {
 						t.Fatalf("could not create a %v: %s", kind, err)
