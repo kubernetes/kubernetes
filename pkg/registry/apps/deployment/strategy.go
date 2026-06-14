@@ -129,9 +129,7 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	oldDeployment := old.(*apps.Deployment)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
-	allErrs := appsvalidation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
-
-	return allErrs
+	return appsvalidation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

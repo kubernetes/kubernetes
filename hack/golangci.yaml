@@ -258,6 +258,12 @@ linters:
       
       # NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
       
+      # apps and extensions top-level spec fields historically remain optional,
+      # even though declarative validation now marks nested selector fields as required.
+      - text: "optionalorrequired: field (Deployment|ReplicaSet)\\.Spec must be marked as optional or required"
+        path: "staging/src/k8s.io/api/apps/v1/types.go"
+      - text: "nonpointerstructs: field (Deployment|ReplicaSet)\\.Spec is a non-pointer struct with required fields. It must be marked as required."
+        path: "staging/src/k8s.io/api/(apps/(v1|v1beta1|v1beta2)|extensions/v1beta1)/types.go"
       # The (PodGroupSpec|PodGroupTemplate).SchedulingPolicy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."

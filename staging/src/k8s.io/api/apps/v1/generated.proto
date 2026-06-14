@@ -227,6 +227,12 @@ message DaemonSetUpdateStrategy {
   optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
+// +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=ApplyScale,verb=apply,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.9
 // Deployment enables declarative updates for Pods and ReplicaSets.
 // +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
@@ -237,7 +243,6 @@ message Deployment {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
-  // +required
   optional DeploymentSpec spec = 2;
 
   // Most recently observed status of the Deployment.
@@ -293,6 +298,8 @@ message DeploymentSpec {
   // selected by this will be the ones affected by this deployment.
   // It must match the pod template's labels.
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
@@ -394,6 +401,12 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
+// +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=ApplyScale,verb=apply,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.9
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 // +k8s:supportsSubresource="/scale"
 // +k8s:supportsSubresource="/status"
@@ -407,7 +420,6 @@ message ReplicaSet {
 
   // Spec defines the specification of the desired behavior of the ReplicaSet.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +required
   optional ReplicaSetSpec spec = 2;
 
   // Status is the most recently observed status of the ReplicaSet.
@@ -474,6 +486,8 @@ message ReplicaSetSpec {
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
