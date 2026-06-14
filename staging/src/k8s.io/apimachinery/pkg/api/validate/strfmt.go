@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -304,4 +305,55 @@ func validateCIdentifier(id string, length int, fldPath *field.Path) field.Error
 		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
 	}
 	return allErrs
+}
+
+// CIDRSloppy verifies that the specified value is a valid CIDR value for both IPv4 and
+// IPv6. Parsing uses "sloppy" mode to allow leading zeros in IP octets and to accept
+// both subnet-mask form (e.g., 192.168.1.0/24) and interface-address form
+// (e.g., 192.168.1.5/24), in order to match historical Kubernetes behavior.
+//
+// This function should be used to validate fields that were historically validated with
+// netutils.ParseCIDRSloppy(). New fields should use a stricter validator.
+func CIDRSloppy[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := string(*value)
+	_, _, err := netutils.ParseCIDRSloppy(val)
+	if err != nil {
+		return field.ErrorList{field.Invalid(fldPath, val, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr")}
+	}
+	return nil
+}
+
+// CIDRv4Sloppy verifies that the specified value is a valid IPv4 CIDR value.
+// Parsing uses "sloppy" mode to allow leading zeros in IP octets and to accept
+// both subnet-mask form (e.g., 192.168.1.0/24) and interface-address form
+// (e.g., 192.168.1.5/24), in order to match historical Kubernetes behavior.
+func CIDRv4Sloppy[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := string(*value)
+	ip, _, err := netutils.ParseCIDRSloppy(val)
+	if err != nil || !netutils.IsIPv4(ip) {
+		return field.ErrorList{field.Invalid(fldPath, val, "must be a valid IPv4 CIDR value, (e.g. 10.9.8.0/24)").WithOrigin("format=k8s-cidrv4")}
+	}
+	return nil
+}
+
+// CIDRv6Sloppy verifies that the specified value is a valid IPv6 CIDR value.
+// Parsing uses "sloppy" mode to allow leading zeros in IP octets and to accept
+// both subnet-mask form (e.g., 2001:db8::/64) and interface-address form
+// (e.g., 2001:db8::1/64), in order to match historical Kubernetes behavior.
+func CIDRv6Sloppy[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	val := string(*value)
+	ip, _, err := netutils.ParseCIDRSloppy(val)
+	if err != nil || !netutils.IsIPv6(ip) {
+		return field.ErrorList{field.Invalid(fldPath, val, "must be a valid IPv6 CIDR value, (e.g. 2001:db8::/64)").WithOrigin("format=k8s-cidrv6")}
+	}
+	return nil
 }
