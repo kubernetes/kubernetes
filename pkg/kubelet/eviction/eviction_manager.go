@@ -430,9 +430,20 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		pod := activePods[i]
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
-			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-			if pod.Spec.TerminationGracePeriodSeconds != nil {
-				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
+			if m.config.MaxPodGracePeriodSeconds < 0 {
+				// A negative value means "defer to the pod's own TerminationGracePeriodSeconds",
+				// as documented in the --eviction-max-pod-grace-period flag.
+				// Previously, min(negative, podGracePeriod) always returned the negative value,
+				// causing the CRI runtime to receive -1 and immediately SIGKILL the container.
+				// See https://github.com/kubernetes/kubernetes/issues/118172
+				if pod.Spec.TerminationGracePeriodSeconds != nil {
+					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
+				}
+			} else {
+				gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+				if pod.Spec.TerminationGracePeriodSeconds != nil {
+					gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
+				}
 			}
 		}
 
