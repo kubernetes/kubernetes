@@ -52,11 +52,15 @@ import (
 
 func TestCollectDataWithSecret(t *testing.T) {
 	caseMappingMode := int32(0400)
+	caseMappingUser1 := int64(1001)
+	caseMappingUser2 := int64(1002)
+
 	cases := []struct {
 		name     string
 		mappings []v1.KeyToPath
 		secret   *v1.Secret
 		mode     int32
+		user     *int64
 		optional bool
 		payload  map[string]util.FileProjection
 		success  bool
@@ -249,6 +253,103 @@ func TestCollectDataWithSecret(t *testing.T) {
 			payload:  map[string]util.FileProjection{},
 			success:  true,
 		},
+		{
+			name: "mapping with defaultUser",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
+		{
+			name: "mapping with User",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+					User: &caseMappingUser2,
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name: "mapping with defaultUser and User",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+					User: &caseMappingUser2,
+				},
+			},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name:     "empty mappings",
+			mappings: []v1.KeyToPath{},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name:     "empty mappings with defaultUser",
+			mappings: []v1.KeyToPath{},
+			secret: &v1.Secret{
+				Data: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser1},
+				"bar": {Data: []byte("bar"), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -260,7 +361,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 				Name:      tc.name,
 			}
 
-			source := makeProjection(tc.name, ptr.To[int32](tc.mode), "secret")
+			source := makeProjection(tc.name, ptr.To[int32](tc.mode), tc.user, "secret")
 			source.Sources[0].Secret.Items = tc.mappings
 			source.Sources[0].Secret.Optional = &tc.optional
 
@@ -303,11 +404,15 @@ func TestCollectDataWithSecret(t *testing.T) {
 
 func TestCollectDataWithConfigMap(t *testing.T) {
 	caseMappingMode := int32(0400)
+	caseMappingUser1 := int64(1001)
+	caseMappingUser2 := int64(1002)
+
 	cases := []struct {
 		name      string
 		mappings  []v1.KeyToPath
 		configMap *v1.ConfigMap
 		mode      int32
+		user      *int64
 		optional  bool
 		payload   map[string]util.FileProjection
 		success   bool
@@ -500,6 +605,111 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 			payload:  map[string]util.FileProjection{},
 			success:  true,
 		},
+		{
+			name: "mapping with defaultUser",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+				},
+			},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
+		{
+			name: "mapping with User",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+					User: &caseMappingUser2,
+				},
+			},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name: "mapping with defaultUser and User",
+			mappings: []v1.KeyToPath{
+				{
+					Key:  "foo",
+					Path: "foo.txt",
+					User: &caseMappingUser2,
+				},
+			},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo.txt": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name:     "empty mappings",
+			mappings: []v1.KeyToPath{},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+				BinaryData: map[string][]byte{
+					"moo": []byte("moo"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+				"moo": {Data: []byte("moo"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name:     "empty mappings with defaultUser",
+			mappings: []v1.KeyToPath{},
+			configMap: &v1.ConfigMap{
+				Data: map[string]string{
+					"foo": "foo",
+					"bar": "bar",
+				},
+				BinaryData: map[string][]byte{
+					"moo": []byte("moo"),
+				},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644, FsUser: &caseMappingUser1},
+				"bar": {Data: []byte("bar"), Mode: 0644, FsUser: &caseMappingUser1},
+				"moo": {Data: []byte("moo"), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -509,7 +719,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				Name:      tc.name,
 			}
 
-			source := makeProjection(tc.name, ptr.To[int32](tc.mode), "configMap")
+			source := makeProjection(tc.name, ptr.To[int32](tc.mode), tc.user, "configMap")
 			source.Sources[0].ConfigMap.Items = tc.mappings
 			source.Sources[0].ConfigMap.Optional = &tc.optional
 
@@ -554,12 +764,15 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 	testNamespace := "test_projected_namespace"
 	testPodUID := types.UID("test_pod_uid")
 	testPodName := "podName"
+	caseMappingUser1 := int64(1001)
+	caseMappingUser2 := int64(1002)
 
 	cases := []struct {
 		name       string
 		volumeFile []v1.DownwardAPIVolumeFile
 		pod        *v1.Pod
 		mode       int32
+		user       *int64
 		payload    map[string]util.FileProjection
 		success    bool
 	}{
@@ -679,11 +892,64 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 			},
 			success: true,
 		},
+		{
+			name: "defaultUser",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser1},
+			},
+			success: true,
+		},
+		{
+			name: "user",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", User: &caseMappingUser2, FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
+		{
+			name: "defaultUser-and-user",
+			volumeFile: []v1.DownwardAPIVolumeFile{
+				{Path: "namespace_file_name", User: &caseMappingUser2, FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace"}}},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID},
+			},
+			mode: 0644,
+			user: &caseMappingUser1,
+			payload: map[string]util.FileProjection{
+				"namespace_file_name": {Data: []byte(testNamespace), Mode: 0644, FsUser: &caseMappingUser2},
+			},
+			success: true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			source := makeProjection("", ptr.To[int32](tc.mode), "downwardAPI")
+			source := makeProjection("", ptr.To[int32](tc.mode), tc.user, "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
 			client := fake.NewSimpleClientset(tc.pod)
@@ -732,8 +998,10 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		svcacct     string
 		audience    string
 		defaultMode *int32
+		defaultUser *int64
 		fsUser      *int64
 		fsGroup     *int64
+		user        *int64
 		expiration  *int64
 		path        string
 
@@ -799,6 +1067,61 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 			},
 		},
 		{
+			name:        "defaultUser != nil",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1000),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name:        "user != nil",
+			defaultMode: ptr.To[int32](0644),
+			user:        ptr.To[int64](1000),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name:        "fsUser != nil && defaultUser != nil",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1001),
+			fsUser:      ptr.To[int64](1000),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1001),
+				},
+			},
+		},
+		{
+			name:        "fsUser != nil && defaultUser != nil && user != nil",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1001),
+			fsUser:      ptr.To[int64](1000),
+			user:        ptr.To[int64](1002),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1002),
+				},
+			},
+		},
+		{
 			name:        "fsGroup != nil",
 			defaultMode: ptr.To[int32](0644),
 			fsGroup:     ptr.To[int64](1000),
@@ -829,9 +1152,10 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			testNamespace := "test_projected_namespace"
-			source := makeProjection(tc.name, tc.defaultMode, "serviceAccountToken")
+			source := makeProjection(tc.name, tc.defaultMode, tc.defaultUser, "serviceAccountToken")
 			source.Sources[0].ServiceAccountToken.Audience = tc.audience
 			source.Sources[0].ServiceAccountToken.ExpirationSeconds = tc.expiration
+			source.Sources[0].ServiceAccountToken.User = tc.user
 			source.Sources[0].ServiceAccountToken.Path = tc.path
 
 			testPodUID := types.UID("test_pod_uid")
@@ -997,6 +1321,200 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "ClusterTrustBundle with fsUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultUser: ptr.To[int64](1000),
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+							User: ptr.To[int64](1000),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with fsUser and defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1001),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with fsUser, defaultUser and user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+							User: ptr.To[int64](1002),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1002),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with fsGroup",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsGroup: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data: []byte(goodCert1),
+					Mode: 0600,
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1097,6 +1615,222 @@ func TestCollectDataWithPodCertificate(t *testing.T) {
 				"certificates.pem": {
 					Data: []byte("cert\n"), // fake kubelet volume host is hardcoded to return this string.
 					Mode: 0644,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			fsUser:  ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1000),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+							User:                 ptr.To[int64](1000),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsUser and defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{},
+			fsUser:  ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1001),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1001),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1001),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsUser, defaultUser and user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+							User:                 ptr.To[int64](1002),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{},
+			fsUser:  ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1002),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1002),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1002),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsGroup",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			fsGroup: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data: []byte("key\ncert\n"),
+					Mode: 0600,
+				},
+				"key.pem": {
+					Data: []byte("key\n"),
+					Mode: 0600,
+				},
+				"certificates.pem": {
+					Data: []byte("cert\n"),
+					Mode: 0600,
 				},
 			},
 		},
@@ -1503,7 +2237,7 @@ func makeVolumeSpec(volumeName, name string, defaultMode int32) *v1.Volume {
 	return &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
-			Projected: makeProjection(name, ptr.To[int32](defaultMode), "secret"),
+			Projected: makeProjection(name, ptr.To[int32](defaultMode), nil, "secret"),
 		},
 	}
 }
@@ -1522,7 +2256,7 @@ func makeSecret(namespace, name string) v1.Secret {
 	}
 }
 
-func makeProjection(name string, defaultMode *int32, kind string) *v1.ProjectedVolumeSource {
+func makeProjection(name string, defaultMode *int32, defaultUser *int64, kind string) *v1.ProjectedVolumeSource {
 	var item v1.VolumeProjection
 
 	switch kind {
@@ -1551,6 +2285,7 @@ func makeProjection(name string, defaultMode *int32, kind string) *v1.ProjectedV
 	return &v1.ProjectedVolumeSource{
 		Sources:     []v1.VolumeProjection{item},
 		DefaultMode: defaultMode,
+		DefaultUser: defaultUser,
 	}
 }
 

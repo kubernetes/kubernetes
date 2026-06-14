@@ -274,7 +274,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 					},
 				}
 			}
-			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, optional)
+			secretPayload, err := secret.MakePayload(source.Secret.Items, secretapi, s.source.DefaultMode, s.source.DefaultUser, optional)
 			if err != nil {
 				klog.Errorf("Couldn't get secret payload %v/%v: %v", s.pod.Namespace, source.Secret.Name, err)
 				errlist = append(errlist, err)
@@ -299,7 +299,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 					},
 				}
 			}
-			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, optional)
+			configMapPayload, err := configmap.MakePayload(source.ConfigMap.Items, configMap, s.source.DefaultMode, s.source.DefaultUser, optional)
 			if err != nil {
 				klog.Errorf("Couldn't get configMap payload %v/%v: %v", s.pod.Namespace, source.ConfigMap.Name, err)
 				errlist = append(errlist, err)
@@ -309,7 +309,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[k] = v
 			}
 		case source.DownwardAPI != nil:
-			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode)
+			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode, s.source.DefaultUser)
 			if err != nil {
 				errlist = append(errlist, err)
 				continue
@@ -320,10 +320,19 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 		case source.ServiceAccountToken != nil:
 			tp := source.ServiceAccountToken
 
+			// Multi-level owner UID resolution (KEP-5936)
+			fsUser := mounterArgs.FsUser
+			if s.source.DefaultUser != nil {
+				fsUser = s.source.DefaultUser
+			}
+			if tp.User != nil {
+				fsUser = tp.User
+			}
+
 			// When FsGroup is set, we depend on SetVolumeOwnership to
 			// change from 0600 to 0640.
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
@@ -350,7 +359,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			payload[tp.Path] = volumeutil.FileProjection{
 				Data:   []byte(tr.Status.Token),
 				Mode:   mode,
-				FsUser: mounterArgs.FsUser,
+				FsUser: fsUser,
 			}
 		case source.ClusterTrustBundle != nil:
 			allowEmpty := false
@@ -378,15 +387,24 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 
+			// Multi-level owner UID resolution (KEP-5936)
+			fsUser := mounterArgs.FsUser
+			if s.source.DefaultUser != nil {
+				fsUser = s.source.DefaultUser
+			}
+			if source.ClusterTrustBundle.User != nil {
+				fsUser = source.ClusterTrustBundle.User
+			}
+
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
 			payload[source.ClusterTrustBundle.Path] = volumeutil.FileProjection{
 				Data:   trustAnchors,
 				Mode:   mode,
-				FsUser: mounterArgs.FsUser,
+				FsUser: fsUser,
 			}
 		case source.PodCertificate != nil:
 			key, certificates, err := s.plugin.kvHost.GetPodCertificateCredentialBundle(context.TODO(), s.pod.ObjectMeta.Namespace, s.pod.ObjectMeta.Name, string(s.pod.ObjectMeta.UID), s.volName, sourceIndex)
@@ -395,8 +413,17 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 
+			// Multi-level owner UID resolution (KEP-5936)
+			fsUser := mounterArgs.FsUser
+			if s.source.DefaultUser != nil {
+				fsUser = s.source.DefaultUser
+			}
+			if source.PodCertificate.User != nil {
+				fsUser = source.PodCertificate.User
+			}
+
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
@@ -407,21 +434,21 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[source.PodCertificate.CredentialBundlePath] = volumeutil.FileProjection{
 					Data:   credentialBundle.Bytes(),
 					Mode:   mode,
-					FsUser: mounterArgs.FsUser,
+					FsUser: fsUser,
 				}
 			}
 			if source.PodCertificate.KeyPath != "" {
 				payload[source.PodCertificate.KeyPath] = volumeutil.FileProjection{
 					Data:   key,
 					Mode:   mode,
-					FsUser: mounterArgs.FsUser,
+					FsUser: fsUser,
 				}
 			}
 			if source.PodCertificate.CertificateChainPath != "" {
 				payload[source.PodCertificate.CertificateChainPath] = volumeutil.FileProjection{
 					Data:   certificates,
 					Mode:   mode,
-					FsUser: mounterArgs.FsUser,
+					FsUser: fsUser,
 				}
 			}
 

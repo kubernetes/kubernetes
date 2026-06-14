@@ -47,6 +47,9 @@ type ConfigMapVolumeSourceApplyConfiguration struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 	// optional specify whether the ConfigMap or its keys must be defined
 	Optional *bool `json:"optional,omitempty"`
+	// defaultUser is Optional: The owner UID of the created files by default.
+	// Default is implementation-defined.
+	DefaultUser *int64 `json:"defaultUser,omitempty"`
 }
 
 // ConfigMapVolumeSourceApplyConfiguration constructs a declarative configuration of the ConfigMapVolumeSource type for use with
@@ -89,5 +92,13 @@ func (b *ConfigMapVolumeSourceApplyConfiguration) WithDefaultMode(value int32) *
 // If called multiple times, the Optional field is set to the value of the last call.
 func (b *ConfigMapVolumeSourceApplyConfiguration) WithOptional(value bool) *ConfigMapVolumeSourceApplyConfiguration {
 	b.Optional = &value
+	return b
+}
+
+// WithDefaultUser sets the DefaultUser field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultUser field is set to the value of the last call.
+func (b *ConfigMapVolumeSourceApplyConfiguration) WithDefaultUser(value int64) *ConfigMapVolumeSourceApplyConfiguration {
+	b.DefaultUser = &value
 	return b
 }
