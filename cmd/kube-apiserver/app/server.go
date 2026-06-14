@@ -88,6 +88,9 @@ cluster's shared state through which all other components interact.`,
 			// silence client-go warnings.
 			// kube-apiserver loopback clients should not log self-issued warnings.
 			rest.SetDefaultWarningHandler(rest.NoWarnings{})
+			if err := utilfeature.DefaultMutableFeatureGate.Freeze(); err != nil {
+				return err
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
