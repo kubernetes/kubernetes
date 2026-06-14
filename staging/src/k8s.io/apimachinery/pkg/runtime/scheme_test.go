@@ -1177,3 +1177,300 @@ func TestToOpenAPIDefinitionName(t *testing.T) {
 		})
 	}
 }
+
+// testApplication is a simple typed object for testing
+type testApplication struct {
+	runtime.TypeMeta `json:",inline"`
+	Data             string `json:"data,omitempty"`
+}
+
+func (t *testApplication) DeepCopyObject() runtime.Object {
+	return &testApplication{
+		TypeMeta: t.TypeMeta,
+		Data:     t.Data,
+	}
+}
+
+// testApplicationList is a simple typed list object for testing
+type testApplicationList struct {
+	runtime.TypeMeta `json:",inline"`
+	Items            []testApplication `json:"items"`
+}
+
+func (t *testApplicationList) DeepCopyObject() runtime.Object {
+	items := make([]testApplication, len(t.Items))
+	for i := range t.Items {
+		items[i] = *t.Items[i].DeepCopyObject().(*testApplication)
+	}
+	return &testApplicationList{
+		TypeMeta: t.TypeMeta,
+		Items:    items,
+	}
+}
+
+// TestConvertToVersionTypedObjectGVKFromField verifies that when multiple kinds are registered
+// with the same Go type, ConvertToVersion uses the GVK from the object's field instead of
+// selecting the first registered kind from typeToGVK.
+func TestConvertToVersionTypedObjectGVKFromField(t *testing.T) {
+	scheme := runtime.NewScheme()
+	gv := schema.GroupVersion{Group: "test.cozystack.io", Version: "v1alpha1"}
+
+	// Register the same Go type with different kinds
+	kind1 := "BootBox"
+	kind2 := "Tenant"
+	kind3 := "Postgres"
+
+	gvk1 := gv.WithKind(kind1)
+	gvk2 := gv.WithKind(kind2)
+	gvk3 := gv.WithKind(kind3)
+
+	scheme.AddKnownTypeWithName(gvk1, &testApplication{})
+	scheme.AddKnownTypeWithName(gvk2, &testApplication{})
+	scheme.AddKnownTypeWithName(gvk3, &testApplication{})
+
+	// Create objects with different kinds set in their fields
+	obj1 := &testApplication{Data: "bootbox-data"}
+	obj1.SetGroupVersionKind(gvk1)
+
+	obj2 := &testApplication{Data: "tenant-data"}
+	obj2.SetGroupVersionKind(gvk2)
+
+	obj3 := &testApplication{Data: "postgres-data"}
+	obj3.SetGroupVersionKind(gvk3)
+
+	tests := []struct {
+		name        string
+		obj         *testApplication
+		expectedGVK schema.GroupVersionKind
+	}{
+		{
+			name:        "BootBox should return BootBox GVK (not first registered)",
+			obj:         obj1,
+			expectedGVK: gvk1,
+		},
+		{
+			name:        "Tenant should return Tenant GVK (not first registered)",
+			obj:         obj2,
+			expectedGVK: gvk2,
+		},
+		{
+			name:        "Postgres should return Postgres GVK (not first registered)",
+			obj:         obj3,
+			expectedGVK: gvk3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Convert to the same version - should preserve the GVK from the field
+			result, err := scheme.ConvertToVersion(tt.obj, gv)
+			if err != nil {
+				t.Fatalf("ConvertToVersion failed: %v", err)
+			}
+
+			resultGVK := result.GetObjectKind().GroupVersionKind()
+			if resultGVK != tt.expectedGVK {
+				t.Errorf("Expected GVK %v (from object field), got %v. This indicates ConvertToVersion is using GVK from field, not from typeToGVK.", tt.expectedGVK, resultGVK)
+			}
+
+			// Verify the data is preserved
+			if typedResult, ok := result.(*testApplication); ok {
+				if typedResult.Data != tt.obj.Data {
+					t.Errorf("Expected data %q, got %q", tt.obj.Data, typedResult.Data)
+				}
+			} else {
+				t.Errorf("Expected *testApplication, got %T", result)
+			}
+		})
+	}
+
+	// Verify that all three kinds return different GVKs (not all returning the first registered)
+	allGvks := make(map[schema.GroupVersionKind]bool)
+	for _, tt := range tests {
+		result, err := scheme.ConvertToVersion(tt.obj, gv)
+		if err != nil {
+			t.Fatalf("ConvertToVersion failed: %v", err)
+		}
+		allGvks[result.GetObjectKind().GroupVersionKind()] = true
+	}
+	if len(allGvks) != 3 {
+		t.Errorf("Expected 3 different GVKs after conversion (using field GVK), got %d: %v", len(allGvks), allGvks)
+	}
+}
+
+// TestConvertToVersionTypedListGVKFromField verifies that when multiple list kinds are registered
+// with the same Go type, ConvertToVersion uses the GVK from the object's field instead of
+// selecting the first registered kind from typeToGVK.
+func TestConvertToVersionTypedListGVKFromField(t *testing.T) {
+	scheme := runtime.NewScheme()
+	gv := schema.GroupVersion{Group: "test.cozystack.io", Version: "v1alpha1"}
+
+	// Register the same Go type with different list kinds
+	kind1 := "BootBoxList"
+	kind2 := "TenantList"
+	kind3 := "PostgresList"
+
+	gvk1 := gv.WithKind(kind1)
+	gvk2 := gv.WithKind(kind2)
+	gvk3 := gv.WithKind(kind3)
+
+	scheme.AddKnownTypeWithName(gvk1, &testApplicationList{})
+	scheme.AddKnownTypeWithName(gvk2, &testApplicationList{})
+	scheme.AddKnownTypeWithName(gvk3, &testApplicationList{})
+
+	// Create list objects with different kinds set in their fields
+	list1 := &testApplicationList{
+		Items: []testApplication{{Data: "bootbox1"}, {Data: "bootbox2"}},
+	}
+	list1.SetGroupVersionKind(gvk1)
+
+	list2 := &testApplicationList{
+		Items: []testApplication{{Data: "tenant1"}, {Data: "tenant2"}},
+	}
+	list2.SetGroupVersionKind(gvk2)
+
+	list3 := &testApplicationList{
+		Items: []testApplication{{Data: "postgres1"}, {Data: "postgres2"}},
+	}
+	list3.SetGroupVersionKind(gvk3)
+
+	tests := []struct {
+		name        string
+		obj         *testApplicationList
+		expectedGVK schema.GroupVersionKind
+	}{
+		{
+			name:        "BootBoxList should return BootBoxList GVK (not first registered)",
+			obj:         list1,
+			expectedGVK: gvk1,
+		},
+		{
+			name:        "TenantList should return TenantList GVK (not first registered)",
+			obj:         list2,
+			expectedGVK: gvk2,
+		},
+		{
+			name:        "PostgresList should return PostgresList GVK (not first registered)",
+			obj:         list3,
+			expectedGVK: gvk3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Convert to the same version - should preserve the GVK from the field
+			result, err := scheme.ConvertToVersion(tt.obj, gv)
+			if err != nil {
+				t.Fatalf("ConvertToVersion failed: %v", err)
+			}
+
+			resultGVK := result.GetObjectKind().GroupVersionKind()
+			if resultGVK != tt.expectedGVK {
+				t.Errorf("Expected GVK %v (from object field), got %v. This indicates ConvertToVersion is using GVK from field, not from typeToGVK.", tt.expectedGVK, resultGVK)
+			}
+
+			// Verify the items are preserved
+			if typedResult, ok := result.(*testApplicationList); ok {
+				if len(typedResult.Items) != len(tt.obj.Items) {
+					t.Errorf("Expected %d items, got %d", len(tt.obj.Items), len(typedResult.Items))
+				}
+			} else {
+				t.Errorf("Expected *testApplicationList, got %T", result)
+			}
+		})
+	}
+
+	// Verify that all three list kinds return different GVKs (not all returning the first registered)
+	allGvks := make(map[schema.GroupVersionKind]bool)
+	for _, tt := range tests {
+		result, err := scheme.ConvertToVersion(tt.obj, gv)
+		if err != nil {
+			t.Fatalf("ConvertToVersion failed: %v", err)
+		}
+		allGvks[result.GetObjectKind().GroupVersionKind()] = true
+	}
+	if len(allGvks) != 3 {
+		t.Errorf("Expected 3 different GVKs after conversion (using field GVK), got %d: %v", len(allGvks), allGvks)
+	}
+}
+
+// TestConvertToVersionReorderingPreservesTargetPriority verifies that reordering kinds
+// to prefer the object's GVK still allows the target GroupVersioner to apply its own
+// priority decisions (e.g., preferring a different version for conversion).
+func TestConvertToVersionReorderingPreservesTargetPriority(t *testing.T) {
+	scheme := runtime.NewScheme()
+
+	g1v1 := schema.GroupVersion{Group: "g1", Version: "v1"}
+	g1v2 := schema.GroupVersion{Group: "g1", Version: "v2"}
+
+	// Register same type with multiple group/version/kind combinations
+	scheme.AddKnownTypeWithName(g1v1.WithKind("k1"), &testApplication{})
+	scheme.AddKnownTypeWithName(g1v1.WithKind("k2"), &testApplication{})
+	scheme.AddKnownTypeWithName(g1v2.WithKind("k1"), &testApplication{})
+	scheme.AddKnownTypeWithName(g1v2.WithKind("k2"), &testApplication{})
+
+	// Object has g1/v1/k1 set
+	obj := &testApplication{Data: "test"}
+	obj.SetGroupVersionKind(g1v1.WithKind("k1"))
+
+	// Target specifically wants g1/v2 - should convert to g1/v2/k1 (respecting target's
+	// version preference while using the object's kind)
+	result, err := scheme.ConvertToVersion(obj, g1v2)
+	if err != nil {
+		t.Fatalf("ConvertToVersion failed: %v", err)
+	}
+
+	resultGVK := result.GetObjectKind().GroupVersionKind()
+	expectedGVK := g1v2.WithKind("k1")
+	if resultGVK != expectedGVK {
+		t.Errorf("Expected GVK %v (target version with object's kind), got %v", expectedGVK, resultGVK)
+	}
+}
+
+// TestConvertToVersionCrossGroupLegacyAlias verifies that ConvertToVersion works correctly
+// when the same Go type is registered under different groups with a legacy alias
+// (like EncryptionConfig in group "" vs EncryptionConfiguration in "apiserver.config.k8s.io").
+// The reordering must not break InternalGroupVersioner's fallback which derives the internal
+// GVK from the first element in the kinds list.
+func TestConvertToVersionCrossGroupLegacyAlias(t *testing.T) {
+	internalGV := schema.GroupVersion{Group: "mygroup.example.com", Version: runtime.APIVersionInternal}
+	externalGV := schema.GroupVersion{Group: "mygroup.example.com", Version: "v1"}
+	legacyGV := schema.GroupVersion{Group: "", Version: "v1"}
+
+	scheme := runtime.NewScheme()
+
+	// Register a separate Go type as the internal version of MyConfig.
+	// Use testApplicationList here just as a distinct registered type — the real
+	// EncryptionConfiguration scenario has separate internal and versioned Go types
+	// with auto-generated conversions. We don't need actual conversion to trigger the
+	// bug; we only need s.New(gvk) to succeed for the fallback GVK.
+	scheme.AddKnownTypeWithName(internalGV.WithKind("MyConfig"), &testApplicationList{})
+
+	// Register a trivial conversion so ConvertToVersion can succeed
+	if err := scheme.AddConversionFunc((*testApplication)(nil), (*testApplicationList)(nil),
+		func(a, b interface{}, scope conversion.Scope) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+
+	// External type
+	scheme.AddKnownTypeWithName(externalGV.WithKind("MyConfig"), &testApplication{})
+	// Legacy alias in a different group
+	scheme.AddKnownTypeWithName(legacyGV.WithKind("LegacyConfig"), &testApplication{})
+
+	// Object decoded from legacy YAML (group="", kind="LegacyConfig")
+	obj := &testApplication{Data: "legacy-data"}
+	obj.SetGroupVersionKind(legacyGV.WithKind("LegacyConfig"))
+
+	// Convert to internal version - should use the standard group's internal version,
+	// not construct a non-existent internal version from the legacy alias
+	result, err := scheme.UnsafeConvertToVersion(obj, runtime.InternalGroupVersioner)
+	if err != nil {
+		t.Fatalf("UnsafeConvertToVersion to internal failed: %v", err)
+	}
+
+	// The result should be the internal type (GVK is cleared for internal versions)
+	resultGVK := result.GetObjectKind().GroupVersionKind()
+	if resultGVK != (schema.GroupVersionKind{}) {
+		t.Errorf("Expected empty GVK for internal version, got %v", resultGVK)
+	}
+}
