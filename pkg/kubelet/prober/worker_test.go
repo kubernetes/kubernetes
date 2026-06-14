@@ -18,11 +18,15 @@ package prober
 
 import (
 	"fmt"
+	"net/http"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1105,5 +1109,274 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+func TestGetRequestCaching(t *testing.T) {
+
+	t.Run("test get request caching", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		manager := newTestManager()
+		container := pod.Spec.Containers[0]
+		trueReference := true
+
+		container.ReadinessProbe = &v1.Probe{
+			InitialDelaySeconds: 0,
+			TimeoutSeconds:      1,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Path: "/",
+					Port: intstr.FromInt(8080),
+				},
+			},
+		}
+
+		manager.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:        container.Name,
+					ContainerID: "docker://fake-id",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{
+							StartedAt: metav1.Now(),
+						},
+					},
+					Ready:   true,
+					Started: &trueReference,
+				},
+			},
+		})
+
+		fakePodIp := "some-pod"
+		worker := newWorker(manager, readiness, pod, container)
+		worker.initHttpProbeHolder(&worker.container)
+
+		req, err := worker.httpProbeRequest.getRequest(fakePodIp)
+		if err != nil {
+			t.Fatalf("Unexpected error getting initial request: %v", err)
+		}
+
+		// Verify internal cache fields are correctly populated
+		assertRequestMatchesCache(t, worker, req)
+
+		req2, err := worker.httpProbeRequest.getRequest(fakePodIp)
+		if err != nil {
+			t.Fatalf("Unexpected error getting cached request: %v", err)
+		}
+
+		// Verify fields between two subsequent requests are identical (hit cache)
+		if req.Proto != req2.Proto {
+			t.Errorf("Proto mismatch: expected %q, got %q", req.Proto, req2.Proto)
+		}
+		if req.URL.String() != req2.URL.String() {
+			t.Errorf("URL mismatch: expected %q, got %q", req.URL.String(), req2.URL.String())
+		}
+		if req.Method != req2.Method {
+			t.Errorf("Method mismatch: expected %q, got %q", req.Method, req2.Method)
+		}
+		if !reflect.DeepEqual(req.Header, req2.Header) {
+			t.Errorf("Header mismatch:\nexpected: %v\ngot: %v", req.Header, req2.Header)
+		}
+
+		// Test cache invalidation via explicit reset()
+		worker.httpProbeRequest.reset()
+		worker.container.ReadinessProbe.HTTPGet.Path = "/new-path"
+
+		req3, err := worker.httpProbeRequest.getRequest(fakePodIp)
+		if err != nil {
+			t.Fatalf("Unexpected error getting request after reset: %v", err)
+		}
+		if req3.URL.Path != "/new-path" {
+			t.Errorf("Cache reset failed: expected updated path %q, got cached path %q", "/new-path", req3.URL.Path)
+		}
+
+		// Test cache invalidation via Pod-IP change
+		updatedPodIp := "updated-pod-ip"
+		req4, err := worker.httpProbeRequest.getRequest(updatedPodIp)
+		if err != nil {
+			t.Fatalf("Unexpected error getting request after IP change: %v", err)
+		}
+		if !strings.Contains(req4.URL.Host, updatedPodIp) {
+			t.Errorf("Cache invalidation via IP change failed: expected host to contain %q, got %q", updatedPodIp, req4.URL.Host)
+		}
+	})
+}
+
+func assertRequestMatchesCache(t *testing.T, worker *worker, req *http.Request) {
+	t.Helper()
+
+	if req.Proto != worker.httpProbeRequest.cachedProto {
+		t.Errorf("Cache Proto mismatch: expected %q, got %q", worker.httpProbeRequest.cachedProto, req.Proto)
+	}
+	if req.URL != worker.httpProbeRequest.cachedURL {
+		t.Errorf("Cache URL mismatch: expected %v, got %v", worker.httpProbeRequest.cachedURL, req.URL)
+	}
+	if req.Method != worker.httpProbeRequest.cachedMethod {
+		t.Errorf("Cache Method mismatch: expected %q, got %q", worker.httpProbeRequest.cachedMethod, req.Method)
+	}
+	if !reflect.DeepEqual(req.Header, worker.httpProbeRequest.cachedHeader) {
+		t.Errorf("Cache Header mismatch:\nexpected: %v\ngot: %v", worker.httpProbeRequest.cachedHeader, req.Header)
+	}
+}
+
+func TestGetRequest(t *testing.T) {
+	cases := []struct {
+		name        string
+		podIp       string
+		expectError bool
+	}{
+		{
+			name:        "valid pod ip",
+			podIp:       "podip.docker",
+			expectError: false,
+		},
+		{
+			name:        "invalid pod ip",
+			podIp:       "scheme://invalid-pod-ip", // httprobe fails on scheme in IP
+			expectError: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pod := getTestPod()
+			manager := newTestManager()
+			container := pod.Spec.Containers[0]
+			trueReference := true
+
+			container.ReadinessProbe = &v1.Probe{
+				InitialDelaySeconds: 0,
+				TimeoutSeconds:      1,
+				PeriodSeconds:       10,
+				SuccessThreshold:    1,
+				FailureThreshold:    3,
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/",
+						Port: intstr.FromInt(8080),
+					},
+				},
+			}
+
+			manager.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        container.Name,
+						ContainerID: "docker://fake-id",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{
+								StartedAt: metav1.Now(),
+							},
+						},
+						Ready:   true,
+						Started: &trueReference,
+					},
+				},
+			})
+
+			worker := newWorker(manager, readiness, pod, container)
+			worker.initHttpProbeHolder(&worker.container)
+
+			req, err := worker.httpProbeRequest.getRequest(c.podIp)
+
+			// Invariant 1: Error presence matches expectations
+			if (err != nil) != c.expectError {
+				t.Fatalf("Unexpected error state: expectError=%t, got err=%v", c.expectError, err)
+			}
+
+			// Invariant 2: If error is expected, no request should be returned
+			if c.expectError {
+				if req != nil {
+					t.Errorf("Expected nil request on error, but got: %v", req)
+				}
+				return // Stop further checks for failure cases
+			}
+
+			// --- Success Path Invariants ---
+
+			// Invariant 3: Request must not be nil if err is nil
+			if req == nil {
+				t.Error("Returned request is nil, but no error was reported")
+			}
+
+			// Invariant 4: Internal podIP state must be updated to the current IP
+			if worker.httpProbeRequest.podIP != c.podIp {
+				t.Errorf("Internal podIP state mismatch: expected %q, got %q", c.podIp, worker.httpProbeRequest.podIP)
+			}
+
+			// Invariant 5: Lazy initialization verification (requestRoot must be set)
+			if worker.httpProbeRequest.requestRoot == nil {
+				t.Error("Internal requestRoot was not initialized after a successful call")
+			}
+
+			// Invariant 6: Returned request data must match cached fields
+			if req.Proto != worker.httpProbeRequest.cachedProto {
+				t.Errorf("Cache Proto mismatch: expected %q, got %q", worker.httpProbeRequest.cachedProto, req.Proto)
+			}
+			if req.URL != worker.httpProbeRequest.cachedURL {
+				t.Errorf("Cache URL mismatch: expected %v, got %v", worker.httpProbeRequest.cachedURL, req.URL)
+			}
+			if req.Method != worker.httpProbeRequest.cachedMethod {
+				t.Errorf("Cache Method mismatch: expected %q, got %q", worker.httpProbeRequest.cachedMethod, req.Method)
+			}
+			if !reflect.DeepEqual(req.Header, worker.httpProbeRequest.cachedHeader) {
+				t.Errorf("Cache Header mismatch:\nexpected: %v\ngot: %v", worker.httpProbeRequest.cachedHeader, req.Header)
+			}
+		})
+	}
+}
+
+var benchmarkHttpProbeSink bool
+
+func BenchmarkHTTPProbe(b *testing.B) {
+	logger, ctx := ktesting.NewTestContext(b)
+	pod := getTestPod()
+	manager := newTestManager()
+	t := true
+
+	container := pod.Spec.Containers[0]
+	container.ReadinessProbe = &v1.Probe{
+		InitialDelaySeconds: 0,
+		TimeoutSeconds:      1,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/",
+				Port: intstr.FromInt(8080),
+			},
+		},
+	}
+
+	manager.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name:        container.Name,
+				ContainerID: "docker://fake-id",
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{
+						StartedAt: metav1.Now(),
+					},
+				},
+				Ready:   true,
+				Started: &t,
+			},
+		},
+	})
+
+	worker := newWorker(manager, readiness, pod, container)
+
+	b.ResetTimer()
+	for b.Loop() {
+		benchmarkHttpProbeSink = worker.doProbe(ctx)
 	}
 }
