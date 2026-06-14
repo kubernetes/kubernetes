@@ -34,6 +34,7 @@ import (
 
 type mockAffinityStore struct {
 	hint topologymanager.TopologyHint
+	ids  []int
 }
 
 func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
@@ -48,10 +49,25 @@ func (m *mockAffinityStore) Name() string {
 	return "container"
 }
 
+func (m *mockAffinityStore) GetNUMANodeIDs() []int {
+	return append([]int{}, m.ids...)
+}
+
 func makeNUMADevice(id string, numa int) *pluginapi.Device {
 	return &pluginapi.Device{
 		ID:       id,
 		Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: int64(numa)}}},
+	}
+}
+
+func makeMultiNUMADevice(id string, numas ...int) *pluginapi.Device {
+	nodes := make([]*pluginapi.NUMANode, 0, len(numas))
+	for _, numa := range numas {
+		nodes = append(nodes, &pluginapi.NUMANode{ID: int64(numa)})
+	}
+	return &pluginapi.Device{
+		ID:       id,
+		Topology: &pluginapi.TopologyInfo{Nodes: nodes},
 	}
 }
 
@@ -110,6 +126,62 @@ func TestGetTopologyHints(t *testing.T) {
 				t.Errorf("%v: Expected result to be %#v, got %#v", tc.description, tc.expectedHints[r], hints[r])
 			}
 		}
+	}
+}
+
+func TestGetTopologyHintsProjectedToEffectiveNUMANodes(t *testing.T) {
+	m := ManagerImpl{
+		allDevices:       NewResourceDeviceInstances(),
+		healthyDevices:   make(map[string]sets.Set[string]),
+		allocatedDevices: make(map[string]sets.Set[string]),
+		podDevices:       newPodDevices(),
+		sourcesReady:     &sourcesReadyStub{},
+		activePods:       func() []*v1.Pod { return []*v1.Pod{} },
+		numaNodes:        []int{0, 1},
+		numaDistances: map[int][]uint64{
+			0: {10, 20, 11, 30},
+			1: {20, 10, 30, 11},
+			2: {11, 30, 10, 40},
+			3: {30, 11, 40, 10},
+		},
+	}
+
+	resourceName := "example.com/gpu"
+	m.allDevices[resourceName] = DeviceInstances{
+		"dev0": makeMultiNUMADevice("dev0", 2),
+		"dev1": makeMultiNUMADevice("dev1", 3),
+	}
+	m.healthyDevices[resourceName] = sets.New("dev0", "dev1")
+
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c0",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName): resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	hints := m.GetTopologyHints(pod, &pod.Spec.Containers[0])
+	expected := []topologymanager.TopologyHint{
+		{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+		{NUMANodeAffinity: makeSocketMask(1), Preferred: true},
+		{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+	}
+	sort.SliceStable(hints[resourceName], func(i, j int) bool {
+		return hints[resourceName][i].LessThan(hints[resourceName][j])
+	})
+	sort.SliceStable(expected, func(i, j int) bool {
+		return expected[i].LessThan(expected[j])
+	})
+	if !reflect.DeepEqual(hints[resourceName], expected) {
+		t.Fatalf("expected projected hints %#v, got %#v", expected, hints[resourceName])
 	}
 }
 
@@ -426,7 +498,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
-			topologyAffinityStore: &mockAffinityStore{tc.hint},
+			topologyAffinityStore: &mockAffinityStore{hint: tc.hint},
 		}
 
 		m.allDevices[tc.resource] = make(DeviceInstances)
@@ -616,7 +688,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
-			topologyAffinityStore: &mockAffinityStore{tc.hint},
+			topologyAffinityStore: &mockAffinityStore{hint: tc.hint},
 		}
 
 		m.allDevices[tc.resource] = make(DeviceInstances)
