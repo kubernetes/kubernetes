@@ -464,7 +464,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 						Requests:            config.Requests,
 						DeviceConfiguration: config.DeviceConfiguration,
 					})
-					continue
+					break // We can stop checking after the first match as all requests in the config should be added.
 				}
 
 				requestKey := requestIndices{claimIndex: claimIndex, requestIndex: i}
@@ -481,6 +481,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 						Requests:            config.Requests,
 						DeviceConfiguration: config.DeviceConfiguration,
 					})
+					break // We can stop checking after the first match as all requests in the config should be added.
 				}
 			}
 		}
