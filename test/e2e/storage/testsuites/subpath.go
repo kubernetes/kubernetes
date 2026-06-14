@@ -1114,20 +1114,19 @@ func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framewor
 	framework.ExpectNoError(err, "lazy-unmounting subPath bind mounts: %s", result)
 	framework.Logf("umount result: %s", result)
 
-	// the container's own mount namespace still has the bind mount intact.
-	// kill the app process inside the container so kubelet restarts it.
-	ginkgo.By("Killing app container process to trigger restart through stale bind-mount path")
-	killContainerCmd := fmt.Sprintf(
-		`DCID=$(docker ps --filter "label=io.kubernetes.pod.uid=%s" -q 2>/dev/null | `+
-			`xargs -I{} docker inspect {} --format "{{.Id}} {{index .Config.Labels \"io.kubernetes.container.name\"}}" 2>/dev/null | `+
-			`grep -v " POD$" | awk "{print \$1}" | head -1); `+
-			`[ -z "$DCID" ] && { echo "no container found"; exit 1; }; `+
-			`docker kill "$DCID" && echo "killed $DCID"`,
-		pod.UID,
+	// stop the container via crictl so kubelet restarts it and calls
+	// prepareSubpathTarget on the stale bind mount.
+	ginkgo.By("Stopping app container via crictl to trigger restart through stale bind-mount path")
+	containerName := pod.Spec.Containers[0].Name
+	stopCmd := fmt.Sprintf(
+		`cid=$(crictl ps --label io.kubernetes.pod.uid=%s --name %s -q 2>/dev/null | head -1); `+
+			`[ -z "$cid" ] && { echo "container not found"; exit 1; }; `+
+			`crictl stop "$cid" && echo "stopped $cid"`,
+		pod.UID, containerName,
 	)
-	stopResult, stopErr := hostExec.IssueCommandWithResult(ctx, killContainerCmd, podNode)
-	framework.ExpectNoError(stopErr, "killing container for pod %s: %s", pod.UID, stopResult)
-	framework.Logf("docker kill result: %s", stopResult)
+	stopResult, stopErr := hostExec.IssueCommandWithResult(ctx, stopCmd, podNode)
+	framework.ExpectNoError(stopErr, "stopping container via crictl for pod %s: %s", pod.UID, stopResult)
+	framework.Logf("crictl stop result: %s", stopResult)
 
 	// wait for the container to restart and reach Running with restarts >= 1.
 	ginkgo.By("Waiting for container to restart with a fresh bind mount")
