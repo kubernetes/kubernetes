@@ -121,16 +121,6 @@ func (w *watchCacheHistory) ResetLocked() {
 	clear(w.cache)
 }
 
-// OldestResourceVersionToPruneLocked returns the resource version of the oldest event in the history
-// to prune snapshots, only if the event history buffer is full.
-// Assumes that lock is already held.
-func (w *watchCacheHistory) OldestResourceVersionToPruneLocked() (uint64, bool) {
-	if !w.isCacheFullLocked() {
-		return 0, false
-	}
-	return w.cache[w.startIndex%w.capacity].ResourceVersion, true
-}
-
 const (
 	// minWatchChanSize is the min size of channels used by the watch.
 	// We keep that set to 10 for "backward compatibility" until we
