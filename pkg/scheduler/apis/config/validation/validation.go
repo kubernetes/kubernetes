@@ -144,7 +144,22 @@ func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *
 		errs = append(errs, field.Required(path.Child("schedulerName"), ""))
 	}
 	errs = append(errs, validatePercentageOfNodesToScore(path.Child("percentageOfNodesToScore"), profile.PercentageOfNodesToScore))
+	errs = append(errs, validatePluginInfluence(path.Child("pluginInfluence"), profile.PluginInfluence)...)
 	errs = append(errs, validatePluginConfig(path, apiVersion, profile)...)
+	return errs
+}
+
+func validatePluginInfluence(path *field.Path, cfg *config.PluginInfluence) []error {
+	if cfg == nil || !cfg.Enabled {
+		return nil
+	}
+	var errs []error
+	if cfg.TopK <= 0 {
+		errs = append(errs, field.Invalid(path.Child("topK"), cfg.TopK, "must be greater than 0"))
+	}
+	if cfg.SamplePercent <= 0 || cfg.SamplePercent > 100 {
+		errs = append(errs, field.Invalid(path.Child("samplePercent"), cfg.SamplePercent, "must be between 1 and 100"))
+	}
 	return errs
 }
 
