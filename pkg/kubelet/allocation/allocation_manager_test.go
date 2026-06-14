@@ -782,6 +782,11 @@ func TestRetryPendingResizes(t *testing.T) {
 				}
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod1, testPod2, testPod3}, nil)
 
+				// Set allocations for all test pods to ensure they're counted in capacity calculations
+				require.NoError(t, allocationManager.SetAllocatedResources(testPod1))
+				require.NoError(t, allocationManager.SetAllocatedResources(testPod2))
+				require.NoError(t, allocationManager.SetAllocatedResources(testPod3))
+
 				if !tt.newResourcesAllocated {
 					require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
 				} else {
@@ -2416,6 +2421,122 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			require.Equal(t, tc.expectedEvent, event)
 		})
 	}
+}
+
+// TestPendingNonAllocatedPodsExcludedFromCapacity verifies that pods that are
+// not in Running phase and have no allocated resources are excluded from capacity
+// calculations. This prevents a race condition where pods that will fail admission
+// consume capacity and prevent legitimate pod operations.
+func TestPendingNonAllocatedPodsExcludedFromCapacity(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+
+	cpu1000m := resource.MustParse("1")
+	cpu1500m := resource.MustParse("1500m")
+	cpu10000m := resource.MustParse("10") // Way beyond node capacity (4 CPUs allocatable)
+	mem1000M := resource.MustParse("1Gi")
+	mem10000M := resource.MustParse("10Gi") // Way beyond node capacity (4Gi allocatable)
+
+	runningPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "running-pod",
+			Name:      "running-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	pendingPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pending-pod",
+			Name:      "pending-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu10000m, v1.ResourceMemory: mem10000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID:        runningPod.UID,
+		Name:      runningPod.Name,
+		Namespace: runningPod.Namespace,
+	}
+	podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(runningPod.Spec.Containers))
+	for i, c := range runningPod.Spec.Containers {
+		setContainerStatus(podStatus, &c, i)
+	}
+
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{runningPod, pendingPod}, nil)
+	require.NoError(t, allocationManager.SetAllocatedResources(runningPod))
+	t.Cleanup(func() {
+		allocationManager.RemovePod(runningPod.UID)
+		allocationManager.RemovePod(pendingPod.UID)
+	})
+
+	resizedPod := runningPod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M}
+
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		if uid == runningPod.UID {
+			return resizedPod, true
+		}
+		if uid == pendingPod.UID {
+			return pendingPod, true
+		}
+		return nil, false
+	}
+
+	allocationManager.PushPendingResize(runningPod.UID)
+	allocationManager.RetryPendingResizes(context.TODO(), TriggerReasonPodUpdated)
+
+	// Verify the resize succeeded. If pendingPod was incorrectly included in capacity
+	// calculations, this would be deferred (1500m + 10000m > 4000m allocatable).
+	resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(runningPod.UID)
+	require.Len(t, resizeStatus, 1)
+	assert.Equal(t, v1.PodResizeInProgress, resizeStatus[0].Type)
+	assert.Equal(t, v1.ConditionTrue, resizeStatus[0].Status)
+
+	alloc, found := allocationManager.GetContainerResourceAllocation(runningPod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, cpu1500m, *alloc.Requests.Cpu())
+
+	_, foundPending := allocationManager.GetContainerResourceAllocation(pendingPod.UID, "c1")
+	assert.False(t, foundPending)
 }
 
 func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, allocatedPods []*v1.Pod, nodeConfig *cm.NodeConfig) Manager {
