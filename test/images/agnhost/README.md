@@ -487,6 +487,9 @@ Starts a HTTP(S) server on given port with the following endpoints:
 		shutdown.
 	- `wait`: The amount of time to wait before starting shutdown. Acceptable values are
 	  golang durations. If 0 the process will start shutdown immediately.
+- `/envvar`: Returns the value of the environment variable specified by the `var` query
+  parameter (`/envvar?var=NODE_NAME`). Returns `400` if the `var` parameter is missing
+  or empty; `500` if the variable is not set.
 - `/healthz`: Returns `200 OK` if the server is ready, `412 Status Precondition Failed`
   otherwise. The server is considered not ready if the UDP server did not start yet or
   it exited.
@@ -513,6 +516,7 @@ It will also start a UDP server on the indicated UDP port that responds to the f
 
 - `hostname`: Returns the server's hostname
 - `echo <msg>`: Returns the given `<msg>`
+- `envvar <VAR_NAME>`: Returns the value of the named environment variable (empty string if not set)
 - `clientip`: Returns the request's IP address
 
 The UDP server can be disabled by setting `--udp-port -1`.
