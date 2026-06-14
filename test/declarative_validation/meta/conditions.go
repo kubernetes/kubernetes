@@ -59,6 +59,19 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.Required(fldPath.Index(0).Child("type"), "").MarkAlpha(),
 			},
 		},
+		{
+			Name: "invalid negative observedGeneration",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakObservedGeneration(-1)),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					fldPath.Index(0).Child("observedGeneration"),
+					int64(-1),
+					"must be greater than or equal to zero",
+				).WithOrigin("minimum").MarkAlpha(),
+			},
+		},
 	}
 }
 
@@ -101,5 +114,11 @@ func TweakType(condType string) func(*metav1.Condition) {
 func TweakStatus(status metav1.ConditionStatus) func(*metav1.Condition) {
 	return func(c *metav1.Condition) {
 		c.Status = status
+	}
+}
+
+func TweakObservedGeneration(gen int64) func(*metav1.Condition) {
+	return func(c *metav1.Condition) {
+		c.ObservedGeneration = gen
 	}
 }

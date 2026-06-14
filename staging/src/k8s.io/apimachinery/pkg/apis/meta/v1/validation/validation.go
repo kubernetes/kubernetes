@@ -328,7 +328,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	}
 
 	if condition.ObservedGeneration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero").WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 
 	if condition.LastTransitionTime.IsZero() {
