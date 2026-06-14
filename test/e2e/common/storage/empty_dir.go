@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -362,6 +363,14 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
 		gomega.Expect(result).To(gomega.Equal(expectedResult), "failed to match expected string %s with %s", expectedResult, result)
 	})
+
+	f.It("should apply mount options on default medium [LinuxOnly]", f.WithFeatureGate(features.EmptyDirMountOptions), func(ctx context.Context) {
+		doTestMountOptions(ctx, f, v1.StorageMediumDefault, []string{"noexec", "nodev", "nosuid"})
+	})
+
+	f.It("should apply mount options on tmpfs medium [LinuxOnly]", f.WithFeatureGate(features.EmptyDirMountOptions), func(ctx context.Context) {
+		doTestMountOptions(ctx, f, v1.StorageMediumMemory, []string{"noexec", "nodev", "nosuid"})
+	})
 })
 
 const (
@@ -580,6 +589,57 @@ func doTest0777(ctx context.Context, f *framework.Framework, uid int64, medium v
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
 	e2epodoutput.TestContainerOutput(ctx, f, msg, pod, 0, out)
+}
+
+func doTestMountOptions(ctx context.Context, f *framework.Framework, medium v1.StorageMedium, mountOptions []string) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-emptydir-mountoptions-" + string(uuid.NewUUID()),
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "test-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:       medium,
+							MountOptions: mountOptions,
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    "test-container",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", e2epod.InfiniteSleepCommand},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "test-vol",
+							MountPath: "/test-volume",
+						},
+					},
+				},
+			},
+			TerminationGracePeriodSeconds: new(int64),
+			RestartPolicy:                 v1.RestartPolicyNever,
+		},
+	}
+
+	ginkgo.By(fmt.Sprintf("Creating pod with emptyDir mountOptions %v on %s", mountOptions, formatMedium(medium)))
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("Verifying mountOptions are preserved in the pod spec")
+	var err error
+	pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
+	gomega.Expect(pod.Spec.Volumes[0].EmptyDir.MountOptions).To(gomega.Equal(mountOptions),
+		"expected mountOptions %v to be preserved in pod spec", mountOptions)
+
+	ginkgo.By("Verifying the volume is mounted and writable")
+	result := e2epod.ExecShellInContainer(f, pod.Name, "test-container", "echo testdata > /test-volume/testfile && cat /test-volume/testfile")
+	gomega.Expect(result).To(gomega.Equal("testdata"), "expected volume to be writable")
 }
 
 func formatMedium(medium v1.StorageMedium) string {

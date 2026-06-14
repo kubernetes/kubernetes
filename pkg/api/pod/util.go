@@ -782,6 +782,7 @@ func dropDisabledFields(
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+	dropEmptyDirMountOptions(podSpec, oldPodSpec)
 }
 
 // setHostnameOverrideInUse returns true if any pod's spec defines HostnameOverride field.
@@ -2003,6 +2004,29 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+func dropEmptyDirMountOptions(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) || emptyDirMountOptionsInUse(oldPodSpec) {
+		return
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].EmptyDir != nil {
+			podSpec.Volumes[i].EmptyDir.MountOptions = nil
+		}
+	}
+}
+
+func emptyDirMountOptionsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.EmptyDir != nil && len(v.EmptyDir.MountOptions) > 0 {
+			return true
 		}
 	}
 	return false

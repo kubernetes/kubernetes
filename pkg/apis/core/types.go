@@ -887,6 +887,10 @@ type EmptyDirVolumeSource struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
 	SizeLimit *resource.Quantity
+	// MountOptions is the list of mount options to apply for this EmptyDir volume. The options noexec, nodev, and nosuid are allowed.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
+	// +optional
+	MountOptions []string
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.

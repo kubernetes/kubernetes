@@ -2054,6 +2054,15 @@
             "description": "medium represents what type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
             "type": "string"
           },
+          "mountOptions": {
+            "description": "mountOptions is the list of mount options to apply for this EmptyDir volume. The options noexec, nodev, and nosuid are allowed.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "sizeLimit": {
             "allOf": [
               {

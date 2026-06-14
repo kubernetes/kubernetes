@@ -605,6 +605,18 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: EmptyDirMountOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
+- name: EnableWorkloadWithJob
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.36"
 - name: EnvFiles
   versionedSpecs:
   - default: false

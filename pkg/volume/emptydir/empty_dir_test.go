@@ -81,6 +81,23 @@ func (fake *fakeMountDetector) GetMountMedium(path string, requestedMedium v1.St
 	return fake.medium, fake.isMount, nil, nil
 }
 
+func TestPluginDefaultEmptyDirWithMountOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, true)
+	for _, opt := range []string{"noexec", "nodev", "nosuid"} {
+		t.Run(opt, func(t *testing.T) {
+			doTestPlugin(t, pluginTestConfig{
+				medium:                        v1.StorageMediumDefault,
+				mountOptions:                  []string{opt},
+				volumeDirExists:               true,
+				readyDirExists:                false,
+				expectedSetupMounts:           1,
+				expectedTeardownMounts:        1,
+				shouldBeMountedBeforeTeardown: true,
+			})
+		})
+	}
+}
+
 func TestPluginEmptyRootContext(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		volumeDirExists:        true,
@@ -133,6 +150,7 @@ func TestPluginHugetlbfs(t *testing.T) {
 
 type pluginTestConfig struct {
 	medium v1.StorageMedium
+	mountOptions []string
 	//volumeDirExists indicates whether volumeDir already/still exists before volume setup/teardown
 	volumeDirExists bool
 	//readyDirExists indicates whether readyDir already/still exists before volume setup/teardown
@@ -158,7 +176,10 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumeName = "test-volume"
 		spec       = &v1.Volume{
 			Name:         volumeName,
-			VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: config.medium}},
+			VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:       config.medium,
+				MountOptions: config.mountOptions,
+			}},
 		}
 
 		physicalMounter = mount.NewFakeMounter(nil)
@@ -182,10 +203,12 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	)
 
 	if config.readyDirExists {
-		physicalMounter.MountPoints = []mount.MountPoint{
-			{
-				Path: volumePath,
-			},
+		if config.medium != v1.StorageMediumDefault {
+			physicalMounter.MountPoints = []mount.MountPoint{
+				{
+					Path: volumePath,
+				},
+			}
 		}
 		volumeutil.SetReady(metadataDir)
 	}
@@ -218,9 +241,42 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	// Check the number of mounts performed during setup
 	if e, a := config.expectedSetupMounts, len(log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during setup, got %v", e, a)
-	} else if config.expectedSetupMounts == 1 &&
-		(log[0].Action != mount.FakeActionMount || (log[0].FSType != "tmpfs" && log[0].FSType != "hugetlbfs")) {
+		} else if config.expectedSetupMounts == 1 &&
+		(log[0].Action != mount.FakeActionMount || (log[0].FSType != "tmpfs" && log[0].FSType != "hugetlbfs" && log[0].FSType != "")) {
 		t.Errorf("Unexpected physicalMounter action during setup: %#v", log[0])
+	}
+	if config.expectedSetupMounts == 1 && len(config.mountOptions) > 0 {
+		var opts []string
+		for _, mp := range physicalMounter.MountPoints {
+			if mp.Path == volumePath {
+				opts = mp.Opts
+				break
+			}
+		}
+		for _, want := range config.mountOptions {
+			found := false
+			for _, o := range opts {
+				if o == want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Expected mount options to contain %q, got %v", want, opts)
+			}
+		}
+		if log[0].FSType == "" {
+			hasBind := false
+			for _, o := range opts {
+				if o == "bind" {
+					hasBind = true
+					break
+				}
+			}
+			if !hasBind {
+				t.Errorf("Expected mount options to contain \"bind\" for default medium, got %v", opts)
+			}
+		}
 	}
 	physicalMounter.ResetLog()
 
@@ -1169,6 +1225,7 @@ func TestTmpfsMountOptions(t *testing.T) {
 	testCases := map[string]struct {
 		tmpfsNoswapSupported bool
 		sizeLimit            resource.Quantity
+		mountOptions         []string
 	}{
 		"default bahavior": {},
 		"tmpfs noswap is supported": {
@@ -1181,12 +1238,22 @@ func TestTmpfsMountOptions(t *testing.T) {
 			tmpfsNoswapSupported: true,
 			sizeLimit:            subQuantity,
 		},
+		"mount option noexec": {
+			mountOptions: []string{"noexec"},
+		},
+		"mount option nodev": {
+			mountOptions: []string{"nodev"},
+		},
+		"mount option nosuid": {
+			mountOptions: []string{"nosuid"},
+		},
 	}
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
 			emptyDirObj := emptyDir{
 				sizeLimit: &testCase.sizeLimit,
+				mountOptions: testCase.mountOptions,
 			}
 
 			options := emptyDirObj.generateTmpfsMountOptions(testCase.tmpfsNoswapSupported)
@@ -1203,6 +1270,170 @@ func TestTmpfsMountOptions(t *testing.T) {
 			}
 			if expectedOption := fmt.Sprintf("size=%d", testCase.sizeLimit.Value()); !testCase.sizeLimit.IsZero() && !doesStringArrayContainSubstring(options, expectedOption) {
 				t.Errorf("size option is not expected when is zero. options: %v", options)
+			}
+
+			for _, want := range testCase.mountOptions {
+				if !doesStringArrayContainSubstring(options, want) {
+					t.Errorf("Expected mount option %q in options %v", want, options)
+				}
+			}
+		})
+	}
+}
+
+func TestMountOptionsFeatureGate(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		mountOptions   []string
+		wantOptions    int
+		wantError      bool
+	}{
+		{
+			name:           "feature enabled, options are read",
+			featureEnabled: true,
+			mountOptions:   []string{"noexec", "nodev"},
+			wantOptions:    2,
+		},
+		{
+			name:           "feature disabled, mountOptions set, rejected",
+			featureEnabled: false,
+			mountOptions:   []string{"noexec", "nodev"},
+			wantError:      true,
+		},
+		{
+			name:           "feature disabled, no mountOptions, succeeds",
+			featureEnabled: false,
+			mountOptions:   nil,
+			wantOptions:    0,
+		},
+		{
+			name:           "unsupported mount option filtered",
+			featureEnabled: true,
+			mountOptions:   []string{"rw"},
+			wantOptions:    0,
+		},
+		{
+			name:           "valid and unsupported mount options mixed",
+			featureEnabled: true,
+			mountOptions:   []string{"noexec", "rw"},
+			wantOptions:    1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, tt.featureEnabled)
+
+			tmpDir, err := utiltesting.MkTmpdir("emptydirTest")
+			if err != nil {
+				t.Fatalf("can't make a temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+			spec := &v1.Volume{
+				Name: "test-volume",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						MountOptions: tt.mountOptions,
+					},
+				},
+			}
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+
+			mounter, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, mount.NewFakeMounter(nil), &fakeMountDetector{})
+			if tt.wantError {
+				if err == nil {
+					t.Fatalf("expected error when feature gate is disabled and mountOptions are set, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating mounter: %v", err)
+			}
+
+			ed := mounter.(*emptyDir)
+			if e, a := tt.wantOptions, len(ed.mountOptions); e != a {
+				t.Errorf("expected %d mountOptions, got %d: %v", e, a, ed.mountOptions)
+			}
+		})
+	}
+}
+
+func TestTeardownDuringBindMount(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, true)
+
+	basePath, err := utiltesting.MkTmpdir("emptydir_teardown_test")
+	if err != nil {
+		t.Fatalf("can't make a temp rootdir: %v", err)
+	}
+	defer os.RemoveAll(basePath)
+
+	volumePath := filepath.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
+	metadataDir := filepath.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
+
+	if err := os.MkdirAll(volumePath, perm); err != nil {
+		t.Fatalf("failed to create volume dir: %v", err)
+	}
+	volumeutil.SetReady(metadataDir)
+
+	tests := []struct {
+		name               string
+		isMountPoint       bool
+		expectedUnmounts   int
+	}{
+		{
+			name:             "teardown with active bind-mount",
+			isMountPoint:     true,
+			expectedUnmounts: 1,
+		},
+		{
+			name:             "teardown with no bind-mount (partial setup)",
+			isMountPoint:     false,
+			expectedUnmounts: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := os.MkdirAll(volumePath, perm); err != nil {
+				t.Fatalf("failed to create volume dir: %v", err)
+			}
+			volumeutil.SetReady(metadataDir)
+
+			var mountPoints []mount.MountPoint
+			if tt.isMountPoint {
+				mountPoints = []mount.MountPoint{
+					{Path: volumePath, Opts: []string{"bind", "noexec"}},
+				}
+			}
+			fakeMounter := mount.NewFakeMounter(mountPoints)
+
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
+			unmounterMountDetector := &fakeMountDetector{medium: v1.StorageMediumDefault, isMount: tt.isMountPoint}
+			unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal("test-volume", types.UID("poduid"), fakeMounter, unmounterMountDetector)
+			if err != nil {
+				t.Fatalf("failed to create unmounter: %v", err)
+			}
+
+			if err := unmounter.TearDown(); err != nil {
+				t.Fatalf("TearDown failed: %v", err)
+			}
+
+			log := fakeMounter.GetLog()
+			if e, a := tt.expectedUnmounts, len(log); e != a {
+				t.Errorf("expected %d unmount calls, got %d", e, a)
+			}
+			if tt.expectedUnmounts == 1 && log[0].Action != mount.FakeActionUnmount {
+				t.Errorf("expected unmount action, got %v", log[0].Action)
+			}
+
+			if _, err := os.Stat(volumePath); !os.IsNotExist(err) {
+				t.Errorf("volume directory should be removed after teardown")
+			}
+			if volumeutil.IsReady(metadataDir) {
+				t.Errorf("ready file should be removed after teardown")
 			}
 		})
 	}

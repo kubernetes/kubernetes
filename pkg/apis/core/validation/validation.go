@@ -542,6 +542,16 @@ func devicePathAlreadyExists(devicePath string, mounts map[string]string) bool {
 	return false
 }
 
+func validateEmptyDirMountOptions(mountOptions []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, opt := range mountOptions {
+		if !helper.AllowedEmptyDirMountOptions.Has(opt) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), opt, "only noexec, nodev, and nosuid are allowed"))
+		}
+	}
+	return allErrs
+}
+
 func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volName string, podMeta *metav1.ObjectMeta, opts PodValidationOptions) field.ErrorList {
 	numVolumes := 0
 	allErrs := field.ErrorList{}
@@ -549,6 +559,11 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		numVolumes++
 		if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) && len(source.EmptyDir.MountOptions) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("mountOptions"), "EmptyDirMountOptions feature gate is not enabled"))
+		} else {
+			allErrs = append(allErrs, validateEmptyDirMountOptions(source.EmptyDir.MountOptions, fldPath.Child("emptyDir").Child("mountOptions"))...)
 		}
 	}
 	if source.HostPath != nil {

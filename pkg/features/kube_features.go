@@ -332,6 +332,19 @@ const (
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @nispriha
+	// kep: https://kep.k8s.io/5855
+	//
+	// Enables mount options (noexec, nodev, nosuid) on emptyDir volumes.
+	EmptyDirMountOptions featuregate.Feature = "EmptyDirMountOptions"
+
+	// owner: @helayoty @mm4tt @wojtek-t
+	// kep: https://kep.k8s.io/5547
+	//
+	// Enables the Job controller to automatically create Workload and PodGroup
+	// objects for Jobs that qualify for gang scheduling.
+	EnableWorkloadWithJob featuregate.Feature = "EnableWorkloadWithJob"
+	
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/3721
 	//
@@ -1389,10 +1402,19 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// TODO (https://github.com/kubernetes/kubernetes/issues/134459): remove completely in 1.38
 	},
 
+	EmptyDirMountOptions: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	EnableWorkloadWithJob: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	EnvFiles: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
+	
 	EventedPLEG: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2335,6 +2357,10 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DynamicResourceAllocation: {},
 
+	EmptyDirMountOptions: {},
+	
+	EnableWorkloadWithJob: {GenericWorkload},
+	
 	EnvFiles: {},
 
 	EventedPLEG: {},

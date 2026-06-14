@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corehelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	usernamespacefeature "k8s.io/kubernetes/pkg/kubelet/userns"
@@ -143,6 +144,7 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
+	var mountOptions []string
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
@@ -152,12 +154,27 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			}
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
+		// Reject pods with mountOptions when the feature gate is disabled,
+		// rather than silently ignoring them. This prevents a security gap
+		// during version skew where a policy engine verifies mountOptions
+		// is set, but the kubelet would silently not enforce it.
+		if len(spec.Volume.EmptyDir.MountOptions) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) {
+			return nil, fmt.Errorf("emptyDir volume %q has mountOptions %v, but the EmptyDirMountOptions feature gate is not enabled on this node", spec.Name(), spec.Volume.EmptyDir.MountOptions)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) {
+			for _, opt := range spec.Volume.EmptyDir.MountOptions {
+				if corehelper.AllowedEmptyDirMountOptions.Has(opt) {
+					mountOptions = append(mountOptions, opt)
+				}
+			}
+		}
 	}
 	return &emptyDir{
 		pod:             pod,
 		volName:         spec.Name(),
 		medium:          medium,
 		sizeLimit:       sizeLimit,
+		mountOptions:    mountOptions,
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
@@ -212,6 +229,7 @@ type emptyDir struct {
 	volName       string
 	sizeLimit     *resource.Quantity
 	medium        v1.StorageMedium
+	mountOptions  []string
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
@@ -248,7 +266,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	if volumeutil.IsReady(readyDir) {
 		if ed.medium == v1.StorageMediumMemory && !notMnt {
 			return nil
-		} else if ed.medium == v1.StorageMediumDefault {
+		} else if ed.medium == v1.StorageMediumDefault && len(ed.mountOptions) == 0 {
 			// Further check dir exists
 			if _, err := os.Stat(dir); err == nil {
 				klog.V(6).InfoS("Dir exists, so check and assign quota if the underlying medium supports quotas", "dir", dir)
@@ -266,7 +284,23 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	switch {
 	case ed.medium == v1.StorageMediumDefault:
-		err = ed.setupDir(dir)
+		if err = ed.setupDir(dir); err != nil {
+			break
+		}
+		if ed.mounter != nil && len(ed.mountOptions) > 0 {
+			notMnt, mountErr := ed.mounter.IsLikelyNotMountPoint(dir)
+			if mountErr != nil {
+				err = mountErr
+				break
+			}
+			if notMnt {
+				opts := append([]string{"bind"}, ed.mountOptions...)
+				err = ed.mounter.MountSensitiveWithoutSystemd(dir, dir, "", opts, nil)
+				if err != nil {
+					klog.ErrorS(err, "emptyDir: bind mount with options failed", "pod", ed.pod.UID, "dir", dir, "options", opts)
+				}
+			}
+		}
 	case ed.medium == v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
 	case v1helper.IsHugePageMedium(ed.medium):
@@ -537,6 +571,15 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 			klog.Warningf("Failed to clear quota on %s: %v", dir, err)
 		}
 	}
+	// If we applied a self-bind mount in default emptyDir, dir is a mount point so unmount first.
+	if ed.mounter != nil {
+		notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
+		if err == nil && !notMnt {
+			if err := ed.mounter.Unmount(dir); err != nil {
+				return err
+			}
+		}
+	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
 	return os.RemoveAll(dir)
@@ -581,5 +624,6 @@ func (ed *emptyDir) generateTmpfsMountOptions(noswapSupported bool) (options []s
 		options = append(options, swap.TmpfsNoswapOption)
 	}
 
+	options = append(options, ed.mountOptions...)
 	return options
 }

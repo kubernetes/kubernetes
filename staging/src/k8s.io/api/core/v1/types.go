@@ -963,6 +963,10 @@ type EmptyDirVolumeSource struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
 	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
+	// mountOptions is the list of mount options to apply for this EmptyDir volume. The options noexec, nodev, and nosuid are allowed.
+	// +optional
+	// +listType=atomic
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,3,rep,name=mountOptions"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

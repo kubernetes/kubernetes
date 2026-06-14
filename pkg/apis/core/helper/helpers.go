@@ -294,6 +294,9 @@ func IsIntegerResourceName(name core.ResourceName) bool {
 	return integerResources.Has(name) || IsExtendedResourceName(name)
 }
 
+// AllowedEmptyDirMountOptions is the set of mount options allowed for emptyDir volumes.
+var AllowedEmptyDirMountOptions = sets.New("noexec", "nodev", "nosuid")
+
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *core.Service) bool {

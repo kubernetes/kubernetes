@@ -7459,3 +7459,101 @@ func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
 		})
 	}
 }
+
+func TestDropEmptyDirMountOptions(t *testing.T) {
+	podWithMountOptions := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "vol",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{
+							MountOptions: []string{"noexec", "nodev", "nosuid"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	podWithoutMountOptions := &api.Pod{
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{
+					Name: "vol",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+
+	noPod := &api.Pod{}
+
+	testcases := []struct {
+		description string
+		enabled     bool
+		oldPod      *api.Pod
+		newPod      *api.Pod
+		wantPod     *api.Pod
+	}{
+		{
+			description: "gate disabled, old has options, new has options => keep",
+			oldPod:      podWithMountOptions,
+			newPod:      podWithMountOptions,
+			wantPod:     podWithMountOptions,
+		},
+		{
+			description: "gate disabled, old without options, new has options => drop",
+			oldPod:      podWithoutMountOptions,
+			newPod:      podWithMountOptions,
+			wantPod:     podWithoutMountOptions,
+		},
+		{
+			description: "gate disabled, no old pod, new has options => drop",
+			oldPod:      noPod,
+			newPod:      podWithMountOptions,
+			wantPod:     podWithoutMountOptions,
+		},
+		{
+			description: "gate disabled, nil old pod, new has options => drop",
+			oldPod:      nil,
+			newPod:      podWithMountOptions,
+			wantPod:     podWithoutMountOptions,
+		},
+		{
+			description: "gate disabled, old without options, new without options => keep",
+			oldPod:      podWithoutMountOptions,
+			newPod:      podWithoutMountOptions,
+			wantPod:     podWithoutMountOptions,
+		},
+		{
+			description: "gate enabled, old without options, new has options => keep",
+			enabled:     true,
+			oldPod:      podWithoutMountOptions,
+			newPod:      podWithMountOptions,
+			wantPod:     podWithMountOptions,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirMountOptions, tc.enabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.wantPod
+			DropDisabledPodFields(newPod, oldPod)
+
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("old pod changed: %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("new pod changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}
+
