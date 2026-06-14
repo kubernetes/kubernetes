@@ -662,6 +662,11 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		}
 		placementCycleState := framework.NewCycleState()
 		placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+		// Seed the per-placement state with any data a PlacementGeneratePlugin attached to this
+		// placement during generation, so the plugin can read it back in later phases.
+		if named, ok := podGroupCycleState.GetPlacementCycleStateForName(placement.Name).(*framework.CycleState); ok {
+			named.CopyPlacementDataInto(placementCycleState)
+		}
 		result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, postFilterMode)
 		sched.nodeInfoSnapshot.ForgetPlacement()
 		if result.status.IsError() {

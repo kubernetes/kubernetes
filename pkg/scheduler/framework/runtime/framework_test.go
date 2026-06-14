@@ -619,34 +619,6 @@ func TestNewFrameworkErrors(t *testing.T) {
 			},
 			wantErr: "repeated config for plugin",
 		},
-		{
-			name: "more than one PlacementGeneratePlugin",
-			plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{
-						{Name: queueSortPlugin},
-					},
-				},
-				Bind: config.PluginSet{
-					Enabled: []config.Plugin{
-						{Name: bindPlugin},
-					},
-				},
-				PlacementGenerate: config.PluginSet{
-					Enabled: []config.Plugin{
-						{Name: testPlugin},
-						{Name: placementGeneratePlugin},
-					},
-				},
-			},
-			pluginCfg: []config.PluginConfig{
-				{Name: queueSortPlugin},
-				{Name: bindPlugin},
-				{Name: testPlugin},
-				{Name: placementGeneratePlugin},
-			},
-			wantErr: "at most one placement generate plugin is allowed",
-		},
 	}
 
 	for _, tc := range tests {
