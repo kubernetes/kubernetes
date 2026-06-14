@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -48,7 +47,7 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		return nil, err
 	}
 
-	deviceTaintEvictionController := devicetainteviction.New(
+	controller := devicetainteviction.New(
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
@@ -56,10 +55,9 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		controllerContext.InformerFactory.Resource().V1beta2().DeviceTaintRules(),
 		controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
 		controllerName,
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 	return newControllerLoop(func(ctx context.Context) {
-		if err := deviceTaintEvictionController.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
+		if err := controller.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
 			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
 		}
 		<-ctx.Done()
@@ -83,13 +81,8 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	ephemeralController, err := resourceclaim.NewController(
+	controller, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
-		resourceclaim.Features{
-			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
-		},
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Scheduling().V1alpha3().PodGroups(),
@@ -100,7 +93,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
+		controller.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
 	}, controllerName), nil
 }
 
