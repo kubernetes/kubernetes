@@ -613,6 +613,15 @@ func needsUpdate(oldService *v1.Service, newService *v1.Service) bool {
 		return true
 	}
 
+	// If the service wants a load balancer and the ingress status has been cleared,
+	// we need to reconcile to restore the status from the cloud provider.
+	if wantsLoadBalancer(newService) {
+		if len(oldService.Status.LoadBalancer.Ingress) > 0 && len(newService.Status.LoadBalancer.Ingress) == 0 {
+			klog.V(2).Infof("Service %s LoadBalancer ingress status was cleared (had %d entries)", klog.KObj(newService), len(oldService.Status.LoadBalancer.Ingress))
+			return true
+		}
+	}
+
 	return false
 }
 
