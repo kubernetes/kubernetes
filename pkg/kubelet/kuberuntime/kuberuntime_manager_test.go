@@ -4230,6 +4230,38 @@ func TestDoPodResizeAction(t *testing.T) {
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
 
+	type podCgroupUpdate struct {
+		hasMemory    bool
+		memory       int64
+		hasCPUShares bool
+		cpuShares    uint64
+		hasCPUQuota  bool
+		cpuQuota     int64
+		hasCPUPeriod bool
+		cpuPeriod    uint64
+	}
+
+	toPodCgroupUpdate := func(cfg *cm.ResourceConfig) podCgroupUpdate {
+		update := podCgroupUpdate{}
+		if cfg.Memory != nil {
+			update.hasMemory = true
+			update.memory = *cfg.Memory
+		}
+		if cfg.CPUShares != nil {
+			update.hasCPUShares = true
+			update.cpuShares = *cfg.CPUShares
+		}
+		if cfg.CPUQuota != nil {
+			update.hasCPUQuota = true
+			update.cpuQuota = *cfg.CPUQuota
+		}
+		if cfg.CPUPeriod != nil {
+			update.hasCPUPeriod = true
+			update.cpuPeriod = *cfg.CPUPeriod
+		}
+		return update
+	}
+
 	for i, tc := range []struct {
 		testName                    string
 		currentResources            resourceRequirements
@@ -4243,7 +4275,10 @@ func TestDoPodResizeAction(t *testing.T) {
 		injectPodUpdateCgroupsError error
 		currentPodLevelResources    *resourceRequirements
 		desiredPodLevelResources    *resourceRequirements
+		omitDesiredPodLevelCPULimit bool
+		omitDesiredPodLevelMemLimit bool
 		updatedPodLevelResources    bool
+		expectedPodCgroupConfigs    []podCgroupUpdate
 		enablePLR                   bool
 	}{
 		{
@@ -4470,6 +4505,30 @@ func TestDoPodResizeAction(t *testing.T) {
 			enablePLR:                true,
 		},
 		{
+			testName: "Remove pod-level memory limit (clears cgroups and actuated state)",
+			currentResources: resourceRequirements{
+				memoryLimit: 200,
+			},
+			desiredResources: resourceRequirements{
+				memoryLimit: 200,
+			},
+			currentPodLevelResources: &resourceRequirements{
+				memoryLimit: 200,
+			},
+			desiredPodLevelResources: &resourceRequirements{
+				memoryLimit: 0,
+			},
+			omitDesiredPodLevelMemLimit: true,
+			updatedPodLevelResources:    true,
+			updatedResources:            []v1.ResourceName{},
+			expectPodCgroupUpdates:      1,
+			expectedPodCgroupConfigs: []podCgroupUpdate{{
+				hasMemory: true,
+				memory:    -1,
+			}},
+			enablePLR: true,
+		},
+		{
 			testName: "Resize pod-level CPU request (updates cgroups and actuated)",
 			currentResources: resourceRequirements{
 				cpuRequest: 100, cpuLimit: 100,
@@ -4506,6 +4565,32 @@ func TestDoPodResizeAction(t *testing.T) {
 			updatedResources:         []v1.ResourceName{},
 			expectPodCgroupUpdates:   1,
 			enablePLR:                true,
+		},
+		{
+			testName: "Remove pod-level CPU limit (clears cgroups and actuated state)",
+			currentResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 200,
+			},
+			desiredResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 200,
+			},
+			currentPodLevelResources: &resourceRequirements{
+				cpuRequest: 100, cpuLimit: 200,
+			},
+			desiredPodLevelResources: &resourceRequirements{
+				cpuRequest: 100, cpuLimit: 0,
+			},
+			omitDesiredPodLevelCPULimit: true,
+			updatedPodLevelResources:    true,
+			updatedResources:            []v1.ResourceName{},
+			expectPodCgroupUpdates:      1,
+			expectedPodCgroupConfigs: []podCgroupUpdate{{
+				hasCPUQuota:  true,
+				cpuQuota:     -1,
+				hasCPUPeriod: true,
+				cpuPeriod:    cm.QuotaPeriod,
+			}},
+			enablePLR: true,
 		},
 		{
 			testName: "Resize pod-level CPU limit and container-level CPU limit (updates cgroups and actuated)",
@@ -4597,6 +4682,7 @@ func TestDoPodResizeAction(t *testing.T) {
 			m.containerManager = mockCM
 			mockPCM := cmtesting.NewMockPodContainerManager(t)
 			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+			var podCgroupConfigs []podCgroupUpdate
 
 			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
 				Memory: ptr.To(tc.currentResources.memoryLimit),
@@ -4612,10 +4698,13 @@ func TestDoPodResizeAction(t *testing.T) {
 			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
 				CPUShares: ptr.To(cm.MilliCPUToShares(podCPURequest)),
 				CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
+				CPUPeriod: ptr.To[uint64](cm.QuotaPeriod),
 			}, nil).Maybe()
 			if tc.expectPodCgroupUpdates > 0 {
 				// TODO: Update to use proper logger once contextual logging migration is complete
-				call := mockPCM.EXPECT().SetPodCgroupConfig(klog.TODO(), mock.Anything, mock.Anything)
+				call := mockPCM.EXPECT().SetPodCgroupConfig(klog.TODO(), mock.Anything, mock.Anything).Run(func(_ klog.Logger, _ *v1.Pod, resourceConfig *cm.ResourceConfig) {
+					podCgroupConfigs = append(podCgroupConfigs, toPodCgroupUpdate(resourceConfig))
+				})
 				if tc.injectPodUpdateCgroupsError != nil {
 					call.Return(tc.injectPodUpdateCgroupsError).Times(1)
 				} else {
@@ -4626,15 +4715,22 @@ func TestDoPodResizeAction(t *testing.T) {
 			pod, kps := makeBasePodAndStatus()
 			if tc.desiredPodLevelResources != nil {
 				// pod spec and allocated resources are already updated as desired when doPodResizeAction() is called.
+				podLevelLimits := v1.ResourceList{}
+				if !tc.omitDesiredPodLevelCPULimit {
+					podLevelLimits[v1.ResourceCPU] = *resource.NewMilliQuantity(tc.desiredPodLevelResources.cpuLimit, resource.DecimalSI)
+				}
+				if !tc.omitDesiredPodLevelMemLimit {
+					podLevelLimits[v1.ResourceMemory] = *resource.NewQuantity(tc.desiredPodLevelResources.memoryLimit, resource.BinarySI)
+				}
 				pod.Spec.Resources = &v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredPodLevelResources.cpuRequest, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(tc.desiredPodLevelResources.memoryRequest, resource.BinarySI),
 					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredPodLevelResources.cpuLimit, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(tc.desiredPodLevelResources.memoryLimit, resource.BinarySI),
-					},
+					Limits: podLevelLimits,
+				}
+				if len(podLevelLimits) == 0 {
+					pod.Spec.Resources.Limits = nil
 				}
 			}
 			if tc.currentPodLevelResources != nil {
@@ -4726,12 +4822,18 @@ func TestDoPodResizeAction(t *testing.T) {
 					if tc.enablePLR {
 						assert.Equal(t, tc.desiredPodLevelResources.memoryRequest, updatedActuated.Requests.Memory().Value(), tc.testName)
 						assert.Equal(t, tc.desiredPodLevelResources.cpuRequest, updatedActuated.Requests.Cpu().MilliValue(), tc.testName)
+						assert.Equal(t, tc.desiredPodLevelResources.memoryLimit, updatedActuated.Limits.Memory().Value(), tc.testName)
+						assert.Equal(t, tc.desiredPodLevelResources.cpuLimit, updatedActuated.Limits.Cpu().MilliValue(), tc.testName)
 					} else {
 						assert.Equal(t, tc.currentPodLevelResources.memoryRequest, updatedActuated.Requests.Memory().Value(), tc.testName)
 						assert.Equal(t, tc.currentPodLevelResources.cpuRequest, updatedActuated.Requests.Cpu().MilliValue(), tc.testName)
+						assert.Equal(t, tc.currentPodLevelResources.memoryLimit, updatedActuated.Limits.Memory().Value(), tc.testName)
+						assert.Equal(t, tc.currentPodLevelResources.cpuLimit, updatedActuated.Limits.Cpu().MilliValue(), tc.testName)
 					}
 				}
 			}
+
+			assert.Equal(t, tc.expectedPodCgroupConfigs, podCgroupConfigs, tc.testName)
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
 
@@ -4866,6 +4968,20 @@ func TestValidatePodResizeAction(t *testing.T) {
 			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](200),
+			expectedError:        true,
+		},
+		{
+			testName: "Add pod limit from unlimited current limit, high usage",
+			currentResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](-1),
 			desiredPodMemLimit:   ptr.To[int64](100),
 			containerMemoryUsage: ptr.To[uint64](20),
 			podMemoryUsage:       ptr.To[uint64](200),
