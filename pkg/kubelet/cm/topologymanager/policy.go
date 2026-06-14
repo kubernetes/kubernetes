@@ -137,6 +137,7 @@ func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
 type HintMerger struct {
 	NUMAInfo *NUMAInfo
 	Hints    [][]TopologyHint
+	Logger   klog.Logger
 	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
 	// preferred amongst all non-preferred hints. We calculate this value as
 	// the maximum of the minimum affinity counts supplied for any given hint
@@ -145,16 +146,15 @@ type HintMerger struct {
 	// NUMA nodes to satisfy its allocation.
 	BestNonPreferredAffinityCount int
 	CompareNUMAAffinityMasks      func(candidate *TopologyHint, current *TopologyHint) (best *TopologyHint)
+	NUMAScorer                    NUMAScorer
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+func NewHintMerger(logger klog.Logger, numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
 	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
-		// If current and candidate bitmasks are the same, prefer current hint.
 		if candidate.NUMANodeAffinity.IsEqual(current.NUMANodeAffinity) {
 			return current
 		}
 
-		// Otherwise compare the hints, based on the policy options provided
 		var best bitmask.BitMask
 		if (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA {
 			best = numaInfo.Closest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
@@ -167,14 +167,13 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string
 		return candidate
 	}
 
-	merger := HintMerger{
+	return HintMerger{
 		NUMAInfo:                      numaInfo,
 		Hints:                         hints,
+		Logger:                        logger,
 		BestNonPreferredAffinityCount: maxOfMinAffinityCounts(hints),
 		CompareNUMAAffinityMasks:      compareNumaAffinityMasks,
 	}
-
-	return merger
 }
 
 func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *TopologyHint {
@@ -304,18 +303,50 @@ func (m HintMerger) Merge() TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
 	var bestHint *TopologyHint
-	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
-		// Get the NUMANodeAffinity from each hint in the permutation and see if any
-		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(defaultAffinity, permutation)
+	var preferredSingleNUMA []TopologyHint
 
-		// Compare the current bestHint with the candidate mergedHint and
-		// update bestHint if appropriate.
+	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
+		mergedHint := mergePermutation(defaultAffinity, permutation)
 		bestHint = m.compare(bestHint, &mergedHint)
+
+		if m.NUMAScorer != nil && mergedHint.Preferred &&
+			mergedHint.NUMANodeAffinity != nil && mergedHint.NUMANodeAffinity.Count() == 1 {
+			unique := true
+			for _, h := range preferredSingleNUMA {
+				if h.NUMANodeAffinity.IsEqual(mergedHint.NUMANodeAffinity) {
+					unique = false
+					break
+				}
+			}
+			if unique {
+				preferredSingleNUMA = append(preferredSingleNUMA, mergedHint)
+			}
+		}
 	})
 
 	if bestHint == nil {
 		bestHint = &TopologyHint{defaultAffinity, false}
+	}
+
+	if m.NUMAScorer != nil && bestHint.Preferred && len(preferredSingleNUMA) > 1 {
+		selected := preferredSingleNUMA[0]
+		for _, candidate := range preferredSingleNUMA[1:] {
+			result := m.NUMAScorer.Score(selected.NUMANodeAffinity, candidate.NUMANodeAffinity)
+			if result.Ok && result.PreferCandidate {
+				m.Logger.V(2).Info("Prefer-most-allocated scorer overrode default NUMA selection",
+					"selectedNUMA", candidate.NUMANodeAffinity,
+					"defaultNUMA", selected.NUMANodeAffinity,
+					"cpuScoreSelected", result.CPUScoreCandidate,
+					"cpuScoreDefault", result.CPUScoreCurrent,
+					"memScoreSelected", result.MemScoreCandidate,
+					"memScoreDefault", result.MemScoreCurrent,
+					"aggregateScoreSelected", result.AggregateScoreCandidate,
+					"aggregateScoreDefault", result.AggregateScoreCurrent,
+				)
+				selected = candidate
+			}
+		}
+		bestHint = &selected
 	}
 
 	return *bestHint

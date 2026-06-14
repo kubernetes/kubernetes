@@ -27,12 +27,15 @@ import (
 )
 
 const (
-	PreferClosestNUMANodes string = "prefer-closest-numa-nodes"
-	MaxAllowableNUMANodes  string = "max-allowable-numa-nodes"
+	PreferClosestNUMANodes      string = "prefer-closest-numa-nodes"
+	MaxAllowableNUMANodes       string = "max-allowable-numa-nodes"
+	PreferMostAllocatedNUMANode string = "prefer-most-allocated-numa-node"
 )
 
 var (
-	alphaOptions  = sets.New[string]()
+	alphaOptions = sets.New[string](
+		PreferMostAllocatedNUMANode,
+	)
 	betaOptions   = sets.New[string]()
 	stableOptions = sets.New[string](
 		PreferClosestNUMANodes,
@@ -57,8 +60,9 @@ func CheckPolicyOptionAvailable(option string) error {
 }
 
 type PolicyOptions struct {
-	PreferClosestNUMA     bool
-	MaxAllowableNUMANodes int
+	PreferClosestNUMA           bool
+	PreferMostAllocatedNUMANode bool
+	MaxAllowableNUMANodes       int
 }
 
 func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (PolicyOptions, error) {
@@ -94,6 +98,12 @@ func NewPolicyOptions(logger klog.Logger, policyOptions map[string]string) (Poli
 				logger.Info("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
 			}
 			opts.MaxAllowableNUMANodes = optValue
+		case PreferMostAllocatedNUMANode:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.PreferMostAllocatedNUMANode = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.

@@ -128,6 +128,25 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			},
 			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
 		},
+		{
+			description:       "prefer-most-allocated-numa-node with alpha gate",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				PreferMostAllocatedNUMANode: "true",
+			},
+			expectedOptions: PolicyOptions{
+				PreferMostAllocatedNUMANode: true,
+				MaxAllowableNUMANodes:       8,
+			},
+		},
+		{
+			description: "prefer-most-allocated-numa-node without alpha gate",
+			policyOptions: map[string]string{
+				PreferMostAllocatedNUMANode: "true",
+			},
+			expectedErr: fmt.Errorf("topology manager policy alpha-level options not enabled,"),
+		},
 	}
 
 	setTopologyManagerOptionsDuringTest(t, betaOptions, fancyBetaOption)
@@ -178,6 +197,10 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 		{
 			option:            MaxAllowableNUMANodes,
 			expectedAvailable: true,
+		},
+		{
+			option:            PreferMostAllocatedNUMANode,
+			expectedAvailable: false,
 		},
 	}
 	for _, testCase := range testCases {
@@ -250,6 +273,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		{
 			option:            fancyBetaOption,
 			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
+		},
+		{
+			option:            PreferMostAllocatedNUMANode,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            PreferMostAllocatedNUMANode,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: false,
 			expectedAvailable: false,
 		},
