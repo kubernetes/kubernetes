@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -553,8 +555,8 @@ func EnableDeviceMetadata(enabled bool) Option {
 }
 
 // MetadataVersions sets the API versions to serialize when the device
-// metadata feature is enabled. If not specified, the current version
-// (v1alpha1) is used.
+// metadata feature is enabled. If not specified, the two most recent
+// versions (v1beta1 and v1alpha1) are used.
 //
 // This has no effect unless [EnableDeviceMetadata] is also set to true.
 func MetadataVersions(versions ...schema.GroupVersion) Option {
@@ -580,11 +582,11 @@ func CDIDirectory(path string) Option {
 	}
 }
 
-// TODO(KEP #5304): Decide on a version negotiation strategy before exiting alpha
-// so that adding new versions does not break existing consumers, until then
-// defaulting is empty.
 func defaultMetadataVersions() []schema.GroupVersion {
-	return []schema.GroupVersion{}
+	return []schema.GroupVersion{
+		metadatav1beta1.SchemeGroupVersion,
+		metadatav1alpha1.SchemeGroupVersion,
+	}
 }
 
 type options struct {
