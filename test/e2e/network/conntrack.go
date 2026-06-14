@@ -155,7 +155,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -163,7 +164,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -185,7 +186,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 1")
 		}
 
@@ -210,7 +211,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})
@@ -233,7 +234,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -241,7 +243,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -263,7 +265,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 1")
 		}
 
@@ -288,7 +290,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})
@@ -313,7 +315,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 1 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 1 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -321,7 +324,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 
 		// Create a daemonset for the Service with InternalTrafficPolicy Local so there is one Server in each Pod
 		// and all pods in the node sends the traffic to the local server.
@@ -357,7 +360,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 1")
 		}
 
@@ -383,7 +386,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 3")
 		}
 	})
@@ -406,7 +409,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		clientPod.Spec.HostNetwork = true
@@ -415,7 +419,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -437,7 +441,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 1")
 		}
 
@@ -462,7 +466,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend2, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})
@@ -496,7 +500,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		testCmd := fmt.Sprintf(`echo hostname | nc -u -w 5 -p %d %s %d`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -504,7 +509,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod client logs: %s", logs)
+		framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
@@ -535,7 +540,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn(podBackend1, podClient)); err != nil {
 			logs, err = e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend pod")
 		}
 
@@ -688,7 +693,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		nodeSelection := e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&clientPod.Spec, nodeSelection)
-		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo serverport | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		testCmd := fmt.Sprintf(`echo serverport | nc -u -w 5 -p %d %s %d`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		cmd := wrapCommandWithTimestampObservations(testCmd, 3000)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
@@ -732,7 +738,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn("8080", podClient)); err != nil {
 			logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 2")
 		}
 
@@ -757,7 +763,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, logContainsFn("9090", podClient)); err != nil {
 			logs, err := e2epod.GetPodLogs(ctx, cs, ns, podClient, podClient)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod client logs: %s", logs)
+			framework.Logf("Pod client logs: %s", collapseDuplicateLogs(logs))
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})

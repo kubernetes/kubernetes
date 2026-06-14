@@ -251,3 +251,52 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 	}
 	return nil
 }
+
+// wrapCommandWithTimestampObservations creates a command to be run 'iter'
+// times, with consistent wrapping to emit logs for retrospective analysis of
+// execution timestamps.
+func wrapCommandWithTimestampObservations(cmd string, iter int) string {
+	finalCmd := `date; `
+	finalCmd += fmt.Sprintf("for i in $(seq 1 %d); do", iter)
+	finalCmd += `echo "$(date)"; `
+	finalCmd += cmd + `; `
+	finalCmd += `done`
+
+	return finalCmd
+}
+
+// collapseDuplicateLogs compresses multiple duplicate lines in the input logs
+// into a single line in the output log, with an optional suffix "(N times)".
+func collapseDuplicateLogs(logs string) string {
+	result := []string{}
+	prev := ""
+	count := 0
+
+	for line := range strings.Lines(logs) {
+		if line == "" {
+			continue
+		}
+		if line == prev {
+			count += 1
+			continue
+		}
+		if prev != "" {
+			outputLine := prev
+			if count > 1 {
+				outputLine += fmt.Sprintf(" (%d times)", count)
+			}
+			result = append(result, outputLine)
+			count = 0
+		}
+		prev = line
+		count = count + 1
+	}
+	if count > 0 {
+		outputLine := prev
+		if count > 1 {
+			outputLine += fmt.Sprintf(" (%d times)", count)
+		}
+		result = append(result, outputLine)
+	}
+	return strings.Join(result, "\n")
+}
