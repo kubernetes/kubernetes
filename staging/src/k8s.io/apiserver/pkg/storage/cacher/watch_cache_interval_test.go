@@ -430,6 +430,33 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 }
 
+func TestCacheIntervalFromOrderedStoreDefersListUntilNext(t *testing.T) {
+	elem := makeTestStoreElement(makeTestPod("pod", 1))
+	indexer := &deferredListOrderedIndexer{items: []interface{}{elem}}
+
+	wci, err := newCacheIntervalFromStore(1, indexer, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if indexer.listCalled {
+		t.Fatal("List was called while constructing cache interval")
+	}
+	if !indexer.cloneCalled {
+		t.Fatal("expected ordered store to be cloned while constructing cache interval")
+	}
+
+	event, err := wci.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event == nil {
+		t.Fatal("expected event from deferred store snapshot")
+	}
+	if !indexer.clone.listCalled {
+		t.Fatal("expected cloned store snapshot to be listed on first Next")
+	}
+}
+
 // TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
 // events sorted by Key for both indexer backends.
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
@@ -471,4 +498,63 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			}
 		})
 	}
+}
+
+type deferredListOrderedIndexer struct {
+	items       []interface{}
+	listCalled  bool
+	cloneCalled bool
+	clone       *deferredListOrderedLister
+}
+
+var _ store.OrderedIndexer = (*deferredListOrderedIndexer)(nil)
+
+func (d *deferredListOrderedIndexer) Add(obj interface{}) error    { return nil }
+func (d *deferredListOrderedIndexer) Update(obj interface{}) error { return nil }
+func (d *deferredListOrderedIndexer) Delete(obj interface{}) error { return nil }
+func (d *deferredListOrderedIndexer) Replace([]interface{}, string) error {
+	return nil
+}
+func (d *deferredListOrderedIndexer) List() []interface{} {
+	d.listCalled = true
+	return d.items
+}
+func (d *deferredListOrderedIndexer) ListKeys() []string { return nil }
+func (d *deferredListOrderedIndexer) Get(obj interface{}) (interface{}, bool, error) {
+	return nil, false, nil
+}
+func (d *deferredListOrderedIndexer) GetByKey(key string) (interface{}, bool, error) {
+	return nil, false, nil
+}
+func (d *deferredListOrderedIndexer) ByIndex(indexName, indexedValue string) ([]interface{}, error) {
+	return nil, nil
+}
+func (d *deferredListOrderedIndexer) OrderedListPrefix(prefix, continueKey string) []interface{} {
+	return d.items
+}
+func (d *deferredListOrderedIndexer) Count(prefix, continueKey string) int {
+	return len(d.items)
+}
+func (d *deferredListOrderedIndexer) Clone() store.OrderedLister {
+	d.cloneCalled = true
+	d.clone = &deferredListOrderedLister{items: d.items}
+	return d.clone
+}
+
+type deferredListOrderedLister struct {
+	items      []interface{}
+	listCalled bool
+}
+
+var _ store.OrderedLister = (*deferredListOrderedLister)(nil)
+
+func (d *deferredListOrderedLister) OrderedListPrefix(prefix, continueKey string) []interface{} {
+	d.listCalled = true
+	return d.items
+}
+func (d *deferredListOrderedLister) Count(prefix, continueKey string) int {
+	return len(d.items)
+}
+func (d *deferredListOrderedLister) Clone() store.OrderedLister {
+	return &deferredListOrderedLister{items: d.items}
 }
