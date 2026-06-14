@@ -2532,3 +2532,124 @@ func TestIsUnsupportedTableObject(t *testing.T) {
 		})
 	}
 }
+
+func TestReflectorOptionsCustomBackoff(t *testing.T) {
+	lw := &ListWatch{
+		ListFunc:  func(_ metav1.ListOptions) (runtime.Object, error) { return &v1.PodList{}, nil },
+		WatchFunc: func(_ metav1.ListOptions) (watch.Interface, error) { return watch.NewFake(), nil },
+	}
+	store := NewStore(MetaNamespaceKeyFunc)
+
+	t.Run("nil Backoff produces non-nil delay handler", func(t *testing.T) {
+		r := NewReflectorWithOptions(lw, &v1.Pod{}, store, ReflectorOptions{})
+		if r.delayHandler == nil {
+			t.Error("expected non-nil delayHandler with default options")
+		}
+	})
+
+	t.Run("custom Backoff initial duration is used", func(t *testing.T) {
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		r := NewReflectorWithOptions(lw, &v1.Pod{}, store, ReflectorOptions{
+			Backoff: &wait.Backoff{
+				Duration: 100 * time.Millisecond,
+				Factor:   2.0,
+				Jitter:   0, // no jitter so result is deterministic
+				Steps:    1000,
+				Cap:      10 * time.Second,
+			},
+			BackoffResetDuration: 5 * time.Minute,
+			Clock:                fakeClock,
+		})
+
+		got := r.delayHandler()
+		if got != 100*time.Millisecond {
+			t.Errorf("expected initial delay of 100ms, got %v", got)
+		}
+	})
+
+	t.Run("zero BackoffResetDuration defaults to 2 minutes", func(t *testing.T) {
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		r := NewReflectorWithOptions(lw, &v1.Pod{}, store, ReflectorOptions{
+			Backoff: &wait.Backoff{
+				Duration: 100 * time.Millisecond,
+				Factor:   2.0,
+				Jitter:   0,
+				Steps:    1000,
+				Cap:      10 * time.Second,
+			},
+			// BackoffResetDuration zero should default to 2 minutes.
+			Clock: fakeClock,
+		})
+
+		// First call: 100ms.
+		if d := r.delayHandler(); d != 100*time.Millisecond {
+			t.Fatalf("first delay expected 100ms, got %v", d)
+		}
+
+		// Advance 1.5 minutes — still under the 2-minute reset threshold.
+		fakeClock.Step(90 * time.Second)
+
+		// Second call should be 200ms (doubled), not 100ms (which would mean a reset occurred).
+		if d := r.delayHandler(); d != 200*time.Millisecond {
+			t.Errorf("expected 200ms after 1.5m (no reset), got %v", d)
+		}
+
+		// Advance 2.5 more minutes — now over the 2-minute reset threshold.
+		fakeClock.Step(150 * time.Second)
+
+		// Third call should reset to 100ms.
+		if d := r.delayHandler(); d != 100*time.Millisecond {
+			t.Errorf("expected reset to 100ms after 2.5m, got %v", d)
+		}
+	})
+}
+
+func TestReflectorOptionsWatchTimeout(t *testing.T) {
+	lw := &ListWatch{
+		ListFunc:  func(_ metav1.ListOptions) (runtime.Object, error) { return &v1.PodList{}, nil },
+		WatchFunc: func(_ metav1.ListOptions) (watch.Interface, error) { return watch.NewFake(), nil },
+	}
+	store := NewStore(MetaNamespaceKeyFunc)
+
+	tests := []struct {
+		name           string
+		opts           ReflectorOptions
+		wantMinTimeout float64
+		wantMaxTimeout float64
+	}{
+		{
+			name:           "default timeouts use 5m to 10m range",
+			opts:           ReflectorOptions{},
+			wantMinTimeout: defaultMinWatchTimeout.Seconds(),
+			wantMaxTimeout: (2 * defaultMinWatchTimeout).Seconds(),
+		},
+		{
+			name:           "custom MinWatchTimeout expands range",
+			opts:           ReflectorOptions{MinWatchTimeout: 10 * time.Minute},
+			wantMinTimeout: (10 * time.Minute).Seconds(),
+			wantMaxTimeout: (20 * time.Minute).Seconds(),
+		},
+		{
+			name:           "custom MaxWatchTimeout limits upper bound",
+			opts:           ReflectorOptions{MinWatchTimeout: 10 * time.Minute, MaxWatchTimeout: 15 * time.Minute},
+			wantMinTimeout: (10 * time.Minute).Seconds(),
+			wantMaxTimeout: (15 * time.Minute).Seconds(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewReflectorWithOptions(lw, &v1.Pod{}, store, tt.opts)
+			// Run watchTimeoutSeconds many times and check the range.
+			for i := 0; i < 100; i++ {
+				got := r.watchTimeoutSeconds()
+				if got < tt.wantMinTimeout {
+					t.Errorf("iteration %d: timeout %v < min %v", i, got, tt.wantMinTimeout)
+				}
+				if got > tt.wantMaxTimeout {
+					t.Errorf("iteration %d: timeout %v > max %v", i, got, tt.wantMaxTimeout)
+				}
+			}
+		})
+	}
+}
