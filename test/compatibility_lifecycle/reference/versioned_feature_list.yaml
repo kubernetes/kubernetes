@@ -999,6 +999,12 @@
     lockToDefault: false
     preRelease: GA
     version: "1.11"
+- name: KubeProxyNFTablesLocalhostNodePorts
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false

@@ -235,6 +235,10 @@ var (
 	KubeProxyDaemonSetUpgrade = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetUpgrade"))
 
 	// Owner: sig-network
+	// Marks tests that require the service proxy to support localhost NodePort services
+	KubeProxyLocalhostNodePorts = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyLocalhostNodePorts"))
+
+	// Owner: sig-network
 	// Marks tests that require the kernel to have support for the nfacct subsystem.
 	// (Some distros don't include this in the kernel.)
 	KubeProxyNFAcct = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyNFAcct"))
