@@ -750,13 +750,14 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		}
 
 		if currentReadyCondition != nil {
+			transitionedToNotReady := currentReadyCondition.Status != v1.ConditionTrue &&
+				(observedReadyCondition.Status == v1.ConditionTrue ||
+					(currentReadyCondition.Status == v1.ConditionUnknown && observedReadyCondition.Status == v1.ConditionFalse))
+
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods of node", node.Name)
-				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
-					// If error happened during node status transition (Ready -> NotReady)
-					// we need to mark node for retry to force MarkPodsNotReady execution
-					// in the next iteration.
+				if transitionedToNotReady {
 					nc.nodesToRetry.Store(node.Name, struct{}{})
 				}
 				return
@@ -764,12 +765,13 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			nc.processTaintBaseEviction(ctx, node, currentReadyCondition)
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
-			switch {
-			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
-				// Report node event only once when status changed.
+			shouldRecordEvent := currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue
+			shouldMarkPodsNotReady := transitionedToNotReady || (needsRetry && observedReadyCondition.Status != v1.ConditionTrue)
+
+			if shouldRecordEvent {
 				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
-				fallthrough
-			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+			}
+			if shouldMarkPodsNotReady {
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to mark all pods NotReady on node; queuing for retry", "node", node.Name)
 					nc.nodesToRetry.Store(node.Name, struct{}{})
