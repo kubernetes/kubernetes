@@ -304,7 +304,7 @@ func (dsc *DaemonSetsController) updateDaemonset(logger klog.Logger, cur, old in
 	if curDS.UID != oldDS.UID {
 		key, err := controller.KeyFunc(oldDS)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", oldDS, err))
+			utilruntime.HandleErrorWithLogger(logger, err, "failed to get key for object", "oldDS", oldDS, "curDS", curDS)
 			return
 		}
 		dsc.deleteDaemonset(logger, cache.DeletedFinalStateUnknown{
@@ -322,12 +322,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "failed to get object from tombstone", "obj", obj)
 			return
 		}
 		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "tombstone contained object that is not a DaemonSet", "obj", obj)
 			return
 		}
 	}
@@ -335,7 +335,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "failed to get key for object", "ds", ds)
 		return
 	}
 	dsc.consistencyStore.Clear(
@@ -408,7 +408,7 @@ func (dsc *DaemonSetsController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", dsKey, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "sync daemon set error", "key", dsKey)
 	dsc.queue.AddRateLimited(dsKey)
 
 	return true
@@ -559,12 +559,12 @@ func (dsc *DaemonSetsController) deleteHistory(logger klog.Logger, obj interface
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "failed to get object from tombstone", "obj", obj)
 			return
 		}
 		history, ok = tombstone.Obj.(*apps.ControllerRevision)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "tombstone contained object that is not a ControllerRevision", "obj", obj)
 			return
 		}
 	}
@@ -696,12 +696,12 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "failed to get object from tombstone", "obj", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleErrorWithLogger(logger, nil, "tombstone contained object that is not a pod", "obj", obj)
 			return
 		}
 	}
@@ -727,7 +727,7 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 func (dsc *DaemonSetsController) addNode(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get node from object %#v", obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "failed to get node from object", "obj", obj)
 		return
 	}
 
@@ -1094,10 +1094,9 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 					}
 				}
 				if err != nil {
-					logger.V(2).Info("Failed creation, decrementing expectations for daemon set", "daemonset", klog.KObj(ds))
 					dsc.expectations.CreationObserved(logger, dsKey)
 					errCh <- err
-					utilruntime.HandleError(err)
+					utilruntime.HandleErrorWithLogger(logger, err, "failed to create daemonset pod, decremented expectations", "daemonset", klog.KObj(ds))
 				}
 			}(i)
 		}
@@ -1125,9 +1124,8 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 				// the delete.
 				dsc.expectations.DeletionObserved(logger, dsKey)
 				if !apierrors.IsNotFound(err) {
-					logger.V(2).Info("Failed deletion, decremented expectations for daemon set", "daemonset", klog.KObj(ds))
 					errCh <- err
-					utilruntime.HandleError(err)
+					utilruntime.HandleErrorWithLogger(logger, err, "failed to delete deamonset pod, decremented expectations", "daemonset", klog.KObj(ds), "podsToDelete", podsToDelete[ix])
 				}
 			}
 		}(i)
@@ -1494,7 +1492,7 @@ func (dsc *DaemonSetsController) processNextNodeUpdate(ctx context.Context) bool
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %w", nodeName, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "failed to update node", "nodeName", nodeName)
 	dsc.nodeUpdateQueue.AddRateLimited(nodeName)
 
 	return true
