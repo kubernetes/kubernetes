@@ -966,15 +966,15 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	mockClient := &fake.Clientset{}
 
 	var (
-		testCount  int64
-		test1Count int64
+		testCount  atomic.Int64
+		test1Count atomic.Int64
 	)
 	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
 		switch action.GetNamespace() {
 		case "test":
-			atomic.AddInt64(&testCount, 1)
+			testCount.Add(1)
 		case "test1":
-			atomic.AddInt64(&test1Count, 1)
+			test1Count.Add(1)
 		default:
 			t.Error("unexpected namespace")
 		}
@@ -1040,11 +1040,11 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	// since all the calls with the same namespace will be holded, they must be catched on the singleflight group,
 	// There are two different sets of namespace calls
 	// hence only 2
-	if testCount != 1 {
-		t.Errorf("Expected 1 limit range call, got %d", testCount)
+	if testCount.Load() != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", testCount.Load())
 	}
-	if test1Count != 1 {
-		t.Errorf("Expected 1 limit range call, got %d", test1Count)
+	if test1Count.Load() != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", test1Count.Load())
 	}
 
 	// invalidate the cache
@@ -1054,10 +1054,10 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if testCount != 2 {
-		t.Errorf("Expected 2 limit range call, got %d", testCount)
+	if testCount.Load() != 2 {
+		t.Errorf("Expected 2 limit range call, got %d", testCount.Load())
 	}
-	if test1Count != 1 {
-		t.Errorf("Expected 1 limit range call, got %d", test1Count)
+	if test1Count.Load() != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", test1Count.Load())
 	}
 }
