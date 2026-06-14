@@ -227,6 +227,83 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("metadata", "name"), ".name", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
+		"duplicate names across PodGroupTemplates and CompositePodGroupTemplates": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = []scheduling.PodGroupTemplate{{Name: "group1"}}
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{{Name: "group1"}}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("name"), "group1"),
+			},
+		},
+		"duplicate names deep in tree": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "main",
+						CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+							{Name: "main"},
+						},
+					},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("name"), "main"),
+			},
+		},
+		"duplicate names in tree": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg1",
+						CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+							{
+								Name: "cpg2",
+								PodGroupTemplates: []scheduling.PodGroupTemplate{
+									{Name: "group1"},
+								},
+							},
+						},
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{Name: "group1"},
+						},
+					},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("name"), "group1"),
+			},
+		},
+		"exceeds max tree height": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{ // depth 1
+						Name: "cpg1",
+						CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+							{ // depth 2
+								Name: "cpg2",
+								CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+									{ // depth 3
+										Name: "cpg3",
+										CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+											{ // depth 4
+												Name: "cpg4",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates"), []scheduling.CompositePodGroupTemplate{{Name: "cpg4"}}, "maximum tree depth is 4"),
+			},
+		},
 		"no namespace": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
 				w.Namespace = ""
@@ -677,11 +754,9 @@ func mkPodGroup(tweaks ...func(pg *scheduling.PodGroup)) *scheduling.PodGroup {
 	pg := &scheduling.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "w",
-					PodGroupTemplateName: "t1",
-				},
+			WorkloadRef: &scheduling.WorkloadReference{
+				WorkloadName: "w",
+				TemplateName: "t1",
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{

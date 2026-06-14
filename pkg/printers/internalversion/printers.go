@@ -769,6 +769,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
+
+	compositePodGroupColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Policy", Type: "string", Description: schedulingv1alpha3.CompositePodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
+		{Name: "Workload", Type: "string", Description: "Name of the referenced Workload object"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(compositePodGroupColumnDefinitions, printCompositePodGroup)
+	_ = h.TableHandler(compositePodGroupColumnDefinitions, printCompositePodGroupList)
 }
 
 // Pass ports=nil for all ports.
@@ -3511,8 +3520,8 @@ func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) (
 	}
 
 	workload := "<none>"
-	if ref := obj.Spec.PodGroupTemplateRef; ref != nil {
-		workload = ref.Workload.WorkloadName
+	if ref := obj.Spec.WorkloadRef; ref != nil {
+		workload = ref.WorkloadName
 	}
 
 	row.Cells = append(row.Cells, obj.Name, policy, workload, status, translateTimestampSince(obj.CreationTimestamp))
@@ -3524,6 +3533,38 @@ func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateO
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodGroup(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printCompositePodGroup(obj *scheduling.CompositePodGroup, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	policy := "Basic"
+	if obj.Spec.SchedulingPolicy.Gang != nil {
+		policy = "Gang"
+	}
+
+	workload := "<none>"
+	if ref := obj.Spec.WorkloadRef; ref != nil {
+		workload = ref.WorkloadName
+	}
+
+	row.Cells = append(row.Cells, obj.Name, policy, workload, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printCompositePodGroupList(list *scheduling.CompositePodGroupList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printCompositePodGroup(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

@@ -30,7 +30,14 @@ type WorkloadSpecApplyConfiguration struct {
 	ControllerRef *TypedLocalObjectReferenceApplyConfiguration `json:"controllerRef,omitempty"`
 	// PodGroupTemplates is the list of templates that make up the Workload.
 	// The maximum number of templates is 8. This field is immutable.
+	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	PodGroupTemplates []PodGroupTemplateApplyConfiguration `json:"podGroupTemplates,omitempty"`
+	// CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
+	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
+	//
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	CompositePodGroupTemplates []CompositePodGroupTemplateApplyConfiguration `json:"compositePodGroupTemplates,omitempty"`
 }
 
 // WorkloadSpecApplyConfiguration constructs a declarative configuration of the WorkloadSpec type for use with
@@ -56,6 +63,19 @@ func (b *WorkloadSpecApplyConfiguration) WithPodGroupTemplates(values ...*PodGro
 			panic("nil value passed to WithPodGroupTemplates")
 		}
 		b.PodGroupTemplates = append(b.PodGroupTemplates, *values[i])
+	}
+	return b
+}
+
+// WithCompositePodGroupTemplates adds the given value to the CompositePodGroupTemplates field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the CompositePodGroupTemplates field.
+func (b *WorkloadSpecApplyConfiguration) WithCompositePodGroupTemplates(values ...*CompositePodGroupTemplateApplyConfiguration) *WorkloadSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithCompositePodGroupTemplates")
+		}
+		b.CompositePodGroupTemplates = append(b.CompositePodGroupTemplates, *values[i])
 	}
 	return b
 }
