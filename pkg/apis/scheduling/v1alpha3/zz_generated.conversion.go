@@ -228,6 +228,86 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode)(nil), (*scheduling.WorkloadPodGroupAllDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupAllDisruptionMode_To_scheduling_WorkloadPodGroupAllDisruptionMode(a.(*schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode), b.(*scheduling.WorkloadPodGroupAllDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupAllDisruptionMode)(nil), (*schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupAllDisruptionMode_To_v1alpha3_WorkloadPodGroupAllDisruptionMode(a.(*scheduling.WorkloadPodGroupAllDisruptionMode), b.(*schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy)(nil), (*scheduling.WorkloadPodGroupBasicSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy_To_scheduling_WorkloadPodGroupBasicSchedulingPolicy(a.(*schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy), b.(*scheduling.WorkloadPodGroupBasicSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupBasicSchedulingPolicy)(nil), (*schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupBasicSchedulingPolicy_To_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(a.(*scheduling.WorkloadPodGroupBasicSchedulingPolicy), b.(*schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupDisruptionMode)(nil), (*scheduling.WorkloadPodGroupDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupDisruptionMode_To_scheduling_WorkloadPodGroupDisruptionMode(a.(*schedulingv1alpha3.WorkloadPodGroupDisruptionMode), b.(*scheduling.WorkloadPodGroupDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupDisruptionMode)(nil), (*schedulingv1alpha3.WorkloadPodGroupDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupDisruptionMode_To_v1alpha3_WorkloadPodGroupDisruptionMode(a.(*scheduling.WorkloadPodGroupDisruptionMode), b.(*schedulingv1alpha3.WorkloadPodGroupDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy)(nil), (*scheduling.WorkloadPodGroupGangSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupGangSchedulingPolicy_To_scheduling_WorkloadPodGroupGangSchedulingPolicy(a.(*schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy), b.(*scheduling.WorkloadPodGroupGangSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupGangSchedulingPolicy)(nil), (*schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupGangSchedulingPolicy_To_v1alpha3_WorkloadPodGroupGangSchedulingPolicy(a.(*scheduling.WorkloadPodGroupGangSchedulingPolicy), b.(*schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupResourceClaim)(nil), (*scheduling.WorkloadPodGroupResourceClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupResourceClaim_To_scheduling_WorkloadPodGroupResourceClaim(a.(*schedulingv1alpha3.WorkloadPodGroupResourceClaim), b.(*scheduling.WorkloadPodGroupResourceClaim), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupResourceClaim)(nil), (*schedulingv1alpha3.WorkloadPodGroupResourceClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupResourceClaim_To_v1alpha3_WorkloadPodGroupResourceClaim(a.(*scheduling.WorkloadPodGroupResourceClaim), b.(*schedulingv1alpha3.WorkloadPodGroupResourceClaim), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints)(nil), (*scheduling.WorkloadPodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupSchedulingConstraints_To_scheduling_WorkloadPodGroupSchedulingConstraints(a.(*schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints), b.(*scheduling.WorkloadPodGroupSchedulingConstraints), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupSchedulingConstraints)(nil), (*schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupSchedulingConstraints_To_v1alpha3_WorkloadPodGroupSchedulingConstraints(a.(*scheduling.WorkloadPodGroupSchedulingConstraints), b.(*schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy)(nil), (*scheduling.WorkloadPodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupSchedulingPolicy_To_scheduling_WorkloadPodGroupSchedulingPolicy(a.(*schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy), b.(*scheduling.WorkloadPodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupSchedulingPolicy)(nil), (*schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupSchedulingPolicy_To_v1alpha3_WorkloadPodGroupSchedulingPolicy(a.(*scheduling.WorkloadPodGroupSchedulingPolicy), b.(*schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode)(nil), (*scheduling.WorkloadPodGroupSingleDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_WorkloadPodGroupSingleDisruptionMode_To_scheduling_WorkloadPodGroupSingleDisruptionMode(a.(*schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode), b.(*scheduling.WorkloadPodGroupSingleDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadPodGroupSingleDisruptionMode)(nil), (*schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadPodGroupSingleDisruptionMode_To_v1alpha3_WorkloadPodGroupSingleDisruptionMode(a.(*scheduling.WorkloadPodGroupSingleDisruptionMode), b.(*schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*schedulingv1alpha3.WorkloadPodGroupTemplateReference)(nil), (*scheduling.WorkloadPodGroupTemplateReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_WorkloadPodGroupTemplateReference_To_scheduling_WorkloadPodGroupTemplateReference(a.(*schedulingv1alpha3.WorkloadPodGroupTemplateReference), b.(*scheduling.WorkloadPodGroupTemplateReference), scope)
 	}); err != nil {
@@ -693,6 +773,168 @@ func autoConvert_scheduling_WorkloadList_To_v1alpha3_WorkloadList(in *scheduling
 // Convert_scheduling_WorkloadList_To_v1alpha3_WorkloadList is an autogenerated conversion function.
 func Convert_scheduling_WorkloadList_To_v1alpha3_WorkloadList(in *scheduling.WorkloadList, out *schedulingv1alpha3.WorkloadList, s conversion.Scope) error {
 	return autoConvert_scheduling_WorkloadList_To_v1alpha3_WorkloadList(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupAllDisruptionMode_To_scheduling_WorkloadPodGroupAllDisruptionMode(in *schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode, out *scheduling.WorkloadPodGroupAllDisruptionMode, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupAllDisruptionMode_To_scheduling_WorkloadPodGroupAllDisruptionMode is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupAllDisruptionMode_To_scheduling_WorkloadPodGroupAllDisruptionMode(in *schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode, out *scheduling.WorkloadPodGroupAllDisruptionMode, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupAllDisruptionMode_To_scheduling_WorkloadPodGroupAllDisruptionMode(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupAllDisruptionMode_To_v1alpha3_WorkloadPodGroupAllDisruptionMode(in *scheduling.WorkloadPodGroupAllDisruptionMode, out *schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupAllDisruptionMode_To_v1alpha3_WorkloadPodGroupAllDisruptionMode is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupAllDisruptionMode_To_v1alpha3_WorkloadPodGroupAllDisruptionMode(in *scheduling.WorkloadPodGroupAllDisruptionMode, out *schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupAllDisruptionMode_To_v1alpha3_WorkloadPodGroupAllDisruptionMode(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy_To_scheduling_WorkloadPodGroupBasicSchedulingPolicy(in *schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy, out *scheduling.WorkloadPodGroupBasicSchedulingPolicy, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy_To_scheduling_WorkloadPodGroupBasicSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy_To_scheduling_WorkloadPodGroupBasicSchedulingPolicy(in *schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy, out *scheduling.WorkloadPodGroupBasicSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy_To_scheduling_WorkloadPodGroupBasicSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupBasicSchedulingPolicy_To_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(in *scheduling.WorkloadPodGroupBasicSchedulingPolicy, out *schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupBasicSchedulingPolicy_To_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupBasicSchedulingPolicy_To_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(in *scheduling.WorkloadPodGroupBasicSchedulingPolicy, out *schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupBasicSchedulingPolicy_To_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupDisruptionMode_To_scheduling_WorkloadPodGroupDisruptionMode(in *schedulingv1alpha3.WorkloadPodGroupDisruptionMode, out *scheduling.WorkloadPodGroupDisruptionMode, s conversion.Scope) error {
+	out.Single = (*scheduling.WorkloadPodGroupSingleDisruptionMode)(unsafe.Pointer(in.Single))
+	out.All = (*scheduling.WorkloadPodGroupAllDisruptionMode)(unsafe.Pointer(in.All))
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupDisruptionMode_To_scheduling_WorkloadPodGroupDisruptionMode is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupDisruptionMode_To_scheduling_WorkloadPodGroupDisruptionMode(in *schedulingv1alpha3.WorkloadPodGroupDisruptionMode, out *scheduling.WorkloadPodGroupDisruptionMode, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupDisruptionMode_To_scheduling_WorkloadPodGroupDisruptionMode(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupDisruptionMode_To_v1alpha3_WorkloadPodGroupDisruptionMode(in *scheduling.WorkloadPodGroupDisruptionMode, out *schedulingv1alpha3.WorkloadPodGroupDisruptionMode, s conversion.Scope) error {
+	out.Single = (*schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode)(unsafe.Pointer(in.Single))
+	out.All = (*schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode)(unsafe.Pointer(in.All))
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupDisruptionMode_To_v1alpha3_WorkloadPodGroupDisruptionMode is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupDisruptionMode_To_v1alpha3_WorkloadPodGroupDisruptionMode(in *scheduling.WorkloadPodGroupDisruptionMode, out *schedulingv1alpha3.WorkloadPodGroupDisruptionMode, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupDisruptionMode_To_v1alpha3_WorkloadPodGroupDisruptionMode(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupGangSchedulingPolicy_To_scheduling_WorkloadPodGroupGangSchedulingPolicy(in *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy, out *scheduling.WorkloadPodGroupGangSchedulingPolicy, s conversion.Scope) error {
+	out.MinCount = (*int32)(unsafe.Pointer(in.MinCount))
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupGangSchedulingPolicy_To_scheduling_WorkloadPodGroupGangSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupGangSchedulingPolicy_To_scheduling_WorkloadPodGroupGangSchedulingPolicy(in *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy, out *scheduling.WorkloadPodGroupGangSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupGangSchedulingPolicy_To_scheduling_WorkloadPodGroupGangSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupGangSchedulingPolicy_To_v1alpha3_WorkloadPodGroupGangSchedulingPolicy(in *scheduling.WorkloadPodGroupGangSchedulingPolicy, out *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy, s conversion.Scope) error {
+	out.MinCount = (*int32)(unsafe.Pointer(in.MinCount))
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupGangSchedulingPolicy_To_v1alpha3_WorkloadPodGroupGangSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupGangSchedulingPolicy_To_v1alpha3_WorkloadPodGroupGangSchedulingPolicy(in *scheduling.WorkloadPodGroupGangSchedulingPolicy, out *schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupGangSchedulingPolicy_To_v1alpha3_WorkloadPodGroupGangSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupResourceClaim_To_scheduling_WorkloadPodGroupResourceClaim(in *schedulingv1alpha3.WorkloadPodGroupResourceClaim, out *scheduling.WorkloadPodGroupResourceClaim, s conversion.Scope) error {
+	out.Name = in.Name
+	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
+	out.ResourceClaimTemplateName = (*string)(unsafe.Pointer(in.ResourceClaimTemplateName))
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupResourceClaim_To_scheduling_WorkloadPodGroupResourceClaim is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupResourceClaim_To_scheduling_WorkloadPodGroupResourceClaim(in *schedulingv1alpha3.WorkloadPodGroupResourceClaim, out *scheduling.WorkloadPodGroupResourceClaim, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupResourceClaim_To_scheduling_WorkloadPodGroupResourceClaim(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupResourceClaim_To_v1alpha3_WorkloadPodGroupResourceClaim(in *scheduling.WorkloadPodGroupResourceClaim, out *schedulingv1alpha3.WorkloadPodGroupResourceClaim, s conversion.Scope) error {
+	out.Name = in.Name
+	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
+	out.ResourceClaimTemplateName = (*string)(unsafe.Pointer(in.ResourceClaimTemplateName))
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupResourceClaim_To_v1alpha3_WorkloadPodGroupResourceClaim is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupResourceClaim_To_v1alpha3_WorkloadPodGroupResourceClaim(in *scheduling.WorkloadPodGroupResourceClaim, out *schedulingv1alpha3.WorkloadPodGroupResourceClaim, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupResourceClaim_To_v1alpha3_WorkloadPodGroupResourceClaim(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupSchedulingConstraints_To_scheduling_WorkloadPodGroupSchedulingConstraints(in *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints, out *scheduling.WorkloadPodGroupSchedulingConstraints, s conversion.Scope) error {
+	out.Topology = *(*[]scheduling.TopologyConstraint)(unsafe.Pointer(&in.Topology))
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupSchedulingConstraints_To_scheduling_WorkloadPodGroupSchedulingConstraints is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupSchedulingConstraints_To_scheduling_WorkloadPodGroupSchedulingConstraints(in *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints, out *scheduling.WorkloadPodGroupSchedulingConstraints, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupSchedulingConstraints_To_scheduling_WorkloadPodGroupSchedulingConstraints(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupSchedulingConstraints_To_v1alpha3_WorkloadPodGroupSchedulingConstraints(in *scheduling.WorkloadPodGroupSchedulingConstraints, out *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints, s conversion.Scope) error {
+	out.Topology = *(*[]schedulingv1alpha3.TopologyConstraint)(unsafe.Pointer(&in.Topology))
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupSchedulingConstraints_To_v1alpha3_WorkloadPodGroupSchedulingConstraints is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupSchedulingConstraints_To_v1alpha3_WorkloadPodGroupSchedulingConstraints(in *scheduling.WorkloadPodGroupSchedulingConstraints, out *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupSchedulingConstraints_To_v1alpha3_WorkloadPodGroupSchedulingConstraints(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupSchedulingPolicy_To_scheduling_WorkloadPodGroupSchedulingPolicy(in *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy, out *scheduling.WorkloadPodGroupSchedulingPolicy, s conversion.Scope) error {
+	out.Basic = (*scheduling.WorkloadPodGroupBasicSchedulingPolicy)(unsafe.Pointer(in.Basic))
+	out.Gang = (*scheduling.WorkloadPodGroupGangSchedulingPolicy)(unsafe.Pointer(in.Gang))
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupSchedulingPolicy_To_scheduling_WorkloadPodGroupSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupSchedulingPolicy_To_scheduling_WorkloadPodGroupSchedulingPolicy(in *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy, out *scheduling.WorkloadPodGroupSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupSchedulingPolicy_To_scheduling_WorkloadPodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupSchedulingPolicy_To_v1alpha3_WorkloadPodGroupSchedulingPolicy(in *scheduling.WorkloadPodGroupSchedulingPolicy, out *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy, s conversion.Scope) error {
+	out.Basic = (*schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy)(unsafe.Pointer(in.Basic))
+	out.Gang = (*schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy)(unsafe.Pointer(in.Gang))
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupSchedulingPolicy_To_v1alpha3_WorkloadPodGroupSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupSchedulingPolicy_To_v1alpha3_WorkloadPodGroupSchedulingPolicy(in *scheduling.WorkloadPodGroupSchedulingPolicy, out *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupSchedulingPolicy_To_v1alpha3_WorkloadPodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1alpha3_WorkloadPodGroupSingleDisruptionMode_To_scheduling_WorkloadPodGroupSingleDisruptionMode(in *schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode, out *scheduling.WorkloadPodGroupSingleDisruptionMode, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha3_WorkloadPodGroupSingleDisruptionMode_To_scheduling_WorkloadPodGroupSingleDisruptionMode is an autogenerated conversion function.
+func Convert_v1alpha3_WorkloadPodGroupSingleDisruptionMode_To_scheduling_WorkloadPodGroupSingleDisruptionMode(in *schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode, out *scheduling.WorkloadPodGroupSingleDisruptionMode, s conversion.Scope) error {
+	return autoConvert_v1alpha3_WorkloadPodGroupSingleDisruptionMode_To_scheduling_WorkloadPodGroupSingleDisruptionMode(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadPodGroupSingleDisruptionMode_To_v1alpha3_WorkloadPodGroupSingleDisruptionMode(in *scheduling.WorkloadPodGroupSingleDisruptionMode, out *schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_scheduling_WorkloadPodGroupSingleDisruptionMode_To_v1alpha3_WorkloadPodGroupSingleDisruptionMode is an autogenerated conversion function.
+func Convert_scheduling_WorkloadPodGroupSingleDisruptionMode_To_v1alpha3_WorkloadPodGroupSingleDisruptionMode(in *scheduling.WorkloadPodGroupSingleDisruptionMode, out *schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadPodGroupSingleDisruptionMode_To_v1alpha3_WorkloadPodGroupSingleDisruptionMode(in, out, s)
 }
 
 func autoConvert_v1alpha3_WorkloadPodGroupTemplateReference_To_scheduling_WorkloadPodGroupTemplateReference(in *schedulingv1alpha3.WorkloadPodGroupTemplateReference, out *scheduling.WorkloadPodGroupTemplateReference, s conversion.Scope) error {

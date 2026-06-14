@@ -593,3 +593,98 @@ type TopologyConstraint struct {
 	// +required
 	Key string
 }
+
+// WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling
+// constraints, such as topology.
+type WorkloadPodGroupSchedulingConstraints struct {
+	// Topology specifies desired topological placements for all pods
+	// within the scheduling group.
+	//
+	// +optional
+	// +listType=atomic
+	Topology []TopologyConstraint
+}
+
+// WorkloadPodGroupDisruptionMode defines how individual pods within a
+// group can be disrupted. Exactly one mode must be set.
+//
+// +union
+type WorkloadPodGroupDisruptionMode struct {
+	// Single specifies that pods can be disrupted independently from each other.
+	//
+	// +optional
+	Single *WorkloadPodGroupSingleDisruptionMode
+
+	// All specifies that all pods in the group must be disrupted together.
+	//
+	// +optional
+	All *WorkloadPodGroupAllDisruptionMode
+}
+
+// WorkloadPodGroupSingleDisruptionMode indicates that individual pods
+// can be disrupted independently.
+type WorkloadPodGroupSingleDisruptionMode struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupAllDisruptionMode indicates that all pods in the
+// group must be disrupted together.
+type WorkloadPodGroupAllDisruptionMode struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a
+// group of pods managed by a workload controller.
+// Exactly one policy must be set.
+//
+// +union
+type WorkloadPodGroupSchedulingPolicy struct {
+	// Basic specifies that standard, pod-by-pod Kubernetes scheduling
+	// behavior should be used.
+	//
+	// +optional
+	Basic *WorkloadPodGroupBasicSchedulingPolicy
+
+	// Gang specifies all-or-nothing scheduling semantics.
+	//
+	// +optional
+	Gang *WorkloadPodGroupGangSchedulingPolicy
+}
+
+// WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes
+// scheduling behavior.
+type WorkloadPodGroupBasicSchedulingPolicy struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang
+// (all-or-nothing) scheduling.
+type WorkloadPodGroupGangSchedulingPolicy struct {
+	// MinCount is the minimum number of pods that must be scheduled
+	// at the same time for the scheduler to admit the entire group.
+	// If omitted, the controller should inject a context-specific sane
+	// default (e.g., parallelism for a Job).
+	//
+	// +optional
+	MinCount *int32
+}
+
+// WorkloadPodGroupResourceClaim references a dynamic resource claim
+// that is shared across pods in the group.
+type WorkloadPodGroupResourceClaim struct {
+	// Name uniquely identifies this resource claim inside the group.
+	//
+	// +required
+	Name string
+
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace.
+	//
+	// +optional
+	ResourceClaimName *string
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	//
+	// +optional
+	ResourceClaimTemplateName *string
+}

@@ -220,6 +220,79 @@ func (WorkloadList) SwaggerDoc() map[string]string {
 	return map_WorkloadList
 }
 
+var map_WorkloadPodGroupAllDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupAllDisruptionMode
+}
+
+var map_WorkloadPodGroupBasicSchedulingPolicy = map[string]string{
+	"": "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
+}
+
+func (WorkloadPodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupBasicSchedulingPolicy
+}
+
+var map_WorkloadPodGroupDisruptionMode = map[string]string{
+	"":       "WorkloadPodGroupDisruptionMode defines how individual pods within a group can be disrupted. Exactly one mode must be set.",
+	"single": "Single specifies that pods can be disrupted independently from each other.",
+	"all":    "All specifies that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupDisruptionMode
+}
+
+var map_WorkloadPodGroupGangSchedulingPolicy = map[string]string{
+	"":         "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
+	"minCount": "MinCount is the minimum number of pods that must be scheduled at the same time for the scheduler to admit the entire group. If omitted, the controller should inject a context-specific sane default (e.g., parallelism for a Job).",
+}
+
+func (WorkloadPodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupGangSchedulingPolicy
+}
+
+var map_WorkloadPodGroupResourceClaim = map[string]string{
+	"":                          "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.",
+	"name":                      "Name uniquely identifies this resource claim inside the group.",
+	"resourceClaimName":         "ResourceClaimName is the name of a ResourceClaim object in the same namespace.",
+	"resourceClaimTemplateName": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace.",
+}
+
+func (WorkloadPodGroupResourceClaim) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupResourceClaim
+}
+
+var map_WorkloadPodGroupSchedulingConstraints = map[string]string{
+	"":         "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.",
+	"topology": "Topology specifies desired topological placements for all pods within the scheduling group.",
+}
+
+func (WorkloadPodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingConstraints
+}
+
+var map_WorkloadPodGroupSchedulingPolicy = map[string]string{
+	"":      "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.",
+	"basic": "Basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used.",
+	"gang":  "Gang specifies all-or-nothing scheduling semantics.",
+}
+
+func (WorkloadPodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingPolicy
+}
+
+var map_WorkloadPodGroupSingleDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
+}
+
+func (WorkloadPodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSingleDisruptionMode
+}
+
 var map_WorkloadPodGroupTemplateReference = map[string]string{
 	"":                     "WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.",
 	"workloadName":         "WorkloadName defines the name of the Workload object.",
