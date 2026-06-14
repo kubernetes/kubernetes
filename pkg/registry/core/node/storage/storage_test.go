@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -226,6 +227,12 @@ func TestResourceLocation(t *testing.T) {
 		query: "node0",
 		host:  "",
 		err:   true,
+	}, {
+		name:  "node without any address",
+		node:  newNode("node0"),
+		query: "node0",
+		host:  "",
+		err:   true,
 	}}
 
 	for _, testCase := range testCases {
@@ -246,6 +253,11 @@ func TestResourceLocation(t *testing.T) {
 			if err != nil {
 				if !testCase.err {
 					t.Fatalf("Unexpected error: %v", err)
+				}
+				// A node that cannot be proxied to must surface as a 400 Bad
+				// Request rather than a 500 Internal Server Error.
+				if !apierrors.IsBadRequest(err) {
+					t.Errorf("Expected a BadRequest error, but got: %v", err)
 				}
 				return
 			} else if testCase.err {
