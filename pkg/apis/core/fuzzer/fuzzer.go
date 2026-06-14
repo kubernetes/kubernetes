@@ -65,6 +65,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
+		func(s *core.ServiceAccountTokenProjection, c randfill.Continue) {
+			c.FillNoCustom(s)
+			if s.ExpirationSeconds == nil {
+				// Defaulted; valid objects always carry a value.
+				s.ExpirationSeconds = ptr.To[int64](3600)
+			}
+		},
 		func(s *core.PodSpec, c randfill.Continue) {
 			c.FillNoCustom(s)
 			// has a default value
@@ -73,6 +80,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				ttl = int64(c.Uint32())
 			}
 			s.TerminationGracePeriodSeconds = &ttl
+
+			// DeprecatedServiceAccount is an alias for ServiceAccountName kept
+			// in sync by defaulting; valid objects always have them equal.
+			//lint:ignore SA1019 DeprecatedServiceAccount must be fuzzed for backward compatibility
+			s.DeprecatedServiceAccount = s.ServiceAccountName
 
 			c.Fill(s.SecurityContext)
 
@@ -93,6 +105,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *core.PodStatus, c randfill.Continue) {
 			c.Fill(&s)
 			s.HostIPs = []core.HostIP{{IP: s.HostIP}}
+			// PodIP and PodIPs[0] are kept in sync by defaulting; valid
+			// objects always have them consistent.
+			s.PodIPs = []core.PodIP{{IP: s.PodIP}}
 		},
 		func(j *core.PodPhase, c randfill.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}

@@ -91,6 +91,7 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 	cronJob.Generation = 1
 
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
+	cronJob.Spec.JobTemplate.Spec.Template.Annotations = pod.DropInitContainerAnnotations(cronJob.Spec.JobTemplate.Spec.Template.Annotations)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -100,6 +101,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob.Status = oldCronJob.Status
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	newCronJob.Spec.JobTemplate.Spec.Template.Annotations = pod.DropInitContainerAnnotations(newCronJob.Spec.JobTemplate.Spec.Template.Annotations)
 
 	// Any changes to the spec increment the generation number.
 	// See metav1.ObjectMeta description for more information on Generation.

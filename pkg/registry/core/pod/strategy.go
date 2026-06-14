@@ -93,11 +93,17 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
+	pod.Annotations = podutil.DropInitContainerAnnotations(pod.Annotations)
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+
+	// Admission (e.g. the ServiceAccount plugin) may set ServiceAccountName
+	// after defaulting synced the deprecated alias; re-sync before persisting.
+	//lint:ignore SA1019 DeprecatedServiceAccount must be synced for backward compatibility
+	pod.Spec.DeprecatedServiceAccount = pod.Spec.ServiceAccountName
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -106,6 +112,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	newPod.Annotations = podutil.DropInitContainerAnnotations(newPod.Annotations)
 	updatePodGeneration(newPod, oldPod)
 }
 
@@ -228,8 +235,22 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
 
+	SyncPodIP(&newPod.Status)
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
+// SyncPodIP keeps status.podIP and status.podIPs[0] in sync, with podIP
+// authoritative when they disagree, for compatibility with older clients that
+// set only the singular field. Historically applied during conversion.
+func SyncPodIP(status *api.PodStatus) {
+	if len(status.PodIP) > 0 {
+		if len(status.PodIPs) == 0 || status.PodIPs[0].IP != status.PodIP {
+			status.PodIPs = []api.PodIP{{IP: status.PodIP}}
+		}
+	} else if len(status.PodIPs) > 0 {
+		status.PodIP = status.PodIPs[0].IP
+	}
 }
 
 // If a client request tries to clear `observedGeneration`, in the pod status or
@@ -492,12 +513,7 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
-	if pod.Spec.SecurityContext != nil {
-		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.SecurityContext.HostNetwork)
-	} else {
-		// default to false
-		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(false)
-	}
+	podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.HostNetwork)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	// TODO: add podIPs as a downward API value(s) with proper format
 	podIP := ""

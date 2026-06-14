@@ -2621,25 +2621,20 @@ func TestDropHostUsers(t *testing.T) {
 
 	podWithoutHostUsers := func() *api.Pod {
 		return &api.Pod{
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{}},
+			Spec: api.PodSpec{},
 		}
 	}
 	podWithHostUsersFalse := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 			},
 		}
 	}
 	podWithHostUsersTrue := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &trueVar,
-				},
+				HostUsers: &trueVar,
 			},
 		}
 	}
@@ -6136,16 +6131,12 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 		}, {
 			name: "hostUsers=false & no volume devices",
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 			},
 		}, {
 			name: "hostUsers=true & container volumeDevice",
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &trueVar,
-				},
+				HostUsers: &trueVar,
 				Containers: []api.Container{{
 					Name: "test-container",
 					VolumeDevices: []api.VolumeDevice{{
@@ -6158,9 +6149,7 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			name:     "hostUsers=false & container volumeDevice",
 			expected: true,
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 				Containers: []api.Container{{
 					Name: "test-container",
 					VolumeDevices: []api.VolumeDevice{{
@@ -6174,9 +6163,7 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			name:     "hostUsers=false & initContainer volumeDevice",
 			expected: true,
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 				InitContainers: []api.Container{{
 					Name: "test-container",
 					VolumeDevices: []api.VolumeDevice{{
@@ -6189,9 +6176,7 @@ func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
 			name:     "hostUsers=false & ephemeralContainer volumeDevice",
 			expected: true,
 			spec: &api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostUsers: &falseVar,
-				},
+				HostUsers: &falseVar,
 				EphemeralContainers: []api.EphemeralContainer{{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Name: "test-container",

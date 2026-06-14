@@ -24,10 +24,6 @@ import (
 
 // PodSecurityContextAccessor allows reading the values of a PodSecurityContext object
 type PodSecurityContextAccessor interface {
-	HostNetwork() bool
-	HostPID() bool
-	HostIPC() bool
-	HostUsers() *bool
 	SELinuxOptions() *api.SELinuxOptions
 	RunAsUser() *int64
 	RunAsGroup() *int64
@@ -42,10 +38,6 @@ type PodSecurityContextAccessor interface {
 type PodSecurityContextMutator interface {
 	PodSecurityContextAccessor
 
-	SetHostNetwork(bool)
-	SetHostPID(bool)
-	SetHostIPC(bool)
-	SetHostUsers(*bool)
 	SetSELinuxOptions(*api.SELinuxOptions)
 	SetRunAsUser(*int64)
 	SetRunAsGroup(*int64)
@@ -85,58 +77,6 @@ func (w *podSecurityContextWrapper) ensurePodSC() {
 	}
 }
 
-func (w *podSecurityContextWrapper) HostNetwork() bool {
-	if w.podSC == nil {
-		return false
-	}
-	return w.podSC.HostNetwork
-}
-func (w *podSecurityContextWrapper) SetHostNetwork(v bool) {
-	if w.podSC == nil && v == false {
-		return
-	}
-	w.ensurePodSC()
-	w.podSC.HostNetwork = v
-}
-func (w *podSecurityContextWrapper) HostPID() bool {
-	if w.podSC == nil {
-		return false
-	}
-	return w.podSC.HostPID
-}
-func (w *podSecurityContextWrapper) SetHostPID(v bool) {
-	if w.podSC == nil && v == false {
-		return
-	}
-	w.ensurePodSC()
-	w.podSC.HostPID = v
-}
-func (w *podSecurityContextWrapper) HostIPC() bool {
-	if w.podSC == nil {
-		return false
-	}
-	return w.podSC.HostIPC
-}
-func (w *podSecurityContextWrapper) SetHostIPC(v bool) {
-	if w.podSC == nil && v == false {
-		return
-	}
-	w.ensurePodSC()
-	w.podSC.HostIPC = v
-}
-func (w *podSecurityContextWrapper) HostUsers() *bool {
-	if w.podSC == nil {
-		return nil
-	}
-	return w.podSC.HostUsers
-}
-func (w *podSecurityContextWrapper) SetHostUsers(v *bool) {
-	if w.podSC == nil && v == nil {
-		return
-	}
-	w.ensurePodSC()
-	w.podSC.HostUsers = v
-}
 func (w *podSecurityContextWrapper) SELinuxOptions() *api.SELinuxOptions {
 	if w.podSC == nil {
 		return nil

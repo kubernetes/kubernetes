@@ -49,6 +49,7 @@ func SetObjectDefaults_CronJob(in *batchv1beta1.CronJob) {
 			}
 		}
 	}
+	corev1.SetDefaults_PodTemplateSpec(&in.Spec.JobTemplate.Spec.Template)
 	corev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]

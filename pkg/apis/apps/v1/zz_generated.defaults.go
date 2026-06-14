@@ -45,6 +45,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_DaemonSet(in *appsv1.DaemonSet) {
 	SetDefaults_DaemonSet(in)
+	apiscorev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -372,6 +373,7 @@ func SetObjectDefaults_DaemonSetList(in *appsv1.DaemonSetList) {
 
 func SetObjectDefaults_Deployment(in *appsv1.Deployment) {
 	SetDefaults_Deployment(in)
+	apiscorev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -699,6 +701,7 @@ func SetObjectDefaults_DeploymentList(in *appsv1.DeploymentList) {
 
 func SetObjectDefaults_ReplicaSet(in *appsv1.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
+	apiscorev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -1026,6 +1029,7 @@ func SetObjectDefaults_ReplicaSetList(in *appsv1.ReplicaSetList) {
 
 func SetObjectDefaults_StatefulSet(in *appsv1.StatefulSet) {
 	SetDefaults_StatefulSet(in)
+	apiscorev1.SetDefaults_PodTemplateSpec(&in.Spec.Template)
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]

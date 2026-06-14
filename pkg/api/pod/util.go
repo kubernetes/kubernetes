@@ -467,7 +467,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
 		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
 			for _, s := range oldPodSpec.SecurityContext.Sysctls {
-				err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec.SecurityContext, nil)
+				err := apivalidation.ValidateHostSysctl(s.Name, oldPodSpec, nil)
 				if err != nil {
 					opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
 					break
@@ -527,15 +527,15 @@ func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *api.PodSpec) bool {
 		return true
 	}
 
-	if oldPodSpec == nil || oldPodSpec.SecurityContext == nil || oldPodSpec.SecurityContext.HostUsers == nil {
+	if oldPodSpec == nil || oldPodSpec.HostUsers == nil {
 		return false
 	}
 
 	// If a pod with user namespaces and hostNetwork already exists in the cluster,
 	// this allows it to continue using the UserNamespacesHostNetworkSupport
 	// validation logic even after the feature gate is disabled.
-	userNamespaces := !*oldPodSpec.SecurityContext.HostUsers
-	return oldPodSpec.SecurityContext.HostNetwork && userNamespaces
+	userNamespaces := !*oldPodSpec.HostUsers
+	return oldPodSpec.HostNetwork && userNamespaces
 }
 
 func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
@@ -709,11 +709,7 @@ func dropDisabledFields(
 
 	// If the feature is disabled and not in use, drop the hostUsers field.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
-		// Drop the field in podSpec only if SecurityContext is not nil.
-		// If it is nil, there is no need to set hostUsers=nil (it will be nil too).
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.HostUsers = nil
-		}
+		podSpec.HostUsers = nil
 	}
 
 	// If the feature is disabled and not in use, drop the SupplementalGroupsPolicy field.
@@ -1352,7 +1348,7 @@ func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
 
 // hostUsersInUse returns true if the pod spec has spec.hostUsers field set.
 func hostUsersInUse(podSpec *api.PodSpec) bool {
-	return podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.HostUsers != nil
+	return podSpec != nil && podSpec.HostUsers != nil
 }
 
 func supplementalGroupsPolicyInUse(podSpec *api.PodSpec) bool {
@@ -1711,7 +1707,7 @@ func allowTaintTolerationComparisonOperators(oldPodSpec *api.PodSpec) bool {
 }
 
 func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {
-	if podSpec.SecurityContext == nil || podSpec.SecurityContext.HostUsers == nil || *podSpec.SecurityContext.HostUsers {
+	if podSpec.HostUsers == nil || *podSpec.HostUsers {
 		return false
 	}
 
@@ -2007,3 +2003,42 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 	}
 	return false
 }
+
+var initContainerAnnotations = map[string]struct{}{
+	"pod.beta.kubernetes.io/init-containers":          {},
+	"pod.alpha.kubernetes.io/init-containers":         {},
+	"pod.beta.kubernetes.io/init-container-statuses":  {},
+	"pod.alpha.kubernetes.io/init-container-statuses": {},
+}
+
+// DropInitContainerAnnotations returns a copy of the annotations with the legacy
+// alpha/beta init container annotations removed, or the original map if no changes were made.
+// Support for these annotations was deprecated in v1.8 in favor of the Spec.InitContainers
+// field. They are dropped on write paths to prevent old clients or legacy kubelets from
+// honoring them over the spec fields.
+func DropInitContainerAnnotations(oldAnnotations map[string]string) map[string]string {
+	if len(oldAnnotations) == 0 {
+		return oldAnnotations
+	}
+
+	// the legacy annotations are rare, so do a scan for them first
+	found := false
+	for k := range initContainerAnnotations {
+		if _, ok := oldAnnotations[k]; ok {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return oldAnnotations
+	}
+
+	newAnnotations := make(map[string]string, len(oldAnnotations))
+	for k, v := range oldAnnotations {
+		if _, ok := initContainerAnnotations[k]; !ok {
+			newAnnotations[k] = v
+		}
+	}
+	return newAnnotations
+}
+

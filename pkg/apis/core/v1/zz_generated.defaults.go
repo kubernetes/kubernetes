@@ -521,6 +521,7 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 		SetDefaults_ResourceList(&in.Spec.Resources.Limits)
 		SetDefaults_ResourceList(&in.Spec.Resources.Requests)
 	}
+	SetDefaults_PodStatus(&in.Status)
 	for i := range in.Status.InitContainerStatuses {
 		a := &in.Status.InitContainerStatuses[i]
 		SetDefaults_ResourceList(&a.AllocatedResources)
@@ -564,6 +565,7 @@ func SetObjectDefaults_PodLogOptions(in *corev1.PodLogOptions) {
 }
 
 func SetObjectDefaults_PodTemplate(in *corev1.PodTemplate) {
+	SetDefaults_PodTemplateSpec(&in.Template)
 	SetDefaults_PodSpec(&in.Template.Spec)
 	for i := range in.Template.Spec.Volumes {
 		a := &in.Template.Spec.Volumes[i]
@@ -896,6 +898,7 @@ func SetObjectDefaults_ReplicationController(in *corev1.ReplicationController) {
 		in.Spec.Replicas = &ptrVar1
 	}
 	if in.Spec.Template != nil {
+		SetDefaults_PodTemplateSpec(in.Spec.Template)
 		SetDefaults_PodSpec(&in.Spec.Template.Spec)
 		for i := range in.Spec.Template.Spec.Volumes {
 			a := &in.Spec.Template.Spec.Volumes[i]
