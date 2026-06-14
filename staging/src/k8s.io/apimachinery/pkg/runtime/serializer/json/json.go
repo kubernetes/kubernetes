@@ -264,6 +264,13 @@ func (s *Serializer) IsStrict() bool {
 	return s.options.Strict
 }
 
+// SupportsStreamingCollectionEncoding implements runtime.StreamingCollectionEncoder.
+// Streaming collection encoding only kicks in for the non-pretty JSON path; both
+// the YAML and pretty paths buffer the whole object before writing (see doEncode).
+func (s *Serializer) SupportsStreamingCollectionEncoding() bool {
+	return s.options.StreamingCollectionsEncoding && !s.options.Yaml && !s.options.Pretty
+}
+
 func (s *Serializer) unmarshal(into runtime.Object, data, originalData []byte) (strictErrs []error, err error) {
 	// If the deserializer is non-strict, return here.
 	if !s.options.Strict {
