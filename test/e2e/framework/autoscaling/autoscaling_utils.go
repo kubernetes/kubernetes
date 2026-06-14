@@ -640,8 +640,6 @@ func (rc *ResourceConsumer) makeConsumeCPUPerPodRequests(ctx context.Context) {
 // bypasses kube-proxy load balancing, guaranteeing each pod receives exactly
 // its share.
 func (rc *ResourceConsumer) sendConsumeCPUPerPodRequest(ctx context.Context, millicoresTotal int) {
-	// Tests that can't rely on random LB use this path to deterministically adjust per-pod load.
-	// Retry transient list errors and fail loudly to avoid silent failures.
 	var readyPods []string
 	err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
 		pods, err := rc.clientSet.CoreV1().Pods(rc.nsName).List(ctx, metav1.ListOptions{
