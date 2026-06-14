@@ -4769,8 +4769,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionFalse,
+				Type:    v1.PodReadyToStartContainers,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		{
@@ -4815,8 +4817,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Message: "test",
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionFalse,
+				Type:    v1.PodReadyToStartContainers,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		{
@@ -4868,8 +4872,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Message: "test",
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionFalse,
+				Type:    v1.PodReadyToStartContainers,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		{
