@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestOptional(t *testing.T) {
@@ -62,6 +63,28 @@ func TestOptional(t *testing.T) {
 				t.Errorf("wrong result, expected %v but got %v", tc.expected, converted)
 			}
 		})
+	}
+}
+
+func TestConvertToNativeStructpbValue(t *testing.T) {
+	v := &ObjectVal{
+		objectType: types.NewObjectType("Object.spec.volumes"),
+		fields: map[string]ref.Val{
+			"name": types.String("x"),
+		},
+	}
+	got, err := v.ConvertToNative(reflect.TypeFor[*structpb.Value]())
+	if err != nil {
+		t.Fatalf("ConvertToNative: %v", err)
+	}
+	pbVal, ok := got.(*structpb.Value)
+	if !ok {
+		t.Fatalf("ConvertToNative returned %T, want *structpb.Value", got)
+	}
+	gotMap := pbVal.GetStructValue().AsMap()
+	want := map[string]any{"name": "x"}
+	if !reflect.DeepEqual(gotMap, want) {
+		t.Errorf("ConvertToNative = %v, want %v", gotMap, want)
 	}
 }
 
