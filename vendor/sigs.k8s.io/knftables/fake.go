@@ -234,12 +234,13 @@ func (fake *Fake) ListElements(_ context.Context, objectType, name string) ([]*E
 	if fake.Table == nil {
 		return nil, notFoundError("no such %s %q", objectType, name)
 	}
-	if objectType == "set" {
+	switch objectType {
+	case "set":
 		s := fake.Table.Sets[name]
 		if s != nil {
 			return s.Elements, nil
 		}
-	} else if objectType == "map" {
+	case "map":
 		m := fake.Table.Maps[name]
 		if m != nil {
 			return m.Elements, nil
