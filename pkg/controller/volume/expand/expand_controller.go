@@ -133,8 +133,11 @@ func NewExpandController(
 		expc.recorder,
 		blkutil)
 
+	logger := klog.FromContext(ctx)
 	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: expc.enqueuePVC,
+		AddFunc: func(obj interface{}) {
+			expc.enqueuePVC(logger, obj)
+		},
 		UpdateFunc: func(old, new interface{}) {
 			oldPVC, ok := old.(*v1.PersistentVolumeClaim)
 			if !ok {
@@ -153,16 +156,18 @@ func NewExpandController(
 			// 1. User has increased PVC's request capacity --> volume needs to be expanded
 			// 2. PVC status capacity has been expanded --> claim's bound PV has likely recently gone through filesystem resize, so remove AnnPreResizeCapacity annotation from PV
 			if newReq.Cmp(oldReq) > 0 || newCap.Cmp(oldCap) > 0 {
-				expc.enqueuePVC(new)
+				expc.enqueuePVC(logger, new)
 			}
 		},
-		DeleteFunc: expc.enqueuePVC,
+		DeleteFunc: func(obj interface{}) {
+			expc.enqueuePVC(logger, obj)
+		},
 	})
 
 	return expc, nil
 }
 
-func (expc *expandController) enqueuePVC(obj interface{}) {
+func (expc *expandController) enqueuePVC(logger klog.Logger, obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		return
@@ -171,7 +176,7 @@ func (expc *expandController) enqueuePVC(obj interface{}) {
 	if pvc.Status.Phase == v1.ClaimBound {
 		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
 		if err != nil {
-			runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pvc, err))
+			runtime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "pvc", klog.KObj(pvc))
 			return
 		}
 		expc.queue.Add(key)
@@ -191,7 +196,7 @@ func (expc *expandController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
+	runtime.HandleErrorWithContext(ctx, err, "Error processing work item", "item", key)
 	expc.queue.AddRateLimited(key)
 
 	return true
@@ -322,8 +327,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
-
+	defer runtime.HandleCrashWithContext(ctx)
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")
 
