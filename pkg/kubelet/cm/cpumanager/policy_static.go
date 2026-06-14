@@ -675,32 +675,52 @@ func (p *staticPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID
 func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (topology.Allocation, error) {
 	logger.Info("AllocateCPUs", "numCPUs", numCPUs, "socket", numaAffinity)
 
-	allocatableCPUs := p.GetAvailableCPUs(s).Union(reusableCPUs)
+	availableCPUs := p.GetAvailableCPUs(s)
+	allocatableCPUs := availableCPUs.Union(reusableCPUs)
+	if numCPUs > allocatableCPUs.Size() {
+		return topology.EmptyAllocation(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, allocatableCPUs.Size())
+	}
 
-	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := topology.EmptyAllocation()
-	if numaAffinity != nil {
-		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
-
-		numAlignedToAlloc := alignedCPUs.Size()
-		if numCPUs < numAlignedToAlloc {
-			numAlignedToAlloc = numCPUs
+	takeCPUs := func(candidates cpuset.CPUSet, numToTake int) error {
+		candidates = candidates.Difference(result.CPUs)
+		if numToTake > candidates.Size() {
+			numToTake = candidates.Size()
+		}
+		if numToTake <= 0 {
+			return nil
 		}
 
-		allocatedCPUs, err := p.takeByTopology(logger, alignedCPUs, numAlignedToAlloc)
+		allocatedCPUs, err := p.takeByTopology(logger, candidates, numToTake)
 		if err != nil {
+			return err
+		}
+		result.CPUs = result.CPUs.Union(allocatedCPUs)
+		return nil
+	}
+
+	if numaAffinity != nil {
+		alignedReusableCPUs := p.getAlignedCPUs(numaAffinity, reusableCPUs)
+		if err := takeCPUs(alignedReusableCPUs, numCPUs-result.CPUs.Size()); err != nil {
 			return topology.EmptyAllocation(), err
 		}
 
-		result.CPUs = result.CPUs.Union(allocatedCPUs)
+		alignedCPUs := p.getAlignedCPUs(numaAffinity, availableCPUs)
+		if err := takeCPUs(alignedCPUs, numCPUs-result.CPUs.Size()); err != nil {
+			return topology.EmptyAllocation(), err
+		}
 	}
 
-	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-	remainingCPUs, err := p.takeByTopology(logger, allocatableCPUs.Difference(result.CPUs), numCPUs-result.CPUs.Size())
-	if err != nil {
+	if err := takeCPUs(reusableCPUs, numCPUs-result.CPUs.Size()); err != nil {
 		return topology.EmptyAllocation(), err
 	}
-	result.CPUs = result.CPUs.Union(remainingCPUs)
+
+	if err := takeCPUs(availableCPUs, numCPUs-result.CPUs.Size()); err != nil {
+		return topology.EmptyAllocation(), err
+	}
+	if result.CPUs.Size() != numCPUs {
+		return topology.EmptyAllocation(), fmt.Errorf("failed to allocate cpus")
+	}
 	result.Aligned = p.topology.CheckAlignment(result.CPUs)
 
 	// Remove allocated CPUs from the shared CPUSet.
