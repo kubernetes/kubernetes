@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -61,7 +62,8 @@ func TestMutationDetector(t *testing.T) {
 
 	fakeWatch.Add(pod)
 
-	wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	ctx := t.Context()
+	_ = wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 		detector.addedObjsLock.Lock()
 		defer detector.addedObjsLock.Unlock()
 		return len(detector.addedObjs) > 0, nil
