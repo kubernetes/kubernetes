@@ -249,7 +249,10 @@ is checked every 20 seconds (also configurable with a flag).`,
 			if err := logsapi.ValidateAndApplyAsField(&kubeletConfig.Logging, utilfeature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
 				return fmt.Errorf("initialize logging: %v", err)
 			}
-			cliflag.PrintFlags(cleanFlagSet)
+			// Log flags against the effective KubeletConfiguration. cleanFlagSet still binds
+			// KubeletConfiguration fields to the pre-LoadConfig object when --config is used,
+			// so PrintFlags(cleanFlagSet) can print stale values (see kubernetes/kubernetes#122736).
+			cliflag.PrintFlags(newKubeletEffectivePrintFlagSet(kubeletFlags, kubeletConfig, cleanFlagSet))
 
 			// We always validate the local configuration (command line + config file).
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
@@ -326,6 +329,21 @@ is checked every 20 seconds (also configurable with a flag).`,
 	})
 
 	return cmd
+}
+
+// newKubeletEffectivePrintFlagSet returns a FlagSet for logging kubelet flags against the effective
+// KubeletConfiguration. cleanFlagSet may still bind KubeletConfiguration fields to a struct that was
+// replaced after --config was loaded (kubernetes/kubernetes#122736).
+func newKubeletEffectivePrintFlagSet(kubeletFlags *options.KubeletFlags, kubeletConfig *kubeletconfiginternal.KubeletConfiguration, cleanFlagSet *pflag.FlagSet) *pflag.FlagSet {
+	printFlagSet := pflag.NewFlagSet("", pflag.ContinueOnError)
+	printFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+	kubeletFlags.AddFlags(printFlagSet)
+	options.AddKubeletConfigFlags(printFlagSet, kubeletConfig)
+	options.AddGlobalFlags(printFlagSet)
+	if helpFlag := cleanFlagSet.Lookup("help"); helpFlag != nil {
+		printFlagSet.AddFlag(helpFlag)
+	}
+	return printFlagSet
 }
 
 // mergeKubeletConfigurations merges the provided drop-in configurations with the base kubelet configuration.
