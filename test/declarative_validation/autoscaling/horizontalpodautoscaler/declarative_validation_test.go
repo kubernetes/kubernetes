@@ -59,6 +59,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid: minReplicas not set (nil)": {
 			input: makeValidHPA(), // Default, no minReplicas set
 		},
+		"invalid: scaleTargetRef.kind empty (required)": {
+			input: makeValidHPA(tweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkAlpha(),
+			},
+		},
+		"invalid: scaleTargetRef.name empty (required)": {
+			input: makeValidHPA(tweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkAlpha(),
+			},
+		},
 		"invalid: maxReplicas = 0 (required)": {
 			input: makeValidHPA(tweakMaxReplicas(0)),
 			expectedErrs: field.ErrorList{
@@ -113,6 +125,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:            makeValidHPA(tweakMinReplicas(1), tweakMetrics(validScaleToZeroMetrics...)),
 			updateObj:         makeValidHPA(tweakMinReplicas(0), tweakMetrics(validScaleToZeroMetrics...)),
 			enableScaleToZero: true,
+		},
+		"invalid update: scaleTargetRef.kind empty (required)": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakScaleTargetRefKind("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkAlpha(),
+			},
+		},
+		"invalid update: scaleTargetRef.name empty (required)": {
+			oldObj:    makeValidHPA(),
+			updateObj: makeValidHPA(tweakScaleTargetRefName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkAlpha(),
+			},
 		},
 		"invalid update: maxReplicas = 0 (required)": {
 			oldObj:    makeValidHPA(),
@@ -177,6 +203,18 @@ func makeValidHPA(mutators ...func(*api.HorizontalPodAutoscaler)) api.Horizontal
 		mutate(&hpa)
 	}
 	return hpa
+}
+
+func tweakScaleTargetRefKind(kind string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Kind = kind
+	}
+}
+
+func tweakScaleTargetRefName(name string) func(*api.HorizontalPodAutoscaler) {
+	return func(hpa *api.HorizontalPodAutoscaler) {
+		hpa.Spec.ScaleTargetRef.Name = name
+	}
 }
 
 func tweakMinReplicas(replicas int32) func(*api.HorizontalPodAutoscaler) {
