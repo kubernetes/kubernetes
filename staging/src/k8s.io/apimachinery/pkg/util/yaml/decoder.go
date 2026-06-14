@@ -394,6 +394,25 @@ type YAMLReader struct {
 	reader Reader
 }
 
+// isYAMLDirective returns true if b only contains YAML directives
+// (lines beginning with '%'), comments, or blank lines.
+func isYAMLDirective(b []byte) bool {
+	for _, line := range strings.Split(string(b), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) == 0 {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "%") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 func NewYAMLReader(r *bufio.Reader) *YAMLReader {
 	return &YAMLReader{
 		reader: &LineReader{reader: r},
@@ -421,6 +440,16 @@ func (r *YAMLReader) Read() ([]byte, error) {
 				}
 			}
 			if buffer.Len() != 0 {
+				// If the buffer only contains YAML directives (lines starting
+				// with '%', e.g. %YAML 1.1 or %TAG), this --- is the required
+				// document start marker and must stay with the directives.
+				if isYAMLDirective(buffer.Bytes()) {
+					buffer.Write(line)
+					if err == io.EOF { //nolint:errorlint
+						return buffer.Bytes(), nil
+					}
+					continue
+				}
 				return buffer.Bytes(), nil
 			}
 			if err == io.EOF { //nolint:errorlint
