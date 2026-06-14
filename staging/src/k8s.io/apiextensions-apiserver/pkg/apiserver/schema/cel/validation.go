@@ -95,6 +95,12 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
 	compilationSchema := *nodeSchema
 	compilationSchema.XValidations = validationSchema.XValidations
+
+	if validationSchema.ValueValidation != nil && len(validationSchema.ValueValidation.AllOf) > 0 {
+		for _, allOf := range validationSchema.ValueValidation.AllOf {
+			mergeAllOfConstraints(&compilationSchema, nestedToStructural(&allOf))
+		}
+	}
 	compiledRules, err := Compile(&compilationSchema, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()), StoredExpressionsEnvLoader())
 
 	var itemsValidator, additionalPropertiesValidator *Validator
@@ -184,6 +190,49 @@ func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot b
 	}
 
 	return nil
+}
+
+func mergeAllOfConstraints(target, allOf *schema.Structural) {
+	if allOf == nil {
+		return
+	}
+
+	// Merge maxLength for strings
+	if target.Type == "string" && allOf.ValueValidation != nil && allOf.ValueValidation.MaxLength != nil {
+		if target.ValueValidation == nil {
+			target.ValueValidation = &schema.ValueValidation{}
+		}
+		if target.ValueValidation.MaxLength == nil || *allOf.ValueValidation.MaxLength < *target.ValueValidation.MaxLength {
+			target.ValueValidation.MaxLength = allOf.ValueValidation.MaxLength
+		}
+	}
+
+	// Merge maxItems for arrays
+	if target.Type == "array" && allOf.ValueValidation != nil && allOf.ValueValidation.MaxItems != nil {
+		if target.ValueValidation == nil {
+			target.ValueValidation = &schema.ValueValidation{}
+		}
+		if target.ValueValidation.MaxItems == nil || *allOf.ValueValidation.MaxItems < *target.ValueValidation.MaxItems {
+			target.ValueValidation.MaxItems = allOf.ValueValidation.MaxItems
+		}
+	}
+
+	// Merge maxProperties for objects
+	if target.Type == "object" && allOf.ValueValidation != nil && allOf.ValueValidation.MaxProperties != nil {
+		if target.ValueValidation == nil {
+			target.ValueValidation = &schema.ValueValidation{}
+		}
+		if target.ValueValidation.MaxProperties == nil || *allOf.ValueValidation.MaxProperties < *target.ValueValidation.MaxProperties {
+			target.ValueValidation.MaxProperties = allOf.ValueValidation.MaxProperties
+		}
+	}
+
+	// Recursively merge nested allOf constraints
+	if allOf.ValueValidation != nil && len(allOf.ValueValidation.AllOf) > 0 {
+		for _, nested := range allOf.ValueValidation.AllOf {
+			mergeAllOfConstraints(target, nestedToStructural(&nested))
+		}
+	}
 }
 
 type options struct {
