@@ -4910,3 +4910,128 @@ func TestEvaluateNominatedNode(t *testing.T) {
 		})
 	}
 }
+
+func TestSchedulePodWithOpportunisticBatching(t *testing.T) {
+	tests := []struct {
+		name                         string
+		disableOpportunisticBatching bool
+		wantEvaluatedNodes           int
+	}{
+		{
+			name:                         "schedule pod with OpportunisticBatching enabled",
+			disableOpportunisticBatching: false,
+			wantEvaluatedNodes:           1,
+		},
+		{
+			name:                         "schedule pod with OpportunisticBatching disabled",
+			disableOpportunisticBatching: true,
+			wantEvaluatedNodes:           2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpportunisticBatching, !tt.disableOpportunisticBatching)
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := internalcache.New(ctx, nil, false)
+			nodes := []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			}
+			for _, node := range nodes {
+				cache.AddNode(logger, node)
+			}
+
+			cs := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+
+			registerPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "PreFilter", "Filter", "Score"),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			schedFramework, err := tf.NewFramework(
+				ctx,
+				registerPlugins, "",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+			}
+			sched.applyDefaultHandlers()
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			// Schedule first pod.
+			pod1 := st.MakePod().Name("pod1").UID("pod1").Namespace(v1.NamespaceDefault).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+			sched.SchedulingQueue.Add(ctx, pod1)
+			entity1, err := sched.SchedulingQueue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
+			poppedPod1 := entity1.(*framework.QueuedPodInfo)
+			poppedPod1.PodSignature = []byte("test-batch-sig")
+
+			result1, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), poppedPod1)
+			if err != nil {
+				t.Fatalf("Failed to schedule pod1: %v", err)
+			}
+			chosenNode := result1.SuggestedHost
+			if chosenNode != "node1" && chosenNode != "node2" {
+				t.Fatalf("Expected pod1 to be scheduled to node1 or node2, got: %s", chosenNode)
+			}
+
+			// Add pod1 to cache on the chosenNode (occupies chosenNode) and mark queue done.
+			pod1.Spec.NodeName = chosenNode
+			cache.AddPod(logger, pod1)
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("UpdateSnapshot failed: %v", err)
+			}
+			sched.SchedulingQueue.Done(pod1.UID)
+
+			otherNode := "node2"
+			if chosenNode == "node2" {
+				otherNode = "node1"
+			}
+
+			// Schedule second pod.
+			pod2 := st.MakePod().Name("pod2").UID("pod2").Namespace(v1.NamespaceDefault).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+			sched.SchedulingQueue.Add(ctx, pod2)
+			entity2, err := sched.SchedulingQueue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
+			poppedPod2 := entity2.(*framework.QueuedPodInfo)
+			poppedPod2.PodSignature = []byte("test-batch-sig")
+
+			result2, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), poppedPod2)
+			if err != nil {
+				t.Fatalf("Failed to schedule pod2: %v", err)
+			}
+			if result2.SuggestedHost != otherNode {
+				t.Fatalf("Expected pod2 to be scheduled to %s, got: %s", otherNode, result2.SuggestedHost)
+			}
+
+			if result2.EvaluatedNodes != tt.wantEvaluatedNodes {
+				t.Errorf("Unexpected EvaluatedNodes for pod2, want: %d, got: %d", tt.wantEvaluatedNodes, result2.EvaluatedNodes)
+			}
+			sched.SchedulingQueue.Done(pod2.UID)
+		})
+	}
+}
