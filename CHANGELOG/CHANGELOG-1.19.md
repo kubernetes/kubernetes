@@ -495,7 +495,7 @@ filename | sha512 hash
 
 ### Bug or Regression
 
-- Fix detach from non-existant nodes and support dangling volumes (#104912, @gnufied) [SIG Cloud Provider and Storage]
+- Fix detach from non-existent nodes and support dangling volumes (#104912, @gnufied) [SIG Cloud Provider and Storage]
 - Revert PR #102925 which introduced unexpected scheduling behavior based on balanced resource allocation (#105526, @harisund) [SIG Scheduling]
 
 ## Dependencies
