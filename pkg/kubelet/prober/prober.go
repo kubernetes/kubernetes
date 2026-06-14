@@ -23,7 +23,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	grpcprobe "k8s.io/kubernetes/pkg/probe/grpc"
+	h2cprobe "k8s.io/kubernetes/pkg/probe/h2c"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
@@ -46,6 +49,7 @@ type prober struct {
 	http   httpprobe.Prober
 	tcp    tcpprobe.Prober
 	grpc   grpcprobe.Prober
+	h2c    h2cprobe.Prober
 	runner kubecontainer.CommandRunner
 
 	recorder record.EventRecorderLogger
@@ -63,6 +67,7 @@ func newProber(
 		http:     httpprobe.New(followNonLocalRedirects),
 		tcp:      tcpprobe.New(),
 		grpc:     grpcprobe.New(),
+		h2c:      h2cprobe.New(),
 		runner:   runner,
 		recorder: recorder,
 	}
@@ -195,6 +200,29 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		}
 		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout)
 		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
+
+	case p.H2CGet != nil:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+			logger.V(4).Info("H2C-Probe skipped: feature gate disabled", "pod", klog.KObj(pod), "containerName", container.Name)
+			return probe.Unknown, "", fmt.Errorf("H2CContainerProbe feature gate is disabled")
+		}
+		if status.PodIP == "" {
+			logger.V(4).Info("H2C-Probe failed: pod IP not set", "pod", klog.KObj(pod), "containerName", container.Name)
+			return probe.Unknown, "", fmt.Errorf("pod IP is not set")
+		}
+		req, err := h2cprobe.NewRequestForH2CGetAction(p.H2CGet, status.PodIP, "probe")
+		if err != nil {
+			logger.V(4).Info("H2C-Probe failed to create request", "error", err)
+			return probe.Unknown, "", err
+		}
+		if loggerV4 := logger.V(4); logger.Enabled() {
+			port := req.URL.Port()
+			host := req.URL.Hostname()
+			path := req.URL.Path
+			headers := p.H2CGet.HTTPHeaders
+			loggerV4.Info("H2C-Probe", "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
+		}
+		return pb.h2c.Probe(req, timeout)
 
 	default:
 		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)
