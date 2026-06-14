@@ -30,10 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 // TestFeatureRollbackDoesNotChoke validates that an object created with a new
@@ -95,6 +97,51 @@ func TestFeatureRollbackDoesNotChoke(t *testing.T) {
 				}
 				if !featureEnabled && !hasField {
 					t.Errorf("Expected FileKeyRef to be PRESERVED when EnvFiles is disabled, but it was dropped")
+				}
+			},
+		},
+		{
+			name:        "H2CContainerProbe field drop",
+			featureGate: string(features.H2CContainerProbe),
+			gvr:         schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"},
+			object: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod-h2cprobe",
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx",
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Port:     intstr.FromInt32(8080),
+										Path:     "/",
+										Protocol: ptr.To(corev1.HTTPProtocolHTTP2),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			assertFn: func(t *testing.T, obj runtime.Object, featureEnabled bool) {
+				pod := obj.(*corev1.Pod)
+				hasField := false
+				if len(pod.Spec.Containers) > 0 && pod.Spec.Containers[0].LivenessProbe != nil && pod.Spec.Containers[0].LivenessProbe.HTTPGet != nil {
+					hasField = pod.Spec.Containers[0].LivenessProbe.HTTPGet.Protocol != nil && *pod.Spec.Containers[0].LivenessProbe.HTTPGet.Protocol == corev1.HTTPProtocolHTTP2
+				}
+				if featureEnabled && !hasField {
+					t.Errorf("Expected Protocol to be HTTP2 when H2CContainerProbe is enabled, but it was missing/different")
+				}
+				if !featureEnabled && !hasField {
+					t.Errorf("Expected Protocol to be PRESERVED when H2CContainerProbe is disabled, but it was dropped/changed")
 				}
 			},
 		},
