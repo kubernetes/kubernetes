@@ -17,6 +17,7 @@ limitations under the License.
 package healthz
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -28,7 +29,7 @@ import (
 )
 
 func TestMutableHealthzHandler(t *testing.T) {
-	badChecker := healthz.NamedCheck("bad", func(r *http.Request) error {
+	badChecker := healthz.NamedCheck("bad", func(_ context.Context) error {
 		return fmt.Errorf("bad")
 	})
 	for _, tc := range []struct {
@@ -141,7 +142,7 @@ func TestConcurrentChecks(t *testing.T) {
 	defer close(stopChan) // always close no matter passing or not
 	concurrentChan := make(chan interface{}, N)
 	var concurrentCount int32
-	pausingCheck := healthz.NamedCheck("pausing", func(r *http.Request) error {
+	pausingCheck := healthz.NamedCheck("pausing", func(_ context.Context) error {
 		atomic.AddInt32(&concurrentCount, 1)
 		concurrentChan <- nil
 		<-stopChan

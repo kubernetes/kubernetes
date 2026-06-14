@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -290,7 +291,7 @@ func makeAPIServiceAvailableHealthCheck(name string, apiServices []*v1.APIServic
 	})
 
 	// Don't return healthy until the pending list is empty
-	return healthz.NamedCheck(name, func(r *http.Request) error {
+	return healthz.NamedCheck(name, func(ctx context.Context) error {
 		pendingServiceNamesLock.RLock()
 		defer pendingServiceNamesLock.RUnlock()
 		if pendingServiceNames.Len() > 0 {

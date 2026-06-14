@@ -17,8 +17,8 @@ limitations under the License.
 package healthz
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"testing"
 )
 
@@ -26,7 +26,7 @@ type checkWithMessage struct {
 	message string
 }
 
-func (c *checkWithMessage) Check(_ *http.Request) error {
+func (c *checkWithMessage) Check(_ context.Context) error {
 	return fmt.Errorf("%s", c.message)
 }
 
@@ -35,7 +35,7 @@ func TestNamedHealthChecker(t *testing.T) {
 	if named.Name() != "foo" {
 		t.Errorf("expected: %v, got: %v", "foo", named.Name())
 	}
-	if err := named.Check(nil); err.Error() != "hello" {
+	if err := named.Check(context.Background()); err.Error() != "hello" {
 		t.Errorf("expected: %v, got: %v", "hello", err.Error())
 	}
 }
