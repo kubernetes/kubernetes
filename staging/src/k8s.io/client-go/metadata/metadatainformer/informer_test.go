@@ -263,3 +263,46 @@ func newPartialObjectMetadata(apiVersion, kind, namespace, name string) *metav1.
 		},
 	}
 }
+
+// TestWatchListClientWithManualListWatch is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/135895.
+// When a user constructs a cache.ListWatch directly (without
+// ToListWatcherWithWatchListSemantics) using a fake metadata client,
+// the informer must still sync when WatchListClient is enabled.
+func TestWatchListClientWithManualListWatch(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	scheme := fake.NewTestScheme()
+	metav1.AddMetaToScheme(scheme)
+	existingObj := newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", "dep-1")
+	fakeClient := fake.NewSimpleMetadataClient(scheme, existingObj)
+
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+
+	// Construct ListWatch manually without ToListWatcherWithWatchListSemantics,
+	// reproducing the pattern from the issue report.
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return fakeClient.Resource(gvr).Namespace("ns-foo").List(context.Background(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return fakeClient.Resource(gvr).Namespace("ns-foo").Watch(context.Background(), options)
+		},
+	}
+
+	informer := cache.NewSharedIndexInformer(lw, &metav1.PartialObjectMetadata{}, 0, cache.Indexers{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go informer.RunWithContext(ctx)
+
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+		t.Fatal("informer did not sync; WatchListClient with a manual ListWatch and fake metadata client is broken")
+	}
+
+	items := informer.GetStore().List()
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item in store, got %d", len(items))
+	}
+}
