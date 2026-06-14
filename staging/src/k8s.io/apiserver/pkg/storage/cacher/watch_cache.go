@@ -219,8 +219,7 @@ func (w *watchCache) Add(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Added, Object: object}
 
-	f := func(elem *store.Element) error { return w.storage.store.Add(elem) }
-	return w.processEvent(event, resourceVersion, f)
+	return w.processEvent(event, resourceVersion)
 }
 
 // Update takes runtime.Object as an argument.
@@ -231,8 +230,7 @@ func (w *watchCache) Update(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Modified, Object: object}
 
-	f := func(elem *store.Element) error { return w.storage.store.Update(elem) }
-	return w.processEvent(event, resourceVersion, f)
+	return w.processEvent(event, resourceVersion)
 }
 
 // Delete takes runtime.Object as an argument.
@@ -243,8 +241,7 @@ func (w *watchCache) Delete(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Deleted, Object: object}
 
-	f := func(elem *store.Element) error { return w.storage.store.Delete(elem) }
-	return w.processEvent(event, resourceVersion, f)
+	return w.processEvent(event, resourceVersion)
 }
 
 func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
@@ -261,7 +258,7 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
-func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*store.Element) error) error {
+func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
 	metrics.EventsReceivedCounter.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Inc()
 
 	key, err := w.config.keyFunc(event.Object)
@@ -284,12 +281,12 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		RecordTime:      w.config.clock.Now(),
 	}
 
-	// We can call w.storage.store.Get() outside of a critical section,
-	// because the w.storage.store itself is thread-safe and the only
-	// place where w.storage.store is modified is below (via updateFunc)
+	// We can call w.storage.Get() outside of a critical section,
+	// because the w.storage itself is thread-safe and the only
+	// place where it is modified is below (via UpdateStoreLocked)
 	// and these calls are serialized because reflector is processing
 	// events one-by-one.
-	previous, exists, err := w.storage.store.Get(elem)
+	previous, exists, err := w.storage.Get(event.Object)
 	if err != nil {
 		return err
 	}
@@ -308,18 +305,15 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
-		err := updateFunc(elem)
-		if err != nil {
+		if err := w.storage.UpdateStoreLocked(event.Type, elem); err != nil {
 			return err
 		}
-		if w.storage.snapshots != nil && w.storage.snapshottingEnabled.Load() {
-			if w.history.isCacheFullLocked() {
-				oldestRV := w.history.cache[w.history.startIndex%w.history.capacity].ResourceVersion
-				w.storage.snapshots.RemoveLess(oldestRV)
-			}
-			w.storage.snapshots.Add(w.resourceVersion, w.storage.store)
+		if w.history.isCacheFullLocked() {
+			oldestRV := w.history.cache[w.history.startIndex%w.history.capacity].ResourceVersion
+			w.storage.CompactSnapshotsLocked(oldestRV)
 		}
-		return err
+		w.storage.AddSnapshotLocked(w.resourceVersion)
+		return nil
 	}(); err != nil {
 		return err
 	}
