@@ -4750,7 +4750,8 @@ func TestValidatePodResizeAction(t *testing.T) {
 		testName                               string
 		currentResources, desiredResources     resourceRequirements
 		currentPodMemLimit, desiredPodMemLimit *int64
-		containerMemoryUsage, podMemoryUsage   *uint64
+		containerMemoryUsage                   *uint64
+		podMemory                              *statsapi.MemoryStats
 		expectedError                          bool
 	}{
 		{
@@ -4774,7 +4775,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](10),
-			podMemoryUsage:       ptr.To[uint64](10),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](10)},
 			expectedError:        false,
 		},
 		{
@@ -4786,7 +4787,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](200),
-			podMemoryUsage:       ptr.To[uint64](200),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](200)},
 			expectedError:        true,
 		},
 		{
@@ -4797,8 +4798,8 @@ func TestValidatePodResizeAction(t *testing.T) {
 			desiredResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
 			},
-			podMemoryUsage: ptr.To[uint64](10),
-			expectedError:  true,
+			podMemory:     &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](10)},
+			expectedError: true,
 		},
 		{
 			testName: "Add container limits, missing pod usage",
@@ -4830,7 +4831,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](20),
-			podMemoryUsage:       ptr.To[uint64](20),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](20)},
 			expectedError:        false,
 		},
 		{
@@ -4842,7 +4843,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 				memoryRequest: 100, memoryLimit: 100,
 			},
 			containerMemoryUsage: ptr.To[uint64](150),
-			podMemoryUsage:       ptr.To[uint64](150),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](150)},
 			expectedError:        true,
 		},
 		{
@@ -4855,7 +4856,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 			},
 			desiredPodMemLimit:   ptr.To[int64](100),
 			containerMemoryUsage: ptr.To[uint64](20),
-			podMemoryUsage:       ptr.To[uint64](20),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](20)},
 			expectedError:        false,
 		},
 		{
@@ -4868,7 +4869,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 			},
 			desiredPodMemLimit:   ptr.To[int64](100),
 			containerMemoryUsage: ptr.To[uint64](20),
-			podMemoryUsage:       ptr.To[uint64](200),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](200)},
 			expectedError:        true,
 		},
 		{
@@ -4882,7 +4883,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 			currentPodMemLimit:   ptr.To[int64](100),
 			desiredPodMemLimit:   ptr.To[int64](200),
 			containerMemoryUsage: ptr.To[uint64](20),
-			podMemoryUsage:       ptr.To[uint64](20),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](20)},
 			expectedError:        false,
 		},
 		{
@@ -4896,7 +4897,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 			currentPodMemLimit:   ptr.To[int64](200),
 			desiredPodMemLimit:   ptr.To[int64](100),
 			containerMemoryUsage: ptr.To[uint64](20),
-			podMemoryUsage:       ptr.To[uint64](20),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](20)},
 			expectedError:        false,
 		},
 		{
@@ -4910,7 +4911,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 			currentPodMemLimit:   ptr.To[int64](200),
 			desiredPodMemLimit:   ptr.To[int64](100),
 			containerMemoryUsage: ptr.To[uint64](50),
-			podMemoryUsage:       ptr.To[uint64](150),
+			podMemory:            &statsapi.MemoryStats{UsageBytes: ptr.To[uint64](150)},
 			expectedError:        true,
 		},
 		{
@@ -4924,7 +4925,21 @@ func TestValidatePodResizeAction(t *testing.T) {
 			currentPodMemLimit:   ptr.To[int64](200),
 			desiredPodMemLimit:   ptr.To[int64](100),
 			containerMemoryUsage: ptr.To[uint64](50),
-			podMemoryUsage:       nil,
+			podMemory:            nil,
+			expectedError:        true,
+		},
+		{
+			testName: "Decrease container limits, missing usage",
+			currentResources: resourceRequirements{
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			desiredResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](200),
+			podMemory:            nil,
 			expectedError:        true,
 		},
 	} {
@@ -4966,9 +4981,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 					Namespace: pod.Namespace,
 					UID:       string(pod.UID),
 				},
-				Memory: &statsapi.MemoryStats{
-					UsageBytes: tc.podMemoryUsage,
-				},
+				Memory: tc.podMemory,
 			}
 			for _, container := range pod.Spec.Containers {
 				podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
