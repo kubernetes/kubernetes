@@ -527,24 +527,71 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 		name                             string
 		wapFeatureGateEnabled            bool
 		postFilterPlugin                 string
+		isSubsequent                     bool
+		filterStatus                     map[string]*fwk.Status
 		expectedPodGroupPostFilterCalled bool
 	}{
 		{
-			name:                             "runs pod group post filter when WAP is enabled and DefaultPreemption is registered",
-			wapFeatureGateEnabled:            true,
-			postFilterPlugin:                 "DefaultPreemption",
+			name:                  "runs pod group post filter when WAP is enabled and DefaultPreemption is registered",
+			wapFeatureGateEnabled: true,
+			postFilterPlugin:      "DefaultPreemption",
+			filterStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+				"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+			},
 			expectedPodGroupPostFilterCalled: true,
 		},
 		{
-			name:                             "disables pod group post filter when WAP feature gate is disabled",
-			wapFeatureGateEnabled:            false,
-			postFilterPlugin:                 "DefaultPreemption",
+			name:                  "disables pod group post filter when WAP feature gate is disabled",
+			wapFeatureGateEnabled: false,
+			postFilterPlugin:      "DefaultPreemption",
+			filterStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+				"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+			},
 			expectedPodGroupPostFilterCalled: false,
 		},
 		{
-			name:                             "disables pod group post filter when DefaultPreemption is not registered",
-			wapFeatureGateEnabled:            true,
-			postFilterPlugin:                 "FakePodGroupPlugin",
+			name:                  "disables pod group post filter when DefaultPreemption is not registered",
+			wapFeatureGateEnabled: true,
+			postFilterPlugin:      "FakePodGroupPlugin",
+			filterStatus: map[string]*fwk.Status{
+				"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
+				"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
+			},
+			expectedPodGroupPostFilterCalled: false,
+		},
+		{
+			name:                  "subsequent scheduling: runs preemption even if some pods are schedulable",
+			wapFeatureGateEnabled: true,
+			postFilterPlugin:      "DefaultPreemption",
+			isSubsequent:          true,
+			filterStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": fwk.NewStatus(fwk.Unschedulable, "fail p2"),
+			},
+			expectedPodGroupPostFilterCalled: true,
+		},
+		{
+			name:                  "initial scheduling: does not run preemption if some pods are schedulable (overall success)",
+			wapFeatureGateEnabled: true,
+			postFilterPlugin:      "DefaultPreemption",
+			isSubsequent:          false,
+			filterStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": fwk.NewStatus(fwk.Unschedulable, "fail p2"),
+			},
+			expectedPodGroupPostFilterCalled: false,
+		},
+		{
+			name:                  "subsequent scheduling: does not run preemption if all pods are schedulable",
+			wapFeatureGateEnabled: true,
+			postFilterPlugin:      "DefaultPreemption",
+			isSubsequent:          true,
+			filterStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": nil,
+			},
 			expectedPodGroupPostFilterCalled: false,
 		},
 	}
@@ -558,9 +605,10 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				features.GangScheduling:          true,
 			})
 
-			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
-			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
-			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+			pgName := "pg"
+			testPodGroup := st.MakePodGroup().Name(pgName).Namespace("default").Obj()
+			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName(pgName).SchedulerName("test-scheduler").Obj()
+			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName(pgName).SchedulerName("test-scheduler").Obj()
 			testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
 			qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
@@ -569,7 +617,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			podGroupInfo := &framework.QueuedPodGroupInfo{
 				QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2},
 				PodGroupInfo: &framework.PodGroupInfo{
-					Name:            "pg",
+					Name:            pgName,
 					Namespace:       "default",
 					UnscheduledPods: []*v1.Pod{p1, p2},
 				},
@@ -580,10 +628,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			defer cancel()
 
 			fakePlugin := &fakePodGroupPlugin{
-				filterStatus: map[string]*fwk.Status{
-					"p1": fwk.NewStatus(fwk.Unschedulable, "always fail p1"),
-					"p2": fwk.NewStatus(fwk.Unschedulable, "always fail p2"),
-				},
+				filterStatus:             tt.filterStatus,
 				podGroupPostFilterStatus: nil,
 			}
 
@@ -635,6 +680,8 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				frameworkruntime.WithPodNominator(queue),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create new framework: %v", err)
@@ -643,6 +690,14 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			cache := internalcache.New(ctx, nil, true)
 			logger, ctx := ktesting.NewTestContext(t)
 			cache.AddNode(logger, testNode)
+
+			if tt.isSubsequent {
+				p3 := st.MakePod().Name("p3").UID("p3").Namespace("default").PodGroupName(pgName).Node(testNode.Name).SchedulerName("test-scheduler").Obj()
+				err := cache.AddPod(logger, p3)
+				if err != nil {
+					t.Fatalf("Failed to add pod to cache: %v", err)
+				}
+			}
 
 			sched := &Scheduler{
 				Profiles:                       profile.Map{"test-scheduler": schedFwk},
