@@ -518,6 +518,9 @@ func (dpo deletePodsOp) patchParams(w *Workload) (realOp, error) {
 type churnOp struct {
 	// Must be "churnOp".
 	Opcode operationCode
+	// Name of the churn operation. Optional.
+	// If empty, stopChurnOp stops all background churns.
+	Name string
 	// Value must be one of the followings:
 	// - recreate. In this mode, API objects will be created for N cycles, and then
 	//   deleted in the next N cycles. N is specified by the "Number" field.
@@ -884,4 +887,23 @@ func divideFloat(i, j any) float64 {
 
 func mod(a, b any) int {
 	return int(toFloat64(a)) % int(toFloat64(b))
+}
+
+// stopChurnOp defines an op that cancels any running background churn operation.
+type stopChurnOp struct {
+	Opcode operationCode
+	// Name of the churn operation to stop. Optional.
+	Name string
+}
+
+func (sco *stopChurnOp) isValid(_ bool) error {
+	return nil
+}
+
+func (*stopChurnOp) collectsMetrics() bool {
+	return false
+}
+
+func (sco stopChurnOp) patchParams(_ *Workload) (realOp, error) {
+	return &sco, nil
 }
