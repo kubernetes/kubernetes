@@ -23885,14 +23885,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get available API versions",
         "operationId": "getCoreAPIVersions",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -40457,14 +40459,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get available API versions",
         "operationId": "getAPIVersions",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -40490,14 +40494,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getAdmissionregistrationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -47479,14 +47485,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getApiextensionsAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -48404,14 +48412,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getApiregistrationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -49329,14 +49339,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getAppsAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -54935,14 +54947,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getAuthenticationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -55167,14 +55181,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getAuthorizationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -55566,14 +55582,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getAutoscalingAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -57729,14 +57747,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getBatchAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -59857,14 +59877,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getCertificatesAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -63405,14 +63427,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getCoordinationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -66051,14 +66075,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getDiscoveryAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -66955,14 +66981,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getEventsAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -67859,14 +67887,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getFlowcontrolApiserverAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -69641,14 +69671,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getInternalApiserverAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -70566,14 +70598,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getNetworkingAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -76247,14 +76281,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getNodeAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -76981,14 +77017,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getPolicyAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -78079,14 +78117,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getRbacAuthorizationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -81151,14 +81191,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getResourceAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -93489,14 +93531,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getSchedulingAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -96124,14 +96168,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getStorageAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
@@ -101250,14 +101296,16 @@
         "consumes": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "description": "get information of a group",
         "operationId": "getStoragemigrationAPIGroup",
         "produces": [
           "application/json",
           "application/yaml",
-          "application/vnd.kubernetes.protobuf"
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
         ],
         "responses": {
           "200": {
