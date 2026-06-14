@@ -678,8 +678,8 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		}
 	}
 
-	sort.Sort(containerStatusByCreated(statuses))
-	sort.Sort(containerStatusByCreated(activeContainerStatuses))
+	sort.Sort(containerStatusSort(statuses))
+	sort.Sort(containerStatusSort(activeContainerStatuses))
 	return statuses, activeContainerStatuses, nil
 }
 
