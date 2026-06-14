@@ -116,6 +116,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"RSSBytes":        bounded(1*e2evolume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 1e9),
+						"HighEvents":      memoryEventExpectation(),
+						"MaxEvents":       memoryEventExpectation(),
 						"PSI":             psiExpectation(),
 					}),
 					"IO":                 ioExpectation(maxStatsAge),
@@ -145,6 +147,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 				"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 				"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
+				"HighEvents":      memoryEventExpectation(),
+				"MaxEvents":       memoryEventExpectation(),
 				"PSI":             psiExpectation(),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -167,6 +171,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"RSSBytes":        bounded(100*e2evolume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 1e9),
+					"HighEvents":      memoryEventExpectation(),
+					"MaxEvents":       memoryEventExpectation(),
 					"PSI":             psiExpectation(),
 				})
 				systemContainers["misc"] = miscContExpectations
@@ -193,6 +199,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 							"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 							"PageFaults":      bounded(100, expectedPageFaultsUpperBound),
 							"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
+							"HighEvents":      memoryEventExpectation(),
+							"MaxEvents":       memoryEventExpectation(),
 							"PSI":             psiExpectation(),
 						}),
 						"IO":           ioExpectation(maxStatsAge),
@@ -244,6 +252,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"RSSBytes":        bounded(1*e2evolume.Kb, 80*e2evolume.Mb),
 					"PageFaults":      bounded(0, expectedPageFaultsUpperBound),
 					"MajorPageFaults": bounded(0, expectedMajorPageFaultsUpperBound),
+					"HighEvents":      memoryEventExpectation(),
+					"MaxEvents":       memoryEventExpectation(),
 					"PSI":             psiExpectation(),
 				}),
 				"IO":   ioExpectation(maxStatsAge),
@@ -298,6 +308,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 1e9),
+						"HighEvents":      memoryEventExpectation(),
+						"MaxEvents":       memoryEventExpectation(),
 						"PSI":             psiExpectation(),
 					}),
 					"IO":   ioExpectation(maxStatsAge),
@@ -490,6 +502,95 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		})
 	})
+
+	framework.Context("when querying /stats/summary for memory events", framework.WithSerial(), framework.WithNodeConformance(), func() {
+		ginkgo.It("should report memory.high events for burstable pods", func(ctx context.Context) {
+			podName := "memory-high-events-pod"
+			ginkgo.By("Creating a burstable pod that exceeds its memory.high threshold")
+			// With MemoryQoS enabled on cgroupv2, memory.high is set for burstable pods using the formula:
+			// memory.high = requests + 0.9 * (limits - requests)
+			// For requests=100M and limits=200M: memory.high ≈ 190M
+			podSpec := getStressTestPod(podName, "memory-high-events", []string{})
+			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+			podSpec.Spec.Containers[0].Args = []string{
+				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=39 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+			}
+			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("200M"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100M"),
+				},
+			}
+			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+
+			ginkgo.By("Waiting for the pod to start")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+			ginkgo.By("Validating memory.high events")
+			var highEventsMatcher types.GomegaMatcher
+			if IsCgroup2UnifiedMode() && utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+				highEventsMatcher = gstruct.PointTo(gomega.BeNumerically(">", uint64(0)))
+			} else {
+				highEventsMatcher = gstruct.PointTo(gomega.BeNumerically("==", uint64(0)))
+			}
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				summary, err := getNodeSummary(ctx)
+				framework.ExpectNoError(err)
+				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Memory": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"HighEvents": highEventsMatcher,
+						})),
+					}),
+				}))
+			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+		})
+
+		ginkgo.It("should report memory.max events when memory limit is hit", func(ctx context.Context) {
+			podName := "memory-events-pod"
+			ginkgo.By("Creating a pod that exceeds its memory limit")
+			podSpec := getStressTestPod(podName, "memory-events", []string{})
+			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+			podSpec.Spec.Containers[0].Args = []string{
+				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+			}
+			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("200M"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("200M"),
+				},
+			}
+			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+
+			ginkgo.By("Waiting for the pod to start")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+			ginkgo.By("Validating memory.max events")
+			var maxEventsMatcher types.GomegaMatcher
+			if IsCgroup2UnifiedMode() {
+				maxEventsMatcher = gstruct.PointTo(gomega.BeNumerically(">", uint64(0)))
+			} else {
+				maxEventsMatcher = gstruct.PointTo(gomega.BeNumerically("==", uint64(0)))
+			}
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				summary, err := getNodeSummary(ctx)
+				framework.ExpectNoError(err)
+				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Memory": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"MaxEvents": maxEventsMatcher,
+						})),
+					}),
+				}))
+			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+		})
+	})
 })
 
 func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...string) []*v1.Pod {
@@ -637,6 +738,10 @@ func recordSystemCgroupProcesses(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func memoryEventExpectation() types.GomegaMatcher {
+	return bounded(0, uint64(math.MaxUint64))
 }
 
 func psiExpectation() types.GomegaMatcher {
