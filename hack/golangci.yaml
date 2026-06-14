@@ -162,7 +162,9 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(apps|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+        path: "staging/src/k8s.io/api/(apps|batch|certificates|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
+      - text: "godoc for field Lease.* should start with '.* ...'"
+        path: "staging/src/k8s.io/api/coordination"
       
       # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
       - text: 'notimestamp: naming convention "notimestamp": field TokenRequestStatus.ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
@@ -262,6 +264,13 @@ linters:
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
         path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
+      
+      # The EvictionRequest.Spec.Target and Eviction.Spec.Target fields are of a union type and nonpointerstructs does not understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field EvictionRequestSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/coordination/v1alpha1/types.go"
+      - text: "nonpointerstructs: field EvictionSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/coordination/v1alpha1/types.go"
 
       - linters:
         - forbidigo

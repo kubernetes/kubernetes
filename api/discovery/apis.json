@@ -229,27 +229,6 @@
       ]
     },
     {
-      "name": "coordination.k8s.io",
-      "preferredVersion": {
-        "groupVersion": "coordination.k8s.io/v1",
-        "version": "v1"
-      },
-      "versions": [
-        {
-          "groupVersion": "coordination.k8s.io/v1",
-          "version": "v1"
-        },
-        {
-          "groupVersion": "coordination.k8s.io/v1beta1",
-          "version": "v1beta1"
-        },
-        {
-          "groupVersion": "coordination.k8s.io/v1alpha2",
-          "version": "v1alpha2"
-        }
-      ]
-    },
-    {
       "name": "node.k8s.io",
       "preferredVersion": {
         "groupVersion": "node.k8s.io/v1",
@@ -297,6 +276,31 @@
         {
           "groupVersion": "resource.k8s.io/v1alpha3",
           "version": "v1alpha3"
+        }
+      ]
+    },
+    {
+      "name": "coordination.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "coordination.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "coordination.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "coordination.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
+          "groupVersion": "coordination.k8s.io/v1alpha2",
+          "version": "v1alpha2"
+        },
+        {
+          "groupVersion": "coordination.k8s.io/v1alpha1",
+          "version": "v1alpha1"
         }
       ]
     },
