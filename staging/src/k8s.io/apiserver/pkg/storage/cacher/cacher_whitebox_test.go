@@ -2131,18 +2131,26 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	defer w.Stop()
 
 	received := 0
+	gotError := false
 	resChan := w.ResultChan()
 	for event := range resChan {
 		received++
 		t.Logf("event type: %v, events received so far: %d", event.Type, received)
-		if event.Type != watch.Added {
-			t.Errorf("unexpected event type, expected: %s, got: %s, event: %v", watch.Added, event.Type, event)
+		switch event.Type {
+		case watch.Added:
+			// expected during initial event replay
+		case watch.Error:
+			gotError = true
+		default:
+			t.Errorf("unexpected event type: %s, event: %v", event.Type, event)
 		}
 	}
-	// Since the watch is stopped after the interval is invalidated,
-	// we should have processed exactly bufferSize number of elements.
-	if received != bufferSize {
+	// bufferSize Added events followed by one Error event when the interval is invalidated.
+	if received != bufferSize+1 {
 		t.Errorf("unexpected number of events received, expected: %d, got: %d", bufferSize+1, received)
+	}
+	if !gotError {
+		t.Error("expected a watch.Error event when the cache interval is invalidated, got none")
 	}
 }
 
