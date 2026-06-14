@@ -280,12 +280,12 @@ func TestRateLimitHealthcheck(t *testing.T) {
 
 			ready := make(chan struct{})
 
-			var counter uint64
+			var counter atomic.Uint64
 			newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 				defer close(ready)
 				dummyKV := mockKV{
 					get: func(ctx context.Context) (*clientv3.GetResponse, error) {
-						atomic.AddUint64(&counter, 1)
+						counter.Add(1)
 						select {
 						case <-ctx.Done():
 							return nil, ctx.Err()
@@ -328,8 +328,8 @@ func TestRateLimitHealthcheck(t *testing.T) {
 
 			// check the counter once the requests have finished
 			wg.Wait()
-			if counter != 1 {
-				t.Errorf("healthcheck() called etcd %d times, expected only one call", counter)
+			if counter.Load() != 1 {
+				t.Errorf("healthcheck() called etcd %d times, expected only one call", counter.Load())
 			}
 
 			// wait until the rate limit allows new connections
@@ -350,8 +350,8 @@ func TestRateLimitHealthcheck(t *testing.T) {
 			}
 			wg.Wait()
 
-			if counter != 2 {
-				t.Errorf("healthcheck() called etcd %d times, expected only two calls", counter)
+			if counter.Load() != 2 {
+				t.Errorf("healthcheck() called etcd %d times, expected only two calls", counter.Load())
 			}
 		})
 	}
@@ -376,13 +376,13 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	ready := make(chan struct{})
 	signal := make(chan struct{})
 
-	var counter uint64
+	var counter atomic.Uint64
 	newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 		defer close(ready)
 		dummyKV := mockKV{
 			get: func(ctx context.Context) (*clientv3.GetResponse, error) {
-				atomic.AddUint64(&counter, 1)
-				val := atomic.LoadUint64(&counter)
+				counter.Add(1)
+				val := counter.Load()
 				// the first request wait for a custom timeout to trigger an error.
 				// We don't use the context timeout because we want to check that
 				// the cached answer is not overridden, and since the rate limit is
@@ -436,7 +436,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	c := atomic.LoadUint64(&counter)
+	c := counter.Load()
 	if c != 2 {
 		t.Errorf("healthcheck() called etcd %d times, expected only two calls", c)
 	}
@@ -447,7 +447,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	c = atomic.LoadUint64(&counter)
+	c = counter.Load()
 	if c != 2 {
 		t.Errorf("healthcheck() called etcd %d times, expected only two calls", c)
 	}

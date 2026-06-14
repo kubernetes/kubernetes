@@ -262,8 +262,6 @@ type indexedTriggerFunc struct {
 // delegated to the underlying storage).
 type Cacher struct {
 	// HighWaterMarks for performance debugging.
-	// Important: Since HighWaterMark is using sync/atomic, it has to be at the top of the struct due to a bug on 32-bit platforms
-	// See: https://golang.org/pkg/sync/atomic/ for more information
 	incomingHWM storage.HighWaterMark
 	// Incoming events that should be dispatched to watchers.
 	incoming chan watchCacheEvent

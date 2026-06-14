@@ -33,7 +33,7 @@ type TestableEventClock interface {
 
 func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.Duration) {
 	exerciseSettablePassiveClock(t, ec)
-	var numDone int32
+	var numDone atomic.Int32
 	now := ec.Now()
 	strictable := true
 	const batchSize = 100
@@ -41,7 +41,7 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 	try := func(abs, strict bool, d time.Duration) {
 		f := func(u time.Time) {
 			realD := ec.Since(now)
-			atomic.AddInt32(&numDone, 1)
+			numDone.Add(1)
 			times <- u
 			if realD < d || strict && strictable && realD > d+fuzz {
 				t.Errorf("Asked for %v, got %v", d, realD)
@@ -59,8 +59,8 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 		try(i%2 == 0, d >= 0, d)
 	}
 	ec.Run(nil)
-	if numDone != batchSize+1 {
-		t.Errorf("Got only %v events", numDone)
+	if numDone.Load() != batchSize+1 {
+		t.Errorf("Got only %v events", numDone.Load())
 	}
 	lastTime := now.Add(-3 * time.Second)
 	for i := 0; i <= batchSize; i++ {
@@ -85,8 +85,8 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 		}
 	}
 	ec.SetTime(now.Add(13*time.Second - 1))
-	if numDone != batchSize+1+shouldRun {
-		t.Errorf("Expected %v, but %v ran", shouldRun, numDone-batchSize-1)
+	if numDone.Load() != batchSize+1+shouldRun {
+		t.Errorf("Expected %v, but %v ran", shouldRun, numDone.Load()-batchSize-1)
 	}
 	lastTime = now.Add(-3 * time.Second)
 	for i := int32(0); i < shouldRun; i++ {

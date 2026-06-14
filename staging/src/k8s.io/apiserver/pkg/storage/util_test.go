@@ -68,8 +68,8 @@ func TestHighWaterMark(t *testing.T) {
 		}
 	}
 	wg.Wait()
-	if m != int64(h) {
-		t.Errorf("unexpected value, wanted %v, got %v", m, int64(h))
+	if m != h.Load() {
+		t.Errorf("unexpected value, wanted %v, got %v", m, h.Load())
 	}
 }
 
