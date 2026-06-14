@@ -244,15 +244,15 @@ func (h *podFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttrib
 // declaredFeaturesAdmitHandler is a PodAdmitHandler that checks a pod's feature requirements.
 type declaredFeaturesAdmitHandler struct {
 	ndfFramework *ndf.Framework
-	ndfSet       ndf.FeatureSet
+	ndfSetFunc   func() ndf.FeatureSet
 	version      *versionutil.Version
 }
 
 // NewDeclaredFeaturesAdmitHandler returns a new features admit handler.
-func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, nodeDeclaredFeaturesSet ndf.FeatureSet, version *versionutil.Version) PodAdmitHandler {
+func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, ndfSetFunc func() ndf.FeatureSet, version *versionutil.Version) PodAdmitHandler {
 	return &declaredFeaturesAdmitHandler{
 		ndfFramework: nodeDeclaredFeaturesHelper,
-		ndfSet:       nodeDeclaredFeaturesSet,
+		ndfSetFunc:   ndfSetFunc,
 		version:      version,
 	}
 }
@@ -275,7 +275,7 @@ func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitA
 		return PodAdmitResult{Admit: true}
 	}
 
-	matchResult, err := c.ndfFramework.MatchNodeFeatureSet(reqs, c.ndfSet)
+	matchResult, err := c.ndfFramework.MatchNodeFeatureSet(reqs, c.ndfSetFunc())
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,

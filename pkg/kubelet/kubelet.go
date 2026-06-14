@@ -1101,8 +1101,7 @@ func NewMainKubelet(ctx context.Context,
 		framework := ndf.DefaultFramework
 		klet.version = v
 		klet.nodeDeclaredFeaturesFramework = framework
-		klet.nodeDeclaredFeatures = klet.discoverNodeDeclaredFeatures()
-		klet.nodeDeclaredFeaturesSet = framework.MustMapSorted(klet.nodeDeclaredFeatures)
+		klet.updateNodeDeclaredFeatures()
 	}
 
 	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.
@@ -1140,7 +1139,7 @@ func NewMainKubelet(ctx context.Context,
 	handlers = append(handlers, lifecycle.NewPodFeaturesAdmitHandler())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
-		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesFramework, klet.nodeDeclaredFeaturesSet, klet.version))
+		handlers = append(handlers, lifecycle.NewDeclaredFeaturesAdmitHandler(klet.nodeDeclaredFeaturesFramework, klet.getNodeDeclaredFeaturesSet, klet.version))
 	}
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
@@ -1351,6 +1350,9 @@ type Kubelet struct {
 	// a list of node labels to register
 	nodeLabels map[string]string
 
+	// nodeDeclaredFeaturesMux protects nodeDeclaredFeatures and nodeDeclaredFeaturesSet,
+	// which are dynamically updated when container runtime features change.
+	nodeDeclaredFeaturesMux sync.RWMutex
 	// nodeDeclaredFeatures is the ordered static list of features that are determined at startup and declared in node status.
 	nodeDeclaredFeatures []string
 	// nodeDeclaredFeaturesSet provides the same features as nodeDeclaredFeatures, but as a set for faster inference.
@@ -2968,7 +2970,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 				logger.Error(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))
 			}
 			if !reqs.IsEmpty() {
-				matchResult, err := kl.nodeDeclaredFeaturesFramework.MatchNodeFeatureSet(reqs, kl.nodeDeclaredFeaturesSet)
+				matchResult, err := kl.nodeDeclaredFeaturesFramework.MatchNodeFeatureSet(reqs, kl.getNodeDeclaredFeaturesSet())
 				if err != nil {
 					logger.Error(err, "Failed to match pod features with the node", "pod", klog.KObj(pod))
 
@@ -3300,6 +3302,11 @@ func (kl *Kubelet) updateRuntimeUp(ctx context.Context) {
 	kl.oneTimeInitializer.Do(func() {
 		kl.initializeRuntimeDependentModules(ctx)
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && kl.nodeDeclaredFeaturesFramework != nil {
+		kl.updateNodeDeclaredFeatures()
+	}
+
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
 }
 
