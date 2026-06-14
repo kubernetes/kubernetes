@@ -29,11 +29,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -111,9 +109,6 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 }
 
 func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
-		return nil
-	}
 	c := time.After(time.Duration(seconds) * time.Second)
 	select {
 	case <-ctx.Done():

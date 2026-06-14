@@ -740,18 +740,6 @@ const (
 	// Enables specifying resources at pod-level.
 	PodLevelResources featuregate.Feature = "PodLevelResources"
 
-	// owner: @AxeZhan
-	// kep: http://kep.k8s.io/3960
-	//
-	// Enables SleepAction in container lifecycle hooks
-	PodLifecycleSleepAction featuregate.Feature = "PodLifecycleSleepAction"
-
-	// owner: @sreeram-venkitesh
-	// kep: http://kep.k8s.io/4818
-	//
-	// Allows zero value for sleep duration in SleepAction in container lifecycle hooks
-	PodLifecycleSleepActionAllowZero featuregate.Feature = "PodLifecycleSleepActionAllowZero"
-
 	// owner: @knight42
 	// kep: https://kep.k8s.io/3288
 	//
@@ -1706,18 +1694,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	PodLifecycleSleepAction: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.34; remove in 1.37
-	},
-
-	PodLifecycleSleepActionAllowZero: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.34, remove in 1.37
-	},
-
 	PodLogsQuerySplitStreams: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2460,10 +2436,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodLevelResourceManagers: {PodLevelResources},
 
 	PodLevelResources: {},
-
-	PodLifecycleSleepAction: {},
-
-	PodLifecycleSleepActionAllowZero: {PodLifecycleSleepAction},
 
 	PodLogsQuerySplitStreams: {},
 
