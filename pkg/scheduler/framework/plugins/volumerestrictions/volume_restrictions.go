@@ -19,6 +19,7 @@ package volumerestrictions
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -38,6 +40,7 @@ import (
 type VolumeRestrictions struct {
 	pvcLister    corelisters.PersistentVolumeClaimLister
 	sharedLister fwk.SharedLister
+	parallelizer parallelize.Parallelizer
 }
 
 var _ fwk.PreFilterPlugin = &VolumeRestrictions{}
@@ -187,7 +190,7 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.Cycl
 		return nil, fwk.AsStatus(err)
 	}
 
-	s, err := pl.calPreFilterState(ctx, pod, pvcs)
+	s, err := pl.calPreFilterState(ctx, pod, nodes, pvcs)
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
@@ -235,15 +238,23 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 
 // calPreFilterState computes preFilterState describing which PVCs use ReadWriteOncePod
 // and which pods in the cluster are in conflict.
-func (pl *VolumeRestrictions) calPreFilterState(ctx context.Context, pod *v1.Pod, pvcs sets.Set[string]) (*preFilterState, error) {
+func (pl *VolumeRestrictions) calPreFilterState(ctx context.Context, pod *v1.Pod, nodes []fwk.NodeInfo, pvcs sets.Set[string]) (*preFilterState, error) {
 	conflictingPVCRefCount := 0
-	for pvc := range pvcs {
-		key := framework.GetNamespacedName(pod.Namespace, pvc)
-		if pl.sharedLister.StorageInfos().IsPVCUsedByPods(key) {
-			// There can only be at most one pod using the ReadWriteOncePod PVC.
-			conflictingPVCRefCount += 1
-		}
+	refCount := &atomic.Int32{}
+	// list iteration is faster than map
+	pvcList := pvcs.UnsortedList()
+	if len(pvcList) > 0 {
+		pl.parallelizer.Until(ctx, len(nodes), func(n int) {
+			for _, pvc := range pvcList {
+				key := framework.GetNamespacedName(pod.Namespace, pvc)
+				_, ok := nodes[n].GetPVCRefCounts()[key]
+				if ok {
+					refCount.Add(1)
+				}
+			}
+		}, pl.Name())
 	}
+	conflictingPVCRefCount = int(refCount.Load())
 	return &preFilterState{
 		readWriteOncePodPVCs:   pvcs,
 		conflictingPVCRefCount: conflictingPVCRefCount,
@@ -419,5 +430,6 @@ func New(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Fea
 	return &VolumeRestrictions{
 		pvcLister:    pvcLister,
 		sharedLister: sharedLister,
+		parallelizer: handle.Parallelizer().(parallelize.Parallelizer),
 	}, nil
 }
