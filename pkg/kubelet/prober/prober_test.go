@@ -364,6 +364,158 @@ func TestNewProber(t *testing.T) {
 
 }
 
+func TestProbeFailureWithThresholdContext(t *testing.T) {
+	err := v1.AddToScheme(legacyscheme.Scheme)
+	require.NoError(t, err, "failed to add v1 to scheme")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "test-probe-pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "test-probe-container",
+					LivenessProbe: &v1.Probe{
+						ProbeHandler: v1.ProbeHandler{
+							Exec: &v1.ExecAction{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
+
+	testCases := []struct {
+		name             string
+		resultRun        int
+		lastResult       results.Result
+		failureThreshold int32
+		expectedMessage  string
+	}{
+		{
+			name:             "First failure of 3 threshold - should be ignored",
+			resultRun:        0,          // no previous run count (new sequence)
+			lastResult:       results.Success, // was succeeding before
+			failureThreshold: 3,
+			expectedMessage:  "Warning Unhealthy Liveness probe failed (1/3, will be ignored): ",
+		},
+		{
+			name:             "Second failure of 3 threshold - should be ignored",
+			resultRun:        1, // 1 previous failure
+			lastResult:       results.Failure,
+			failureThreshold: 3,
+			expectedMessage:  "Warning Unhealthy Liveness probe failed (2/3, will be ignored): ",
+		},
+		{
+			name:             "Third failure of 3 threshold - should NOT be ignored",
+			resultRun:        2, // 2 previous failures
+			lastResult:       results.Failure,
+			failureThreshold: 3,
+			expectedMessage:  "Warning Unhealthy Liveness probe failed (3/3): ",
+		},
+		{
+			name:             "Fourth failure of 3 threshold - should NOT be ignored",
+			resultRun:        3, // 3 previous failures
+			lastResult:       results.Failure,
+			failureThreshold: 3,
+			expectedMessage:  "Warning Unhealthy Liveness probe failed (4/3): ",
+		},
+		{
+			name:             "First failure of 1 threshold - should NOT be ignored",
+			resultRun:        0,
+			lastResult:       results.Success,
+			failureThreshold: 1,
+			expectedMessage:  "Warning Unhealthy Liveness probe failed (1/1): ",
+		},
+		{
+			name:             "First failure after many successes - should be ignored",
+			resultRun:        10, // 10 previous successes
+			lastResult:       results.Success,
+			failureThreshold: 3,
+			expectedMessage:  "Warning Unhealthy Liveness probe failed (1/3, will be ignored): ",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeRecorder := record.NewFakeRecorder(10)
+
+			pb := &prober{
+				recorder: fakeRecorder,
+				exec:     fakeExecProber{probe.Failure, nil},
+			}
+
+			probeCtx := &ProbeContext{
+				ResultRun:        tc.resultRun,
+				LastResult:       tc.lastResult,
+				FailureThreshold: tc.failureThreshold,
+				SuccessThreshold: 1,
+			}
+
+			result, err := pb.probeWithContext(tCtx, liveness, pod, v1.PodStatus{}, pod.Spec.Containers[0], containerID, probeCtx)
+			require.NoError(t, err)
+			assert.Equal(t, results.Failure, result)
+
+			select {
+			case event := <-fakeRecorder.Events:
+				assert.Equal(t, tc.expectedMessage, event, "unexpected event message")
+			default:
+				t.Error("expected an event to be recorded")
+			}
+		})
+	}
+}
+
+func TestProbeFailureWithoutContext(t *testing.T) {
+	err := v1.AddToScheme(legacyscheme.Scheme)
+	require.NoError(t, err, "failed to add v1 to scheme")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "test-probe-pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "test-probe-container",
+					LivenessProbe: &v1.Probe{
+						ProbeHandler: v1.ProbeHandler{
+							Exec: &v1.ExecAction{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
+
+	tCtx := ktesting.Init(t)
+	fakeRecorder := record.NewFakeRecorder(10)
+
+	pb := &prober{
+		recorder: fakeRecorder,
+		exec:     fakeExecProber{probe.Failure, nil},
+	}
+
+	// Call probe without context (backward compatibility)
+	result, err := pb.probe(tCtx, liveness, pod, v1.PodStatus{}, pod.Spec.Containers[0], containerID)
+	require.NoError(t, err)
+	assert.Equal(t, results.Failure, result)
+
+	select {
+	case event := <-fakeRecorder.Events:
+		// Should use the original message format without threshold info
+		assert.Equal(t, "Warning Unhealthy Liveness probe failed: ", event, "unexpected event message")
+	default:
+		t.Error("expected an event to be recorded")
+	}
+}
+
 func TestRecordContainerEventUnknownStatus(t *testing.T) {
 
 	err := v1.AddToScheme(legacyscheme.Scheme)
