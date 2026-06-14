@@ -638,7 +638,7 @@ func WaitTimeoutForPodReadyInNamespace(ctx context.Context, c clientset.Interfac
 	return WaitForPodCondition(ctx, c, namespace, podName, "running and ready", timeout, func(pod *v1.Pod) (bool, error) {
 		switch pod.Status.Phase {
 		case v1.PodFailed, v1.PodSucceeded:
-			return false, gomega.StopTrying(fmt.Sprintf("The phase of Pod %s is %s which is unexpected.", pod.Name, pod.Status.Phase))
+			return false, gomega.StopTrying(fmt.Sprintf("The phase of Pod %s is %s which is unexpected: %+v", pod.Name, pod.Status.Phase,pod.Status))
 		case v1.PodRunning:
 			return podutils.IsPodReady(pod), nil
 		}
