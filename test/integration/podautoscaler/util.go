@@ -132,6 +132,12 @@ func withHPAMinMaxReplicas(minReplicas, maxReplicas int32) createHPAOption {
 	}
 }
 
+func withHPABehavior(behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) createHPAOption {
+	return func(hpa *autoscalingv2.HorizontalPodAutoscaler) {
+		hpa.Spec.Behavior = behavior
+	}
+}
+
 func createHPA(t *testing.T, cs *clientset.Clientset, deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, opts ...createHPAOption) *autoscalingv2.HorizontalPodAutoscaler {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
@@ -238,6 +244,16 @@ func equalReplicas(replicas int32) func(*appsv1.Deployment) error {
 		r := ptr.Deref(d.Spec.Replicas, math.MaxInt32)
 		if r != replicas {
 			return fmt.Errorf("got %d replicas, want exactly %d", r, replicas)
+		}
+		return nil
+	}
+}
+
+func noMoreThanReplicas(maxReplicas int32) func(*appsv1.Deployment) error {
+	return func(d *appsv1.Deployment) error {
+		r := ptr.Deref(d.Spec.Replicas, 0)
+		if r > maxReplicas {
+			return fmt.Errorf("got %d replicas, want at most %d", r, maxReplicas)
 		}
 		return nil
 	}
