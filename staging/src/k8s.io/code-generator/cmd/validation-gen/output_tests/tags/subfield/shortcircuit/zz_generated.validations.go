@@ -218,6 +218,21 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type ParentWithPointerOpaqueAlias
+	scheme.AddValidationFunc(
+		(*ParentWithPointerOpaqueAlias)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ParentWithPointerOpaqueAlias(
+					ctx, op, nil, /* fldPath */
+					obj.(*ParentWithPointerOpaqueAlias),
+					safe.Cast[*ParentWithPointerOpaqueAlias](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ParentWithRequired
 	scheme.AddValidationFunc(
 		(*ParentWithRequired)(nil),
@@ -821,6 +836,47 @@ func Validate_ParentWithOptional(
 				return &oldObj.Field
 			})
 		errs = append(errs, fn(fldPath.Child("field"), &obj.Field, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_ParentWithPointerOpaqueAlias validates an instance of ParentWithPointerOpaqueAlias according
+// to declarative validation rules in the API schema.
+func Validate_ParentWithPointerOpaqueAlias(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ParentWithPointerOpaqueAlias) (errs field.ErrorList) {
+
+	// field ParentWithPointerOpaqueAlias.TypeMeta has no validation
+
+	{ // field ParentWithPointerOpaqueAlias.Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *AliasOpaqueTargetWithRequired,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "value"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+					func(o *AliasOpaqueTargetWithRequired) *string { return o.Value }, validate.DirectEqualPtr,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithPointerOpaqueAlias.Field.Value")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ParentWithPointerOpaqueAlias) *AliasOpaqueTargetWithRequired {
+				return oldObj.Field
+			})
+		errs = append(errs, fn(fldPath.Child("field"), obj.Field, oldVal, oldObj != nil)...)
 	}
 
 	return errs

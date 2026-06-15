@@ -102,92 +102,87 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 	}
 	getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
 
-	// equivArg is the function that is used to compare the correlated
-	// elements in the old and new lists, for ratcheting.
-	var equivArg any
-
-	// directComparable is used to determine whether we can use the direct
-	// comparison operator "==" or need to use the semantic DeepEqual when
-	// looking up and comparing correlated list elements for validation ratcheting.
-	directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type)))
-	if directComparable {
+	// equivArg compares the correlated elements in the old and new lists, for
+	// ratcheting. directComparable selects "==" vs semantic DeepEqual.
+	var equivArg any = Identifier(validateSemanticDeepEqual)
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type))) {
 		// It must be a pointer, since other nilable types are not directly
 		// comparable.
 		equivArg = Identifier(validateDirectEqualPtr)
-	} else {
-		equivArg = Identifier(validateSemanticDeepEqual)
 	}
 
-	var combinedValidations Validations
-	key := subContext.Path.String()
-	// Extract and copy the subfield's own short-circuit validations (e.g. required
-	// or immutable) once per subfield path. Since multiple subfield validations can
-	// target the same field, doing this for all tags would emit duplicate validations.
-	if !stv.processedShortCircuits[key] {
-		stv.processedShortCircuits[key] = true
-		isOpaque := false
-		if ve, ok := stv.validator.(ValidationExtractor); ok {
-			var err error
-			checkOpaque := func(comments []string) (bool, error) {
-				tags, err := ve.ExtractTags(context, comments)
-				if err != nil {
-					return false, err
-				}
-				return util.HasTag(tags, opaqueTypeTagName), nil
-			}
-
-			if context.Member != nil {
-				isOpaque, err = checkOpaque(context.Member.CommentLines)
-				if err != nil {
-					return Validations{}, err
-				}
-			}
-			if !isOpaque && context.Type != nil {
-				isOpaque, err = checkOpaque(context.Type.CommentLines)
-				if err != nil {
-					return Validations{}, err
-				}
-			}
-
-			if !isOpaque {
-				tags, err := ve.ExtractTags(subContext, submemb.CommentLines)
-				if err != nil {
-					return Validations{}, err
-				}
-				memberValidations, err := ve.ExtractValidations(subContext, tags...)
-				if err != nil {
-					return Validations{}, err
-				}
-				combinedValidations.Add(copyShortCircuitsAsNonError(memberValidations))
-			}
-		}
-	}
-
-	validations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
+	tagValidations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}
-	combinedValidations.Add(validations)
 
-	mapped := WrapFunctions(combinedValidations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
-		// This functions will be emitted without cohort, like Union validations.
-		if scope == ParentContext {
-			return fn
+	// Only the parent-member short-circuit inheritance depends on opaque-tag
+	// globals (see globalOpaqueTypes / globalOpaqueMembers in opaque.go), so
+	// defer just that decision until all opaque tags have been registered. The
+	// rest of the wrapping is independent and runs eagerly.
+	result := Validations{}
+	result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+		// Inherited short-circuits run first so a failing required/immutable
+		// check on the parent member skips the subfield's own validations.
+		var combined Validations
+		if !isFieldOpaque(context) {
+			fieldValidations, err := stv.extractMemberShortCircuits(subContext)
+			if err != nil {
+				return Validations{}, err
+			}
+			combined.Add(fieldValidations)
 		}
-		f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
-			WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
-		f.Cohort = subname
-		return f
-	})
+		combined.Add(tagValidations)
 
-	for i := range mapped.Deferred {
-		// The validations are of the subfields and should be scoped to the field.
-		if mapped.Deferred[i].Scope == ParentContext {
-			mapped.Deferred[i].Scope = ThisContext
+		mapped := WrapFunctions(combined, func(fn FunctionGen, scope DeferredScope) FunctionGen {
+			// ParentContext functions (e.g. Union) emit without a cohort.
+			if scope == ParentContext {
+				return fn
+			}
+			f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
+				WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
+			f.Cohort = subname
+			return f
+		})
+
+		for i := range mapped.Deferred {
+			// The validations belong to the subfield, so re-scope ParentContext
+			// (which would target the enclosing struct) to ThisContext.
+			if mapped.Deferred[i].Scope == ParentContext {
+				mapped.Deferred[i].Scope = ThisContext
+			}
 		}
+
+		return mapped, nil
+	}))
+	return result, nil
+}
+
+// extractMemberShortCircuits extracts short-circuit validations (e.g. required,
+// immutable) from the child member's own comment lines so that the subfield
+// validator can inherit them. Each subfield path is processed at most once;
+// without this dedup, multiple subfield tags for the same child field would emit
+// duplicate short-circuit validations.
+func (stv *subfieldTagValidator) extractMemberShortCircuits(subContext Context) (Validations, error) {
+	key := subContext.Path.String()
+	if stv.processedShortCircuits[key] {
+		return Validations{}, nil
 	}
+	stv.processedShortCircuits[key] = true
 
-	return mapped, nil
+	ve, ok := stv.validator.(ValidationExtractor)
+	if !ok {
+		return Validations{}, fmt.Errorf("validator does not implement ValidationExtractor")
+	}
+	tags, err := ve.ExtractTags(subContext, subContext.Member.CommentLines)
+	if err != nil {
+		return Validations{}, err
+	}
+	memberValidations, err := ve.ExtractValidations(subContext, tags...)
+	if err != nil {
+		return Validations{}, err
+	}
+	return copyShortCircuitsAsNonError(memberValidations), nil
 }
 
 func (stv *subfieldTagValidator) Docs() TagDoc {

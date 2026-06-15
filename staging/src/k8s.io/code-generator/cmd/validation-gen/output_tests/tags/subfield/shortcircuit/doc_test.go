@@ -24,10 +24,9 @@ import (
 
 func TestRequiredShortCircuit(t *testing.T) {
 	tests := []struct {
-		name                string
-		value               any
-		expectValidateFalse map[string][]string
-		expectErrors        field.ErrorList
+		name         string
+		value        any
+		expectErrors field.ErrorList
 	}{
 		{
 			name: "required field is nil, short circuits",
@@ -38,7 +37,7 @@ func TestRequiredShortCircuit(t *testing.T) {
 			},
 			expectErrors: field.ErrorList{
 				field.Required(field.NewPath("field", "value"), ""),
-			},
+			}.MarkShortCircuit(),
 		},
 		{
 			name: "required field is provided, subfield validation runs",
@@ -47,8 +46,8 @@ func TestRequiredShortCircuit(t *testing.T) {
 					Value: new(""),
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithRequired.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithRequired.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -58,8 +57,8 @@ func TestRequiredShortCircuit(t *testing.T) {
 					Value: nil,
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithOpaqueField.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithOpaqueField.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -69,11 +68,10 @@ func TestRequiredShortCircuit(t *testing.T) {
 					Value: nil,
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithAlphaOpaqueField.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithAlphaOpaqueField.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
-
 		{
 			name: "opaqueType on alias, required check is not inherited, subfield validation runs",
 			value: &ParentWithOpaqueAlias{
@@ -81,32 +79,39 @@ func TestRequiredShortCircuit(t *testing.T) {
 					Value: nil,
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithOpaqueAlias.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithOpaqueAlias.Field.Value").WithOrigin("validateFalse"),
+			},
+		},
+		{
+			name: "opaqueType on pointer alias, required check is not inherited, subfield validation runs",
+			value: &ParentWithPointerOpaqueAlias{
+				Field: &AliasOpaqueTargetWithRequired{
+					Value: nil,
+				},
+			},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithPointerOpaqueAlias.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 	}
 
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact().MatchShortCircuit()
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			st := localSchemeBuilder.Test(t)
-			tester := st.Value(tc.value)
-			if len(tc.expectErrors) > 0 {
-				tester.ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), tc.expectErrors)
-			} else {
-				tester.ExpectValidateFalseByPath(tc.expectValidateFalse)
-			}
+			st.Value(tc.value).ExpectMatches(matcher, tc.expectErrors)
 		})
 	}
 }
 
 func TestImmutableShortCircuit(t *testing.T) {
 	tests := []struct {
-		name                string
-		value               any
-		oldValue            any
-		expectValidateFalse map[string][]string
-		expectErrors        field.ErrorList
+		name         string
+		value        any
+		oldValue     any
+		expectErrors field.ErrorList
 	}{
 		{
 			name: "immutable field changed on update, short circuits",
@@ -121,8 +126,8 @@ func TestImmutableShortCircuit(t *testing.T) {
 				},
 			},
 			expectErrors: field.ErrorList{
-				field.Invalid(field.NewPath("field", "value"), "new", "").WithOrigin("immutable"),
-			},
+				field.Invalid(field.NewPath("field", "value"), "new", "field is immutable").WithOrigin("immutable"),
+			}.MarkShortCircuit(),
 		},
 		{
 			name: "immutable field not validated on create, subfield validation runs",
@@ -131,8 +136,8 @@ func TestImmutableShortCircuit(t *testing.T) {
 					Value: "new",
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithImmutable.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithImmutable.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -147,8 +152,8 @@ func TestImmutableShortCircuit(t *testing.T) {
 					Value: "old",
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithOpaqueImmutableField.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithOpaqueImmutableField.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -163,11 +168,10 @@ func TestImmutableShortCircuit(t *testing.T) {
 					Value: "old",
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithAlphaOpaqueImmutableField.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithAlphaOpaqueImmutableField.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
-
 		{
 			name: "opaqueType on alias, immutable check is not inherited, subfield validation runs on update",
 			value: &ParentWithOpaqueImmutableAlias{
@@ -180,11 +184,13 @@ func TestImmutableShortCircuit(t *testing.T) {
 					Value: "old",
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithOpaqueImmutableAlias.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithOpaqueImmutableAlias.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 	}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact().MatchShortCircuit()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -193,22 +199,17 @@ func TestImmutableShortCircuit(t *testing.T) {
 			if tc.oldValue != nil {
 				tester.OldValue(tc.oldValue)
 			}
-			if len(tc.expectErrors) > 0 {
-				tester.ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().MatchShortCircuit(), tc.expectErrors.MarkShortCircuit())
-			} else {
-				tester.ExpectValidateFalseByPath(tc.expectValidateFalse)
-			}
+			tester.ExpectMatches(matcher, tc.expectErrors)
 		})
 	}
 }
 
 func TestMultipleShortCircuit(t *testing.T) {
 	tests := []struct {
-		name                string
-		value               any
-		oldValue            any
-		expectValidateFalse map[string][]string
-		expectErrors        field.ErrorList
+		name         string
+		value        any
+		oldValue     any
+		expectErrors field.ErrorList
 	}{
 		{
 			name: "required field is nil, short circuits at field level",
@@ -217,7 +218,7 @@ func TestMultipleShortCircuit(t *testing.T) {
 			},
 			expectErrors: field.ErrorList{
 				field.Required(field.NewPath("field"), ""),
-			},
+			}.MarkShortCircuit(),
 		},
 		{
 			name: "immutable subfield changed, short circuits at subfield level on update",
@@ -232,8 +233,8 @@ func TestMultipleShortCircuit(t *testing.T) {
 				},
 			},
 			expectErrors: field.ErrorList{
-				field.Invalid(field.NewPath("field", "value"), "new", "").WithOrigin("immutable"),
-			},
+				field.Invalid(field.NewPath("field", "value"), "new", "field is immutable").WithOrigin("immutable"),
+			}.MarkShortCircuit(),
 		},
 		{
 			name: "field is not nil, subfield validation runs on create",
@@ -242,11 +243,13 @@ func TestMultipleShortCircuit(t *testing.T) {
 					Value: new("val"),
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithMultipleShortCircuit.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithMultipleShortCircuit.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 	}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact().MatchShortCircuit()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -255,22 +258,17 @@ func TestMultipleShortCircuit(t *testing.T) {
 			if tc.oldValue != nil {
 				tester.OldValue(tc.oldValue)
 			}
-			if len(tc.expectErrors) > 0 {
-				tester.ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().MatchShortCircuit(), tc.expectErrors.MarkShortCircuit())
-			} else {
-				tester.ExpectValidateFalseByPath(tc.expectValidateFalse)
-			}
+			tester.ExpectMatches(matcher, tc.expectErrors)
 		})
 	}
 }
 
 func TestOtherShortCircuits(t *testing.T) {
 	tests := []struct {
-		name                string
-		value               any
-		oldValue            any
-		expectValidateFalse map[string][]string
-		expectErrors        field.ErrorList
+		name         string
+		value        any
+		oldValue     any
+		expectErrors field.ErrorList
 	}{
 		// +k8s:optional
 		{
@@ -280,7 +278,7 @@ func TestOtherShortCircuits(t *testing.T) {
 					Value: nil,
 				},
 			},
-			expectValidateFalse: map[string][]string{},
+			expectErrors: nil,
 		},
 		{
 			name: "optional field is provided, subfield validation runs",
@@ -289,8 +287,8 @@ func TestOtherShortCircuits(t *testing.T) {
 					Value: new(""),
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithOptional.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithOptional.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 
@@ -302,7 +300,7 @@ func TestOtherShortCircuits(t *testing.T) {
 					Value: nil,
 				},
 			},
-			expectValidateFalse: map[string][]string{},
+			expectErrors: nil,
 		},
 		{
 			name: "forbidden field is provided, fails forbidden validation and short circuits",
@@ -313,7 +311,7 @@ func TestOtherShortCircuits(t *testing.T) {
 			},
 			expectErrors: field.ErrorList{
 				field.Forbidden(field.NewPath("field", "value"), ""),
-			},
+			}.MarkShortCircuit(),
 		},
 
 		// +k8s:update
@@ -324,8 +322,8 @@ func TestOtherShortCircuits(t *testing.T) {
 					Value: "any",
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithUpdate.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithUpdate.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -341,8 +339,8 @@ func TestOtherShortCircuits(t *testing.T) {
 				},
 			},
 			expectErrors: field.ErrorList{
-				field.Invalid(field.NewPath("field", "value"), "new", "").WithOrigin("update"),
-			},
+				field.Invalid(field.NewPath("field", "value"), "new", "field cannot be modified once set").WithOrigin("update"),
+			}.MarkShortCircuit(),
 		},
 
 		// +k8s:maxItems
@@ -353,8 +351,8 @@ func TestOtherShortCircuits(t *testing.T) {
 					Value: []string{"a", "b"},
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithMaxItems.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithMaxItems.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -366,7 +364,7 @@ func TestOtherShortCircuits(t *testing.T) {
 			},
 			expectErrors: field.ErrorList{
 				field.TooMany(field.NewPath("field", "value"), 3, 2).WithOrigin("maxItems"),
-			},
+			}.MarkShortCircuit(),
 		},
 
 		// +k8s:maxProperties
@@ -377,8 +375,8 @@ func TestOtherShortCircuits(t *testing.T) {
 					Value: map[string]string{"a": "1", "b": "2"},
 				},
 			},
-			expectValidateFalse: map[string][]string{
-				"field.value": {"subfield ParentWithMaxProperties.Field.Value"},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithMaxProperties.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 		{
@@ -390,9 +388,11 @@ func TestOtherShortCircuits(t *testing.T) {
 			},
 			expectErrors: field.ErrorList{
 				field.TooMany(field.NewPath("field", "value"), 3, 2).WithOrigin("maxProperties"),
-			},
+			}.MarkShortCircuit(),
 		},
 	}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact().MatchShortCircuit()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -401,11 +401,7 @@ func TestOtherShortCircuits(t *testing.T) {
 			if tc.oldValue != nil {
 				tester.OldValue(tc.oldValue)
 			}
-			if len(tc.expectErrors) > 0 {
-				tester.ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().MatchShortCircuit(), tc.expectErrors.MarkShortCircuit())
-			} else {
-				tester.ExpectValidateFalseByPath(tc.expectValidateFalse)
-			}
+			tester.ExpectMatches(matcher, tc.expectErrors)
 		})
 	}
 }

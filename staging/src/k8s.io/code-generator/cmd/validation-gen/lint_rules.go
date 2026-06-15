@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -139,9 +138,23 @@ func validationStability() lintRule {
 	}
 }
 
+// hasTag recursively checks if a tag with given name exists in the tag tree.
+func hasTag(tags []codetags.Tag, name string) bool {
+	for _, tag := range tags {
+		if tag.Name == name {
+			return true
+		}
+		// Also check conditional tags value
+		if tag.ValueTag != nil && hasTag([]codetags.Tag{*tag.ValueTag}, name) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasRequirednessTag returns true if tags contain +k8s:optional, +k8s:required, or +k8s:forbidden.
 func hasRequirednessTag(tags []codetags.Tag) bool {
-	return util.HasTag(tags, "k8s:optional") || util.HasTag(tags, "k8s:required") || util.HasTag(tags, "k8s:forbidden")
+	return hasTag(tags, "k8s:optional") || hasTag(tags, "k8s:required") || hasTag(tags, "k8s:forbidden")
 }
 
 // hasNonOpaqueValidationTag returns true if tags contain any registered validation tag that is not opaqueType.

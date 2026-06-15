@@ -85,6 +85,12 @@ type ParentWithOpaqueAlias struct {
 	Field AliasOpaqueTargetWithRequired `json:"field"`
 }
 
+type ParentWithPointerOpaqueAlias struct {
+	TypeMeta int `json:"typeMeta"`
+	// +k8s:subfield(value)=+k8s:validateFalse="subfield ParentWithPointerOpaqueAlias.Field.Value"
+	Field *AliasOpaqueTargetWithRequired `json:"field"`
+}
+
 // +k8s:opaqueType
 type AliasOpaqueTargetWithImmutable TargetWithImmutable
 

@@ -125,7 +125,17 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	if len(validations.Deferred) > 0 {
-		return Validations{}, fmt.Errorf("nested deferred validations are not supported for eachVal value")
+		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+			resolved := Validations{}
+			for _, d := range validations.Deferred {
+				inner, err := d.Callback()
+				if err != nil {
+					return Validations{}, err
+				}
+				resolved.Add(inner)
+			}
+			return evtv.getValidations(context.Path, t, resolved)
+		}))
 	}
 
 	if result.Empty() {
@@ -159,9 +169,6 @@ func ForEachVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations
 // t is expected to be the top-most type of the list. For example, if this is a
 // typedef to a list, this is the alias type, not the underlying type.
 func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
-	result := Validations{}
-	result.OpaqueValType = validations.OpaqueType
-
 	listMetadata := evtv.byPath[fldPath.String()]
 	if listMetadata == nil {
 		// If we don't have metadata for this field, we might have it for the
@@ -207,35 +214,37 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		}
 	}
 
-	for _, vfn := range validations.Functions {
+	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		vfn = Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
-		result.AddFunction(vfn)
-	}
-
-	return result, nil
+		return Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+	})
+	// Only Functions/Deferred carry forward; element opacity becomes value opacity.
+	return Validations{
+		Functions:     wrapped.Functions,
+		Deferred:      wrapped.Deferred,
+		OpaqueValType: validations.OpaqueType,
+	}, nil
 }
 
 // t is expected to be the top-most type of the map. For example, if this is a
 // typedef to a map, this is the alias type, not the underlying type.
 func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Validations) (Validations, error) {
-	result := Validations{}
-	result.OpaqueValType = validations.OpaqueType
-
 	nt := util.NativeType(t)
 	equivArg := Identifier(validateSemanticDeepEqual)
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 		equivArg = Identifier(validateDirectEqual)
 	}
-	for _, vfn := range validations.Functions {
+	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		vfn = Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
-		result.AddFunction(vfn)
-	}
-
-	return result, nil
+		return Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+	})
+	return Validations{
+		Functions:     wrapped.Functions,
+		Deferred:      wrapped.Deferred,
+		OpaqueValType: validations.OpaqueType,
+	}, nil
 }
 
 func (evtv eachValTagValidator) Docs() TagDoc {
@@ -292,28 +301,61 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		StabilityLevel: context.StabilityLevel,
 	}
 
-	if validations, err := ektv.validator.ExtractTagValidations(elemContext, *tag.ValueTag); err != nil {
+	validations, err := ektv.validator.ExtractTagValidations(elemContext, *tag.ValueTag)
+	if err != nil {
 		return Validations{}, err
-	} else {
-		if len(validations.Variables) > 0 {
-			return Validations{}, fmt.Errorf("variable generation is not supported")
-		}
-
-		return ektv.getValidations(t, validations)
 	}
+
+	if len(validations.Variables) > 0 {
+		return Validations{}, fmt.Errorf("variable generation is not supported")
+	}
+
+	result := Validations{
+		OpaqueKeyType: validations.OpaqueType,
+	}
+	result.Comments = append(result.Comments, validations.Comments...)
+
+	if len(validations.Functions) > 0 {
+		innerVals, err := ektv.getValidations(t, Validations{Functions: validations.Functions})
+		if err != nil {
+			return Validations{}, err
+		}
+		result.Add(innerVals)
+	}
+
+	if len(validations.Deferred) > 0 {
+		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+			resolved := Validations{}
+			for _, d := range validations.Deferred {
+				inner, err := d.Callback()
+				if err != nil {
+					return Validations{}, err
+				}
+				resolved.Add(inner)
+			}
+			return ektv.getValidations(t, resolved)
+		}))
+	}
+
+	if result.Empty() {
+		return Validations{}, fmt.Errorf("no validation functions found")
+	}
+
+	return result, nil
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {
 	nt := util.NativeType(t)
-	result := Validations{}
-	result.OpaqueKeyType = validations.OpaqueType
-	for _, vfn := range validations.Functions {
+	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
-		result.AddFunction(f)
-	}
-	return result, nil
+		return Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
+	})
+	return Validations{
+		Functions:     wrapped.Functions,
+		Deferred:      wrapped.Deferred,
+		OpaqueKeyType: validations.OpaqueType,
+	}, nil
 }
 
 // ForEachKey returns a validation that applies a function to each key of
