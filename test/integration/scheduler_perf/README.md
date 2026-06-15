@@ -119,6 +119,22 @@ stdout+stderr, then `grep -e "metrics collection" -e '^gc'`. The garbage
 collector output between "Started metrics collection" and "Stopped metrics
 collection" is the relevant one for performance.
 
+The `traceparse` tool in `hack/tools/traceparse` summarizes GC activity from
+execution trace files. It is useful for comparing two runs and spotting
+allocation-driven regressions:
+
+```shell
+go -C hack/tools build -o /tmp/traceparse ./traceparse
+/tmp/traceparse \
+  /tmp/perf-data/before-trace.out \
+  /tmp/perf-data/after-trace.out
+```
+
+The most diagnostic output is the **GC mark assist** row: it counts goroutine
+interruptions caused by allocations outpacing background GC marking. A large
+count (or high total duration) in the hot scheduling path directly caps
+throughput. See `hack/tools/traceparse/README.md` for details.
+
 For more information, see:
 - memory profiles: https://pkg.go.dev/runtime/pprof#Profile
 - pprof tool: https://github.com/google/pprof/blob/main/doc/README.md
