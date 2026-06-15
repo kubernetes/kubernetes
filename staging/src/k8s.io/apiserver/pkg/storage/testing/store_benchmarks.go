@@ -189,7 +189,7 @@ func runTraffic(ctx context.Context, b *testing.B, store storage.Interface, data
 		} else if !storage.IsNotFound(err) {
 			panic(fmt.Sprintf("Unexpected error on Delete %q: %v", data.PodKeys[index], err))
 		}
-		pod := data.Pods[index]
+		pod := data.Pods[index].DeepCopy()
 		if tracker != nil {
 			tracker.RecordWrite(pod)
 		}
@@ -531,7 +531,8 @@ func PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, nodeCount int) (
 		data.NamespaceNames[i] = namespace
 		for j := 0; j < podPerNamespaceCount; j++ {
 			p := exemplar.DeepCopy()
-			randomizePod(p, namespace, data.NodeNames[rand.Intn(nodeCount)])
+			nodeIdx := (i*podPerNamespaceCount + j) % nodeCount
+			randomizePod(p, namespace, data.NodeNames[nodeIdx])
 			data.Pods = append(data.Pods, p)
 			data.PodKeys = append(data.PodKeys, computePodKey(p))
 		}
@@ -612,6 +613,8 @@ func (t *WatchLatencyTracker) RecordWrite(obj interface{}) {
 	if !ok {
 		return
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	annotations := metaObj.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
@@ -625,6 +628,8 @@ func (t *WatchLatencyTracker) HandleEvent(obj interface{}) {
 	if !ok {
 		return
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	annotations := metaObj.GetAnnotations()
 	if annotations == nil {
 		return
@@ -638,9 +643,7 @@ func (t *WatchLatencyTracker) HandleEvent(obj interface{}) {
 		return
 	}
 	delay := t.clock.Since(writeTime)
-	t.mu.Lock()
 	t.durations = append(t.durations, delay)
-	t.mu.Unlock()
 }
 
 func (t *WatchLatencyTracker) GetP99Latency() time.Duration {
