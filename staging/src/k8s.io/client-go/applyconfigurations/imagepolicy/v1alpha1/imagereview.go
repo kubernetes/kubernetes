@@ -33,12 +33,12 @@ import (
 // ImageReview checks if the set of images in a pod are allowed.
 type ImageReviewApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec holds information about the pod being evaluated
+	// spec holds information about the pod being evaluated
 	Spec *ImageReviewSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status is filled in by the backend and indicates whether the pod should be allowed.
+	// status is filled in by the backend and indicates whether the pod should be allowed.
 	Status *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
 }
 
