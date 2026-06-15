@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	networkingv1informers "k8s.io/client-go/informers/networking/v1"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1listers "k8s.io/client-go/listers/networking/v1"
@@ -40,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/servicecidr"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -338,15 +336,6 @@ func (c *MetaAllocator) AllocateService(service *api.Service, ip net.IP) error {
 	if err != nil {
 		return err
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-		cidr := c.bitmapAllocator.CIDR()
-		if cidr.Contains(ip) {
-			err := c.bitmapAllocator.Allocate(ip)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return allocator.AllocateService(service, ip)
 }
 
@@ -362,20 +351,6 @@ func (c *MetaAllocator) Allocate(ip net.IP) error {
 }
 
 func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error) {
-	// If the cluster is still using the old allocators use them first to try to
-	// get an IP address to keep backwards compatibility.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-		ip, err := c.bitmapAllocator.AllocateNext()
-		if err == nil {
-			allocator, err := c.getAllocator(ip, true)
-			if err != nil {
-				return nil, err
-			}
-			return ip, allocator.AllocateService(service, ip)
-		} else {
-			klog.Infof("no IP address available on the old ClusterIP allocator, trying to get a new address using the new allocators")
-		}
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// TODO(aojea) add strategy to return a random allocator but
@@ -413,12 +388,6 @@ func (c *MetaAllocator) Release(ip net.IP) error {
 	if err != nil {
 		return err
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-		cidr := c.bitmapAllocator.CIDR()
-		if cidr.Contains(ip) {
-			_ = c.bitmapAllocator.Release(ip)
-		}
-	}
 	return allocator.Release(ip)
 
 }
@@ -454,9 +423,6 @@ func (c *MetaAllocator) Destroy() {
 	select {
 	case <-c.internalStopCh:
 	default:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-			c.bitmapAllocator.Destroy()
-		}
 		close(c.internalStopCh)
 	}
 }

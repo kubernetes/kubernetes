@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
@@ -43,1013 +42,957 @@ import (
 
 // TestCreateServiceSingleStackIPv4 test the Service dualstackness in an IPv4 SingleStack cluster
 func TestCreateServiceSingleStackIPv4(t *testing.T) {
-	for _, enableMultiServiceCIDR := range []bool{false, true} {
-		for _, disableAllocatorDualWrite := range []bool{false, true} {
-			if !enableMultiServiceCIDR && disableAllocatorDualWrite {
-				// Inavlid configuration: DisableAllocatorDualWrite depends on MultiServiceCIDR
-				continue
-			}
-			t.Run(fmt.Sprintf("MultiServiceCIDR=%v DisableAllocatorDualWrite=%v", enableMultiServiceCIDR, disableAllocatorDualWrite), func(t *testing.T) {
-				// Create an IPv4 single stack control-plane
-				tCtx := ktesting.Init(t)
-				etcdOptions := framework.SharedEtcd()
-				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
-				flags := []string{
-					"--service-cluster-ip-range=10.0.0.0/16",
-					"--advertise-address=10.1.1.1",
-					"--disable-admission-plugins=ServiceAccount",
-					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-				}
-				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
-					flags = append(flags, "--emulated-version=1.33")
-				}
-				s := kubeapiservertesting.StartTestServerOrDie(t,
-					apiServerOptions,
-					flags,
-					etcdOptions)
-				defer s.TearDownFn()
+	// Create an IPv4 single stack control-plane
+	tCtx := ktesting.Init(t)
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	flags := []string{
+		"--service-cluster-ip-range=10.0.0.0/16",
+		"--advertise-address=10.1.1.1",
+		"--disable-admission-plugins=ServiceAccount",
+	}
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		flags,
+		etcdOptions)
+	defer s.TearDownFn()
 
-				client, err := kubernetes.NewForConfig(s.ClientConfig)
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+	client, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-				// Wait until the default "kubernetes" service is created.
-				if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-					_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
-					if err != nil && !apierrors.IsNotFound(err) {
-						return false, err
-					}
-					return !apierrors.IsNotFound(err), nil
-				}); err != nil {
-					t.Fatalf("creating kubernetes service timed out")
-				}
-
-				var testcases = []struct {
-					name               string
-					serviceType        v1.ServiceType
-					clusterIPs         []string
-					ipFamilies         []v1.IPFamily
-					ipFamilyPolicy     v1.IPFamilyPolicy
-					expectedIPFamilies []v1.IPFamily
-					expectError        bool
-				}{
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         nil,
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Client Allocated IP - Default IP Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{"10.0.0.16"},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         nil,
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         nil,
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        true,
-					},
-				}
-
-				for i, tc := range testcases {
-					t.Run(tc.name, func(t *testing.T) {
-
-						svc := &v1.Service{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
-							},
-							Spec: v1.ServiceSpec{
-								Type:       tc.serviceType,
-								ClusterIPs: tc.clusterIPs,
-								IPFamilies: tc.ipFamilies,
-								Ports: []v1.ServicePort{
-									{
-										Port:       443,
-										TargetPort: intstr.FromInt32(443),
-									},
-								},
-							},
-						}
-
-						if len(tc.ipFamilyPolicy) > 0 {
-							svc.Spec.IPFamilyPolicy = &tc.ipFamilyPolicy
-						}
-
-						if len(tc.clusterIPs) > 0 {
-							svc.Spec.ClusterIP = tc.clusterIPs[0]
-						}
-
-						// create the service
-						_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
-						if (err != nil) != tc.expectError {
-							t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
-						}
-						// if no error was expected validate the service otherwise return
-						if err != nil {
-							return
-						}
-						// validate the service was created correctly if it was not expected to fail
-						svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
-						if err != nil {
-							t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
-						}
-						if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
-							t.Errorf("Unexpected error validating the service %s\n%+v\n%v", svc.Name, svc, err)
-						}
-					})
-				}
-			})
+	// Wait until the default "kubernetes" service is created.
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
 		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	var testcases = []struct {
+		name               string
+		serviceType        v1.ServiceType
+		clusterIPs         []string
+		ipFamilies         []v1.IPFamily
+		ipFamilyPolicy     v1.IPFamilyPolicy
+		expectedIPFamilies []v1.IPFamily
+		expectError        bool
+	}{
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         nil,
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - Default IP Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.16"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         nil,
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         nil,
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        true,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
+				},
+				Spec: v1.ServiceSpec{
+					Type:       tc.serviceType,
+					ClusterIPs: tc.clusterIPs,
+					IPFamilies: tc.ipFamilies,
+					Ports: []v1.ServicePort{
+						{
+							Port:       443,
+							TargetPort: intstr.FromInt32(443),
+						},
+					},
+				},
+			}
+
+			if len(tc.ipFamilyPolicy) > 0 {
+				svc.Spec.IPFamilyPolicy = &tc.ipFamilyPolicy
+			}
+
+			if len(tc.clusterIPs) > 0 {
+				svc.Spec.ClusterIP = tc.clusterIPs[0]
+			}
+
+			// create the service
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
+			if (err != nil) != tc.expectError {
+				t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
+			}
+			// if no error was expected validate the service otherwise return
+			if err != nil {
+				return
+			}
+			// validate the service was created correctly if it was not expected to fail
+			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+			}
+			if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
+				t.Errorf("Unexpected error validating the service %s\n%+v\n%v", svc.Name, svc, err)
+			}
+		})
 	}
 }
 
 // TestCreateServiceSingleStackIPv6 test the Service dualstackness in an IPv6 only DualStack cluster
 func TestCreateServiceSingleStackIPv6(t *testing.T) {
-	for _, enableMultiServiceCIDR := range []bool{false, true} {
-		for _, disableAllocatorDualWrite := range []bool{false, true} {
-			if !enableMultiServiceCIDR && disableAllocatorDualWrite {
-				// Inavlid configuration: DisableAllocatorDualWrite depends on MultiServiceCIDR
-				continue
-			}
-			t.Run(fmt.Sprintf("MultiServiceCIDR=%v DisableAllocatorDualWrite=%v", enableMultiServiceCIDR, disableAllocatorDualWrite), func(t *testing.T) {
-				// Create an IPv6 only control-plane
-				tCtx := ktesting.Init(t)
-				etcdOptions := framework.SharedEtcd()
-				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
-				flags := []string{
-					"--service-cluster-ip-range=2001:db8:1::/108",
-					"--advertise-address=2001:db8::10",
-					"--disable-admission-plugins=ServiceAccount",
-					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-				}
-				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
-					flags = append(flags, "--emulated-version=1.33")
-				}
-				s := kubeapiservertesting.StartTestServerOrDie(t,
-					apiServerOptions,
-					flags,
-					etcdOptions)
-				defer s.TearDownFn()
+	// Create an IPv6 only control-plane
+	tCtx := ktesting.Init(t)
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	flags := []string{
+		"--service-cluster-ip-range=2001:db8:1::/108",
+		"--advertise-address=2001:db8::10",
+		"--disable-admission-plugins=ServiceAccount",
+	}
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		flags,
+		etcdOptions)
+	defer s.TearDownFn()
 
-				client, err := kubernetes.NewForConfig(s.ClientConfig)
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+	client, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-				// Wait until the default "kubernetes" service is created.
-				if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-					_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
-					if err != nil && !apierrors.IsNotFound(err) {
-						return false, err
-					}
-					return !apierrors.IsNotFound(err), nil
-				}); err != nil {
-					t.Fatalf("creating kubernetes service timed out")
-				}
-
-				var testcases = []struct {
-					name               string
-					serviceType        v1.ServiceType
-					clusterIPs         []string
-					ipFamilies         []v1.IPFamily
-					expectedIPFamilies []v1.IPFamily
-					ipFamilyPolicy     v1.IPFamilyPolicy
-					expectError        bool
-				}{
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        true,
-					},
-				}
-
-				for i, tc := range testcases {
-					t.Run(tc.name, func(t *testing.T) {
-
-						svc := &v1.Service{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
-							},
-							Spec: v1.ServiceSpec{
-								Type:           tc.serviceType,
-								ClusterIPs:     tc.clusterIPs,
-								IPFamilies:     tc.ipFamilies,
-								IPFamilyPolicy: &tc.ipFamilyPolicy,
-								Ports: []v1.ServicePort{
-									{
-										Name:       fmt.Sprintf("port-test-%d", i),
-										Port:       443,
-										TargetPort: intstr.IntOrString{IntVal: 443},
-										Protocol:   "TCP",
-									},
-								},
-							},
-						}
-
-						// create the service
-						_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
-						if (err != nil) != tc.expectError {
-							t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
-						}
-						// if no error was expected validate the service otherwise return
-						if err != nil {
-							return
-						}
-						// validate the service was created correctly if it was not expected to fail
-						svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
-						if err != nil {
-							t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
-						}
-						if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
-							t.Errorf("Unexpected error validating the service %s %v", svc.Name, err)
-						}
-					})
-				}
-			})
+	// Wait until the default "kubernetes" service is created.
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
 		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	var testcases = []struct {
+		name               string
+		serviceType        v1.ServiceType
+		clusterIPs         []string
+		ipFamilies         []v1.IPFamily
+		expectedIPFamilies []v1.IPFamily
+		ipFamilyPolicy     v1.IPFamilyPolicy
+		expectError        bool
+	}{
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        true,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
+				},
+				Spec: v1.ServiceSpec{
+					Type:           tc.serviceType,
+					ClusterIPs:     tc.clusterIPs,
+					IPFamilies:     tc.ipFamilies,
+					IPFamilyPolicy: &tc.ipFamilyPolicy,
+					Ports: []v1.ServicePort{
+						{
+							Name:       fmt.Sprintf("port-test-%d", i),
+							Port:       443,
+							TargetPort: intstr.IntOrString{IntVal: 443},
+							Protocol:   "TCP",
+						},
+					},
+				},
+			}
+
+			// create the service
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
+			if (err != nil) != tc.expectError {
+				t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
+			}
+			// if no error was expected validate the service otherwise return
+			if err != nil {
+				return
+			}
+			// validate the service was created correctly if it was not expected to fail
+			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+			}
+			if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
+				t.Errorf("Unexpected error validating the service %s %v", svc.Name, err)
+			}
+		})
 	}
 }
 
 // TestCreateServiceDualStackIPv4IPv6 test the Service dualstackness in a IPv4IPv6 DualStack cluster
 func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
-	for _, enableMultiServiceCIDR := range []bool{false, true} {
-		for _, disableAllocatorDualWrite := range []bool{false, true} {
-			if !enableMultiServiceCIDR && disableAllocatorDualWrite {
-				// Inavlid configuration: DisableAllocatorDualWrite depends on MultiServiceCIDR
-				continue
-			}
-			t.Run(fmt.Sprintf("MultiServiceCIDR=%v DisableAllocatorDualWrite=%v", enableMultiServiceCIDR, disableAllocatorDualWrite), func(t *testing.T) {
-				// Create an IPv4IPv6 dual stack control-plane
-				tCtx := ktesting.Init(t)
-				etcdOptions := framework.SharedEtcd()
-				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
-				flags := []string{
-					"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
-					"--advertise-address=10.0.0.1",
-					"--disable-admission-plugins=ServiceAccount",
-					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-				}
-				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
-					flags = append(flags, "--emulated-version=1.33")
-				}
-				s := kubeapiservertesting.StartTestServerOrDie(t,
-					apiServerOptions,
-					flags,
-					etcdOptions)
-				defer s.TearDownFn()
+	// Create an IPv4IPv6 dual stack control-plane
+	tCtx := ktesting.Init(t)
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	flags := []string{
+		"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
+		"--advertise-address=10.0.0.1",
+		"--disable-admission-plugins=ServiceAccount",
+	}
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		flags,
+		etcdOptions)
+	defer s.TearDownFn()
 
-				client, err := kubernetes.NewForConfig(s.ClientConfig)
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+	client, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-				// Wait until the default "kubernetes" service is created.
-				if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-					_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
-					if err != nil && !apierrors.IsNotFound(err) {
-						return false, err
-					}
-					return !apierrors.IsNotFound(err), nil
-				}); err != nil {
-					t.Fatalf("creating kubernetes service timed out")
-				}
-
-				var testcases = []struct {
-					name               string
-					serviceType        v1.ServiceType
-					clusterIPs         []string
-					ipFamilies         []v1.IPFamily
-					expectedIPFamilies []v1.IPFamily
-					ipFamilyPolicy     v1.IPFamilyPolicy
-					expectError        bool
-				}{
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Client Allocated IP - IPv4 Family",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{"10.0.0.16"},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Client Allocated IP - IPv6 Family",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{"2001:db8:1::16"},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{"10.0.0.17", "2001:db8:1::17"},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{"10.0.0.17", "2001:db8:1::17"},
-						ipFamilies:         nil,
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{"10.0.0.18", "2001:db8:1::18"},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-				}
-
-				for i, tc := range testcases {
-					t.Run(tc.name, func(t *testing.T) {
-
-						svc := &v1.Service{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
-							},
-							Spec: v1.ServiceSpec{
-								Type:       tc.serviceType,
-								ClusterIPs: tc.clusterIPs,
-								IPFamilies: tc.ipFamilies,
-								Ports: []v1.ServicePort{
-									{
-										Port:       443,
-										TargetPort: intstr.FromInt32(443),
-									},
-								},
-							},
-						}
-
-						if len(tc.ipFamilyPolicy) > 0 {
-							svc.Spec.IPFamilyPolicy = &tc.ipFamilyPolicy
-						}
-
-						if len(tc.clusterIPs) > 0 {
-							svc.Spec.ClusterIP = tc.clusterIPs[0]
-						}
-
-						// create a service
-						_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
-						if (err != nil) != tc.expectError {
-							t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
-						}
-						// if no error was expected validate the service otherwise return
-						if err != nil {
-							return
-						}
-						// validate the service was created correctly if it was not expected to fail
-						svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
-						if err != nil {
-							t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
-						}
-
-						if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
-							t.Errorf("Unexpected error validating the service %s %v", svc.Name, err)
-						}
-					})
-				}
-			})
+	// Wait until the default "kubernetes" service is created.
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
 		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	var testcases = []struct {
+		name               string
+		serviceType        v1.ServiceType
+		clusterIPs         []string
+		ipFamilies         []v1.IPFamily
+		expectedIPFamilies []v1.IPFamily
+		ipFamilyPolicy     v1.IPFamilyPolicy
+		expectError        bool
+	}{
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 Family",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.16"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv6 Family",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"2001:db8:1::16"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.17", "2001:db8:1::17"},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.17", "2001:db8:1::17"},
+			ipFamilies:         nil,
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Client Allocated IP - IPv4 IPv6 Family ",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{"10.0.0.18", "2001:db8:1::18"},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
+				},
+				Spec: v1.ServiceSpec{
+					Type:       tc.serviceType,
+					ClusterIPs: tc.clusterIPs,
+					IPFamilies: tc.ipFamilies,
+					Ports: []v1.ServicePort{
+						{
+							Port:       443,
+							TargetPort: intstr.FromInt32(443),
+						},
+					},
+				},
+			}
+
+			if len(tc.ipFamilyPolicy) > 0 {
+				svc.Spec.IPFamilyPolicy = &tc.ipFamilyPolicy
+			}
+
+			if len(tc.clusterIPs) > 0 {
+				svc.Spec.ClusterIP = tc.clusterIPs[0]
+			}
+
+			// create a service
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
+			if (err != nil) != tc.expectError {
+				t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
+			}
+			// if no error was expected validate the service otherwise return
+			if err != nil {
+				return
+			}
+			// validate the service was created correctly if it was not expected to fail
+			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+			}
+
+			if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
+				t.Errorf("Unexpected error validating the service %s %v", svc.Name, err)
+			}
+		})
 	}
 }
 
 // TestCreateServiceDualStackIPv6IPv4 test the Service dualstackness in a IPv6IPv4 DualStack cluster
 func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
-	for _, enableMultiServiceCIDR := range []bool{false, true} {
-		for _, disableAllocatorDualWrite := range []bool{false, true} {
-			if !enableMultiServiceCIDR && disableAllocatorDualWrite {
-				// Inavlid configuration: DisableAllocatorDualWrite depends on MultiServiceCIDR
-				continue
-			}
-			t.Run(fmt.Sprintf("MultiServiceCIDR=%v DisableAllocatorDualWrite=%v", enableMultiServiceCIDR, disableAllocatorDualWrite), func(t *testing.T) {
-				// Create an IPv6IPv4 dual stack control-plane
-				tCtx := ktesting.Init(t)
-				etcdOptions := framework.SharedEtcd()
-				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
-				flags := []string{
-					"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
-					"--advertise-address=2001:db8::10",
-					"--disable-admission-plugins=ServiceAccount",
-					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-				}
-				if !enableMultiServiceCIDR || !disableAllocatorDualWrite {
-					flags = append(flags, "--emulated-version=1.33")
-				}
-				s := kubeapiservertesting.StartTestServerOrDie(t,
-					apiServerOptions,
-					flags,
-					etcdOptions)
-				defer s.TearDownFn()
+	// Create an IPv6IPv4 dual stack control-plane
+	tCtx := ktesting.Init(t)
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	flags := []string{
+		"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
+		"--advertise-address=2001:db8::10",
+		"--disable-admission-plugins=ServiceAccount",
+	}
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		flags,
+		etcdOptions)
+	defer s.TearDownFn()
 
-				client, err := kubernetes.NewForConfig(s.ClientConfig)
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+	client, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-				// Wait until the default "kubernetes" service is created.
-				if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-					_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
-					if err != nil && !apierrors.IsNotFound(err) {
-						return false, err
-					}
-					return !apierrors.IsNotFound(err), nil
-				}); err != nil {
-					t.Fatalf("creating kubernetes service timed out")
-				}
-
-				// verify client is working
-				if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-					_, err := client.CoreV1().Endpoints("default").Get(tCtx, "kubernetes", metav1.GetOptions{})
-					if err != nil {
-						t.Logf("error fetching endpoints: %v", err)
-						return false, nil
-					}
-					return true, nil
-				}); err != nil {
-					t.Errorf("server without enabled endpoints failed to register: %v", err)
-				}
-
-				var testcases = []struct {
-					name               string
-					serviceType        v1.ServiceType
-					clusterIPs         []string
-					ipFamilies         []v1.IPFamily
-					expectedIPFamilies []v1.IPFamily
-					ipFamilyPolicy     v1.IPFamilyPolicy
-					expectError        bool
-				}{
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         nil,
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
-						expectError:        true,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
-						expectError:        false,
-					},
-					{
-						name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
-						serviceType:        v1.ServiceTypeClusterIP,
-						clusterIPs:         []string{},
-						ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-						ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
-						expectError:        false,
-					},
-				}
-
-				for i, tc := range testcases {
-					t.Run(tc.name, func(t *testing.T) {
-
-						svc := &v1.Service{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
-							},
-							Spec: v1.ServiceSpec{
-								Type:           tc.serviceType,
-								ClusterIPs:     tc.clusterIPs,
-								IPFamilies:     tc.ipFamilies,
-								IPFamilyPolicy: &tc.ipFamilyPolicy,
-								Ports: []v1.ServicePort{
-									{
-										Port:       443,
-										TargetPort: intstr.FromInt32(443),
-									},
-								},
-							},
-						}
-
-						// create a service
-						_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
-						if (err != nil) != tc.expectError {
-							t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
-						}
-						// if no error was expected validate the service otherwise return
-						if err != nil {
-							return
-						}
-						// validate the service was created correctly if it was not expected to fail
-						svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
-						if err != nil {
-							t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
-						}
-
-						if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
-							t.Errorf("Unexpected error validating the service %s %v", svc.Name, err)
-						}
-					})
-				}
-			})
+	// Wait until the default "kubernetes" service is created.
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
 		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	// verify client is working
+	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Endpoints("default").Get(tCtx, "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Errorf("server without enabled endpoints failed to register: %v", err)
+	}
+
+	var testcases = []struct {
+		name               string
+		serviceType        v1.ServiceType
+		clusterIPs         []string
+		ipFamilies         []v1.IPFamily
+		expectedIPFamilies []v1.IPFamily
+		ipFamilyPolicy     v1.IPFamilyPolicy
+		expectError        bool
+	}{
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         nil,
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv4 IPv6 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Single Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicySingleStack,
+			expectError:        true,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Prefer Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyPreferDualStack,
+			expectError:        false,
+		},
+		{
+			name:               "Type ClusterIP - Server Allocated IP - IPv6 IPv4 Family - Policy Required Dual Stack",
+			serviceType:        v1.ServiceTypeClusterIP,
+			clusterIPs:         []string{},
+			ipFamilies:         []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedIPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			ipFamilyPolicy:     v1.IPFamilyPolicyRequireDualStack,
+			expectError:        false,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
+				},
+				Spec: v1.ServiceSpec{
+					Type:           tc.serviceType,
+					ClusterIPs:     tc.clusterIPs,
+					IPFamilies:     tc.ipFamilies,
+					IPFamilyPolicy: &tc.ipFamilyPolicy,
+					Ports: []v1.ServicePort{
+						{
+							Port:       443,
+							TargetPort: intstr.FromInt32(443),
+						},
+					},
+				},
+			}
+
+			// create a service
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
+			if (err != nil) != tc.expectError {
+				t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
+			}
+			// if no error was expected validate the service otherwise return
+			if err != nil {
+				return
+			}
+			// validate the service was created correctly if it was not expected to fail
+			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svc.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+			}
+
+			if err := validateServiceAndClusterIPFamily(svc, tc.expectedIPFamilies); err != nil {
+				t.Errorf("Unexpected error validating the service %s %v", svc.Name, err)
+			}
+		})
 	}
 }
 

@@ -64,7 +64,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
@@ -79,7 +78,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 
@@ -371,19 +369,17 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			controller := defaultservicecidr.NewController(
-				c.Extra.ServiceIPRange,
-				c.Extra.SecondaryServiceIPRange,
-				client,
-			)
-			// The default serviceCIDR must exist before the apiserver is healthy
-			// otherwise the allocators for Services will not work.
-			controller.Start(hookContext)
-			return nil
-		})
-	}
+	s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		controller := defaultservicecidr.NewController(
+			c.Extra.ServiceIPRange,
+			c.Extra.SecondaryServiceIPRange,
+			client,
+		)
+		// The default serviceCIDR must exist before the apiserver is healthy
+		// otherwise the allocators for Services will not work.
+		controller.Start(hookContext)
+		return nil
+	})
 
 	return s, nil
 

@@ -609,11 +609,10 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	endpointSliceConfig.RegisterEventHandler(s.Proxier)
 	go endpointSliceConfig.Run(ctx.Done())
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
-		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
-		go serviceCIDRConfig.Run(wait.NeverStop)
-	}
+	serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
+	serviceCIDRConfig.RegisterEventHandler(s.Proxier)
+	go serviceCIDRConfig.Run(wait.NeverStop)
+
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
