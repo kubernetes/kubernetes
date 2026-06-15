@@ -17,6 +17,7 @@ limitations under the License.
 package authorizer
 
 import (
+	"context"
 	"fmt"
 	"iter"
 	"reflect"
@@ -218,10 +219,11 @@ func isNilValue(i any) bool {
 // with optional support for fast in-process conditions evaluation, by
 // setting EvaluateFunc non-nil.
 type GenericCondition struct {
-	ID          string
-	Condition   string
-	Type        string
-	Description string
+	ID           string
+	Condition    string
+	Type         string
+	Description  string
+	EvaluateFunc func(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult
 }
 
 var _ Condition = GenericCondition{}
@@ -240,4 +242,10 @@ func (c GenericCondition) GetDescription() string {
 }
 func (c GenericCondition) DeepCopy() Condition {
 	return c // no values passed by reference
+}
+func (c GenericCondition) Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult {
+	if c.EvaluateFunc == nil {
+		return ConditionsEvaluationResultUnevaluatable()
+	}
+	return c.EvaluateFunc(ctx, data)
 }
