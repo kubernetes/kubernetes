@@ -507,11 +507,11 @@ func validateAllContainersRestarted(ctx context.Context, f *framework.Framework,
 			}
 			if cStatus.RestartCount > 0 {
 				restartedCount++
+				if cStatus.LastTerminationState.Terminated == nil {
+					return false, fmt.Errorf("container %s does not have lastTerminationState after restart", cName)
+				}
 			} else {
-				framework.Logf("container %s did not restart", cName)
-			}
-			if cStatus.LastTerminationState.Terminated == nil {
-				return false, fmt.Errorf("container %s do not have lastTerminationState", cName)
+				framework.Logf("container %s did not restart yet", cName)
 			}
 		}
 		framework.Logf("%d out of %d containers restarted", restartedCount, len(containers))
