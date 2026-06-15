@@ -28,30 +28,47 @@ import (
 )
 
 const (
-	dependentRequiredTagName = "k8s:dependentRequired"
+	dependentRequiredTagName  = "k8s:dependentRequired"
+	dependentForbiddenTagName = "k8s:dependentForbidden"
 )
 
-var dependentRequiredValidator = types.Name{Package: libValidationPkg, Name: "DependentRequired"}
+var (
+	dependentRequiredValidator  = types.Name{Package: libValidationPkg, Name: "DependentRequired"}
+	dependentForbiddenValidator = types.Name{Package: libValidationPkg, Name: "DependentForbidden"}
+)
 
 func init() {
-	RegisterTagValidator(dependentRequiredTagValidator{})
+	RegisterTagValidator(dependencyTagValidator{dependencyRequired})
+	RegisterTagValidator(dependencyTagValidator{dependencyForbidden})
 }
 
-type dependentRequiredTagValidator struct{}
-
-func (dependentRequiredTagValidator) Init(_ Config) {}
-
-func (dependentRequiredTagValidator) TagName() string {
-	return dependentRequiredTagName
+// dependencyTagValidator implements conditional set-ness dependencies between
+// sibling fields: when the tagged (trigger) field is set, a named sibling must
+// also be set (required mode) or must not be set (forbidden mode).
+type dependencyTagValidator struct {
+	mode dependencyMode
 }
 
-var dependentRequiredTagValidScopes = sets.New(ScopeField)
+type dependencyMode string
 
-func (dependentRequiredTagValidator) ValidScopes() sets.Set[Scope] {
-	return dependentRequiredTagValidScopes
+const (
+	dependencyRequired  dependencyMode = dependentRequiredTagName
+	dependencyForbidden dependencyMode = dependentForbiddenTagName
+)
+
+func (dependencyTagValidator) Init(_ Config) {}
+
+func (dtv dependencyTagValidator) TagName() string {
+	return string(dtv.mode)
 }
 
-func (drv dependentRequiredTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+var dependencyTagValidScopes = sets.New(ScopeField)
+
+func (dependencyTagValidator) ValidScopes() sets.Set[Scope] {
+	return dependencyTagValidScopes
+}
+
+func (dtv dependencyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	if context.Member == nil {
 		return Validations{}, fmt.Errorf("must be used on a struct field")
 	}
@@ -96,6 +113,19 @@ func (drv dependentRequiredTagValidator) GetValidations(context Context, tag cod
 		}
 	}
 
+	tagName := string(dtv.mode)
+	var validator types.Name
+	var emitType field.ErrorType
+	var origin string
+	switch dtv.mode {
+	case dependencyRequired:
+		validator, emitType, origin = dependentRequiredValidator, field.ErrorTypeRequired, "dependentRequired"
+	case dependencyForbidden:
+		validator, emitType, origin = dependentForbiddenValidator, field.ErrorTypeForbidden, "dependentForbidden"
+	default:
+		panic(fmt.Sprintf("unknown dependency mode: %q", dtv.mode))
+	}
+
 	ptrType := types.PointerTo(context.ParentType)
 	triggerExtractor := createMemberExtractor(ptrType, context.Member)
 	dependentExtractor := createMemberExtractor(ptrType, dependentMember)
@@ -104,12 +134,12 @@ func (drv dependentRequiredTagValidator) GetValidations(context Context, tag cod
 	return Validations{
 		Deferred: []DeferredGen{
 			Deferred(ParentContext, func() (Validations, error) {
-				fn := Function(dependentRequiredTagName, DefaultFlags, dependentRequiredValidator,
+				fn := Function(tagName, DefaultFlags, validator,
 					triggerJSONName, triggerExtractor,
 					dependentJSONName, dependentExtractor,
 				).WithEmits(Emission{
-					Type:         field.ErrorTypeRequired,
-					Origin:       "dependentRequired",
+					Type:         emitType,
+					Origin:       origin,
 					PathFragment: "." + dependentJSONName,
 				})
 				return Validations{Functions: []FunctionGen{fn}}, nil
@@ -118,19 +148,30 @@ func (drv dependentRequiredTagValidator) GetValidations(context Context, tag cod
 	}, nil
 }
 
-func (drv dependentRequiredTagValidator) Docs() TagDoc {
-	return TagDoc{
-		Tag:            drv.TagName(),
+func (dtv dependencyTagValidator) Docs() TagDoc {
+	doc := TagDoc{
+		Tag:            dtv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         sets.List(drv.ValidScopes()),
-		Description:    "Indicates that when this field is set, the named sibling field must also be set.",
+		Scopes:         sets.List(dtv.ValidScopes()),
 		Args: []TagArgDoc{{
 			Description: "<sibling-field-json-name>",
 			Type:        codetags.ArgTypeString,
 			Required:    true,
 		}},
-		Docs: "When the tagged field is set (non-nil pointer, non-empty slice/map, or non-zero " +
-			"builtin), the named sibling must also be set. Dependencies are one-directional. " +
-			"Repeat the tag to require multiple siblings.",
 	}
+	switch dtv.mode {
+	case dependencyRequired:
+		doc.Description = "Indicates that when this field is set, the named sibling field must also be set."
+		doc.Docs = "When the tagged field is set (non-nil pointer, non-empty slice/map, or non-zero " +
+			"builtin), the named sibling must also be set. Dependencies are one-directional. " +
+			"Repeat the tag to require multiple siblings."
+	case dependencyForbidden:
+		doc.Description = "Indicates that when this field is set, the named sibling field must not be set."
+		doc.Docs = "When the tagged field is set (non-nil pointer, non-empty slice/map, or non-zero " +
+			"builtin), the named sibling must not be set. Dependencies are one-directional. " +
+			"Repeat the tag to forbid multiple siblings."
+	default:
+		panic(fmt.Sprintf("unknown dependency mode: %q", dtv.mode))
+	}
+	return doc
 }
