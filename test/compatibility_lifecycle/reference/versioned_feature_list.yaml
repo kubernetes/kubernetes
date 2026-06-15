@@ -998,7 +998,11 @@
   - default: true
     lockToDefault: false
     preRelease: GA
-    version: "1.11"
+    version: "1.0"
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.37"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false

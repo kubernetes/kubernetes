@@ -1501,7 +1501,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	KubeProxyIPVS: {
-		{Version: version.MustParse("1.11"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated},
 	},
 
 	KubeletCgroupDriverFromCRI: {
