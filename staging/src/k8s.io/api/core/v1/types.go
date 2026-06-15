@@ -5493,6 +5493,7 @@ type PodStatus struct {
 // +k8s:supportsSubresource="/ephemeralcontainers"
 // +k8s:supportsSubresource="/resize"
 // +k8s:supportsSubresource="/eviction"
+// +k8s:hubType
 type Pod struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -5518,6 +5519,7 @@ type Pod struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // PodList is a list of Pods.
+// +k8s:hubType
 type PodList struct {
 	metav1.TypeMeta `json:""`
 	// Standard list metadata.
