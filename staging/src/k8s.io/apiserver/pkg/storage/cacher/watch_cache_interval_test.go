@@ -401,12 +401,6 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 
 	for i := 0; i < numEvents; i++ {
-		// The interval buffer can never be empty unless
-		// all elements obtained through List() have been
-		// returned.
-		if wci.buffer.isEmpty() && i != numEvents {
-			t.Fatal("expected non-empty interval buffer")
-		}
 		event, err := wci.Next()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -424,9 +418,13 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		}
 	}
 
-	// The interval's buffer should now be empty.
-	if !wci.buffer.isEmpty() {
-		t.Error("expected cache interval's buffer to be empty")
+	// All events should have been consumed.
+	event, err := wci.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if event != nil {
+		t.Errorf("expected nil event after consuming all events, got %v", *event)
 	}
 }
 

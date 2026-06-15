@@ -24,6 +24,11 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
+// cacheIntervalSource provides the iteration logic for a watchCacheInterval.
+type cacheIntervalSource interface {
+	Next() (*watchCacheEvent, error)
+}
+
 // watchCacheInterval serves as an abstraction over a source
 // of watchCacheEvents. It maintains a window of events over
 // an underlying source and these events can be served using
@@ -57,6 +62,10 @@ import (
 // valid and should not be used to retrieve and serve elements
 // from the underlying source.
 type watchCacheInterval struct {
+	// source provides the iteration logic for this interval.
+	// When set, Next() delegates to source.Next().
+	source cacheIntervalSource
+
 	// startIndex denotes the starting point of the interval
 	// being considered. The value is the index in the actual
 	// source of watchCacheEvents. If the source of events is
@@ -118,6 +127,19 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
+// snapshotCacheIntervalSource serves events from a pre-populated buffer.
+type snapshotCacheIntervalSource struct {
+	buffer *watchCacheIntervalBuffer
+}
+
+func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+	event, exists := s.buffer.next()
+	if !exists {
+		return nil, nil
+	}
+	return event, nil
+}
+
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
@@ -157,10 +179,7 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 		buffer.endIndex++
 	}
 	ci := &watchCacheInterval{
-		startIndex: 0,
-		// Simulate that we already have all the events we're looking for.
-		endIndex:        0,
-		buffer:          buffer,
+		source:          &snapshotCacheIntervalSource{buffer: buffer},
 		resourceVersion: resourceVersion,
 	}
 
@@ -171,6 +190,9 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 // interval is still valid. An error is returned if the interval is
 // invalidated.
 func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
+	if wci.source != nil {
+		return wci.source.Next()
+	}
 	// if there are items in the buffer to return, return from
 	// the buffer.
 	if event, exists := wci.buffer.next(); exists {
