@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -704,5 +705,64 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 				t.Errorf("Convert_core_Pod_To_v1_Pod() mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// TestPodConversionAliasesMemory tests for that conversions are zero-copy at runtime.
+// This specifically tests conversion registrations that shadow the generated functions.
+func TestPodConversionAliasesMemory(t *testing.T) {
+	{
+		in := &v1.PodList{Items: make([]v1.Pod, 1)}
+		out := &core.PodList{}
+		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		if unsafe.Pointer(&in.Items[0]) != unsafe.Pointer(&out.Items[0]) {
+			t.Errorf("v1->core PodList conversion copied Items instead of aliasing")
+		}
+	}
+	{
+		in := &core.PodList{Items: make([]core.Pod, 1)}
+		out := &v1.PodList{}
+		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		if unsafe.Pointer(&in.Items[0]) != unsafe.Pointer(&out.Items[0]) {
+			t.Errorf("core->v1 PodList conversion copied Items instead of aliasing")
+		}
+	}
+	// Handle init container annotations
+	annotations := map[string]string{"pod.beta.kubernetes.io/init-containers": "x", "k": "v"}
+	{
+		in := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+			Spec:       v1.PodSpec{Containers: make([]v1.Container, 1)},
+		}
+		out := &core.Pod{}
+		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		if unsafe.Pointer(&in.Spec.Containers[0]) != unsafe.Pointer(&out.Spec.Containers[0]) {
+			t.Errorf("v1->core Pod conversion copied Spec.Containers instead of aliasing")
+		}
+		if reflect.ValueOf(in.Annotations).UnsafePointer() != reflect.ValueOf(out.Annotations).UnsafePointer() {
+			t.Errorf("v1->core Pod conversion rewrote Annotations instead of aliasing")
+		}
+	}
+	{
+		in := &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+			Spec:       core.PodSpec{Containers: make([]core.Container, 1)},
+		}
+		out := &v1.Pod{}
+		if err := legacyscheme.Scheme.Convert(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		if unsafe.Pointer(&in.Spec.Containers[0]) != unsafe.Pointer(&out.Spec.Containers[0]) {
+			t.Errorf("core->v1 Pod conversion copied Spec.Containers instead of aliasing")
+		}
+		if reflect.ValueOf(in.Annotations).UnsafePointer() != reflect.ValueOf(out.Annotations).UnsafePointer() {
+			t.Errorf("core->v1 Pod conversion rewrote Annotations instead of aliasing")
+		}
 	}
 }

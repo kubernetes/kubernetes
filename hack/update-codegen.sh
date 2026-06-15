@@ -537,6 +537,12 @@ function codegen::conversions() {
         k8s.io/api/core/v1
     )
 
+    local known_violations_file="${API_KNOWN_VIOLATIONS_DIR}/conversion_violation_exceptions.list"
+    local report_file="${OUT_DIR}/conversion_violations.report"
+    if [[ "${UPDATE_API_KNOWN_VIOLATIONS}" == true ]]; then
+        report_file="${known_violations_file}"
+    fi
+
     kube::log::status "Generating conversion code for ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running conversion-gen for:"
@@ -552,9 +558,17 @@ function codegen::conversions() {
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
         --lint-rules=known-tags-only,require-explicit-disablement \
+        --report-filename "${report_file}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
+
+    touch "${report_file}"
+    if ! diff -u "${known_violations_file}" "${report_file}"; then
+        echo -e "ERROR:"
+        echo -e "\tConversion check failed - reported violations differ from known violations"
+        echo -e "\tPlease read api/api-rules/README.md to resolve the failure in ${known_violations_file}"
+    fi
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated conversion code"
