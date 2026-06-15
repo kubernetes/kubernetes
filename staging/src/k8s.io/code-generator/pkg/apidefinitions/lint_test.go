@@ -200,10 +200,9 @@ func TestLintRules(t *testing.T) {
 			wantErr: "+k8s:conversion-x-gen",
 		},
 		{
-			name:    "unknown rule name fails",
-			pkg:     pkg("test/pkg"),
-			rules:   []string{"future-rule"},
-			wantErr: "unrecognized lint-rule: future-rule",
+			name:  "generator-specific rule is tolerated",
+			pkg:   pkg("test/pkg"),
+			rules: []string{"require-hub-types"},
 		},
 		{
 			name:  "empty rule list passes",
@@ -226,6 +225,34 @@ func TestLintRules(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("err = %q, want substring %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		rules   []string
+		extra   []string
+		wantErr string
+	}{
+		{name: "generic rules accepted", rules: []string{LintRuleKnownTagsOnly, LintRuleExplicitDisablement}},
+		{name: "declared extra rule accepted", rules: []string{"require-hub-types"}, extra: []string{"require-hub-types"}},
+		{name: "undeclared rule rejected", rules: []string{"require-hub-types"}, wantErr: "require-hub-types"},
+		{name: "bogus rule rejected", rules: []string{"bogus-rule"}, wantErr: "bogus-rule"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateFlags(tc.rules, tc.extra...)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Errorf("err = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("err = %v, want substring %q", err, tc.wantErr)
 			}
 		})
 	}

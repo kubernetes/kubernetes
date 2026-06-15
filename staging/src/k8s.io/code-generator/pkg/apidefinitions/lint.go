@@ -64,24 +64,28 @@ func WithLintRules(names ...string) Option {
 }
 
 type LintArgs struct {
-	// LintRules names tag-checking lint rules to enable; see
-	// apipkg.LintRule* constants for the supported names. Off by
-	// default to preserve backward compatibility with third-party generator tags.
 	LintRules []string
 }
 
-var allLintRules = []string{LintRuleKnownTagsOnly, LintRuleExplicitDisablement}
-
-func AddFlags(args *LintArgs, fs *pflag.FlagSet) {
-	supportedLinters := allLintRules
-	fs.StringSliceVar(&args.LintRules, "lint-rules", args.LintRules,
-		fmt.Sprintf("Comma-separated list of tag-checking lint rules to enable. Supports: %s",
-			strings.Join(supportedLinters, ",")))
+// HasRule reports whether the named lint rule is enabled.
+func (a LintArgs) HasRule(name string) bool {
+	return slices.Contains(a.LintRules, name)
 }
 
-func ValidateFlags(lintRules []string) error {
+var globalLintRules = []string{LintRuleKnownTagsOnly, LintRuleExplicitDisablement}
+
+// AddFlags registers the --lint-rules flag. extraRules provies generator-specific rules.
+func AddFlags(args *LintArgs, fs *pflag.FlagSet, extraRules ...string) {
+	supported := append(append([]string{}, globalLintRules...), extraRules...)
+	fs.StringSliceVar(&args.LintRules, "lint-rules", args.LintRules,
+		fmt.Sprintf("Comma-separated list of lint rules to enable. Supports: %s",
+			strings.Join(supported, ",")))
+}
+
+func ValidateFlags(lintRules []string, extraRules ...string) error {
+	known := append(append([]string{}, globalLintRules...), extraRules...)
 	for _, rule := range lintRules {
-		if !slices.Contains(allLintRules, rule) {
+		if !slices.Contains(known, rule) {
 			return fmt.Errorf("unrecognized rule in --lint-rules: %s", rule)
 		}
 	}
@@ -100,7 +104,7 @@ func applyLintRules(st *identifyState, pkg *types.Package) error {
 				return err
 			}
 		default:
-			return fmt.Errorf("unrecognized lint-rule: %s", rule)
+			// Allow generator-specific lint rules
 		}
 	}
 	return nil
