@@ -44,6 +44,11 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 		ExpectedErrs field.ErrorList
 	}{
 		{
+			Name:         "valid: baseline",
+			Modify:       func(meta metav1.Object) {},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
 			Name: "annotations: invalid key",
 			Modify: func(meta metav1.Object) {
 				meta.SetAnnotations(map[string]string{
@@ -66,6 +71,15 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			},
 		},
 		{
+			Name: "valid: annotations: at total size limit",
+			Modify: func(meta metav1.Object) {
+				meta.SetAnnotations(map[string]string{
+					"a": string(make([]byte, apivalidation.TotalAnnotationSizeLimitB-1)),
+				})
+			},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
 			Name: "generation: negative",
 			Modify: func(meta metav1.Object) {
 				meta.SetGeneration(-1)
@@ -73,6 +87,13 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			ExpectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkFromImperative(),
 			},
+		},
+		{
+			Name: "valid: generation: zero",
+			Modify: func(meta metav1.Object) {
+				meta.SetGeneration(0)
+			},
+			ExpectedErrs: field.ErrorList{},
 		},
 		{
 			Name: "ownerReferences: empty apiVersion",
@@ -160,6 +181,15 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			},
 		},
 		{
+			Name: "finalizers: name too long",
+			Modify: func(meta metav1.Object) {
+				meta.SetFinalizers([]string{strings.Repeat("a", 317)})
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+			},
+		},
+		{
 			Name: "managedFields: invalid operation",
 			Modify: func(meta metav1.Object) {
 				meta.SetManagedFields([]metav1.ManagedFieldsEntry{
@@ -193,6 +223,15 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			},
 		},
 		{
+			Name: "valid: managedFields: manager at max length",
+			Modify: func(meta metav1.Object) {
+				meta.SetManagedFields([]metav1.ManagedFieldsEntry{
+					mkManagedFieldsEntry(tweakManager(strings.Repeat("a", 128))),
+				})
+			},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
 			Name: "managedFields: subresource too long",
 			Modify: func(meta metav1.Object) {
 				meta.SetManagedFields([]metav1.ManagedFieldsEntry{
@@ -202,6 +241,15 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			ExpectedErrs: field.ErrorList{
 				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 0).MarkFromImperative(),
 			},
+		},
+		{
+			Name: "valid: managedFields: subresource at max length",
+			Modify: func(meta metav1.Object) {
+				meta.SetManagedFields([]metav1.ManagedFieldsEntry{
+					mkManagedFieldsEntry(tweakSubresource(strings.Repeat("a", 256))),
+				})
+			},
+			ExpectedErrs: field.ErrorList{},
 		},
 		{
 			Name: "labels: invalid key format",
@@ -248,13 +296,13 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			},
 		},
 		{
-			Name: "finalizers: name too long",
+			Name: "valid: labels: value at max length",
 			Modify: func(meta metav1.Object) {
-				meta.SetFinalizers([]string{strings.Repeat("a", 317)})
+				meta.SetLabels(map[string]string{
+					"key": strings.Repeat("a", 63),
+				})
 			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
-			},
+			ExpectedErrs: field.ErrorList{},
 		},
 	}
 
@@ -334,6 +382,11 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 		ExpectedErrs field.ErrorList
 	}{
 		{
+			Name:         "update: valid: baseline",
+			Modify:       func(old, new metav1.Object) {},
+			ExpectedErrs: field.ErrorList{},
+		},
+		{
 			Name: "update: annotations: invalid key",
 			Modify: func(old, new metav1.Object) {
 				new.SetAnnotations(map[string]string{
@@ -356,15 +409,6 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 		},
 		{
-			Name: "update: resourceVersion: missing",
-			Modify: func(old, new metav1.Object) {
-				new.SetResourceVersion("")
-			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").MarkFromImperative(),
-			},
-		},
-		{
 			Name: "update: generation: decremented",
 			Modify: func(old, new metav1.Object) {
 				old.SetGeneration(5)
@@ -372,6 +416,15 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 			ExpectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+			},
+		},
+		{
+			Name: "update: resourceVersion: missing",
+			Modify: func(old, new metav1.Object) {
+				new.SetResourceVersion("")
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").MarkFromImperative(),
 			},
 		},
 		{
@@ -431,6 +484,15 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 		},
 		{
+			Name: "update: finalizers: name too long",
+			Modify: func(old, new metav1.Object) {
+				new.SetFinalizers([]string{strings.Repeat("a", 317)})
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+			},
+		},
+		{
 			Name: "update: managedFields: subresource too long",
 			Modify: func(old, new metav1.Object) {
 				new.SetManagedFields([]metav1.ManagedFieldsEntry{
@@ -483,15 +545,6 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 			ExpectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
-			},
-		},
-		{
-			Name: "update: finalizers: name too long",
-			Modify: func(old, new metav1.Object) {
-				new.SetFinalizers([]string{strings.Repeat("a", 317)})
-			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
 			},
 		},
 	}

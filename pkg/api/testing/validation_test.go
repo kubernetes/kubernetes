@@ -106,8 +106,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					if subresource != "" {
 						opts = append(opts, WithSubResources(subresource))
 					}
-					// extensions/v1beta1 is unserved and no longer carries
-					// declarative validation;
+					// extensions/v1beta1 is unserved and does not carry declarative validation,
+					// so skip it from the versioned validation equivalence sweep.
 					opts = append(opts, WithSkipGroupVersions("extensions/v1beta1"))
 					VerifyVersionedValidationEquivalence(t, obj, nil, opts...)
 
