@@ -770,6 +770,8 @@ message StatefulSetSpec {
   // It must match the pod template's labels.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +required
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // template is the object that describes the pod that will be created if
@@ -790,6 +792,8 @@ message StatefulSetSpec {
   // any volumes in the template, with the same name.
   // TODO: Define the behavior if a claim already exists with the same name.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   // +listType=atomic
   repeated .k8s.io.api.core.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
@@ -799,6 +803,8 @@ message StatefulSetSpec {
   // pattern: pod-specific-string.serviceName.default.svc.cluster.local
   // where "pod-specific-string" is managed by the StatefulSet controller.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   optional string serviceName = 5;
 
   // podManagementPolicy controls how pods are created during initial scale up,
@@ -810,6 +816,8 @@ message StatefulSetSpec {
   // to match the desired scale without waiting, and on scale down will delete
   // all pods at once.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   optional string podManagementPolicy = 6;
 
   // updateStrategy indicates the StatefulSetUpdateStrategy that will be

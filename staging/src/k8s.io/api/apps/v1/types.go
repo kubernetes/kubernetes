@@ -201,6 +201,8 @@ type StatefulSetSpec struct {
 	// It must match the pod template's labels.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// template is the object that describes the pod that will be created if
@@ -221,6 +223,8 @@ type StatefulSetSpec struct {
 	// any volumes in the template, with the same name.
 	// TODO: Define the behavior if a claim already exists with the same name.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +listType=atomic
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
@@ -230,6 +234,8 @@ type StatefulSetSpec struct {
 	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
 	// where "pod-specific-string" is managed by the StatefulSet controller.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	ServiceName string `json:"serviceName" protobuf:"bytes,5,opt,name=serviceName"`
 
 	// podManagementPolicy controls how pods are created during initial scale up,
@@ -241,6 +247,8 @@ type StatefulSetSpec struct {
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	PodManagementPolicy PodManagementPolicyType `json:"podManagementPolicy,omitempty" protobuf:"bytes,6,opt,name=podManagementPolicy,casttype=PodManagementPolicyType"`
 
 	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
