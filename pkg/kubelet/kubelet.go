@@ -1308,6 +1308,13 @@ type Kubelet struct {
 	// allocationManager manages allocated resources for pods.
 	allocationManager allocation.Manager
 
+	// staticPodsPendingAdmissionLock guards staticPodsPendingAdmission.
+	staticPodsPendingAdmissionLock sync.Mutex
+	// staticPodsPendingAdmission lists static pod UIDs whose kubelet admission
+	// failed on add (for example transient resource pressure). They are retried
+	// on each periodic sync without requiring a manifest change or kubelet restart.
+	staticPodsPendingAdmission sets.Set[types.UID]
+
 	// podCertificateManager is fed updates as pods are added and removed from
 	// the node, and requests certificates for them based on their configured
 	// pod certificate volumes.
@@ -2632,6 +2639,82 @@ func recordAdmissionRejection(reason string) {
 	}
 }
 
+func (kl *Kubelet) rememberStaticPodPendingAdmission(uid types.UID) {
+	kl.staticPodsPendingAdmissionLock.Lock()
+	defer kl.staticPodsPendingAdmissionLock.Unlock()
+	if kl.staticPodsPendingAdmission == nil {
+		kl.staticPodsPendingAdmission = sets.New[types.UID]()
+	}
+	kl.staticPodsPendingAdmission.Insert(uid)
+}
+
+func (kl *Kubelet) forgetStaticPodPendingAdmission(uid types.UID) {
+	kl.staticPodsPendingAdmissionLock.Lock()
+	defer kl.staticPodsPendingAdmissionLock.Unlock()
+	if kl.staticPodsPendingAdmission == nil {
+		return
+	}
+	kl.staticPodsPendingAdmission.Delete(uid)
+}
+
+// tryAdmitPendingStaticPods re-runs kubelet admission for static pods that failed
+// admission on their originating config add. File and HTTP sources may not emit
+// another update while the manifest is unchanged, so admission would otherwise
+// never be retried until kubelet restart.
+func (kl *Kubelet) tryAdmitPendingStaticPods(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	kl.staticPodsPendingAdmissionLock.Lock()
+	if kl.staticPodsPendingAdmission == nil || kl.staticPodsPendingAdmission.Len() == 0 {
+		kl.staticPodsPendingAdmissionLock.Unlock()
+		return
+	}
+	uids := kl.staticPodsPendingAdmission.UnsortedList()
+	kl.staticPodsPendingAdmissionLock.Unlock()
+
+	start := kl.clock.Now()
+	for _, uid := range uids {
+		pod, ok := kl.podManager.GetPodByUID(uid)
+		if !ok || !kubetypes.IsStaticPod(pod) {
+			kl.forgetStaticPodPendingAdmission(uid)
+			continue
+		}
+		if kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+			continue
+		}
+		if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+			logger.V(4).Info("Static pod admission still denied, will retry on next periodic sync", "pod", klog.KObj(pod), "reason", reason, "message", message)
+			continue
+		}
+		kl.forgetStaticPodPendingAdmission(uid)
+		logger.Info("Static pod admission succeeded after earlier denial", "pod", klog.KObj(pod))
+		kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
+			Phase:    v1.PodPending,
+			QOSClass: v1qos.GetPodQOS(pod),
+		})
+		pod, mirrorPod, _ := kl.podManager.GetPodAndMirrorPod(pod)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			var pendingResizes []types.UID
+			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+			if updatedFromAllocation {
+				pendingResizes = append(pendingResizes, pod.UID)
+			}
+			kl.statusManager.BackfillPodResizeConditions([]*v1.Pod{pod})
+			for _, resizeUID := range pendingResizes {
+				kl.allocationManager.PushPendingResize(resizeUID)
+			}
+			if len(pendingResizes) > 0 {
+				kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodsAdded)
+			}
+		}
+		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
+			Pod:        pod,
+			MirrorPod:  mirrorPod,
+			UpdateType: kubetypes.SyncPodCreate,
+			StartTime:  start,
+		})
+	}
+}
+
 // syncLoop is the main loop for processing changes. It watches for changes from
 // three channels (file, apiserver, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
@@ -2768,6 +2851,8 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			}
 		}
 	case <-syncCh:
+		// Retry kubelet admission for static pods that failed on add before syncing.
+		kl.tryAdmitPendingStaticPods(ctx)
 		// Sync pods waiting for sync
 		podsToSync := kl.getPodsToSync()
 		if len(podsToSync) == 0 {
@@ -2890,6 +2975,9 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
 			if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+				if kubetypes.IsStaticPod(pod) {
+					kl.rememberStaticPodPendingAdmission(pod.UID)
+				}
 				kl.rejectPod(ctx, pod, reason, message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.
@@ -2897,6 +2985,9 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				// and capture resize events separately.
 				recordAdmissionRejection(reason)
 				continue
+			}
+			if kubetypes.IsStaticPod(pod) {
+				kl.forgetStaticPodPendingAdmission(pod.UID)
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
@@ -3080,6 +3171,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
 	for _, pod := range pods {
+		kl.forgetStaticPodPendingAdmission(pod.UID)
 		kl.podCertificateManager.ForgetPod(ctx, pod)
 		kl.podManager.RemovePod(pod)
 		kl.allocationManager.RemovePod(pod.UID)
