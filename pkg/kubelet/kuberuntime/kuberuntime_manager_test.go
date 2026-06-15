@@ -90,7 +90,7 @@ func withRecorder(recorder *record.FakeRecorder) testRuntimeManagerOption {
 	}
 }
 
-func createTestRuntimeManager(tCtx ktesting.TContext, opts ...testRuntimeManagerOption) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+func createTestRuntimeManager(ctx context.Context, opts ...testRuntimeManagerOption) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	options := &testRuntimeManagerOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -113,7 +113,7 @@ func createTestRuntimeManager(tCtx ktesting.TContext, opts ...testRuntimeManager
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(tCtx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""), options.recorder)
+	manager, err := newFakeKubeRuntimeManager(ctx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""), options.recorder)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
@@ -1887,7 +1887,7 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
@@ -2202,7 +2202,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				}
 				// Sync the state manager with the base (old) values before the resize
 				resources := pod.Spec.InitContainers[0].Resources
-				require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, pod.Spec.InitContainers[0].Name, resources))
+				require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, pod.Spec.InitContainers[0].Name, resources))
 			}
 
 			if test.mutatePodFn != nil {
@@ -3049,7 +3049,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -3070,11 +3070,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	setupActuatedResources := func(pod *v1.Pod, container *v1.Container, actuatedResources v1.ResourceRequirements) {
 		actuatedContainer := container.DeepCopy()
 		actuatedContainer.Resources = actuatedResources
-		require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+		require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
 	}
 
 	setupActuatedPodResources := func(pod *v1.Pod, actuatedPodResources *v1.ResourceRequirements) {
-		require.NoError(t, m.actuatedState.SetPodLevelResources(pod.UID, actuatedPodResources))
+		require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources))
 
 	}
 
@@ -3915,7 +3915,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			if test.setupFn != nil {
 				test.setupFn(pod)
 			}
-			t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
+			t.Cleanup(func() { _ = m.actuatedState.RemovePod(logger, pod.UID) })
 
 			for idx := range pod.Spec.Containers {
 				// compute hash
@@ -4225,7 +4225,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		t.Skip("unsupported OS")
 	}
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
@@ -4649,7 +4649,7 @@ func TestDoPodResizeAction(t *testing.T) {
 						v1.ResourceMemory: *resource.NewQuantity(tc.currentPodLevelResources.memoryLimit, resource.BinarySI),
 					},
 				}
-				require.NoError(t, m.actuatedState.SetPodLevelResources(pod.UID, initialActuated))
+				require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, initialActuated))
 			}
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -5119,6 +5119,7 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 }
 
 func TestIsPodResizeInProgress(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	type testResources struct {
 		cpuReq, cpuLim, memReq, memLim int64
 	}
@@ -5426,7 +5427,6 @@ func TestIsPodResizeInProgress(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inplacePodLevelResizeEnabled)
-			tCtx := ktesting.Init(t)
 			_, _, m, err := createTestRuntimeManager(tCtx)
 			require.NoError(t, err)
 
@@ -5467,7 +5467,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 				if c.actuated != nil {
 					actuatedContainer := container.DeepCopy()
 					actuatedContainer.Resources = mkRequirements(*c.actuated)
-					require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+					require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
 
 					fetched, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.True(t, found)
@@ -5484,7 +5484,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 				if test.podLevelResources.actuated != nil {
 					actuatedReqs := mkRequirements(*test.podLevelResources.actuated)
-					require.NoError(t, m.actuatedState.SetPodLevelResources(pod.UID, &actuatedReqs))
+					require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, &actuatedReqs))
 
 					fetched, found := m.actuatedState.GetPodLevelResources(pod.UID)
 					require.True(t, found)

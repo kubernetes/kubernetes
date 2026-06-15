@@ -150,7 +150,7 @@ type Runtime interface {
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
 	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
-	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
+	UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error
 }
 
 var (

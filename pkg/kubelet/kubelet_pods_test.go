@@ -6575,7 +6575,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
@@ -7023,7 +7023,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			} else {
 				tPod.Spec.Containers[0].Resources = tc.Resources
 			}
-			err := kubelet.allocationManager.SetAllocatedResources(tPod)
+			err := kubelet.allocationManager.SetAllocatedResources(logger, tPod)
 			require.NoError(t, err)
 			resources := tc.ActualResources
 			if resources == nil {

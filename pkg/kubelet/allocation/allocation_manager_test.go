@@ -310,7 +310,8 @@ func TestRetryPendingResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
+
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	cpu2m := resource.MustParse("2m")
@@ -783,11 +784,11 @@ func TestRetryPendingResizes(t *testing.T) {
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod1, testPod2, testPod3}, nil)
 
 				if !tt.newResourcesAllocated {
-					require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
+					require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
 				} else {
-					require.NoError(t, allocationManager.SetAllocatedResources(newPod))
+					require.NoError(t, allocationManager.SetAllocatedResources(logger, newPod))
 				}
-				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+				t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 				if tt.originalInProgress {
 					allocationManager.(*manager).statusManager.SetPodResizeInProgressCondition(originalPod.UID, "", originalInProgressMsg, 0)
@@ -799,7 +800,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
-				allocationManager.PushPendingResize(originalPod.UID)
+				allocationManager.PushPendingResize(logger, originalPod.UID)
 				allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 				var updatedPod *v1.Pod
@@ -870,7 +871,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	nodeConfig := cm.NodeConfig{}
 	nodeConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
@@ -1068,13 +1069,13 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 				}
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{guaranteedQOSPod, guaranteedQOSPodWithSidecar, bestEffortPod}, &nodeConfig)
 
-				require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+				require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+				t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
-				allocationManager.PushPendingResize(originalPod.UID)
+				allocationManager.PushPendingResize(logger, originalPod.UID)
 				allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 				var updatedPod *v1.Pod
@@ -1125,7 +1126,7 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 		features.InPlacePodVerticalScaling: true,
 		features.NodeSwap:                  true,
 	})
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
 
 	cpu500m := resource.MustParse("500m")
@@ -1248,13 +1249,13 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 			}
 			allocationManager := makeAllocationManager(t, runtime, []*v1.Pod{testPod}, nil)
 
-			require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-			t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+			t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 			allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return newPod, true
 			}
-			allocationManager.PushPendingResize(testPod.UID)
+			allocationManager.PushPendingResize(logger, testPod.UID)
 			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 			var updatedPod *v1.Pod
@@ -1294,7 +1295,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -1348,7 +1349,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	}
 
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod}, nil)
-	require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
 	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		return testPod, true
 	}
@@ -1464,7 +1465,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				},
 			}
 
-			allocationManager.PushPendingResize(testPod.UID)
+			allocationManager.PushPendingResize(logger, testPod.UID)
 			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
 
 			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(testPod.UID)
@@ -1505,6 +1506,8 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	const containerName = "c1"
 
@@ -1746,7 +1749,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			}
 
 			for podUID, resources := range tc.initialAllocatedResourcesState {
-				err := allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				err := allocationManager.SetAllocatedResources(logger, podForAllocation(podUID, resources))
 				require.NoError(t, err)
 			}
 
@@ -1755,7 +1758,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -1807,6 +1810,8 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	const containerName = "c1"
 
@@ -2002,7 +2007,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			}
 
 			for podUID, resources := range tc.initialAllocatedResourcesState {
-				err := allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				err := allocationManager.SetAllocatedResources(logger, podForAllocation(podUID, resources))
 				require.NoError(t, err)
 			}
 
@@ -2011,7 +2016,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -2038,6 +2043,8 @@ func TestAllocationManagerAddPod(t *testing.T) {
 }
 
 func TestIsResizeIncreasingRequests(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
 	cpu1500m := resource.MustParse("1500m")
@@ -2216,7 +2223,7 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 			}
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{testPod}, nil)
-			require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
 
 			if tc.newPodRequests != nil {
 				testPod.Spec.Resources.Requests = tc.newPodRequests
@@ -2230,6 +2237,8 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 }
 
 func TestSortPendingResizes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
 	cpu1500m := resource.MustParse("1500m")
@@ -2259,7 +2268,7 @@ func TestSortPendingResizes(t *testing.T) {
 	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5), createTestPod(6)}
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods, nil)
 	for _, testPod := range testPods {
-		require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+		require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
 	}
 
 	// testPods[0] has the highest priority, as it doesn't increase resource requests (pod-level).
@@ -2296,14 +2305,14 @@ func TestSortPendingResizes(t *testing.T) {
 
 	// Push all the pods to the queue.
 	for i := range testPods {
-		allocationManager.PushPendingResize(testPods[i].UID)
+		allocationManager.PushPendingResize(logger, testPods[i].UID)
 	}
 	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
 
 	// Clear the queue and push the pods in reverse order to spice things up.
 	allocationManager.(*manager).podsWithPendingResizes = nil
 	for i := len(testPods) - 1; i >= 0; i-- {
-		allocationManager.PushPendingResize(testPods[i].UID)
+		allocationManager.PushPendingResize(logger, testPods[i].UID)
 	}
 	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
 }
@@ -2313,9 +2322,10 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 
+	logger, tCtx := ktesting.NewTestContext(t)
+
 	metrics.Register()
 	metrics.PodDeferredAcceptedResizes.Reset()
-	tCtx := ktesting.Init(t)
 
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -2392,7 +2402,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
 
 			am := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{original}, nil)
-			require.NoError(t, am.SetAllocatedResources(original))
+			require.NoError(t, am.SetAllocatedResources(logger, original))
 			if tc.hasPendingCondition {
 				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", 1)
 			}
@@ -2400,7 +2410,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			am.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return resizedPod, true
 			}
-			am.PushPendingResize(original.UID)
+			am.PushPendingResize(logger, original.UID)
 			resizedPods := am.(*manager).retryPendingResizes(tCtx, tc.trigger)
 
 			require.Len(t, resizedPods, 1)
@@ -2429,6 +2439,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		containerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
 	}
 	allocationManager := NewInMemoryManager(
+		logger,
 		statusManager,
 		func(_ context.Context, pod *v1.Pod) {
 			/* For testing, just mark the pod as having a pod sync triggered in an annotation. */
