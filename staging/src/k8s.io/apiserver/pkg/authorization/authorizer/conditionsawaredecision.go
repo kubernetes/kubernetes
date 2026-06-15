@@ -17,16 +17,11 @@ limitations under the License.
 package authorizer
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
-
-// ErrorConditionEvaluationNotSupported is returned by authorizer implementations
-// that do not support condition evaluation.
-var ErrorConditionEvaluationNotSupported = errors.New("condition evaluation not supported")
 
 // ConditionsAwareDecision models an authorization decision that is conditions-aware.
 // It is an enum type of the following five variants:
@@ -149,10 +144,4 @@ func (d ConditionsAwareDecision) String() string {
 	// Deny is written such that if none of the other modes apply,
 	// IsDenied() is true.
 	return fmt.Sprintf("Deny%s", paramsStr())
-}
-
-// ConditionsData is an enum type for various evaluation targets conditions
-// can be written against.
-// TODO(luxas): Implement this in the follow-up PR.
-type ConditionsData struct {
 }
