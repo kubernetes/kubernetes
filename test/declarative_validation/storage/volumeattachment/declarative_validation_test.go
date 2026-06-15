@@ -122,6 +122,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tc.oldInput.ObjectMeta.ResourceVersion = "1"
+			tc.newInput.ObjectMeta.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newInput, &tc.oldInput, registry.Strategy, tc.expectedErrs)
 		})
 	}
