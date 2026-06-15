@@ -19,6 +19,7 @@ package scheduler
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -267,6 +268,33 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 				t.Errorf("Want pod UID %v, got %v", tt.newPod.UID, pod.UID)
 			}
 		})
+	}
+}
+
+func TestAddPodLogsUnhandledSchedulerName(t *testing.T) {
+	// The ignored-pod message is logged at V(4), so the logger must be
+	// configured with a matching verbosity for the entry to be buffered.
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true), ktesting.Verbosity(4)))
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("other-scheduler").Obj()
+
+	sched := &Scheduler{
+		Cache:           internalcache.New(ctx, nil, false),
+		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+		logger:          logger,
+		Profiles: profile.Map{
+			testSchedulerName: nil,
+		},
+	}
+
+	sched.addPod(pod)
+
+	output := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+	expectedMsg := "Pod is ignored by this scheduler because of mismatched scheduler name"
+	if !strings.Contains(output, expectedMsg) {
+		t.Errorf("Expected log message %q, got: %s", expectedMsg, output)
 	}
 }
 

@@ -135,6 +135,8 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		sched.addAssignedPodToCache(pod)
 	} else if responsibleForPod(pod, sched.Profiles) {
 		sched.addPodToSchedulingQueue(pod)
+	} else {
+		logger.V(4).Info("Pod is ignored by this scheduler because of mismatched scheduler name", "pod", klog.KObj(pod), "schedulerName", pod.Spec.SchedulerName)
 	}
 }
 
