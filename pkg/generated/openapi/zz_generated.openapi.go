@@ -40507,21 +40507,21 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref common.ReferenceCallb
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the pod being evaluated",
+							Description: "spec holds information about the pod being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref(imagepolicyv1alpha1.ImageReviewSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the backend and indicates whether the pod should be allowed.",
+							Description: "status is filled in by the backend and indicates whether the pod should be allowed.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(imagepolicyv1alpha1.ImageReviewStatus{}.OpenAPIModelName()),
 						},
@@ -40543,7 +40543,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref common.R
 				Properties: map[string]spec.Schema{
 					"image": {
 						SchemaProps: spec.SchemaProps{
-							Description: "This can be in the form image:tag or image@SHA:012345679abcdef.",
+							Description: "image can be in the form image:tag or image@SHA:012345679abcdef.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -40568,7 +40568,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Containers is a list of a subset of the information in each container of the Pod being created.",
+							Description: "containers is a list of a subset of the information in each container of the Pod being created.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40581,7 +40581,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceC
 					},
 					"annotations": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Annotations is a list of key-value pairs extracted from the Pod's annotations. It only includes keys which match the pattern `*.image-policy.k8s.io/*`. It is up to each webhook backend to determine how to interpret these annotations, if at all.",
+							Description: "annotations is a list of key-value pairs extracted from the Pod's annotations. It only includes keys which match the pattern `*.image-policy.k8s.io/*`. It is up to each webhook backend to determine how to interpret these annotations, if at all.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -40596,7 +40596,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceC
 					},
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespace is the namespace the pod is being created in.",
+							Description: "namespace is the namespace the pod is being created in.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -40618,7 +40618,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"allowed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Allowed indicates that all images were allowed to be run.",
+							Description: "allowed indicates that all images were allowed to be run.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -40626,14 +40626,14 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reason should be empty unless Allowed is false in which case it may contain a short description of what is wrong.  Kubernetes may truncate excessively long errors when displaying to the user.",
+							Description: "reason should be empty unless Allowed is false in which case it may contain a short description of what is wrong.  Kubernetes may truncate excessively long errors when displaying to the user.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"auditAnnotations": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AuditAnnotations will be added to the attributes object of the admission controller request using 'AddAnnotation'.  The keys should be prefix-less (i.e., the admission controller will add an appropriate prefix).",
+							Description: "auditAnnotations will be added to the attributes object of the admission controller request using 'AddAnnotation'.  The keys should be prefix-less (i.e., the admission controller will add an appropriate prefix).",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
