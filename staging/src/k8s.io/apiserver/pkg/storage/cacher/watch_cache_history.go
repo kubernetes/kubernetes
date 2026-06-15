@@ -25,7 +25,56 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/klog/v2"
 )
+
+const (
+	// defaultLowerBoundCapacity is a default value for event cache capacity's lower bound.
+	// TODO: Figure out, to what value we can decreased it.
+	defaultLowerBoundCapacity = 100
+
+	// defaultUpperBoundCapacity should be able to keep the required history.
+	defaultUpperBoundCapacity = 100 * 1024
+)
+
+func newWatchCacheHistory(config *ImmutableWatchCacheConfig, eventFreshDuration time.Duration) *watchCacheHistory {
+	h := &watchCacheHistory{
+		config:             config,
+		capacity:           defaultLowerBoundCapacity,
+		cache:              make([]*watchCacheEvent, defaultLowerBoundCapacity),
+		lowerBoundCapacity: defaultLowerBoundCapacity,
+		upperBoundCapacity: capacityUpperBound(eventFreshDuration),
+		startIndex:         0,
+		endIndex:           0,
+		eventFreshDuration: eventFreshDuration,
+	}
+	metrics.WatchCacheCapacity.WithLabelValues(config.groupResource.Group, config.groupResource.Resource).Set(float64(h.capacity))
+	return h
+}
+
+// capacityUpperBound denotes the maximum possible capacity of the watch cache
+// to which it can resize.
+func capacityUpperBound(eventFreshDuration time.Duration) int {
+	if eventFreshDuration <= DefaultEventFreshDuration {
+		return defaultUpperBoundCapacity
+	}
+	// eventFreshDuration determines how long the watch events are supposed
+	// to be stored in the watch cache.
+	// In very high churn situations, there is a need to store more events
+	// in the watch cache, hence it would have to be upsized accordingly.
+	// Because of that, for larger values of eventFreshDuration, we set the
+	// upper bound of the watch cache's capacity proportionally to the ratio
+	// between eventFreshDuration and DefaultEventFreshDuration.
+	// Given that the watch cache size can only double, we round up that
+	// proportion to the next power of two.
+	exponent := int(math.Ceil((math.Log2(eventFreshDuration.Seconds() / DefaultEventFreshDuration.Seconds()))))
+	if maxExponent := int(math.Floor((math.Log2(math.MaxInt32 / defaultUpperBoundCapacity)))); exponent > maxExponent {
+		// Making sure that the capacity's upper bound fits in a 32-bit integer.
+		exponent = maxExponent
+		klog.Warningf("Capping watch cache capacity upper bound to %v", defaultUpperBoundCapacity<<exponent)
+	}
+	return defaultUpperBoundCapacity << exponent
+}
 
 type watchCacheHistory struct {
 	config *ImmutableWatchCacheConfig
@@ -198,4 +247,14 @@ func (w *watchCacheHistory) GetIntervalLocked(resourceVersion uint64, listResour
 	}
 	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.config.indexValidator, resourceVersion, locker)
 	return ci, nil
+}
+
+// OldestResourceVersionLocked returns the resource version of the oldest event in the cyclic buffer.
+func (w *watchCacheHistory) OldestResourceVersionLocked() uint64 {
+	return w.cache[w.startIndex%w.capacity].ResourceVersion
+}
+
+// Capacity returns the current capacity of the event history cache.
+func (w *watchCacheHistory) Capacity() int {
+	return w.capacity
 }
