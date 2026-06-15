@@ -79,8 +79,21 @@ func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, contain
 	pb.recorder.WithLogger(logger).Eventf(ref, eventType, reason, message, args...)
 }
 
-// probe probes the container.
+// ProbeContext carries probe run context from the worker for enriched event messages.
+type ProbeContext struct {
+	ResultRun        int
+	LastResult       results.Result
+	FailureThreshold int32
+	SuccessThreshold int32
+}
+
+// probe probes the container (backward-compatible wrapper).
 func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+	return pb.probeWithContext(ctx, probeType, pod, status, container, containerID, nil)
+}
+
+// probeWithContext probes the container with optional ProbeContext for enriched events.
+func (pb *prober) probeWithContext(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, probeCtx *ProbeContext) (results.Result, error) {
 	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
@@ -120,7 +133,21 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 	case probe.Failure:
 		logger.V(1).Info("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-		pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+		if probeCtx != nil && probeCtx.FailureThreshold > 0 {
+			var failureCount int
+			if probeCtx.LastResult == results.Failure {
+				failureCount = probeCtx.ResultRun + 1
+			} else {
+				failureCount = 1
+			}
+			if failureCount < int(probeCtx.FailureThreshold) {
+				pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed (%d/%d, will be ignored): %s", probeType, failureCount, probeCtx.FailureThreshold, output)
+			} else {
+				pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed (%d/%d): %s", probeType, failureCount, probeCtx.FailureThreshold, output)
+			}
+		} else {
+			pb.recordContainerEvent(ctx, pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+		}
 		return results.Failure, nil
 
 	case probe.Unknown:
