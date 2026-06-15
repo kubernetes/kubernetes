@@ -24,15 +24,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	fakeremote "k8s.io/cri-client/pkg/fake"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetClient(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := map[string]func(string, time.Duration, int) (any, *grpc.ClientConn, error){
 		"v1alpha1": func(socket string, timeout time.Duration, maxSize int) (any, *grpc.ClientConn, error) {
-			return GetV1alpha1Client(socket, timeout, maxSize)
+			return GetV1alpha1Client(tCtx, socket, timeout, maxSize)
 		},
 		"v1": func(socket string, timeout time.Duration, maxSize int) (any, *grpc.ClientConn, error) {
-			return GetV1Client(socket, timeout, maxSize)
+			return GetV1Client(tCtx, socket, timeout, maxSize)
 		},
 	}
 

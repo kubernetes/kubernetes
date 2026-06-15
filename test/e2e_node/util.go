@@ -131,7 +131,7 @@ func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.L
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
-	client, conn, err := podresources.GetV1alpha1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	client, conn, err := podresources.GetV1alpha1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting grpc client: %w", err)
 	}
@@ -150,7 +150,7 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
-	client, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	client, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting gRPC client: %w", err)
 	}

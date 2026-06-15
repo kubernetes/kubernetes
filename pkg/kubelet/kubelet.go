@@ -670,9 +670,9 @@ func NewMainKubelet(ctx context.Context,
 			configMapManager = configmap.NewWatchingConfigMapManager(klet.kubeClient, klet.resyncInterval)
 		case kubeletconfiginternal.TTLCacheChangeDetectionStrategy:
 			secretManager = secret.NewCachingSecretManager(
-				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(ctx, klet.GetNode))
 			configMapManager = configmap.NewCachingConfigMapManager(
-				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(ctx, klet.GetNode))
 		case kubeletconfiginternal.GetChangeDetectionStrategy:
 			secretManager = secret.NewSimpleSecretManager(klet.kubeClient)
 			configMapManager = configmap.NewSimpleConfigMapManager(klet.kubeClient)
