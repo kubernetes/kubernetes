@@ -894,7 +894,9 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 
 						// Print progress over time.
 						for _, sample := range item.progress {
-							fmt.Fprintf(f, "%.1fs %d %d %d %f\n", sample.ts.Sub(item.start).Seconds(), sample.completed, sample.attempts, sample.observedTotal, sample.observedRate)
+							if _, err := fmt.Fprintf(f, "%.1fs %d %d %d %f %d %d %d %d\n", sample.ts.Sub(item.start).Seconds(), sample.completed, sample.attempts, sample.observedTotal, sample.observedRate, sample.activePods, sample.backoffPods, sample.unschedulable, sample.gatedPods); err != nil {
+								b.Fatalf("write to data file: %v", err)
+							}
 						}
 						if err := f.Close(); err != nil {
 							b.Fatalf("closing data file: %v", err)

@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	schedulermetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
@@ -233,6 +234,10 @@ type podScheduling struct {
 	completed     int
 	observedTotal int
 	observedRate  float64
+	activePods    int
+	backoffPods   int
+	unschedulable int
+	gatedPods     int
 }
 
 // makeBasePod creates a Pod object to be used as a template.
@@ -571,6 +576,11 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 	started := false
 	skipped := 0
 
+	activePods := schedulermetrics.ActivePods()
+	backoffPods := schedulermetrics.BackoffPods()
+	unschedulablePods := schedulermetrics.UnschedulablePods()
+	gatedPods := schedulermetrics.GatedPods()
+
 	for {
 		select {
 		case <-tCtx.Done():
@@ -628,12 +638,20 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			if err != nil {
 				klog.Error(err)
 			}
+			activePods, _ := testutil.GetGaugeMetricValue(activePods)
+			backoffPods, _ := testutil.GetGaugeMetricValue(backoffPods)
+			unschedulable, _ := testutil.GetGaugeMetricValue(unschedulablePods)
+			gatedPods, _ := testutil.GetGaugeMetricValue(gatedPods)
 			tc.progress = append(tc.progress, podScheduling{
 				ts:            now,
 				attempts:      int(counters["unschedulable"] + counters["error"] + counters["scheduled"]),
 				completed:     int(counters["scheduled"]),
 				observedTotal: scheduled,
 				observedRate:  throughput,
+				activePods:    int(activePods),
+				backoffPods:   int(backoffPods),
+				unschedulable: int(unschedulable),
+				gatedPods:     int(gatedPods),
 			})
 
 			lastScheduledCount = scheduled
