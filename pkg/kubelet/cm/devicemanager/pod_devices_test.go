@@ -347,20 +347,20 @@ func TestPodDevicesConcurrentAccess(t *testing.T) {
 	wg.Add(numReaders + numWriters)
 
 	// Start multiple readers calling podDevices() which triggers the fixed code path
-	for i := 0; i < numReaders; i++ {
+	for range numReaders {
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				pdev.podDevices("pod1", "resource1")
 			}
 		}()
 	}
 
 	// Start writers that need write lock (competing with readers)
-	for i := 0; i < numWriters; i++ {
+	for range numWriters {
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 50; j++ {
+			for range 50 {
 				pdev.insert("pod2", "cont3", "resource2",
 					checkpoint.DevicesPerNUMA{0: []string{"dev5"}},
 					newContainerAllocateResponse(),
