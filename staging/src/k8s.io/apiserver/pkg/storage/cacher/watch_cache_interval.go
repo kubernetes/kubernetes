@@ -44,6 +44,13 @@ type watchCacheInterval struct {
 	initialEventsEndBookmark *watchCacheEvent
 }
 
+// Next returns the next item in the cache interval provided the cache
+// interval is still valid. An error is returned if the interval is
+// invalidated.
+func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
+	return wci.source.Next()
+}
+
 type indexerFunc func(int) *watchCacheEvent
 type indexValidator func(int) bool
 
@@ -59,6 +66,52 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 		},
 		resourceVersion: resourceVersion,
 	}
+}
+
+// newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
+// returned by Next() need to be events from a List() done on the underlying store of
+// the watch cache.
+// The items returned in the interval will be sorted by Key.
+func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key string, matchesSingle bool) (*watchCacheInterval, error) {
+	buffer := &watchCacheIntervalBuffer{}
+	var allItems []interface{}
+	var err error
+	if matchesSingle {
+		item, exists, err := snap.GetByKey(key)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			allItems = append(allItems, item)
+		}
+	} else {
+		allItems, err = snap.OrderedListPrefix("", "")
+		if err != nil {
+			return nil, err
+		}
+	}
+	buffer.buffer = make([]*watchCacheEvent, len(allItems))
+	for i, item := range allItems {
+		elem, ok := item.(*store.Element)
+		if !ok {
+			return nil, fmt.Errorf("not a storeElement: %v", elem)
+		}
+		buffer.buffer[i] = &watchCacheEvent{
+			Type:            watch.Added,
+			Object:          elem.Object,
+			ObjLabels:       elem.Labels,
+			ObjFields:       elem.Fields,
+			Key:             elem.Key,
+			ResourceVersion: resourceVersion,
+		}
+		buffer.endIndex++
+	}
+	ci := &watchCacheInterval{
+		source:          &snapshotCacheIntervalSource{buffer: buffer},
+		resourceVersion: resourceVersion,
+	}
+
+	return ci, nil
 }
 
 // historyCacheIntervalSource serves events from the watchCache circular buffer.
@@ -119,72 +172,6 @@ type historyCacheIntervalSource struct {
 	lock sync.Locker
 }
 
-// snapshotCacheIntervalSource serves events from a pre-populated buffer.
-type snapshotCacheIntervalSource struct {
-	buffer *watchCacheIntervalBuffer
-}
-
-func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
-	event, exists := s.buffer.next()
-	if !exists {
-		return nil, nil
-	}
-	return event, nil
-}
-
-// newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
-// returned by Next() need to be events from a List() done on the underlying store of
-// the watch cache.
-// The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	buffer := &watchCacheIntervalBuffer{}
-	var allItems []interface{}
-	var err error
-	if matchesSingle {
-		item, exists, err := snap.GetByKey(key)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			allItems = append(allItems, item)
-		}
-	} else {
-		allItems, err = snap.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
-	for i, item := range allItems {
-		elem, ok := item.(*store.Element)
-		if !ok {
-			return nil, fmt.Errorf("not a storeElement: %v", elem)
-		}
-		buffer.buffer[i] = &watchCacheEvent{
-			Type:            watch.Added,
-			Object:          elem.Object,
-			ObjLabels:       elem.Labels,
-			ObjFields:       elem.Fields,
-			Key:             elem.Key,
-			ResourceVersion: resourceVersion,
-		}
-		buffer.endIndex++
-	}
-	ci := &watchCacheInterval{
-		source:          &snapshotCacheIntervalSource{buffer: buffer},
-		resourceVersion: resourceVersion,
-	}
-
-	return ci, nil
-}
-
-// Next returns the next item in the cache interval provided the cache
-// interval is still valid. An error is returned if the interval is
-// invalidated.
-func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
-	return wci.source.Next()
-}
-
 func (s *historyCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	// if there are items in the buffer to return, return from
 	// the buffer.
@@ -222,6 +209,19 @@ func (s *historyCacheIntervalSource) fillBuffer() {
 		s.buffer.endIndex++
 		s.startIndex++
 	}
+}
+
+// snapshotCacheIntervalSource serves events from a pre-populated buffer.
+type snapshotCacheIntervalSource struct {
+	buffer *watchCacheIntervalBuffer
+}
+
+func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+	event, exists := s.buffer.next()
+	if !exists {
+		return nil, nil
+	}
+	return event, nil
 }
 
 const bufferSize = 100
