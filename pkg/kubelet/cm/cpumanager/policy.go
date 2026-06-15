@@ -45,4 +45,6 @@ type Policy interface {
 	AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod) error
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
+	// CanAllocateExclusively returns true if the policy can allocate exclusively CPUs
+	CanAllocateExclusively() bool
 }
