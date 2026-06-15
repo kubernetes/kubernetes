@@ -1777,3 +1777,569 @@ func TestPodResizeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-level-resources", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	cpu := func(val string) v1.ResourceList {
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(val)}
+	}
+
+	cReq := cpu("1")
+	cLim := cpu("2")
+	pReq := cpu("3")
+	pLim := cpu("4")
+
+	aggReq := cpu("2") // aggregated request for the 2 container cases
+	aggLim := cpu("4") // aggregated limit for the 2 containers cases
+
+	// For generating test case names.
+	quantityName := func(q v1.ResourceList) string {
+		switch {
+		case len(q) == 0:
+			return ""
+		case apiequality.Semantic.DeepEqual(q, cReq):
+			return "cReq"
+		case apiequality.Semantic.DeepEqual(q, cLim):
+			return "cLim"
+		case apiequality.Semantic.DeepEqual(q, pReq):
+			return "pReq"
+		case apiequality.Semantic.DeepEqual(q, pLim):
+			return "pLim"
+		case apiequality.Semantic.DeepEqual(q, aggReq):
+			return "aggReq"
+		case apiequality.Semantic.DeepEqual(q, aggLim):
+			return "aggLim"
+		}
+		return "custom"
+	}
+	resourceSummary := func(reqs, lims v1.ResourceList) string {
+		if len(reqs) == 0 && len(lims) == 0 {
+			return "none"
+		}
+		summary := quantityName(reqs) + "+" + quantityName(lims)
+		return strings.Trim(summary, "+") // Remove + if either reqs or lims is nil
+	}
+
+	type resources struct {
+		podReqs, podLims             v1.ResourceList
+		containerReqs, containerLims v1.ResourceList
+	}
+
+	tests := []struct {
+		name            string
+		initial         resources
+		secondContainer bool
+		expected        resources
+		expectError     bool
+		expectedQOS     v1.PodQOSClass
+	}{
+		{
+			initial:  resources{nil, nil, nil, nil},
+			expected: resources{nil, nil, nil, nil},
+		}, {
+			initial:  resources{nil, nil, nil, cLim},
+			expected: resources{nil, nil, cLim, cLim},
+		}, {
+			initial:  resources{nil, nil, cReq, nil},
+			expected: resources{nil, nil, cReq, nil},
+		}, {
+			initial:  resources{nil, nil, cReq, cLim},
+			expected: resources{nil, nil, cReq, cLim},
+		}, {
+			initial:  resources{nil, pLim, nil, nil},
+			expected: resources{pLim, pLim, nil, nil},
+		}, {
+			initial:  resources{nil, pLim, nil, cLim},
+			expected: resources{cLim, pLim, cLim, cLim}, // Pod requests default to container requests
+		}, {
+			initial:  resources{nil, pLim, cReq, nil},
+			expected: resources{cReq, pLim, cReq, nil}, // Pod requests default to container requests
+		}, {
+			initial:  resources{nil, pLim, cReq, cLim},
+			expected: resources{cReq, pLim, cReq, cLim}, // Pod requests default to container requests
+		}, {
+			initial:  resources{pReq, nil, nil, nil},
+			expected: resources{pReq, nil, nil, nil},
+		}, {
+			initial:  resources{pReq, nil, nil, cLim},
+			expected: resources{pReq, nil, cLim, cLim},
+		}, {
+			initial:  resources{pReq, nil, cReq, nil},
+			expected: resources{pReq, nil, cReq, nil},
+		}, {
+			// TODO: Once https://github.com/kubernetes/kubernetes/issues/136120 is fixed,
+			// expected pod limits here would be aggregated container limits.
+			initial:  resources{pReq, nil, cReq, cLim},
+			expected: resources{pReq, nil, cReq, cLim},
+		}, {
+			initial:  resources{pReq, pLim, nil, nil},
+			expected: resources{pReq, pLim, nil, nil},
+		}, {
+			initial:  resources{pReq, pLim, nil, cLim},
+			expected: resources{pReq, pLim, cLim, cLim},
+		}, {
+			initial:  resources{pReq, pLim, cReq, nil},
+			expected: resources{pReq, pLim, cReq, nil},
+		}, {
+			initial:  resources{pReq, pLim, cReq, cLim},
+			expected: resources{pReq, pLim, cReq, cLim},
+		},
+		// 2 Container cases
+		{
+			secondContainer: true,
+			initial:         resources{nil, nil, nil, nil},
+			expected:        resources{nil, nil, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, nil, cLim},
+			expected:        resources{nil, nil, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, cReq, nil},
+			expected:        resources{nil, nil, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, cReq, cLim},
+			expected:        resources{nil, nil, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, nil, nil},
+			expected:        resources{pLim, pLim, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, nil, cLim},
+			expected:        resources{aggLim, pLim, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, cReq, nil},
+			expected:        resources{aggReq, pLim, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, cReq, cLim},
+			expected:        resources{aggReq, pLim, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, nil, nil},
+			expected:        resources{pReq, nil, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, nil, cLim},
+			expectError:     true, // pReq(3) < 2 * cLim(2)
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, cReq, nil},
+			expected:        resources{pReq, nil, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, cReq, cLim},
+			expected:        resources{pReq, nil, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, nil, nil},
+			expected:        resources{pReq, pLim, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, nil, cLim},
+			expectError:     true, // pReq(3) < 2 * cLim(2)
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, cReq, nil},
+			expected:        resources{pReq, pLim, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, cReq, cLim},
+			expected:        resources{pReq, pLim, cReq, cLim},
+		},
+		// The following test cases invert the container & pod values to test error conditions.
+		{
+			initial:     resources{nil, cLim, nil, pLim},
+			expectError: true, // cLim < pLim
+		}, {
+			initial:     resources{nil, cLim, pReq, nil},
+			expectError: true, // Pod defaulted reqs to pReq > cLim
+		}, {
+			initial:     resources{nil, cLim, pReq, pLim},
+			expectError: true, // Pod defaulted reqs to pReq > cLim
+		}, {
+			initial:     resources{nil, cLim, cReq, pLim},
+			expectError: true, // Individual container limits must be <= pod limits
+		}, {
+			initial:     resources{cReq, nil, nil, pLim},
+			expectError: true, // Container defaulted reqs to pLim > cReq
+		}, {
+			initial:     resources{cReq, nil, pReq, nil},
+			expectError: true, // cReq < pReq
+		}, {
+			initial:     resources{cReq, nil, pReq, pLim},
+			expectError: true, // cReq < pReq
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, cLim, nil, cLim},
+			expectError:     true, // pod req defaults to 2x cLim
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, cLim, cReq, cLim},
+			expected:        resources{aggReq, cLim, cReq, cLim}, // aggReq == cLim
+		},
+		{
+			name: "CPU + memory at container level, only CPU at pod level",
+			initial: resources{
+				podReqs: cpu("2"),
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name: "Ephemeral storage at pod level, cpu + mem at container level",
+			initial: resources{
+				podReqs: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				podLims: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "Combining propagation: pod requests cpu, container requests memory",
+			initial: resources{
+				podReqs:       cpu("1"),
+				containerReqs: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: resources{
+				podReqs: cpu("1"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+		{
+			name: "Empty variant: pod requests empty map, container requests cpu",
+			initial: resources{
+				podReqs:       v1.ResourceList{},
+				containerReqs: cpu("1"),
+			},
+			expected: resources{
+				podReqs:       v1.ResourceList{},
+				containerReqs: cpu("1"),
+			},
+		},
+		{
+			name: "Zero variant: pod requests cpu 0, container requests cpu 1",
+			initial: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("1"),
+			},
+			expectError: true,
+		},
+		/*
+		// TODO: Once https://github.com/kubernetes/kubernetes/issues/135082 is fixed,
+		// empty Pod-level resources should evaluate QoS using container resources.
+		{
+			name: "Empty Pod-level resources with container resources",
+			initial: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSGuaranteed,
+		},
+		{
+			name: "Empty Pod-level requests (limits unset) with container resources",
+			initial: resources{
+				podReqs: v1.ResourceList{},
+				podLims: nil,
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{},
+				podLims: nil,
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSGuaranteed,
+		},
+		{
+			name: "Empty Pod-level limits (requests unset) with container resources",
+			initial: resources{
+				podReqs: nil,
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: nil,
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSGuaranteed,
+		},
+		*/
+		{
+			name: "Guaranteed QoS: equal CPU and Memory requests and limits",
+			initial: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSGuaranteed,
+		},
+	}
+
+	for i, test := range tests {
+		testName := test.name
+		if testName == "" {
+			testName = fmt.Sprintf("%d_pod:%s_container:%s", i,
+				resourceSummary(test.initial.podReqs, test.initial.podLims),
+				resourceSummary(test.initial.containerReqs, test.initial.containerLims))
+			if test.secondContainer {
+				testName += "_2containers"
+			}
+		}
+		t.Run(testName, func(t *testing.T) {
+			var podResources *v1.ResourceRequirements
+			if test.initial.podReqs != nil || test.initial.podLims != nil {
+				podResources = &v1.ResourceRequirements{
+					Requests: test.initial.podReqs,
+					Limits:   test.initial.podLims,
+				}
+			}
+
+			containerResources := v1.ResourceRequirements{
+				Requests: test.initial.containerReqs,
+				Limits:   test.initial.containerLims,
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: v1.PodSpec{
+					Resources: podResources,
+					Containers: []v1.Container{
+						{
+							Name:      "fake-name",
+							Image:     "fakeimage",
+							Resources: containerResources,
+						},
+					},
+				},
+			}
+
+			if test.secondContainer {
+				c2 := pod.Spec.Containers[0].DeepCopy()
+				c2.Name = "fake-name2"
+				pod.Spec.Containers = append(pod.Spec.Containers, *c2)
+			}
+
+			result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if !test.expectError && err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			} else if test.expectError {
+				if err == nil {
+					t.Fatalf("Expected an error, but received none")
+				} else if !apierrors.IsInvalid(err) {
+					t.Fatalf("Expected an Invalid error, but got: %v", err)
+				} else {
+					return
+				}
+			}
+
+			if test.expectedQOS != "" {
+				if result.Status.QOSClass != test.expectedQOS {
+					t.Errorf("Expected QoS class %s; got: %s", test.expectedQOS, result.Status.QOSClass)
+				}
+			}
+
+			if test.expected.podReqs != nil || test.expected.podLims != nil {
+				expectedPodResources := &v1.ResourceRequirements{
+					Requests: test.expected.podReqs,
+					Limits:   test.expected.podLims,
+				}
+				if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPodResources) {
+					t.Errorf("Expected pod resources %s; got: %s", expectedPodResources.String(), result.Spec.Resources.String())
+				}
+			} else if result.Spec.Resources != nil {
+				t.Errorf("Expected empty pod resources, but got: %s", result.Spec.Resources.String())
+			}
+
+			expectedContainerResources := v1.ResourceRequirements{
+				Requests: test.expected.containerReqs,
+				Limits:   test.expected.containerLims,
+			}
+			if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedContainerResources) {
+				t.Errorf("Expected container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[0].Resources.String())
+			}
+			if test.secondContainer {
+				if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedContainerResources) {
+					t.Errorf("Expected second container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[1].Resources.String())
+				}
+			}
+		})
+	}
+
+	t.Run("2 containers: 1 container with limit set, pod request set", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: pReq,
+				},
+				Containers: []v1.Container{
+					{
+						Name:  "c1",
+						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Limits: cLim,
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+
+		result, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		expectedPodResources := &v1.ResourceRequirements{
+			Requests: pReq,
+		}
+		if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPodResources) {
+			t.Errorf("Expected pod resources %s; got: %s", expectedPodResources.String(), result.Spec.Resources.String())
+		}
+
+		expectedC1 := v1.ResourceRequirements{
+			Requests: cLim,
+			Limits:   cLim,
+		}
+		if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedC1) {
+			t.Errorf("Expected container 1 resources %s; got: %s", expectedC1.String(), result.Spec.Containers[0].Resources.String())
+		}
+
+		expectedC2 := v1.ResourceRequirements{}
+		if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedC2) {
+			t.Errorf("Expected container 2 resources %s; got: %s", expectedC2.String(), result.Spec.Containers[1].Resources.String())
+		}
+	})
+}
