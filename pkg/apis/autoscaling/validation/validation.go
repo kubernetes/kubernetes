@@ -84,7 +84,11 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectReference, fldPath *field.Path, opts CrossVersionObjectReferenceValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(ref.Kind) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
+		err := field.Required(fldPath.Child("kind"), "")
+		if opts.RequiredCoveredByDeclarative {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	} else {
 		for _, msg := range content.IsPathSegmentName(ref.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
@@ -92,7 +96,11 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	}
 
 	if len(ref.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+		err := field.Required(fldPath.Child("name"), "")
+		if opts.RequiredCoveredByDeclarative {
+			err = err.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, err)
 	} else {
 		for _, msg := range content.IsPathSegmentName(ref.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
@@ -150,6 +158,12 @@ type CrossVersionObjectReferenceValidationOptions struct {
 	AllowEmptyAPIGroup bool
 	// AllowInvalidAPIVersion skips APIVersion validation when true.
 	AllowInvalidAPIVersion bool
+	// RequiredCoveredByDeclarative marks the required-value errors for Kind and
+	// Name as covered by declarative validation. Set it only where declarative
+	// validation actually validates the reference (scaleTargetRef); leave it
+	// false for describedObject, which is under the opaque metrics subtree and is
+	// validated only by hand-written validation.
+	RequiredCoveredByDeclarative bool
 }
 
 // HorizontalPodAutoscalerSpecValidationOptions contains the different settings for
