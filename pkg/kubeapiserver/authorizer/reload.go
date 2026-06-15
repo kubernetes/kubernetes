@@ -92,6 +92,11 @@ func (r *reloadableAuthorizerResolver) EvaluateConditions(ctx context.Context, d
 	return r.current.Load().authorizer.EvaluateConditions(ctx, decision, data)
 }
 
+// ConditionalAuthorizerName delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) ConditionalAuthorizerName() string {
+	return r.current.Load().authorizer.ConditionalAuthorizerName()
+}
+
 func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return r.current.Load().ruleResolver.RulesFor(ctx, user, namespace)
 }

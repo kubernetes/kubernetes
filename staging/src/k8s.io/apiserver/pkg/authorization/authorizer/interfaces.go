@@ -115,6 +115,14 @@ type Authorizer interface {
 	// An authorizer who does not support conditions should fail closed and
 	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
+
+	// ConditionalAuthorizerName specifies a name of a conditional authorizer. The name is required to
+	// be unique only locally within a given union authorizer, which uses the name to correlate
+	// conditional decisions computed during ConditionsAwareAuthorize to the correct authorizer during
+	// EvaluateConditions. Unconditional-only authorizers should return "".
+	// Validated when/if conditions are used, needs to be a DNS 1123 domain with at least two dots.
+	// Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+	ConditionalAuthorizerName() string
 }
 
 // AuthorizerFunc implements Authorizer
@@ -132,6 +140,11 @@ func (f AuthorizerFunc) ConditionsAwareAuthorize(ctx context.Context, a Attribut
 
 func (f AuthorizerFunc) EvaluateConditions(_ context.Context, _ ConditionsAwareDecision, _ ConditionsData) (Decision, string, error) {
 	return DecisionDeny, "", ErrorConditionEvaluationNotSupported
+}
+
+// ConditionalAuthorizerName returns "" as AuthorizerFunc does not support conditions.
+func (f AuthorizerFunc) ConditionalAuthorizerName() string {
+	return ""
 }
 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.

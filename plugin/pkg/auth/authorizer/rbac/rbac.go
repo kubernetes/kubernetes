@@ -139,6 +139,11 @@ func (*RBACAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Condit
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// ConditionalAuthorizerName returns "" as the RBAC authorizer does not support conditions.
+func (*RBACAuthorizer) ConditionalAuthorizerName() string {
+	return ""
+}
+
 func (r *RBACAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo

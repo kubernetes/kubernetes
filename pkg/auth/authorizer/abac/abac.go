@@ -251,6 +251,11 @@ func (PolicyList) EvaluateConditions(_ context.Context, _ authorizer.ConditionsA
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// ConditionalAuthorizerName returns "" as the ABAC authorizer does not support conditions.
+func (PolicyList) ConditionalAuthorizerName() string {
+	return ""
+}
+
 // RulesFor returns rules for the given user and namespace.
 func (pl PolicyList) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (

@@ -635,6 +635,8 @@ func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldP
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), a.Name, fmt.Sprintf("authorizer name is invalid: %s", strings.Join(errs, ", "))))
 		}
 		seenAuthorizerNames.Insert(a.Name)
+		// TODO(luxas): When later adding the configuration for opting a webhook authorizer into conditions, validate that the name has at least two dots,
+		// and does not use the k8s.io or kubernetes.io top-level domains.
 
 		switch a.Type {
 		case api.TypeWebhook:

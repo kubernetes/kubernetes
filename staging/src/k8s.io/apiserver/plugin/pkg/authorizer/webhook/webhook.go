@@ -80,8 +80,8 @@ type WebhookAuthorizer struct {
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
-func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics, compiler authorizationcel.Compiler) (*WebhookAuthorizer, error) {
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, compiler, "")
+func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics, compiler authorizationcel.Compiler, name string) (*WebhookAuthorizer, error) {
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, compiler, name)
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -301,6 +301,12 @@ func (w *WebhookAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a auth
 // EvaluateConditions is not supported by this authorizer.
 func (*WebhookAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+// ConditionalAuthorizerName returns the name assigned to this webhook.
+// In order to support authorization conditions, the name must be a DNS 1123 subdomain with at least 2 dots.
+func (w *WebhookAuthorizer) ConditionalAuthorizerName() string {
+	return w.name
 }
 
 func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {

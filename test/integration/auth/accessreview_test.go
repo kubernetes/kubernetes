@@ -57,6 +57,10 @@ func (sarAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Conditio
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+func (sarAuthorizer) ConditionalAuthorizerName() string {
+	return "" // conditions-unaware
+}
+
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{

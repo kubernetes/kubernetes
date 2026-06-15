@@ -31,6 +31,7 @@ import (
 type mockAuthzHandler struct {
 	decision authorizer.Decision
 	err      error
+	name     string
 }
 
 func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -45,6 +46,10 @@ func (mock *mockAuthzHandler) ConditionsAwareAuthorize(ctx context.Context, a au
 // EvaluateConditions is not supported by this authorizer.
 func (*mockAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func (mock *mockAuthzHandler) ConditionalAuthorizerName() string {
+	return mock.name
 }
 
 func TestAuthorizationSecondPasses(t *testing.T) {
@@ -274,5 +279,17 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 				t.Errorf("Unexpected authorization failure: %v, expected: %v", decision, c.decision)
 			}
 		})
+	}
+}
+
+func TestAuthorizerName(t *testing.T) {
+	u := New()
+	if gotName := u.ConditionalAuthorizerName(); gotName != "" {
+		t.Errorf("Expected empty-string name of default union, got: %v", gotName)
+	}
+
+	u = NewConditional("foo.bar.io")
+	if gotName := u.ConditionalAuthorizerName(); gotName != "foo.bar.io" {
+		t.Errorf("Expected foo.bar.io name of conditions-aware union, got: %v", gotName)
 	}
 }

@@ -36,11 +36,19 @@ import (
 var _ = authorizer.Authorizer(unionAuthzHandler{})
 
 // unionAuthzHandler authorizer against a chain of authorizer.Authorizer
-type unionAuthzHandler []authorizer.Authorizer
+type unionAuthzHandler struct {
+	name  string
+	chain []authorizer.Authorizer
+}
 
 // New returns an authorizer that authorizes against a chain of authorizer.Authorizer objects
 func New(authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
-	return unionAuthzHandler(authorizationHandlers)
+	return NewConditional("", authorizationHandlers...)
+}
+
+// New returns a conditions-aware authorizer that authorizes against a chain of authorizer.Authorizer objects
+func NewConditional(name string, authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
+	return unionAuthzHandler{name: name, chain: authorizationHandlers}
 }
 
 // Authorizes against a chain of authorizer.Authorizer objects and returns nil if successful and returns error if unsuccessful
@@ -50,7 +58,7 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 		reasonlist []string
 	)
 
-	for _, currAuthzHandler := range authzHandler {
+	for _, currAuthzHandler := range authzHandler.chain {
 		decision, reason, err := currAuthzHandler.Authorize(ctx, a)
 
 		if err != nil {
@@ -115,4 +123,10 @@ func (authzHandler unionAuthzRulesHandler) RulesFor(ctx context.Context, user us
 	}
 
 	return resourceRulesList, nonResourceRulesList, incompleteStatus, utilerrors.NewAggregate(errList)
+}
+
+// ConditionalAuthorizerName returns a name for the union authorizer itself.
+// Might be empty if conditions-unaware.
+func (authzHandler unionAuthzHandler) ConditionalAuthorizerName() string {
+	return authzHandler.name
 }

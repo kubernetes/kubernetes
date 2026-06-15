@@ -116,6 +116,11 @@ func (*NodeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.Condit
 	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
+// ConditionalAuthorizerName returns "" as the Node authorizer does not support conditions.
+func (*NodeAuthorizer) ConditionalAuthorizerName() string {
+	return ""
+}
+
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {

@@ -65,5 +65,11 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		authorizer.DecisionNoOpinion,
 		NewDelegatingAuthorizerMetrics(),
 		compiler,
+		// This name abides by the rules of being a DNS 1123 subdomain with at least two dots,
+		// thus can this webhook authorizer handle conditions. Also, it shouldn't conflict with
+		// any other conditional authorizer name in any union as a) user-defined authorizernames
+		// must not use the kubernetes.io domain, and b) Kubernetes doesn't define other authorizers
+		// with this name, and c) we don't support two delegating authorizers in the same union chain.
+		"delegatingauthorizer.kubernetes.io",
 	)
 }

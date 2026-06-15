@@ -131,3 +131,8 @@ func (a *instrumentedAuthorizer) EvaluateConditions(ctx context.Context, unevalu
 	}
 	return decision, reason, err
 }
+
+// ConditionalAuthorizerName delegates to the wrapped authorizer.
+func (a *instrumentedAuthorizer) ConditionalAuthorizerName() string {
+	return a.delegate.ConditionalAuthorizerName()
+}
