@@ -96,14 +96,7 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 		if !ok {
 			return nil, fmt.Errorf("not a storeElement: %v", elem)
 		}
-		buffer.buffer[i] = &watchCacheEvent{
-			Type:            watch.Added,
-			Object:          elem.Object,
-			ObjLabels:       elem.Labels,
-			ObjFields:       elem.Fields,
-			Key:             elem.Key,
-			ResourceVersion: resourceVersion,
-		}
+		buffer.buffer[i] = storeElementToWatchCacheEvent(elem, resourceVersion)
 		buffer.endIndex++
 	}
 	ci := &watchCacheInterval{
@@ -112,6 +105,17 @@ func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key 
 	}
 
 	return ci, nil
+}
+
+func storeElementToWatchCacheEvent(elem *store.Element, resourceVersion uint64) *watchCacheEvent {
+	return &watchCacheEvent{
+		Type:            watch.Added,
+		Object:          elem.Object,
+		ObjLabels:       elem.Labels,
+		ObjFields:       elem.Fields,
+		Key:             elem.Key,
+		ResourceVersion: resourceVersion,
+	}
 }
 
 // historyCacheIntervalSource serves events from the watchCache circular buffer.
