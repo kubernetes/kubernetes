@@ -59,7 +59,6 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
-	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
@@ -242,7 +241,7 @@ func makeBasePod() *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pod-",
 		},
-		Spec: testutils.MakePodSpec(),
+		Spec: MakePodSpec(),
 	}
 	return basePod
 }
