@@ -30,9 +30,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func newWatchCacheStorage(config *ImmutableWatchCacheConfig, indexers *cache.Indexers) *watchCacheStorage {
+func newWatchCacheStorage(keyFunc func(runtime.Object) (string, error), indexers *cache.Indexers) *watchCacheStorage {
 	storage := &watchCacheStorage{
-		config:              config,
+		keyFunc:             keyFunc,
 		store:               store.NewIndexer(indexers),
 		listResourceVersion: 0,
 	}
@@ -44,7 +44,7 @@ func newWatchCacheStorage(config *ImmutableWatchCacheConfig, indexers *cache.Ind
 }
 
 type watchCacheStorage struct {
-	config *ImmutableWatchCacheConfig
+	keyFunc func(runtime.Object) (string, error)
 
 	// store will effectively support LIST operation from the "end of cache
 	// history" i.e. from the moment just after the newest cached watched event.
@@ -165,7 +165,7 @@ func (w *watchCacheStorage) Get(obj interface{}) (interface{}, bool, error) {
 	if !ok {
 		return nil, false, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
 	}
-	key, err := w.config.keyFunc(object)
+	key, err := w.keyFunc(object)
 	if err != nil {
 		return nil, false, fmt.Errorf("couldn't compute key: %w", err)
 	}

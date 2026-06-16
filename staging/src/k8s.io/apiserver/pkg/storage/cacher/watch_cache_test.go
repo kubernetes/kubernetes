@@ -1311,109 +1311,137 @@ func TestHistogramCacheReadWait(t *testing.T) {
 	}
 }
 
-func TestCacheSnapshots(t *testing.T) {
+func TestWatchCacheStorageSnapshots(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
-	s := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
-	defer s.Stop()
-	s.history.upperBoundCapacity = 3
-	s.history.lowerBoundCapacity = 1
-	clock := s.config.clock.(*testingclock.FakeClock)
+	keyFunc := func(obj runtime.Object) (string, error) {
+		return obj.(*mockObject).key, nil
+	}
 
-	_, found := s.storage.snapshots.GetLessOrEqual(100)
-	assert.False(t, found, "Expected empty cache to not include any snapshots")
+	indexers := &cache.Indexers{}
+	s := newWatchCacheStorage(keyFunc, indexers)
 
-	t.Log("Test cache on rev 100")
-	require.NoError(t, s.Add(makeTestPod("foo", 100)))
-	require.NoError(t, s.Update(makeTestPod("foo", 200)))
-	clock.Step(time.Second)
-	require.NoError(t, s.Delete(makeTestPod("foo", 300)))
+	assert.True(t, s.snapshottingEnabled.Load(), "Expected snapshotting to be enabled when feature gate is active")
+
+	_, err := s.GetExactSnapshotLocked(100)
+	require.Error(t, err, "Expected empty cache to not include any snapshots")
 
 	t.Log("Test cache on rev 100")
-	_, found = s.storage.snapshots.GetLessOrEqual(99)
-	assert.False(t, found, "Expected store to not include rev 99")
-	lister, found := s.storage.snapshots.GetLessOrEqual(100)
-	assert.True(t, found, "Expected store to not include rev 100")
-	elements, err := lister.OrderedListPrefix("", "")
+	elem1 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem1))
+	s.AddSnapshotLocked(100)
+
+	elem2 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "200"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem2))
+	s.AddSnapshotLocked(200)
+
+	elem3 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "300"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Deleted, elem3))
+	s.AddSnapshotLocked(300)
+
+	t.Log("Test cache on rev 100")
+	_, err = s.GetExactSnapshotLocked(99)
+	require.Error(t, err, "Expected store to not include rev 99")
+
+	snap100, err := s.GetExactSnapshotLocked(100)
+	require.NoError(t, err)
+	elements, err := snap100.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, makeTestPod("foo", 100), elements[0].(*store.Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].(*store.Element).Object)
 
-	t.Log("Overflow cache to remove rev 100")
-	require.NoError(t, s.Add(makeTestPod("foo", 400)))
-	_, found = s.storage.snapshots.GetLessOrEqual(100)
-	assert.False(t, found, "Expected overfilled cache to delete oldest rev 100")
+	t.Log("Compact snapshots to remove rev 100")
+	s.CompactSnapshotsLocked(200)
+	_, err = s.GetExactSnapshotLocked(100)
+	require.Error(t, err, "Expected compacted snapshot at 100 to be deleted")
 
 	t.Log("Test cache on rev 200")
-	lister, found = s.storage.snapshots.GetLessOrEqual(200)
-	assert.True(t, found, "Expected store to still keep rev 200")
-	elements, err = lister.OrderedListPrefix("", "")
+	snap200, err := s.GetExactSnapshotLocked(200)
+	require.NoError(t, err)
+	elements, err = snap200.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, makeTestPod("foo", 200), elements[0].(*store.Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "200"}, elements[0].(*store.Element).Object)
 
 	t.Log("Test cache on rev 300")
-	lister, found = s.storage.snapshots.GetLessOrEqual(300)
-	assert.True(t, found, "Expected store to still keep rev 300")
-	elements, err = lister.OrderedListPrefix("", "")
+	snap300, err := s.GetExactSnapshotLocked(300)
+	require.NoError(t, err)
+	elements, err = snap300.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Empty(t, elements)
 
 	t.Log("Test cache on rev 400")
-	lister, found = s.storage.snapshots.GetLessOrEqual(400)
-	assert.True(t, found, "Expected store to still keep rev 400")
-	elements, err = lister.OrderedListPrefix("", "")
+	elem4 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "400"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem4))
+	s.AddSnapshotLocked(400)
+
+	snap400, err := s.GetExactSnapshotLocked(400)
+	require.NoError(t, err)
+	elements, err = snap400.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, makeTestPod("foo", 400), elements[0].(*store.Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "400"}, elements[0].(*store.Element).Object)
 
-	t.Log("Add event outside the event fresh window to force cache capacity downsize")
-	assert.Equal(t, 3, s.history.capacity)
-	clock.Step(DefaultEventFreshDuration + 1)
-	require.NoError(t, s.Update(makeTestPod("foo", 500)))
-	assert.Equal(t, 1, s.history.capacity)
-	assert.Equal(t, 1, s.storage.snapshots.Len())
-	_, found = s.storage.snapshots.GetLessOrEqual(499)
-	assert.False(t, found, "Expected overfilled cache to delete events below 500")
+	t.Log("Compact snapshots to simulate cache capacity downsize")
+	s.CompactSnapshotsLocked(500)
+	_, err = s.GetExactSnapshotLocked(499)
+	require.Error(t, err, "Expected compacted snapshots below 500 to be deleted")
 
 	t.Log("Test cache on rev 500")
-	lister, found = s.storage.snapshots.GetLessOrEqual(500)
-	assert.True(t, found, "Expected store to still keep rev 500")
-	elements, err = lister.OrderedListPrefix("", "")
+	elem5 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "500"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem5))
+	s.AddSnapshotLocked(500)
+
+	snap500, err := s.GetExactSnapshotLocked(500)
+	require.NoError(t, err)
+	elements, err = snap500.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, makeTestPod("foo", 500), elements[0].(*store.Element).Object)
-
-	t.Log("Add event to force capacity upsize")
-	require.NoError(t, s.Update(makeTestPod("foo", 600)))
-	assert.Equal(t, 2, s.history.capacity)
-	assert.Equal(t, 2, s.storage.snapshots.Len())
+	assert.Equal(t, &mockObject{key: "foo", val: "500"}, elements[0].(*store.Element).Object)
 
 	t.Log("Test cache on rev 600")
-	lister, found = s.storage.snapshots.GetLessOrEqual(600)
-	assert.True(t, found, "Expected replace to be snapshotted")
-	elements, err = lister.OrderedListPrefix("", "")
+	elem6 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem6))
+	s.AddSnapshotLocked(600)
+
+	snap600, err := s.GetExactSnapshotLocked(600)
+	require.NoError(t, err)
+	elements, err = snap600.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*store.Element).Object)
 
 	t.Log("Replace cache to remove history")
-	_, found = s.storage.snapshots.GetLessOrEqual(500)
-	assert.True(t, found, "Confirm that cache stores history before replace")
-	err = s.Replace([]interface{}{makeTestPod("foo", 600)}, "700")
+	_, err = s.GetExactSnapshotLocked(500)
+	require.NoError(t, err, "Confirm that cache stores history before replace")
+
+	err = s.ReplaceLocked([]interface{}{
+		&store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}},
+	}, "700", 700)
 	require.NoError(t, err)
-	_, found = s.storage.snapshots.GetLessOrEqual(500)
-	assert.False(t, found, "Expected replace to remove history")
-	_, found = s.storage.snapshots.GetLessOrEqual(600)
-	assert.False(t, found, "Expected replace to remove history")
+
+	_, err = s.GetExactSnapshotLocked(500)
+	require.Error(t, err, "Expected replace to remove history")
+	_, err = s.GetExactSnapshotLocked(600)
+	require.Error(t, err, "Expected replace to remove history")
 
 	t.Log("Test cache on rev 700")
-	lister, found = s.storage.snapshots.GetLessOrEqual(700)
-	assert.True(t, found, "Expected replace to be snapshotted")
-	elements, err = lister.OrderedListPrefix("", "")
+	snap700, err := s.GetExactSnapshotLocked(700)
+	require.NoError(t, err)
+	elements, err = snap700.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*store.Element).Object)
+}
+
+type mockObject struct {
+	runtime.Object
+	key string
+	val string
+}
+
+func (m *mockObject) DeepCopyObject() runtime.Object {
+	return &mockObject{key: m.key, val: m.val}
 }
 
 func TestWatchCacheSnapshotConcurrency(t *testing.T) {
