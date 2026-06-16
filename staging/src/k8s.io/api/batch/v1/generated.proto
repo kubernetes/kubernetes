@@ -22,6 +22,7 @@ syntax = "proto2";
 package k8s.io.api.batch.v1;
 
 import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/api/scheduling/v1alpha3/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -180,6 +181,62 @@ message JobList {
 
   // items is the list of Jobs.
   repeated Job items = 2;
+}
+
+// JobSchedulingConfiguration composes the reusable workload-aware
+// scheduling building blocks.
+message JobSchedulingConfiguration {
+  // SchedulingPolicy defines the scheduling policy for this Job.
+  // Exactly one of Basic or Gang must be set.
+  // This field is immutable after creation: the policy may not be added or
+  // removed. The policy variant (basic/gang) is frozen by hand-written
+  // validation; only schedulingPolicy.gang.minCount may be changed.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:update=NoSet
+  // +k8s:update=NoUnset
+  optional .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy schedulingPolicy = 1;
+
+  // SchedulingConstraints defines scheduling constraints (e.g. topology)
+  // for the Job's pods.
+  // This field is immutable after creation.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints schedulingConstraints = 2;
+
+  // DisruptionMode defines the mode in which the Job's pods can be disrupted.
+  // One of Single, All.
+  // This field is immutable after creation: it may not be added or removed,
+  // and the selected mode may not be changed.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode disruptionMode = 3;
+
+  // ResourceClaims defines which ResourceClaims may be shared among Pods in
+  // the Job. Pods consume the devices allocated to a PodGroup's claim by
+  // defining a claim in its own Spec.ResourceClaims that matches the
+  // PodGroup's claim exactly. The claim must have the same name and refer to
+  // the same ResourceClaim or ResourceClaimTemplate.
+  // At most 4 claims may be set, matching the limit on the resulting PodGroup.
+  // This list is immutable after creation: entries may neither be added,
+  // removed, nor modified.
+  //
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=4
+  // +k8s:immutable
+  repeated .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim resourceClaims = 4;
 }
 
 // JobSpec describes how the job execution will look like.
@@ -350,6 +407,23 @@ message JobSpec {
   // This field is immutable.
   // +optional
   optional string managedBy = 15;
+
+  // scheduling defines the Workload-aware Scheduling configuration for this Job.
+  // When set, it specifies the scheduling policy (basic or gang), topology
+  // constraints, disruption mode, and shared resource claims.
+  // When omitted, the Job defaults to the basic scheduling policy, which behaves
+  // as standard pod-by-pod scheduling.
+  // This field is alpha-level and requires the WorkloadWithJob feature gate.
+  // This field is immutable, including whether it is set at all, only
+  // policy.gang.minCount may be changed after creation.
+  //
+  // +featureGate=WorkloadWithJob
+  // +optional
+  // +k8s:ifDisabled(WorkloadWithJob)=+k8s:forbidden
+  // +k8s:optional
+  // +k8s:update=NoSet
+  // +k8s:update=NoUnset
+  optional JobSchedulingConfiguration scheduling = 17;
 }
 
 // JobStatus represents the current state of a Job.

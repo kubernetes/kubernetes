@@ -90,6 +90,21 @@ spec:
           - status: statusValue
             type: typeValue
       podReplacementPolicy: podReplacementPolicyValue
+      scheduling:
+        disruptionMode:
+          all: {}
+          single: {}
+        resourceClaims:
+        - name: nameValue
+          resourceClaimName: resourceClaimNameValue
+          resourceClaimTemplateName: resourceClaimTemplateNameValue
+        schedulingConstraints:
+          topology:
+          - key: keyValue
+        schedulingPolicy:
+          basic: {}
+          gang:
+            minCount: 1
       selector:
         matchExpressions:
         - key: keyValue

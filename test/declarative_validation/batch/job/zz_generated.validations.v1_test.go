@@ -64,6 +64,49 @@ func init() {
 			"spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
+			"spec.scheduling": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"spec.scheduling.disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.scheduling.resourceClaims": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.scheduling.resourceClaims[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.scheduling.resourceClaims[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.scheduling.resourceClaims[*].resourceClaimName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.scheduling.resourceClaims[*].resourceClaimTemplateName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.scheduling.schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.scheduling.schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.scheduling.schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.scheduling.schedulingPolicy": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"spec.scheduling.schedulingPolicy.gang.minCount": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
