@@ -298,6 +298,79 @@ func (WorkloadList) SwaggerDoc() map[string]string {
 	return map_WorkloadList
 }
 
+var map_WorkloadPodGroupAllDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupAllDisruptionMode
+}
+
+var map_WorkloadPodGroupBasicSchedulingPolicy = map[string]string{
+	"": "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
+}
+
+func (WorkloadPodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupBasicSchedulingPolicy
+}
+
+var map_WorkloadPodGroupDisruptionMode = map[string]string{
+	"":       "WorkloadPodGroupDisruptionMode defines how individual pods within a group can be disrupted. Exactly one mode must be set.",
+	"single": "single specifies that pods can be disrupted independently from each other.",
+	"all":    "all specifies that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupDisruptionMode
+}
+
+var map_WorkloadPodGroupGangSchedulingPolicy = map[string]string{
+	"":         "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
+	"minCount": "minCount is the minimum number of pods that must be scheduled at the same time for the scheduler to admit the entire group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., parallelism for a Job). If set, it must be a positive integer.",
+}
+
+func (WorkloadPodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupGangSchedulingPolicy
+}
+
+var map_WorkloadPodGroupResourceClaim = map[string]string{
+	"":                          "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.",
+	"name":                      "name uniquely identifies this resource claim inside the group. This field is required. It must be a DNS_LABEL.",
+	"resourceClaimName":         "resourceClaimName is the name of a ResourceClaim object in the same namespace. This field is optional. If it is not specified, no resource claim is used. If set, it must be a DNS subdomain.",
+	"resourceClaimTemplateName": "resourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace. This field is optional. If it is not specified, no resource claim template is used. If set, it must be a DNS subdomain.",
+}
+
+func (WorkloadPodGroupResourceClaim) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupResourceClaim
+}
+
+var map_WorkloadPodGroupSchedulingConstraints = map[string]string{
+	"":         "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.",
+	"topology": "topology specifies desired topological placements for all pods within the pod group. If unset, no topology placement is requested.",
+}
+
+func (WorkloadPodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingConstraints
+}
+
+var map_WorkloadPodGroupSchedulingPolicy = map[string]string{
+	"":      "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.",
+	"basic": "basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used.",
+	"gang":  "gang specifies all-or-nothing scheduling semantics.",
+}
+
+func (WorkloadPodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingPolicy
+}
+
+var map_WorkloadPodGroupSingleDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
+}
+
+func (WorkloadPodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSingleDisruptionMode
+}
+
 var map_WorkloadReference = map[string]string{
 	"":             "WorkloadReference references the Workload object together with the template that was used to create a particular PodGroup.",
 	"workloadName": "workloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
