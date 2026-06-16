@@ -45,11 +45,16 @@ type StorageInfoLister interface {
 	IsPVCUsedByPods(key string) bool
 }
 
+// RestoreState is a function that can be used to restore listers state
+// from the backup.
+type RestoreState func()
+
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
 	PodGroupStates() PodGroupStateLister
+	BackupState() (RestoreState, error)
 }
 
 // PodGroupStateLister provides read access to pod group states.

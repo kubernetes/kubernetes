@@ -75,7 +75,7 @@ type frameworkImpl struct {
 	postBindPlugins           []fwk.PostBindPlugin
 	permitPlugins             []fwk.PermitPlugin
 	batchablePlugins          []fwk.SignPlugin
-	podGroupPostFilterPlugins []framework.PodGroupPostFilterPlugin
+	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []framework.PlacementFeasiblePlugin
@@ -139,6 +139,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.QueueSort, &f.queueSortPlugins},
 		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
 		{&plugins.PlacementScore, &f.placementScorePlugins},
+		{&plugins.PodGroupPostFilter, &f.podGroupPostFilterPlugins},
 	}
 }
 
@@ -443,6 +444,32 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		return nil, fmt.Errorf("at most one placement generate plugin is allowed for profile with scheduler name %q", profile.SchedulerName)
 	}
 
+	// If WorkloadAwarePreemption is enabled, and DefaultPreemption is enabled in PostFilter,
+	// automatically register it in PodGroupPostFilter if not already present.
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		var defaultPreemptionActive bool
+		for _, pl := range f.postFilterPlugins {
+			if pl.Name() == names.DefaultPreemption {
+				defaultPreemptionActive = true
+				break
+			}
+		}
+		if defaultPreemptionActive {
+			var alreadyRegistered bool
+			for _, pl := range f.podGroupPostFilterPlugins {
+				if pl.Name() == names.DefaultPreemption {
+					alreadyRegistered = true
+					break
+				}
+			}
+			if !alreadyRegistered {
+				if pl, ok := f.pluginsMap[names.DefaultPreemption].(fwk.PodGroupPostFilterPlugin); ok {
+					f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, pl)
+				}
+			}
+		}
+	}
+
 	podScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.ScorePlugin](), append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...))
 	if err != nil {
 		return nil, fmt.Errorf("score plugins: %w", err)
@@ -475,19 +502,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		f.computeBatchablePlugins()
 	}
 
-	// Put default preemption as the only PodGroupPostFilterPlugin
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
-		if dp, ok := f.pluginsMap[names.DefaultPreemption]; ok {
-			if _, ok := dp.(framework.PodGroupPostFilterPlugin); ok {
-				f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, dp.(framework.PodGroupPostFilterPlugin))
-			} else {
-				logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin does not fulfill PodGroupPostFilterPlugin interface. Workload Aware Preemption will not be used.")
-			}
-		} else {
-			logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin is not set. Workload Aware Preemption will not be used.")
-		}
-	}
-
 	// Use GangScheduling plugin as the only PlacementFeasiblePlugin.
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		if gs, ok := f.pluginsMap[names.GangScheduling]; ok {
@@ -495,6 +509,12 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 				f.placementFeasiblePlugins = append(f.placementFeasiblePlugins, p)
 			} else {
 				return nil, fmt.Errorf("GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface")
+			}
+		}
+
+		for _, pl := range f.postFilterPlugins {
+			if _, ok := pl.(fwk.PodGroupPostFilterPlugin); !ok {
+				logger.Error(nil, "Plugin implements PostFilter interface without implementing PodGroupPostFilter interface", "plugin", pl.Name())
 			}
 		}
 	}
@@ -1207,6 +1227,7 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl fwk.PostFilt
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PostFilter, pl.Name(), s.Code().String(), metrics.SinceInSeconds(startTime))
 	return r, s
 }
+
 
 // RunFilterPluginsWithNominatedPods runs the set of configured filter plugins
 // for nominated pod on the given node.
@@ -2202,9 +2223,70 @@ func (f *frameworkImpl) HasScorePlugins() bool {
 	return len(f.scorePlugins) > 0
 }
 
-// PodGroupPostFilterPlugins returns registered PodGroup PostFilter plugins.
-func (f *frameworkImpl) PodGroupPostFilterPlugins() []framework.PodGroupPostFilterPlugin {
-	return f.podGroupPostFilterPlugins
+// HasPodGroupPostFilterPlugins returns true if at least one podGroupPostFilter plugin is defined.
+func (f *frameworkImpl) HasPodGroupPostFilterPlugins() bool {
+	return len(f.podGroupPostFilterPlugins) > 0
+}
+
+// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins until the first
+// Success, Error or UnschedulableAndUnresolvable is met; otherwise continues to execute all plugins.
+func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, pgInfo fwk.PodGroupInfo, pods []*v1.Pod, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (_ *fwk.PodGroupPostFilterResult, status *fwk.Status) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "generic workload feature is disabled, cannot perform workload aware preemption")
+	}
+
+	if len(f.podGroupPostFilterPlugins) == 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "")
+	}
+
+	if f.informerFactory != nil {
+		_, err := f.informerFactory.Scheduling().V1alpha3().PodGroups().Lister().PodGroups(pgInfo.GetNamespace()).Get(pgInfo.GetName())
+		if err != nil {
+			return nil, fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", err))
+		}
+	}
+
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "PodGroupPostFilter")
+	}
+
+	var result *fwk.PodGroupPostFilterResult
+	var reasons []string
+	var rejectorPlugin string
+	for _, pl := range f.podGroupPostFilterPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		r, s := pl.PodGroupPostFilter(ctx, pgInfo, pods, pgSchedulingFunc)
+		if s.IsSuccess() {
+			return r, s
+		} else if s.Code() == fwk.UnschedulableAndUnresolvable {
+			return r, s.WithPlugin(pl.Name())
+		} else if !s.IsRejected() {
+			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
+			return nil, fwk.AsStatus(s.AsError()).WithPlugin(pl.Name())
+		} else if r != nil {
+			result = r
+		}
+
+		reasons = append(reasons, s.Reasons()...)
+		// Record the first failed plugin unless we proved that
+		// the latter is more relevant.
+		if len(rejectorPlugin) == 0 {
+			rejectorPlugin = pl.Name()
+		}
+	}
+
+	return result, fwk.NewStatus(fwk.Unschedulable, reasons...).WithPlugin(rejectorPlugin)
 }
 
 // ListPlugins returns a map of extension point name to plugin names configured at each extension

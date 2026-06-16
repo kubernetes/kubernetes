@@ -445,6 +445,7 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 	in.MultiPoint.DeepCopyInto(&out.MultiPoint)
 	in.PlacementGenerate.DeepCopyInto(&out.PlacementGenerate)
 	in.PlacementScore.DeepCopyInto(&out.PlacementScore)
+	in.PodGroupPostFilter.DeepCopyInto(&out.PodGroupPostFilter)
 	return
 }
 

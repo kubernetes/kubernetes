@@ -238,6 +238,10 @@ type Plugins struct {
 
 	// PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.
 	PlacementScore PluginSet `json:"placementScore,omitempty"`
+
+	// PodGroupPostFilter is a list of plugins that are invoked after the workload scheduling phase,
+	// but only when the PodGroup cannot be scheduled (e.g. not enough feasible nodes were found to satisfy its requirements).
+	PodGroupPostFilter PluginSet `json:"podGroupPostFilter,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.

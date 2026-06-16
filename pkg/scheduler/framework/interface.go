@@ -24,7 +24,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -161,24 +160,7 @@ type SortedScoredNodes interface {
 	Len() int
 }
 
-// PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group
-// scheduling during workload-aware preemption algorithm.
-type PodGroupSchedulingFunc func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status)
 
-// PodGroupPostFilterResult stores information about nominated nodes for a pod group.
-type PodGroupPostFilterResult struct {
-	NominatedNodeNames map[*v1.Pod]*fwk.NominatingInfo
-}
-
-// PodGroupPostFilterPlugin is an interface for plugins that are called
-// after a PodGroup cannot be scheduled.
-// It should not be used by any other plugin but DefaultPreemption.
-type PodGroupPostFilterPlugin interface {
-	fwk.Plugin
-
-	// PodGroupPostFilter is called after a PodGroup cannot be scheduled.
-	PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
-}
 
 // PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
 // It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
@@ -311,6 +293,7 @@ type Framework interface {
 	// Each PlacementCycleState is passed to ScorePlacement for the PodGroupAssignments at the same index.
 	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ns []fwk.PlacementPluginScores, status *fwk.Status)
 
+
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
 
@@ -320,8 +303,13 @@ type Framework interface {
 	// HasScorePlugins returns true if at least one Score plugin is defined.
 	HasScorePlugins() bool
 
-	// PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
-	PodGroupPostFilterPlugins() []PodGroupPostFilterPlugin
+	// HasPodGroupPostFilterPlugins returns true if at least one PodGroupPostFilter plugin is defined.
+	HasPodGroupPostFilterPlugins() bool
+
+	// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
+	// It returns *PodGroupPostFilterResult and *Status. If any plugin returns 'Success',
+	// further plugins are not run, and the result is returned.
+	RunPodGroupPostFilterPlugins(ctx context.Context, pgInfo fwk.PodGroupInfo, pods []*v1.Pod, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins

@@ -69214,6 +69214,13 @@ func schema_k8sio_kube_scheduler_config_v1_Plugins(ref common.ReferenceCallback)
 							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
 						},
 					},
+					"podGroupPostFilter": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodGroupPostFilter is a list of plugins that are invoked after the workload scheduling phase, but only when the PodGroup cannot be scheduled (e.g. not enough feasible nodes were found to satisfy its requirements).",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
