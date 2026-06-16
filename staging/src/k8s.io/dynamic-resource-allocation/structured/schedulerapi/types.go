@@ -86,6 +86,12 @@ type AllocatedState struct {
 	AllocatedDevices         sets.Set[DeviceID]
 	AllocatedSharedDeviceIDs sets.Set[SharedDeviceID]
 	AggregatedCapacity       ConsumedCapacityCollection
+	// AllocatedCompatibilityGroups records, per allocated device, the
+	// per-counter-set compatibility groups captured in the device's allocation
+	// result snapshot. It is used by the DRADeviceCompatibilityGroups feature so
+	// that the scheduler enforces compatibility against the groups recorded at
+	// allocation time rather than the (possibly mutated) source ResourceSlice.
+	AllocatedCompatibilityGroups CompatibilityGroupsCollection
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
@@ -190,6 +196,44 @@ func (c ConsumedCapacityCollection) Remove(cap DeviceConsumedCapacity) {
 type DeviceConsumedCapacity struct {
 	DeviceID
 	ConsumedCapacity
+}
+
+// CompatibilityGroupsCollection records, per allocated device, the
+// per-counter-set compatibility groups captured in the device's allocation
+// result snapshot (DeviceRequestAllocationResult.CompatibilityGroups).
+// This type is used in the DRADeviceCompatibilityGroups feature and the
+// scheduler and autoscaler contract.
+//
+// The outer key is the device, the inner key is the counter-set name, and the
+// value is the list of compatibility group names declared for that counter set
+// at the time of allocation.
+type CompatibilityGroupsCollection map[DeviceID]map[string][]string
+
+// NewCompatibilityGroupsCollection initiates a new CompatibilityGroupsCollection.
+func NewCompatibilityGroupsCollection() CompatibilityGroupsCollection {
+	return make(CompatibilityGroupsCollection)
+}
+
+// Clone makes a deep copy of the collection.
+func (c CompatibilityGroupsCollection) Clone() CompatibilityGroupsCollection {
+	clone := make(CompatibilityGroupsCollection, len(c))
+	for deviceID, perCounterSet := range c {
+		clonePerCounterSet := make(map[string][]string, len(perCounterSet))
+		for counterSet, groups := range perCounterSet {
+			clonePerCounterSet[counterSet] = append([]string(nil), groups...)
+		}
+		clone[deviceID] = clonePerCounterSet
+	}
+	return clone
+}
+
+// Insert records the per-counter-set compatibility groups of a single device.
+func (c CompatibilityGroupsCollection) Insert(deviceID DeviceID, compatibilityGroups map[string][]string) {
+	perCounterSet := make(map[string][]string, len(compatibilityGroups))
+	for counterSet, groups := range compatibilityGroups {
+		perCounterSet[counterSet] = append([]string(nil), groups...)
+	}
+	c[deviceID] = perCounterSet
 }
 
 // NewDeviceConsumedCapacity creates a new DeviceConsumedCapacity.

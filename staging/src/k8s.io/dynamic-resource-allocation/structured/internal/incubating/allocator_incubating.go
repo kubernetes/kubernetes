@@ -81,6 +81,7 @@ var SupportedFeatures = internal.Features{
 	DeviceTaints:           true,
 	DeviceBindingAndStatus: true,
 	ConsumableCapacity:     true,
+	CompatibilityGroups:    true,
 }
 
 type Allocator struct {
@@ -101,7 +102,13 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[draapi.UniqueString]counterSets
-	mutex             sync.RWMutex
+	// compatibilityGroupsBaseline caches, per resource pool, the
+	// compatibility-group intersection contributed by already-allocated devices
+	// (read from the claim-status snapshots in allocatedState). Like
+	// availableCounters it is computed lazily, never changes once set, and is
+	// guarded by mutex. The keys in the map are resource pool names.
+	compatibilityGroupsBaseline map[draapi.UniqueString]map[string]compatibilityGroupIntersection
+	mutex                       sync.RWMutex
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -141,6 +148,8 @@ func NewAllocator(ctx context.Context,
 		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[draapi.UniqueString]counterSets),
+
+		compatibilityGroupsBaseline: make(map[draapi.UniqueString]map[string]compatibilityGroupIntersection),
 	}, nil
 }
 
@@ -158,9 +167,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(claims)),
 		consumedCounters:     make(map[draapi.UniqueString]counterSets),
-		requestData:          make(map[requestIndices]requestData),
-		result:               make([]internalAllocationResult, len(claims)),
-		allocatingCapacity:   NewConsumedCapacityCollection(),
+
+		consumedCompatibilityGroups: make(map[draapi.UniqueString]map[string]compatibilityGroupIntersection),
+
+		requestData:        make(map[requestIndices]requestData),
+		result:             make([]internalAllocationResult, len(claims)),
+		allocatingCapacity: NewConsumedCapacityCollection(),
 	}
 	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlicesForNode", len(slicesForNode))
@@ -377,15 +389,25 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					consumedCapacity[key] = val.DeepCopy()
 				}
 			}
+			var compatibilityGroups map[string]resourceapi.CompatibilityGroupList
+			if internal.compatibilityGroups != nil {
+				compatibilityGroups = make(map[string]resourceapi.CompatibilityGroupList, len(internal.compatibilityGroups))
+				for counterSet, groups := range internal.compatibilityGroups {
+					compatibilityGroups[counterSet] = resourceapi.CompatibilityGroupList{
+						Groups: append([]string(nil), groups...),
+					}
+				}
+			}
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
-				Request:          internal.requestName(),
-				Driver:           internal.id.Driver.String(),
-				Pool:             internal.id.Pool.String(),
-				Device:           internal.id.Device.String(),
-				AdminAccess:      internal.adminAccess,
-				Tolerations:      internal.lookupRequest(claim).tolerations(),
-				ShareID:          internal.shareID,
-				ConsumedCapacity: consumedCapacity,
+				Request:             internal.requestName(),
+				Driver:              internal.id.Driver.String(),
+				Pool:                internal.id.Pool.String(),
+				Device:              internal.id.Device.String(),
+				AdminAccess:         internal.adminAccess,
+				Tolerations:         internal.lookupRequest(claim).tolerations(),
+				ShareID:             internal.shareID,
+				ConsumedCapacity:    consumedCapacity,
+				CompatibilityGroups: compatibilityGroups,
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
@@ -650,7 +672,13 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool names.
 	consumedCounters map[draapi.UniqueString]counterSets
-	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
+	// consumedCompatibilityGroups tracks the rolling compatibility-group
+	// intersection per counter set for each pool across the devices being
+	// allocated in the current attempt. It is seeded from the already-allocated
+	// peers (compatibilityGroupsBaseline) the first time a counter set is touched.
+	// pool name -> counter set name -> running intersection.
+	consumedCompatibilityGroups map[draapi.UniqueString]map[string]compatibilityGroupIntersection
+	requestData                 map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
 	// and its values represent for which of a pod's claims the device will
@@ -745,7 +773,11 @@ type internalDeviceResult struct {
 	shareID          *types.UID
 	slice            *draapi.ResourceSlice
 	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
-	adminAccess      *bool
+	// compatibilityGroups is the per-counter-set snapshot of the device's
+	// declared compatibility groups, recorded on the allocation result so that
+	// subsequent allocations can enforce compatibility against it.
+	compatibilityGroups map[string][]string
+	adminAccess         *bool
 }
 
 func (idr internalDeviceResult) requestName() string {
@@ -1378,6 +1410,34 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 	}
 
+	// Enforce the DRADeviceCompatibilityGroups constraint: a device may only be
+	// co-allocated with the other devices already drawing from a counter set when
+	// their declared compatibility groups intersect. This is gated identically to
+	// the counter check above so that additional shares of an already-allocated
+	// device (skipCounterCheck) are not re-evaluated.
+	var restoreCompatibilityGroups func()
+	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+		if alloc.features.CompatibilityGroups {
+			ok, restore := alloc.checkAndConsumeCompatibilityGroups(device)
+			if !ok {
+				alloc.logger.V(7).Info("Incompatible compatibility groups", "device", device.id)
+				// Roll back the counters consumed by checkAvailableCounters above so
+				// the in-flight tally no longer reflects this rejected candidate.
+				alloc.deallocateCountersForDevice(device)
+				return false, nil, nil
+			}
+			restoreCompatibilityGroups = restore
+		} else if alloc.skipForDisabledCompatibilityGroups(device) {
+			// The feature is disabled but compatibility groups are present in the
+			// cluster (version skew with the apiserver). Skip rather than risk an
+			// allocation that cannot be validated, so the feature can be enabled
+			// later without deleting pods.
+			alloc.logger.V(7).Info("Skipping device with compatibility groups because the feature is disabled", "device", device.id)
+			alloc.deallocateCountersForDevice(device)
+			return false, nil, nil
+		}
+	}
+
 	var parentRequestName string
 	var baseRequestName string
 	var subRequestName string
@@ -1463,10 +1523,16 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if len(consumedCapacity) > 0 {
 		result.consumedCapacity = consumedCapacity
 	}
+	if alloc.features.CompatibilityGroups {
+		result.compatibilityGroups = snapshotCompatibilityGroups(device)
+	}
 	previousNumResults := len(alloc.result[r.claimIndex].devices)
 	alloc.result[r.claimIndex].devices = append(alloc.result[r.claimIndex].devices, result)
 
 	return true, func() {
+		if restoreCompatibilityGroups != nil {
+			restoreCompatibilityGroups()
+		}
 		for _, constraint := range alloc.constraints[r.claimIndex] {
 			constraint.remove(baseRequestName, subRequestName, device.Device, device.id)
 		}
