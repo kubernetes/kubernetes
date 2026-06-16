@@ -305,6 +305,49 @@
           }
         ]
       },
+      "io.k8s.api.batch.v1.JobSchedulingConfiguration": {
+        "description": "JobSchedulingConfiguration composes the reusable workload-aware scheduling building blocks.",
+        "properties": {
+          "constraints": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingConstraints"
+              }
+            ],
+            "description": "Constraints defines scheduling constraints (e.g. topology) for the Job's pods."
+          },
+          "disruptionMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.DisruptionMode"
+              }
+            ],
+            "description": "DisruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All."
+          },
+          "policy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingPolicy"
+              }
+            ],
+            "description": "Policy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set."
+          },
+          "resourceClaims": {
+            "description": "ResourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.PodGroupResourceClaim"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.batch.v1.JobSpec": {
         "description": "JobSpec describes how the job execution will look like.",
         "properties": {
@@ -361,6 +404,14 @@
           "podReplacementPolicy": {
             "description": "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.",
             "type": "string"
+          },
+          "scheduling": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.batch.v1.JobSchedulingConfiguration"
+              }
+            ],
+            "description": "scheduling defines the Workload-aware Scheduling configuration for this Job. When omitted, the Job defaults to basic (standard pod-by-pod) scheduling. This field is alpha-level and requires the WorkloadWithJob feature gate. Once set, this field is immutable except for the Gang.MinCount."
           },
           "selector": {
             "allOf": [
@@ -4482,6 +4533,143 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.AllDisruptionMode": {
+        "description": "AllDisruptionMode specifies that children can only be disrupted together.",
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.BasicSchedulingPolicy": {
+        "description": "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.DisruptionMode": {
+        "description": "DisruptionMode defines how individual entities within a group can be disrupted. Exactly one mode can be set.",
+        "properties": {
+          "all": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.AllDisruptionMode"
+              }
+            ],
+            "description": "All specifies that all children can only be disrupted together."
+          },
+          "single": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode"
+              }
+            ],
+            "description": "Single specifies that children can be disrupted independently from each other."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "fields-to-discriminateBy": {
+              "all": "All",
+              "single": "Single"
+            }
+          }
+        ]
+      },
+      "io.k8s.api.scheduling.v1alpha3.GangSchedulingPolicy": {
+        "description": "GangSchedulingPolicy defines the parameters for gang scheduling.",
+        "properties": {
+          "minCount": {
+            "default": 0,
+            "description": "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minCount"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.PodGroupResourceClaim": {
+        "description": "PodGroupResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the PodGroup.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup. Pods that need access to the ResourceClaim define a matching reference in its own Spec.ResourceClaims. The Pod's claim must match all fields of the PodGroup's claim exactly.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
+            "type": "string"
+          },
+          "resourceClaimName": {
+            "description": "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+            "type": "string"
+          },
+          "resourceClaimTemplateName": {
+            "description": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingConstraints": {
+        "description": "PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.",
+        "properties": {
+          "topology": {
+            "description": "Topology defines the topology constraints for the pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingPolicy": {
+        "description": "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
+        "properties": {
+          "basic": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.BasicSchedulingPolicy"
+              }
+            ],
+            "description": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior."
+          },
+          "gang": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.GangSchedulingPolicy"
+              }
+            ],
+            "description": "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "fields-to-discriminateBy": {
+              "basic": "Basic",
+              "gang": "Gang"
+            }
+          }
+        ]
+      },
+      "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode": {
+        "description": "SingleDisruptionMode specifies that children can be disrupted independently.",
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.TopologyConstraint": {
+        "description": "TopologyConstraint defines a topology constraint for a PodGroup.",
+        "properties": {
+          "key": {
+            "default": "",
+            "description": "Key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.api.resource.Quantity": {
