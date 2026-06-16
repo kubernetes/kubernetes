@@ -2296,7 +2296,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ClusterTrustBundleProjection: {ClusterTrustBundle},
 
-	CompositePodGroup: {GenericWorkload},
+	CompositePodGroup: {GenericWorkload, TopologyAwareWorkloadScheduling},
 
 	ContainerCheckpoint: {},
 
