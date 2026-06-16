@@ -26,6 +26,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/volumeattachment"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -91,6 +92,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidVolumeAttachment()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
@@ -127,6 +131,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newInput, &tc.oldInput, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidVolumeAttachment()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TweakAttacher(attacher string) func(obj *storage.VolumeAttachment) {
