@@ -95,6 +95,20 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// This field is populated only for devices that allow multiple allocations.
 	// All capacity entries are included, even if the consumed amount is zero.
 	ConsumedCapacity map[resourcev1beta2.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
+	// CompatibilityGroups is written by the scheduler at allocation time and is
+	// a per-counter-set snapshot of the allocated device's declared compatibility
+	// groups. It is keyed by counter-set name (matching consumesCounters[*].counterSet),
+	// and each value is the list of groups declared on the allocated device's
+	// consumesCounters[] entry for that counter set at the time of allocation.
+	// Counter sets the device does not consume from are omitted from the map.
+	//
+	// The scheduler consults this snapshot on subsequent allocations against the
+	// same counter set, rather than re-reading the (possibly mutated) source
+	// ResourceSlice. Drivers do not write this field.
+	//
+	// It is present only when the allocated device's slice entry declares at
+	// least one compatibility group on any counter set.
+	CompatibilityGroups map[string]CompatibilityGroupListApplyConfiguration `json:"compatibilityGroups,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -194,6 +208,20 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(e
 	}
 	for k, v := range entries {
 		b.ConsumedCapacity[k] = v
+	}
+	return b
+}
+
+// WithCompatibilityGroups puts the entries into the CompatibilityGroups field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the CompatibilityGroups field,
+// overwriting an existing map entries in CompatibilityGroups field with the same key.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithCompatibilityGroups(entries map[string]CompatibilityGroupListApplyConfiguration) *DeviceRequestAllocationResultApplyConfiguration {
+	if b.CompatibilityGroups == nil && len(entries) > 0 {
+		b.CompatibilityGroups = make(map[string]CompatibilityGroupListApplyConfiguration, len(entries))
+	}
+	for k, v := range entries {
+		b.CompatibilityGroups[k] = v
 	}
 	return b
 }

@@ -284,6 +284,10 @@ const ResourceSliceMaxDeviceCounterConsumptionsPerDevice = 2
 // per device counter consumption.
 const ResourceSliceMaxCountersPerDeviceCounterConsumption = 32
 
+// Defines the maximum number of compatibility groups that can be
+// declared per device counter consumption.
+const DeviceCompatibilityGroupsMaxSize = 8
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -492,6 +496,30 @@ type DeviceCounterConsumption struct {
 	//
 	// +required
 	Counters map[string]Counter
+
+	// CompatibilityGroups is a driver-declared list of opaque group names for
+	// this counter-set consumption.
+	//
+	// The scheduler uses it to decide whether devices that draw from the same
+	// counter set may be allocated at the same time: two such devices may be
+	// co-allocated only if their CompatibilityGroups for that counter set
+	// intersect (share at least one name). Devices that consume from different
+	// counter sets are never compared via this field.
+	//
+	// An unset field, an explicit nil, and an empty list are equivalent and
+	// mean "no groups": such a device is only co-allocatable with sibling
+	// devices on the same counter set that also have no groups, and is never
+	// co-allocatable with a device that declares one or more groups.
+	//
+	// Group names are opaque to the scheduler and meaningful only within the
+	// publishing driver's pool.
+	//
+	// The maximum number of groups is 8.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceCompatibilityGroups
+	CompatibilityGroups []string
 }
 
 // DeviceCapacity describes a quantity associated with a device.
@@ -1725,6 +1753,42 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity
+
+	// CompatibilityGroups is written by the scheduler at allocation time and is
+	// a per-counter-set snapshot of the allocated device's declared compatibility
+	// groups. It is keyed by counter-set name (matching consumesCounters[*].counterSet),
+	// and each value is the list of groups declared on the allocated device's
+	// consumesCounters[] entry for that counter set at the time of allocation.
+	// Counter sets the device does not consume from are omitted from the map.
+	//
+	// The scheduler consults this snapshot on subsequent allocations against the
+	// same counter set, rather than re-reading the (possibly mutated) source
+	// ResourceSlice. Drivers do not write this field.
+	//
+	// It is present only when the allocated device's slice entry declares at
+	// least one compatibility group on any counter set.
+	//
+	// +optional
+	// +featureGate=DRADeviceCompatibilityGroups
+	CompatibilityGroups map[string]CompatibilityGroupList
+}
+
+// CompatibilityGroupList is the list of compatibility groups declared for a
+// single counter-set consumption.
+//
+// It exists as a named type so that the per-counter-set snapshot on
+// DeviceRequestAllocationResult can be represented as a map value: protobuf map
+// values cannot themselves be repeated, so a list of group names is wrapped in
+// this message.
+type CompatibilityGroupList struct {
+	// Groups is the list of opaque compatibility group names declared for the
+	// counter set.
+	//
+	// The maximum number of groups is 8.
+	//
+	// +optional
+	// +listType=atomic
+	Groups []string
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

@@ -93,6 +93,15 @@ func (CapacityRequirements) SwaggerDoc() map[string]string {
 	return map_CapacityRequirements
 }
 
+var map_CompatibilityGroupList = map[string]string{
+	"":       "CompatibilityGroupList is the list of compatibility groups declared for a single counter-set consumption.\n\nIt exists as a named type so that the per-counter-set snapshot on DeviceRequestAllocationResult can be represented as a map value: protobuf map values cannot themselves be repeated, so a list of group names is wrapped in this message.",
+	"groups": "Groups is the list of opaque compatibility group names declared for the counter set.\n\nThe maximum number of groups is 8.",
+}
+
+func (CompatibilityGroupList) SwaggerDoc() map[string]string {
+	return map_CompatibilityGroupList
+}
+
 var map_Counter = map[string]string{
 	"":      "Counter describes a quantity associated with a device.",
 	"value": "Value defines how much of a certain device counter is available.",
@@ -259,9 +268,10 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceCounterConsumption = map[string]string{
-	"":           "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
-	"counterSet": "CounterSet is the name of the set from which the counters defined will be consumed.",
-	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
+	"":                    "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
+	"counterSet":          "CounterSet is the name of the set from which the counters defined will be consumed.",
+	"counters":            "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
+	"compatibilityGroups": "CompatibilityGroups is a driver-declared list of opaque group names for this counter-set consumption.\n\nThe scheduler uses it to decide whether devices that draw from the same counter set may be allocated at the same time: two such devices may be co-allocated only if their CompatibilityGroups for that counter set intersect (share at least one name). Devices that consume from different counter sets are never compared via this field.\n\nAn unset field, an explicit nil, and an empty list are equivalent and mean \"no groups\": such a device is only co-allocatable with sibling devices on the same counter set that also have no groups, and is never co-allocatable with a device that declares one or more groups.\n\nGroup names are opaque to the scheduler and meaningful only within the publishing driver's pool.\n\nThe maximum number of groups is 8.",
 }
 
 func (DeviceCounterConsumption) SwaggerDoc() map[string]string {
@@ -291,6 +301,7 @@ var map_DeviceRequestAllocationResult = map[string]string{
 	"bindingFailureConditions": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"shareID":                  "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
 	"consumedCapacity":         "ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
+	"compatibilityGroups":      "CompatibilityGroups is written by the scheduler at allocation time and is a per-counter-set snapshot of the allocated device's declared compatibility groups. It is keyed by counter-set name (matching consumesCounters[*].counterSet), and each value is the list of groups declared on the allocated device's consumesCounters[] entry for that counter set at the time of allocation. Counter sets the device does not consume from are omitted from the map.\n\nThe scheduler consults this snapshot on subsequent allocations against the same counter set, rather than re-reading the (possibly mutated) source ResourceSlice. Drivers do not write this field.\n\nIt is present only when the allocated device's slice entry declares at least one compatibility group on any counter set.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
