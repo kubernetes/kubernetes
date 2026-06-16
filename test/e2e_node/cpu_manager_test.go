@@ -1613,6 +1613,130 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				}
 			})
 		})
+
+		ginkgo.Context("align-by-socket and distribute-cpus-across-numa policy options", ginkgo.Label("align-by-socket", "distribute-cpus-across-numa"), func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				reservedCPUs = cpuset.New(0)
+			})
+
+			ginkgo.It("should assign CPUs within a single socket when align-by-socket is enabled", func(ctx context.Context) {
+				_, _, numaPerSocket, cpusNumPerNUMA := hostCheckForSocketPolicyOptions()
+
+				// Request more CPUs than a single NUMA node provides, but fewer than a full socket,
+				// so allocation must span multiple NUMA nodes on the same socket.
+				cpuReq := cpusNumPerNUMA + 1
+				cpusPerSocket := cpusNumPerNUMA * numaPerSocket
+				if cpuReq >= cpusPerSocket {
+					e2eskipper.Skipf("cannot construct align-by-socket test: need %d < %d CPUs per socket", cpuReq, cpusPerSocket)
+				}
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.AlignBySocketOption:            "true",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "false",
+					},
+				}))
+
+				pod := makeCPUManagerPod("test-pod-align-by-socket", []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-align-by-socket",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				})
+				ginkgo.By("creating the test pod")
+				pod = createPodSync(ctx, pod)
+
+				ginkgo.By("validating the container is allocated within a single socket")
+				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-align-by-socket", false)
+				framework.ExpectNoError(err)
+				gomega.Expect(cpus.Size()).To(gomega.Equal(cpuReq))
+				gomega.Expect(cpus).To(BeAllocatedToSingleSocket())
+			})
+
+			ginkgo.It("should assign CPUs distributed across NUMA when distribute-cpus-across-numa is enabled", func(ctx context.Context) {
+				if smtLevel < minSMTLevel {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
+				}
+
+				numaNodeNum, _, _, cpusNumPerNUMA := hostCheck()
+				cpuReq := (cpusNumPerNUMA - smtLevel) * numaNodeNum
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:            "true",
+						cpumanager.AlignBySocketOption:            "false",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+					},
+				}))
+
+				pod := makeCPUManagerPod("test-pod-distribute-cpus-across-numa-only", []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-distribute-cpus-across-numa-only",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				})
+				ginkgo.By("creating the test pod")
+				pod = createPodSync(ctx, pod)
+
+				ginkgo.By("validating CPUs are evenly distributed across NUMA nodes")
+				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-distribute-cpus-across-numa-only", false)
+				framework.ExpectNoError(err)
+				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo("test-gu-container-distribute-cpus-across-numa-only", smtLevel))
+				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("test-gu-container-distribute-cpus-across-numa-only"))
+
+				expectedSpread := cpus.Size() / numaNodeNum
+				gomega.Expect(cpus).To(BeDistributedCPUs(expectedSpread))
+			})
+
+			ginkgo.It("should distribute CPUs across NUMA within a single socket when both policy options are enabled", func(ctx context.Context) {
+				if smtLevel < minSMTLevel {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
+				}
+
+				_, _, numaPerSocket, cpusNumPerNUMA := hostCheckForSocketPolicyOptions()
+				cpuReq := (cpusNumPerNUMA - smtLevel) * numaPerSocket
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:            "true",
+						cpumanager.AlignBySocketOption:            "true",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+					},
+				}))
+
+				pod := makeCPUManagerPod("test-pod-align-by-socket-distribute-across-numa", []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-align-by-socket-distribute-across-numa",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				})
+				ginkgo.By("creating the test pod")
+				pod = createPodSync(ctx, pod)
+
+				ginkgo.By("validating CPUs are socket-aligned and evenly distributed across NUMA nodes on that socket")
+				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-align-by-socket-distribute-across-numa", false)
+				framework.ExpectNoError(err)
+				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo("test-gu-container-align-by-socket-distribute-across-numa", smtLevel))
+				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("test-gu-container-align-by-socket-distribute-across-numa"))
+				gomega.Expect(cpus).To(BeAllocatedToSingleSocket())
+				gomega.Expect(cpus).To(BeEvenlyDistributedAcrossActiveNUMANodes())
+			})
+		})
 	})
 
 	ginkgo.When("checking the CFS quota management", ginkgo.Label("cfs-quota"), func() {
@@ -3629,6 +3753,62 @@ func numaAllocationCounts(allocatedCPUs cpuset.CPUSet, activeOnly bool) ([]int, 
 	return counts, nil
 }
 
+func hostCheckForSocketPolicyOptions() (numaNodes, sockets, numaPerSocket, cpusNumPerNUMA int) {
+	numaNodes, _, _, cpusNumPerNUMA = hostCheck()
+	sockets = detectSockets()
+	if sockets < 2 {
+		e2eskipper.Skipf("align-by-socket policy option tests require a multi-socket system")
+	}
+	// Assumes a clean socket to NUMA node hierarchy (multiple NUMA nodes per socket, not the reverse).
+	// Skip when that does not hold, e.g. a single NUMA node spanning multiple sockets.
+	numaPerSocket = numaNodes / sockets
+	if numaPerSocket < 2 {
+		e2eskipper.Skipf("align-by-socket policy option tests require at least 2 NUMA nodes per socket")
+	}
+	return numaNodes, sockets, numaPerSocket, cpusNumPerNUMA
+}
+
+func BeAllocatedToSingleSocket() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
+		if allocatedCPUs.IsEmpty() {
+			return false, fmt.Errorf("empty cpuset")
+		}
+		socketIDs := sets.New[int]()
+		for _, cpu := range allocatedCPUs.UnsortedList() {
+			socketID, err := getCPUSocketID(cpu)
+			if err != nil {
+				return false, err
+			}
+			socketIDs.Insert(socketID)
+		}
+		if socketIDs.Len() != 1 {
+			return false, fmt.Errorf("CPUs span %d sockets (%v), expected 1", socketIDs.Len(), socketIDs.UnsortedList())
+		}
+		return true, nil
+	}).WithMessage("expected CPUs to be allocated within a single socket")
+}
+
+func BeEvenlyDistributedAcrossActiveNUMANodes() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
+		counts, err := numaAllocationCounts(allocatedCPUs, true)
+		if err != nil {
+			return false, err
+		}
+		if !allCountsEqual(counts) {
+			return false, fmt.Errorf("uneven NUMA distribution across active nodes: %v", counts)
+		}
+		return true, nil
+	}).WithMessage("expected CPUs to be evenly distributed across NUMA nodes with non-zero allocation")
+}
+func allCountsEqual(counts []int) bool {
+	expected := counts[0]
+	for _, count := range counts[1:] {
+		if count != expected {
+			return false
+		}
+	}
+	return true
+}
 func getContainerAllowedCPUsFromLogs(podName, cntName, logs string) cpuset.CPUSet {
 	framework.Logf("got pod logs: <%v>", logs)
 	cpus, err := cpuset.Parse(strings.TrimSpace(logs))

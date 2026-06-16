@@ -92,6 +92,16 @@ func detectCoresPerSocket() int {
 	return coreCount
 }
 
+func detectSockets() int {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Socket(s):\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	socketCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return socketCount
+}
+
 func detectThreadPerCore() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
 	framework.ExpectNoError(err)
