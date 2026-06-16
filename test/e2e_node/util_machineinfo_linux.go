@@ -110,3 +110,12 @@ func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
 
 	return numaNodes, nil
 }
+
+func getCPUSocketID(cpuID int) (int, error) {
+	path := fmt.Sprintf("/sys/devices/system/cpu/cpu%d/topology/physical_package_id", cpuID)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return -1, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(data)))
+}
