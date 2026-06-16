@@ -507,6 +507,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
+
+	obj := mkValidResourceClaim()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func tweakDevicesConfigs(items int) func(*resource.ResourceClaim) {
@@ -825,6 +828,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
+
+	updateObj := mkValidResourceClaim()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {

@@ -515,6 +515,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidPodGroup(setResourceVersion("1"))
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.NewStrategy(), meta.Options{StringentFinalizerValidation: true})
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {

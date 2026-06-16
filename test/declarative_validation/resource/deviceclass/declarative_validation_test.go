@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	registry "k8s.io/kubernetes/pkg/registry/resource/deviceclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -170,6 +171,9 @@ func TestDeclarativeValidate(t *testing.T) {
 					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 				})
 			}
+
+			obj := mkDeviceClass()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -275,6 +279,9 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs)
 				})
 			}
+
+			updateObj := mkDeviceClass()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
