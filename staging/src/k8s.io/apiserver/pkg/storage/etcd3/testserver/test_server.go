@@ -61,6 +61,11 @@ func NewTestConfig(t testing.TB) *embed.Config {
 
 	cfg.UnsafeNoFsync = true
 
+	// Default 2 GiB backend quota overflows during large/long benchmarks
+	// (e.g. BenchmarkStore* on 150k-pod datasets at -count=N) because MVCC
+	// history accumulates without compaction. Raise to 8 GiB.
+	cfg.QuotaBackendBytes = 8 << 30
+
 	ports, err := getAvailablePorts(2)
 	if err != nil {
 		t.Fatal(err)
