@@ -327,7 +327,7 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 	go manager.Run(tCtx, sourcesReady)
 	podManager.SetPods([]*v1.Pod{pod})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(tCtx, 1*time.Second)
 	defer cancel()
 	err = manager.WaitForAttachAndMount(ctx, pod)
 
@@ -741,7 +741,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 				for _, pod := range pods {
 					go func() {
-						err := manager.WaitForAttachAndMount(context.Background(), pod)
+						err := manager.WaitForAttachAndMount(ctx, pod)
 						resultChan <- attachResult{
 							podName: pod.Name,
 							err:     err,

@@ -114,8 +114,8 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 }
 
 func testGetTrustAnchorsByName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer cancel()
 
 	ctb1Bundle := mustMakeRoot(t, "root1")
@@ -251,8 +251,8 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 }
 
 func testGetTrustAnchorsBySignerName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer cancel()
 
 	ctb1 := b.ctbConstructor("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))

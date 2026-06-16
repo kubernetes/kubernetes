@@ -255,7 +255,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 	}
 }
 
-func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
+func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.UnconditionalAuthorizer, attributes authorizer.Attributes) rest.ValidateObjectFunc {
 	var once sync.Once
 	var authorizerDecision authorizer.Decision
 	var authorizerReason string

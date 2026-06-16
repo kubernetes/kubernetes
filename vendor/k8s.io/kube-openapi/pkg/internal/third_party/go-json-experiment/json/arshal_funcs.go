@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package json
 
 import (
@@ -9,62 +11,75 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/internal"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/internal/jsonflags"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/internal/jsonopts"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
-// SkipFunc may be returned by MarshalFuncV2 and UnmarshalFuncV2 functions.
+// SkipFunc may be returned by [MarshalToFunc] and [UnmarshalFromFunc] functions.
 //
 // Any function that returns SkipFunc must not cause observable side effects
-// on the provided Encoder or Decoder. For example, it is permissible to call
-// Decoder.PeekKind, but not permissible to call Decoder.ReadToken or
-// Encoder.WriteToken since such methods mutate the state.
-const SkipFunc = jsonError("skip function")
+// on the provided [jsontext.Encoder] or [jsontext.Decoder].
+// For example, it is permissible to call [jsontext.Decoder.PeekKind],
+// but not permissible to call [jsontext.Decoder.ReadToken] or
+// [jsontext.Encoder.WriteToken] since such methods mutate the state.
+var SkipFunc = errors.New("json: skip function")
+
+var errSkipMutation = errors.New("must not read or write any tokens when skipping")
+var errNonSingularValue = errors.New("must read or write exactly one value")
 
 // Marshalers is a list of functions that may override the marshal behavior
-// of specific types. Populate MarshalOptions.Marshalers to use it.
+// of specific types. Populate [WithMarshalers] to use it with
+// [Marshal], [MarshalWrite], or [MarshalEncode].
 // A nil *Marshalers is equivalent to an empty list.
+// There are no exported fields or methods on Marshalers.
 type Marshalers = typedMarshalers
 
-// NewMarshalers constructs a flattened list of marshal functions.
+// JoinMarshalers constructs a flattened list of marshal functions.
 // If multiple functions in the list are applicable for a value of a given type,
 // then those earlier in the list take precedence over those that come later.
-// If a function returns SkipFunc, then the next applicable function is called,
+// If a function returns [SkipFunc], then the next applicable function is called,
 // otherwise the default marshaling behavior is used.
 //
 // For example:
 //
-//	m1 := NewMarshalers(f1, f2)
-//	m2 := NewMarshalers(f0, m1, f3)     // equivalent to m3
-//	m3 := NewMarshalers(f0, f1, f2, f3) // equivalent to m2
-func NewMarshalers(ms ...*Marshalers) *Marshalers {
+//	m1 := JoinMarshalers(f1, f2)
+//	m2 := JoinMarshalers(f0, m1, f3)     // equivalent to m3
+//	m3 := JoinMarshalers(f0, f1, f2, f3) // equivalent to m2
+func JoinMarshalers(ms ...*Marshalers) *Marshalers {
 	return newMarshalers(ms...)
 }
 
 // Unmarshalers is a list of functions that may override the unmarshal behavior
-// of specific types. Populate UnmarshalOptions.Unmarshalers to use it.
+// of specific types. Populate [WithUnmarshalers] to use it with
+// [Unmarshal], [UnmarshalRead], or [UnmarshalDecode].
 // A nil *Unmarshalers is equivalent to an empty list.
+// There are no exported fields or methods on Unmarshalers.
 type Unmarshalers = typedUnmarshalers
 
-// NewUnmarshalers constructs a flattened list of unmarshal functions.
+// JoinUnmarshalers constructs a flattened list of unmarshal functions.
 // If multiple functions in the list are applicable for a value of a given type,
 // then those earlier in the list take precedence over those that come later.
-// If a function returns SkipFunc, then the next applicable function is called,
+// If a function returns [SkipFunc], then the next applicable function is called,
 // otherwise the default unmarshaling behavior is used.
 //
 // For example:
 //
-//	u1 := NewUnmarshalers(f1, f2)
-//	u2 := NewUnmarshalers(f0, u1, f3)     // equivalent to u3
-//	u3 := NewUnmarshalers(f0, f1, f2, f3) // equivalent to u2
-func NewUnmarshalers(us ...*Unmarshalers) *Unmarshalers {
+//	u1 := JoinUnmarshalers(f1, f2)
+//	u2 := JoinUnmarshalers(f0, u1, f3)     // equivalent to u3
+//	u3 := JoinUnmarshalers(f0, f1, f2, f3) // equivalent to u2
+func JoinUnmarshalers(us ...*Unmarshalers) *Unmarshalers {
 	return newUnmarshalers(us...)
 }
 
-type typedMarshalers = typedArshalers[MarshalOptions, Encoder]
-type typedUnmarshalers = typedArshalers[UnmarshalOptions, Decoder]
-type typedArshalers[Options, Coder any] struct {
+type typedMarshalers = typedArshalers[jsontext.Encoder]
+type typedUnmarshalers = typedArshalers[jsontext.Decoder]
+type typedArshalers[Coder any] struct {
 	nonComparable
 
-	fncVals  []typedArshaler[Options, Coder]
+	fncVals  []typedArshaler[Coder]
 	fncCache sync.Map // map[reflect.Type]arshaler
 
 	// fromAny reports whether any of Go types used to represent arbitrary JSON
@@ -78,18 +93,18 @@ type typedArshalers[Options, Coder any] struct {
 	// if this is true.
 	fromAny bool
 }
-type typedMarshaler = typedArshaler[MarshalOptions, Encoder]
-type typedUnmarshaler = typedArshaler[UnmarshalOptions, Decoder]
-type typedArshaler[Options, Coder any] struct {
+type typedMarshaler = typedArshaler[jsontext.Encoder]
+type typedUnmarshaler = typedArshaler[jsontext.Decoder]
+type typedArshaler[Coder any] struct {
 	typ     reflect.Type
-	fnc     func(Options, *Coder, addressableValue) error
+	fnc     func(*Coder, addressableValue, *jsonopts.Struct) error
 	maySkip bool
 }
 
 func newMarshalers(ms ...*Marshalers) *Marshalers       { return newTypedArshalers(ms...) }
 func newUnmarshalers(us ...*Unmarshalers) *Unmarshalers { return newTypedArshalers(us...) }
-func newTypedArshalers[Options, Coder any](as ...*typedArshalers[Options, Coder]) *typedArshalers[Options, Coder] {
-	var a typedArshalers[Options, Coder]
+func newTypedArshalers[Coder any](as ...*typedArshalers[Coder]) *typedArshalers[Coder] {
+	var a typedArshalers[Coder]
 	for _, a2 := range as {
 		if a2 != nil {
 			a.fncVals = append(a.fncVals, a2.fncVals...)
@@ -102,7 +117,7 @@ func newTypedArshalers[Options, Coder any](as ...*typedArshalers[Options, Coder]
 	return &a
 }
 
-func (a *typedArshalers[Options, Coder]) lookup(fnc func(Options, *Coder, addressableValue) error, t reflect.Type) (func(Options, *Coder, addressableValue) error, bool) {
+func (a *typedArshalers[Coder]) lookup(fnc func(*Coder, addressableValue, *jsonopts.Struct) error, t reflect.Type) (func(*Coder, addressableValue, *jsonopts.Struct) error, bool) {
 	if a == nil {
 		return fnc, false
 	}
@@ -110,12 +125,12 @@ func (a *typedArshalers[Options, Coder]) lookup(fnc func(Options, *Coder, addres
 		if v == nil {
 			return fnc, false
 		}
-		return v.(func(Options, *Coder, addressableValue) error), true
+		return v.(func(*Coder, addressableValue, *jsonopts.Struct) error), true
 	}
 
 	// Collect a list of arshalers that can be called for this type.
 	// This list may be longer than 1 since some arshalers can be skipped.
-	var fncs []func(Options, *Coder, addressableValue) error
+	var fncs []func(*Coder, addressableValue, *jsonopts.Struct) error
 	for _, fncVal := range a.fncVals {
 		if !castableTo(t, fncVal.typ) {
 			continue
@@ -133,21 +148,21 @@ func (a *typedArshalers[Options, Coder]) lookup(fnc func(Options, *Coder, addres
 
 	// Construct an arshaler that may call every applicable arshaler.
 	fncDefault := fnc
-	fnc = func(o Options, c *Coder, v addressableValue) error {
+	fnc = func(c *Coder, v addressableValue, o *jsonopts.Struct) error {
 		for _, fnc := range fncs {
-			if err := fnc(o, c, v); err != SkipFunc {
+			if err := fnc(c, v, o); err != SkipFunc {
 				return err // may be nil or non-nil
 			}
 		}
-		return fncDefault(o, c, v)
+		return fncDefault(c, v, o)
 	}
 
 	// Use the first stored so duplicate work can be garbage collected.
 	v, _ := a.fncCache.LoadOrStore(t, fnc)
-	return v.(func(Options, *Coder, addressableValue) error), true
+	return v.(func(*Coder, addressableValue, *jsonopts.Struct) error), true
 }
 
-// MarshalFuncV1 constructs a type-specific marshaler that
+// MarshalFunc constructs a type-specific marshaler that
 // specifies how to marshal values of type T.
 // T can be any type except a named pointer.
 // The function is always provided with a non-nil pointer value
@@ -155,22 +170,30 @@ func (a *typedArshalers[Options, Coder]) lookup(fnc func(Options, *Coder, addres
 //
 // The function must marshal exactly one JSON value.
 // The value of T must not be retained outside the function call.
-// It may not return SkipFunc.
-func MarshalFuncV1[T any](fn func(T) ([]byte, error)) *Marshalers {
-	t := reflect.TypeOf((*T)(nil)).Elem()
+// It may not return [SkipFunc].
+func MarshalFunc[T any](fn func(T) ([]byte, error)) *Marshalers {
+	t := reflect.TypeFor[T]()
 	assertCastableTo(t, true)
 	typFnc := typedMarshaler{
 		typ: t,
-		fnc: func(mo MarshalOptions, enc *Encoder, va addressableValue) error {
+		fnc: func(enc *jsontext.Encoder, va addressableValue, mo *jsonopts.Struct) error {
 			val, err := fn(va.castTo(t).Interface().(T))
 			if err != nil {
 				err = wrapSkipFunc(err, "marshal function of type func(T) ([]byte, error)")
-				// TODO: Avoid wrapping semantic errors.
-				return &SemanticError{action: "marshal", GoType: t, Err: err}
+				if mo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
+					return internal.NewMarshalerError(va.Addr().Interface(), err, "MarshalFunc") // unlike unmarshal, always wrapped
+				}
+				err = newMarshalErrorBefore(enc, t, err)
+				return collapseSemanticErrors(err)
 			}
 			if err := enc.WriteValue(val); err != nil {
-				// TODO: Avoid wrapping semantic or I/O errors.
-				return &SemanticError{action: "marshal", JSONKind: RawValue(val).Kind(), GoType: t, Err: err}
+				if mo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
+					return internal.NewMarshalerError(va.Addr().Interface(), err, "MarshalFunc") // unlike unmarshal, always wrapped
+				}
+				if isSyntacticError(err) {
+					err = newMarshalErrorBefore(enc, t, err)
+				}
+				return err
 			}
 			return nil
 		},
@@ -178,39 +201,47 @@ func MarshalFuncV1[T any](fn func(T) ([]byte, error)) *Marshalers {
 	return &Marshalers{fncVals: []typedMarshaler{typFnc}, fromAny: castableToFromAny(t)}
 }
 
-// MarshalFuncV2 constructs a type-specific marshaler that
+// MarshalToFunc constructs a type-specific marshaler that
 // specifies how to marshal values of type T.
 // T can be any type except a named pointer.
 // The function is always provided with a non-nil pointer value
 // if T is an interface or pointer type.
 //
 // The function must marshal exactly one JSON value by calling write methods
-// on the provided encoder. It may return SkipFunc such that marshaling can
+// on the provided encoder. It may return [SkipFunc] such that marshaling can
 // move on to the next marshal function. However, no mutable method calls may
-// be called on the encoder if SkipFunc is returned.
-// The pointer to Encoder and the value of T must not be retained
-// outside the function call.
-func MarshalFuncV2[T any](fn func(MarshalOptions, *Encoder, T) error) *Marshalers {
-	t := reflect.TypeOf((*T)(nil)).Elem()
+// be called on the encoder if [SkipFunc] is returned.
+// The pointer to [jsontext.Encoder] and the value of T
+// must not be retained outside the function call.
+func MarshalToFunc[T any](fn func(*jsontext.Encoder, T) error) *Marshalers {
+	t := reflect.TypeFor[T]()
 	assertCastableTo(t, true)
 	typFnc := typedMarshaler{
 		typ: t,
-		fnc: func(mo MarshalOptions, enc *Encoder, va addressableValue) error {
-			prevDepth, prevLength := enc.tokens.depthLength()
-			err := fn(mo, enc, va.castTo(t).Interface().(T))
-			currDepth, currLength := enc.tokens.depthLength()
+		fnc: func(enc *jsontext.Encoder, va addressableValue, mo *jsonopts.Struct) error {
+			xe := export.Encoder(enc)
+			prevDepth, prevLength := xe.Tokens.DepthLength()
+			xe.Flags.Set(jsonflags.WithinArshalCall | 1)
+			err := fn(enc, va.castTo(t).Interface().(T))
+			xe.Flags.Set(jsonflags.WithinArshalCall | 0)
+			currDepth, currLength := xe.Tokens.DepthLength()
 			if err == nil && (prevDepth != currDepth || prevLength+1 != currLength) {
-				err = errors.New("must write exactly one JSON value")
+				err = errNonSingularValue
 			}
 			if err != nil {
 				if err == SkipFunc {
 					if prevDepth == currDepth && prevLength == currLength {
 						return SkipFunc
 					}
-					err = errors.New("must not write any JSON tokens when skipping")
+					err = errSkipMutation
 				}
-				// TODO: Avoid wrapping semantic or I/O errors.
-				return &SemanticError{action: "marshal", GoType: t, Err: err}
+				if mo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
+					return internal.NewMarshalerError(va.Addr().Interface(), err, "MarshalToFunc") // unlike unmarshal, always wrapped
+				}
+				if !export.IsIOError(err) {
+					err = newSemanticErrorWithPosition(enc, t, prevDepth, prevLength, err)
+				}
+				return err
 			}
 			return nil
 		},
@@ -219,7 +250,7 @@ func MarshalFuncV2[T any](fn func(MarshalOptions, *Encoder, T) error) *Marshaler
 	return &Marshalers{fncVals: []typedMarshaler{typFnc}, fromAny: castableToFromAny(t)}
 }
 
-// UnmarshalFuncV1 constructs a type-specific unmarshaler that
+// UnmarshalFunc constructs a type-specific unmarshaler that
 // specifies how to unmarshal values of type T.
 // T must be an unnamed pointer or an interface type.
 // The function is always provided with a non-nil pointer value.
@@ -227,13 +258,13 @@ func MarshalFuncV2[T any](fn func(MarshalOptions, *Encoder, T) error) *Marshaler
 // The function must unmarshal exactly one JSON value.
 // The input []byte must not be mutated.
 // The input []byte and value T must not be retained outside the function call.
-// It may not return SkipFunc.
-func UnmarshalFuncV1[T any](fn func([]byte, T) error) *Unmarshalers {
-	t := reflect.TypeOf((*T)(nil)).Elem()
+// It may not return [SkipFunc].
+func UnmarshalFunc[T any](fn func([]byte, T) error) *Unmarshalers {
+	t := reflect.TypeFor[T]()
 	assertCastableTo(t, false)
 	typFnc := typedUnmarshaler{
 		typ: t,
-		fnc: func(uo UnmarshalOptions, dec *Decoder, va addressableValue) error {
+		fnc: func(dec *jsontext.Decoder, va addressableValue, uo *jsonopts.Struct) error {
 			val, err := dec.ReadValue()
 			if err != nil {
 				return err // must be a syntactic or I/O error
@@ -241,8 +272,11 @@ func UnmarshalFuncV1[T any](fn func([]byte, T) error) *Unmarshalers {
 			err = fn(val, va.castTo(t).Interface().(T))
 			if err != nil {
 				err = wrapSkipFunc(err, "unmarshal function of type func([]byte, T) error")
-				// TODO: Avoid wrapping semantic, syntactic, or I/O errors.
-				return &SemanticError{action: "unmarshal", JSONKind: val.Kind(), GoType: t, Err: err}
+				if uo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
+					return err // unlike marshal, never wrapped
+				}
+				err = newUnmarshalErrorAfter(dec, t, err)
+				return collapseSemanticErrors(err)
 			}
 			return nil
 		},
@@ -250,38 +284,49 @@ func UnmarshalFuncV1[T any](fn func([]byte, T) error) *Unmarshalers {
 	return &Unmarshalers{fncVals: []typedUnmarshaler{typFnc}, fromAny: castableToFromAny(t)}
 }
 
-// UnmarshalFuncV2 constructs a type-specific unmarshaler that
+// UnmarshalFromFunc constructs a type-specific unmarshaler that
 // specifies how to unmarshal values of type T.
 // T must be an unnamed pointer or an interface type.
 // The function is always provided with a non-nil pointer value.
 //
 // The function must unmarshal exactly one JSON value by calling read methods
-// on the provided decoder. It may return SkipFunc such that unmarshaling can
+// on the provided decoder. It may return [SkipFunc] such that unmarshaling can
 // move on to the next unmarshal function. However, no mutable method calls may
-// be called on the decoder if SkipFunc is returned.
-// The pointer to Decoder and the value of T must not be retained
-// outside the function call.
-func UnmarshalFuncV2[T any](fn func(UnmarshalOptions, *Decoder, T) error) *Unmarshalers {
-	t := reflect.TypeOf((*T)(nil)).Elem()
+// be called on the decoder if [SkipFunc] is returned.
+// The pointer to [jsontext.Decoder] and the value of T
+// must not be retained outside the function call.
+func UnmarshalFromFunc[T any](fn func(*jsontext.Decoder, T) error) *Unmarshalers {
+	t := reflect.TypeFor[T]()
 	assertCastableTo(t, false)
 	typFnc := typedUnmarshaler{
 		typ: t,
-		fnc: func(uo UnmarshalOptions, dec *Decoder, va addressableValue) error {
-			prevDepth, prevLength := dec.tokens.depthLength()
-			err := fn(uo, dec, va.castTo(t).Interface().(T))
-			currDepth, currLength := dec.tokens.depthLength()
+		fnc: func(dec *jsontext.Decoder, va addressableValue, uo *jsonopts.Struct) error {
+			xd := export.Decoder(dec)
+			prevDepth, prevLength := xd.Tokens.DepthLength()
+			xd.Flags.Set(jsonflags.WithinArshalCall | 1)
+			err := fn(dec, va.castTo(t).Interface().(T))
+			xd.Flags.Set(jsonflags.WithinArshalCall | 0)
+			currDepth, currLength := xd.Tokens.DepthLength()
 			if err == nil && (prevDepth != currDepth || prevLength+1 != currLength) {
-				err = errors.New("must read exactly one JSON value")
+				err = errNonSingularValue
 			}
 			if err != nil {
 				if err == SkipFunc {
 					if prevDepth == currDepth && prevLength == currLength {
 						return SkipFunc
 					}
-					err = errors.New("must not read any JSON tokens when skipping")
+					err = errSkipMutation
 				}
-				// TODO: Avoid wrapping semantic, syntactic, or I/O errors.
-				return &SemanticError{action: "unmarshal", GoType: t, Err: err}
+				if uo.Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) {
+					if err2 := xd.SkipUntil(prevDepth, prevLength+1); err2 != nil {
+						return err2
+					}
+					return err // unlike marshal, never wrapped
+				}
+				if !isSyntacticError(err) && !export.IsIOError(err) {
+					err = newSemanticErrorWithPosition(dec, t, prevDepth, prevLength, err)
+				}
+				return err
 			}
 			return nil
 		},

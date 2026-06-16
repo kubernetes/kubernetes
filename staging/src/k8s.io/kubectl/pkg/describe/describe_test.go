@@ -41,6 +41,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1374,6 +1375,7 @@ func TestDescribeService(t *testing.T) {
 
 func TestPodDescribeResultsSorted(t *testing.T) {
 	// Arrange
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"}}
 	fake := fake.NewClientset(
 		&corev1.EventList{
 			Items: []corev1.Event{
@@ -1406,7 +1408,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 				},
 			},
 		},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"}},
+		pod,
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
@@ -2810,61 +2812,63 @@ func TestGetPodsForPVC(t *testing.T) {
 func TestDescribeDeployment(t *testing.T) {
 	labels := map[string]string{"k8s-app": "bar"}
 	testCases := []struct {
-		name    string
-		objects []runtime.Object
-		expects []string
+		name       string
+		deployment runtime.Object
+		objects    []runtime.Object
+		expects    []string
 	}{
 		{
 			name: "deployment with two mounted volumes",
-			objects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "bar",
-						Namespace:         "foo",
-						Labels:            labels,
-						UID:               "00000000-0000-0000-0000-000000000001",
-						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			deployment: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					Namespace:         "foo",
+					Labels:            labels,
+					UID:               "00000000-0000-0000-0000-000000000001",
+					CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To[int32](1),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: labels,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+							Labels:    labels,
 						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "bar",
-								Namespace: "foo",
-								Labels:    labels,
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Image: "mytest-image:latest",
-										VolumeMounts: []corev1.VolumeMount{
-											{
-												Name:      "vol-foo",
-												MountPath: "/tmp/vol-foo",
-											}, {
-												Name:      "vol-bar",
-												MountPath: "/tmp/vol-bar",
-											},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "mytest-image:latest",
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "vol-foo",
+											MountPath: "/tmp/vol-foo",
+										}, {
+											Name:      "vol-bar",
+											MountPath: "/tmp/vol-bar",
 										},
 									},
 								},
-								Volumes: []corev1.Volume{
-									{
-										Name:         "vol-foo",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
-									{
-										Name:         "vol-bar",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name:         "vol-foo",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
+								{
+									Name:         "vol-bar",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 								},
 							},
 						},
 					},
-				}, &appsv1.ReplicaSet{
+				},
+			},
+			objects: []runtime.Object{
+				&appsv1.ReplicaSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -2939,61 +2943,62 @@ func TestDescribeDeployment(t *testing.T) {
 		},
 		{
 			name: "deployment during the process of rolling out",
-			objects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "bar",
-						Namespace:         "foo",
-						Labels:            labels,
-						UID:               "00000000-0000-0000-0000-000000000001",
-						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			deployment: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					Namespace:         "foo",
+					Labels:            labels,
+					UID:               "00000000-0000-0000-0000-000000000001",
+					CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](2),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To[int32](2),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: labels,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+							Labels:    labels,
 						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "bar",
-								Namespace: "foo",
-								Labels:    labels,
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Image: "mytest-image:v2.0",
-										VolumeMounts: []corev1.VolumeMount{
-											{
-												Name:      "vol-foo",
-												MountPath: "/tmp/vol-foo",
-											}, {
-												Name:      "vol-bar",
-												MountPath: "/tmp/vol-bar",
-											},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "mytest-image:v2.0",
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "vol-foo",
+											MountPath: "/tmp/vol-foo",
+										}, {
+											Name:      "vol-bar",
+											MountPath: "/tmp/vol-bar",
 										},
 									},
 								},
-								Volumes: []corev1.Volume{
-									{
-										Name:         "vol-foo",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
-									{
-										Name:         "vol-bar",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name:         "vol-foo",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
+								{
+									Name:         "vol-bar",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 								},
 							},
 						},
 					},
-					Status: appsv1.DeploymentStatus{
-						Replicas:            3,
-						UpdatedReplicas:     1,
-						AvailableReplicas:   2,
-						UnavailableReplicas: 1,
-					},
-				}, &appsv1.ReplicaSet{
+				},
+				Status: appsv1.DeploymentStatus{
+					Replicas:            3,
+					UpdatedReplicas:     1,
+					AvailableReplicas:   2,
+					UnavailableReplicas: 1,
+				},
+			},
+			objects: []runtime.Object{
+				&appsv1.ReplicaSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -3199,61 +3204,62 @@ func TestDescribeDeployment(t *testing.T) {
 		},
 		{
 			name: "deployment after successful rollout",
-			objects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "bar",
-						Namespace:         "foo",
-						Labels:            labels,
-						UID:               "00000000-0000-0000-0000-000000000001",
-						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			deployment: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					Namespace:         "foo",
+					Labels:            labels,
+					UID:               "00000000-0000-0000-0000-000000000001",
+					CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](2),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To[int32](2),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: labels,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+							Labels:    labels,
 						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "bar",
-								Namespace: "foo",
-								Labels:    labels,
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Image: "mytest-image:v2.0",
-										VolumeMounts: []corev1.VolumeMount{
-											{
-												Name:      "vol-foo",
-												MountPath: "/tmp/vol-foo",
-											}, {
-												Name:      "vol-bar",
-												MountPath: "/tmp/vol-bar",
-											},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "mytest-image:v2.0",
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "vol-foo",
+											MountPath: "/tmp/vol-foo",
+										}, {
+											Name:      "vol-bar",
+											MountPath: "/tmp/vol-bar",
 										},
 									},
 								},
-								Volumes: []corev1.Volume{
-									{
-										Name:         "vol-foo",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
-									{
-										Name:         "vol-bar",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name:         "vol-foo",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
+								{
+									Name:         "vol-bar",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 								},
 							},
 						},
 					},
-					Status: appsv1.DeploymentStatus{
-						Replicas:            2,
-						UpdatedReplicas:     2,
-						AvailableReplicas:   2,
-						UnavailableReplicas: 0,
-					},
-				}, &appsv1.ReplicaSet{
+				},
+				Status: appsv1.DeploymentStatus{
+					Replicas:            2,
+					UpdatedReplicas:     2,
+					AvailableReplicas:   2,
+					UnavailableReplicas: 0,
+				},
+			},
+			objects: []runtime.Object{
+				&appsv1.ReplicaSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -3496,7 +3502,8 @@ func TestDescribeDeployment(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fakeClient := fake.NewClientset(testCase.objects...)
+			objs := append([]runtime.Object{testCase.deployment}, testCase.objects...)
+			fakeClient := fake.NewClientset(objs...)
 			d := DeploymentDescriber{fakeClient}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
@@ -6319,20 +6326,21 @@ func TestDescribeNode(t *testing.T) {
 		getHugePageResourceList("1Gi", "0"),
 	)
 
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
-			Spec: corev1.NodeSpec{
-				Unschedulable: true,
-			},
-			Status: corev1.NodeStatus{
-				Capacity:    nodeCapacity,
-				Allocatable: nodeAllocatable,
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
 		&coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "bar",
@@ -6453,20 +6461,21 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 	)
 
 	restartPolicy := corev1.ContainerRestartPolicyAlways
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
-			Spec: corev1.NodeSpec{
-				Unschedulable: true,
-			},
-			Status: corev1.NodeStatus{
-				Capacity:    nodeCapacity,
-				Allocatable: nodeAllocatable,
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
 		&coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "bar",
@@ -6595,20 +6604,21 @@ func TestDescribeNodeWithPodLevelResources(t *testing.T) {
 	nodeCapacity := getResourceList("8", "24Gi")
 	nodeAllocatable := getResourceList("4", "12Gi")
 
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
-			Spec: corev1.NodeSpec{
-				Unschedulable: false,
-			},
-			Status: corev1.NodeStatus{
-				Capacity:    nodeCapacity,
-				Allocatable: nodeAllocatable,
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: false,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
 		&coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "bar",
@@ -6681,6 +6691,156 @@ func TestDescribeNodeWithPodLevelResources(t *testing.T) {
 	}
 }
 
+func TestDescribeNodeWithResourceSlice(t *testing.T) {
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "slice-1",
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   "nvidia.com/gpu",
+				Pool: resourcev1.ResourcePool{
+					Name: "gpu-pool",
+				},
+				Devices: []resourcev1.Device{
+					{Name: "gpu-0"},
+					{Name: "gpu-1"},
+				},
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "slice-2",
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   "nvidia.com/gpu",
+				Pool: resourcev1.ResourcePool{
+					Name: "gpu-pool",
+				},
+				Devices: []resourcev1.Device{
+					{Name: "gpu-2"},
+					{Name: "gpu-3"},
+				},
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify node-exclusive resource slices are shown aggregated by pool
+	expectedOut := []string{
+		"Unschedulable",
+		"true",
+		"Node-Local ResourceSlices:",
+		"Driver",
+		"Pool",
+		"Slices",
+		"Devices",
+		"nvidia.com/gpu",
+		"gpu-pool",
+	}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
+func TestDescribeNodeWithResourceSliceCapping(t *testing.T) {
+	// Create a node with more than 10 pools to test capping
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
+		},
+	}
+
+	objects := []runtime.Object{node}
+
+	// Create 12 different driver/pool combinations
+	for i := range 12 {
+		objects = append(objects, &resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("slice-%d", i),
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   fmt.Sprintf("driver-%d.example.com", i),
+				Pool: resourcev1.ResourcePool{
+					Name: fmt.Sprintf("pool-%d", i),
+				},
+				Devices: []resourcev1.Device{
+					{Name: "device-0"},
+				},
+			},
+		})
+	}
+
+	fake := fake.NewClientset(objects...)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should show capping message
+	if !strings.Contains(out, "...and 2 more pools") {
+		t.Errorf("expected capping message in output: %q", out)
+	}
+}
+
+func TestDescribeNodeWithNoResourceSlices(t *testing.T) {
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should NOT show ResourceSlices section when there are none
+	if strings.Contains(out, "Node-Local ResourceSlices") {
+		t.Errorf("did not expect ResourceSlices section when there are no slices: %q", out)
+	}
+}
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
@@ -6690,14 +6850,25 @@ func TestDescribeStatefulSet(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{},
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas:            &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "mytest"},
+			},
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Image: "mytest-image:latest"},
+						{
+							Name:  "mytest",
+							Image: "mytest-image:latest",
+						},
 					},
 				},
+			},
+			ServiceName: "test-service",
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 			},
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -6714,7 +6885,18 @@ func TestDescribeStatefulSet(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	expectedOutputs := []string{
-		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition", "2672",
+		"Name:                   bar",
+		"Namespace:              foo",
+		"CreationTimestamp:      Mon, 01 Jan 0001 00:00:00 +0000",
+		"Selector:               app=mytest",
+		"Service Name:           test-service",
+		"Pod Management Policy:  Parallel",
+		"Replicas:               1 desired | 0 total",
+		"Update Strategy:        RollingUpdate",
+		"  Partition:            2672",
+		"Persistent Volume Claim Retention Policy:",
+		"  WhenDeleted:  Delete",
+		"  WhenScaled:   Retain",
 	}
 	for _, o := range expectedOutputs {
 		if !strings.Contains(out, o) {
@@ -7027,28 +7209,29 @@ Events:       <none>` + "\n",
 
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
-	f := fake.NewClientset(
-		&corev1.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-				UID:       "123456",
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind: "ReplicationController",
-			},
-			Spec: corev1.ReplicationControllerSpec{
-				Replicas: &replicas,
-				Selector: map[string]string{"abc": "xyz"},
-				Template: &corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{Image: "mytest-image:latest"},
-						},
+	replicationController := &corev1.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+			UID:       "123456",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "ReplicationController",
+		},
+		Spec: corev1.ReplicationControllerSpec{
+			Replicas: &replicas,
+			Selector: map[string]string{"abc": "xyz"},
+			Template: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Image: "mytest-image:latest"},
 					},
 				},
 			},
 		},
+	}
+	f := fake.NewClientset(
+		replicationController,
 		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            "barpod",

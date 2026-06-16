@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
@@ -83,8 +84,8 @@ var _ = SIGDescribe("ContainerLogRotation", framework.WithSlow(), framework.With
 
 			ginkgo.By("get container log path")
 			gomega.Expect(logRotationPod.Status.ContainerStatuses).To(gomega.HaveLen(1), "log rotation pod should have one container")
-			id := kubecontainer.ParseContainerID(logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
-			r, _, err := getCRIClient()
+			id := kubecontainer.ParseContainerID(klog.FromContext(ctx), logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
+			r, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
 			resp, err := r.ContainerStatus(context.Background(), id, false)
 			framework.ExpectNoError(err)
@@ -155,10 +156,10 @@ var _ = SIGDescribe("ContainerLogRotationWithMultipleWorkers", framework.WithSlo
 			var logPaths []string
 			for _, pod := range logRotationPods {
 				gomega.Expect(pod.Status.ContainerStatuses).To(gomega.HaveLen(1), "log rotation pod should have one container")
-				id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
-				r, _, err := getCRIClient()
+				id := kubecontainer.ParseContainerID(klog.FromContext(ctx), pod.Status.ContainerStatuses[0].ContainerID).ID
+				r, _, err := getCRIClient(ctx)
 				framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
-				resp, err := r.ContainerStatus(context.Background(), id, false)
+				resp, err := r.ContainerStatus(ctx, id, false)
 				framework.ExpectNoError(err)
 				logPaths = append(logPaths, resp.GetStatus().GetLogPath())
 			}

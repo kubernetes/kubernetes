@@ -446,7 +446,7 @@ func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store Inter
 	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err == nil {
 		t.Fatalf("Expected normal Delete to fail")
 	}
-	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{IgnoreStoreReadError: true}); err != nil {
+	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{ExpectTransformOrDecodeError: true}); err != nil {
 		t.Fatalf("Expected unsafe Delete to succeed, but got: %v", err)
 	}
 

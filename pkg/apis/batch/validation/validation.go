@@ -212,7 +212,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.MaxFailedIndexes != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.MaxFailedIndexes), fldPath.Child("maxFailedIndexes"))...)
 		if spec.BackoffLimitPerIndex == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("backoffLimitPerIndex"), fmt.Sprintf("when maxFailedIndexes is specified")))
+			allErrs = append(allErrs, field.Required(fldPath.Child("backoffLimitPerIndex"), "when maxFailedIndexes is specified").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
 		}
 	}
 	if spec.ManagedBy != nil {
@@ -587,17 +587,11 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ready"), *status.Ready, "cannot set more ready pods than active"))
 		}
 	}
-	if !opts.AllowForSuccessCriteriaMetInExtendedScope && ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet to NonIndexed Job"))
-	}
 	if isJobSuccessCriteriaMet(job) && IsJobFailed(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and Failed=true conditions"))
 	}
 	if isJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and FailureTarget=true conditions"))
-	}
-	if !opts.AllowForSuccessCriteriaMetInExtendedScope && job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job without SuccessPolicy"))
 	}
 	if job.Spec.SuccessPolicy != nil && !isJobSuccessCriteriaMet(job) && IsJobComplete(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True for Job with SuccessPolicy unless SuccessCriteriaMet=True"))
@@ -783,7 +777,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	allErrs := field.ErrorList{}
 
 	if len(spec.Schedule) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), "").MarkCoveredByDeclarative())
 	} else {
 		allowTZInSchedule := false
 		if oldSpec != nil {
@@ -1090,7 +1084,6 @@ type JobStatusValidationOptions struct {
 	RejectNotCompleteJobWithCompletionTime       bool
 	RejectCompleteJobWithFailedCondition         bool
 	RejectCompleteJobWithFailureTargetCondition  bool
-	AllowForSuccessCriteriaMetInExtendedScope    bool
 	RejectMoreReadyThanActivePods                bool
 	RejectFinishedJobWithTerminatingPods         bool
 }

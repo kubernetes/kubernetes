@@ -55,6 +55,13 @@ const (
 	// "application/json" or "application/apply-patch+yaml", respectively.
 	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
 
+	// owner: @enj
+	// beta: v1.36
+	//
+	// If enabled, the client-go TLS transport cache uses weak pointers to allow
+	// garbage collection of unused transports, preventing unbounded cache growth.
+	ClientsAllowTLSCacheGC Feature = "ClientsAllowTLSCacheGC"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -110,6 +117,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsAllowTLSCacheGC: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
 	},
 	ClientsPreferCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},

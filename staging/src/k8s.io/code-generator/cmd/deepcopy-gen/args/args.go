@@ -20,11 +20,15 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/code-generator/pkg/apidefinitions"
 )
 
 type Args struct {
 	OutputFile   string
 	GoHeaderFile string
+
+	apidefinitions.LintArgs
 }
 
 // New returns default arguments for the generator.
@@ -38,12 +42,16 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"the name of the file to be generated")
 	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
+	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
 // Validate checks the given arguments.
 func (args *Args) Validate() error {
 	if len(args.OutputFile) == 0 {
 		return fmt.Errorf("--output-file must be specified")
+	}
+	if err := apidefinitions.ValidateFlags(args.LintRules); err != nil {
+		return err
 	}
 	return nil
 }

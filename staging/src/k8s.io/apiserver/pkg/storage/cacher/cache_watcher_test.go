@@ -29,13 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
@@ -47,7 +47,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -77,7 +77,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 }
 
 func TestCacheWatcherHandlesFiltering(t *testing.T) {
-	filter := func(_ string, _ labels.Set, field fields.Set) bool {
+	filter := func(_ string, _ labels.Set, field fields.Set, _ runtime.Object) bool {
 		return field["spec.nodeName"] == "host"
 	}
 	forget := func(bool) {}
@@ -209,7 +209,7 @@ TestCase:
 func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	var w *cacheWatcher
 	done := make(chan struct{})
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
@@ -291,7 +291,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 
 func TestResourceVersionAfterInitEvents(t *testing.T) {
 	const numObjects = 10
-	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
+	store := store.NewIndexer(nil)
 
 	for i := 0; i < numObjects; i++ {
 		elem := makeTestStoreElement(makeTestPod(fmt.Sprintf("pod-%d", i), uint64(i)))
@@ -303,7 +303,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	filter := func(_ string, _ labels.Set, _ fields.Set) bool { return true }
+	filter := func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }
 	forget := func(_ bool) {}
 	deadline := time.Now().Add(time.Minute)
 	w := newCacheWatcher(numObjects+1, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
@@ -343,7 +343,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 }
 
 func TestTimeBucketWatchersBasic(t *testing.T) {
-	filter := func(_ string, _ labels.Set, _ fields.Set) bool {
+	filter := func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool {
 		return true
 	}
 	forget := func(bool) {}
@@ -404,7 +404,7 @@ func TestCacheWatcherDraining(t *testing.T) {
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -445,7 +445,7 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -479,7 +479,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -543,7 +543,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	watchInitializationSignal := utilflowcontrol.NewInitializationSignal()
 	ctx := utilflowcontrol.WithInitializationSignal(context.Background(), watchInitializationSignal)
 	count := 0
-	filter := func(string, labels.Set, fields.Set) bool { return true }
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
 	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -606,7 +606,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 
 func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
-		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, id)
+		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, id)
 		w.setBookmarkAfterResourceVersion(10)
 		return w
 	}

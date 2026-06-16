@@ -17,6 +17,7 @@ limitations under the License.
 package sysctl
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -103,7 +104,7 @@ func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 
 // Admit checks that all sysctls given in pod's security context
 // are valid according to the allowlist.
-func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (w *patternAllowlist) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 	if pod.Spec.SecurityContext == nil || len(pod.Spec.SecurityContext.Sysctls) == 0 {
 		return lifecycle.PodAdmitResult{

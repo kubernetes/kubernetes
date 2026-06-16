@@ -120,6 +120,6 @@ Sponsors commit to a [sponsorship](https://github.com/sponsors/onsi) for a year.
 
 <p style="font-size:21px; color:black;">Browser testing via 
     <a href="https://www.testmu.ai/" target="_blank">
-        <img src="https://www.testmu.ai/blue-logo.png" style="vertical-align: middle;" width="250" height="45" />
+        <img src="https://assets.testmu.ai/resources/images/logos/white-logo.png" style="vertical-align: middle;" width="250" />
     </a>
 </p>

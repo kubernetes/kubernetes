@@ -19,11 +19,11 @@ package restartallcontainers
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // Ensure the feature struct implements the unified Feature interface.
-var _ nodedeclaredfeatures.Feature = &restartAllContainersFeature{}
+var _ types.Feature = &restartAllContainersFeature{}
 
 const (
 	RestartRulesFeatureGate              = "ContainerRestartRules"
@@ -39,16 +39,17 @@ func (f *restartAllContainersFeature) Name() string {
 	return RestartAllContainersOnContainerExits
 }
 
-func (f *restartAllContainersFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (f *restartAllContainersFeature) Discover(cfg *types.NodeConfiguration) bool {
 	return cfg.FeatureGates.Enabled(RestartAllContainersOnContainerExits)
 }
 
-func (f *restartAllContainersFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
-	return &nodedeclaredfeatures.FeatureRequirements{
+func (f *restartAllContainersFeature) Requirements() *types.FeatureRequirements {
+	return &types.FeatureRequirements{
 		EnabledFeatureGates: []string{RestartAllContainersOnContainerExits},
 	}
 }
-func (f *restartAllContainersFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
+
+func (f *restartAllContainersFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	for _, c := range podInfo.Spec.Containers {
 		for _, rule := range c.RestartPolicyRules {
 			if rule.Action == v1.ContainerRestartRuleActionRestartAllContainers {
@@ -66,7 +67,7 @@ func (f *restartAllContainersFeature) InferForScheduling(podInfo *nodedeclaredfe
 	return false
 }
 
-func (f *restartAllContainersFeature) InferForUpdate(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *restartAllContainersFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
 	// container.restartPolicy and container.restartPolicyRules are not mutable.
 	return false
 }

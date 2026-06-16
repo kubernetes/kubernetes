@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
@@ -49,8 +51,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/expfmt"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
@@ -603,7 +603,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			// Verify pod observedGeneration converges to the expected generation.
 			expectedPodGeneration := int64(500)
-			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 30*time.Second))
+			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, framework.PodStartTimeout))
 
 			// Verify pod generation converges to the expected generation.
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
@@ -640,8 +640,22 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			ginkgo.By("verifying the pod conditions have observedGeneration values")
 			expectedObservedGeneration := int64(1)
 			for _, condition := range expectedPodConditions {
-				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, framework.PodStartTimeout))
 			}
+
+			ginkgo.By("waiting for the container to fail to pull the image")
+			// We need to wait for the container to fail to pull the image to avoid a race condition
+			// where the pod is still being initialized by kubelet while the pod update is received.
+			framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "image pull failure", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+				if len(pod.Status.ContainerStatuses) > 0 {
+					status := pod.Status.ContainerStatuses[0]
+					if status.State.Waiting != nil {
+						reason := status.State.Waiting.Reason
+						return reason == "ErrImagePull" || reason == "ImagePullBackOff", nil
+					}
+				}
+				return false, nil
+			}))
 
 			ginkgo.By("updating pod to have a valid image")
 			podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
@@ -651,7 +665,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			ginkgo.By("verifying the pod conditions have updated observedGeneration values")
 			for _, condition := range expectedPodConditions {
-				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, framework.PodStartTimeout))
 			}
 		})
 	})
@@ -665,8 +679,8 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 		wg sync.WaitGroup
 	)
 
-	r := prometheus.NewRegistry()
-	h := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+	r := metrics.NewKubeRegistry()
+	h := metrics.NewSummaryVec(&metrics.SummaryOpts{ //nolint:staticcheck // SA1019
 		Name: "latency",
 		Objectives: map[float64]float64{
 			0.5:  0.05,
@@ -790,7 +804,7 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 	values, _ := r.Gather()
 	var buf bytes.Buffer
 	for _, m := range values {
-		expfmt.MetricFamilyToText(&buf, m)
+		_, _ = testutil.MetricFamilyToText(&buf, m)
 	}
 	framework.Logf("Summary of latencies:\n%s", buf.String())
 }
@@ -1001,6 +1015,11 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		switch {
 		case t.ExitCode == 1:
 			// expected
+		case t.ExitCode == 2 && t.Reason == "Error" && t.Message == "":
+			// Some runtimes occasionally surface exit code 2 if stopped before execve makes
+			// it to launching /bin/false in fast-delete scenarios. The test only cares
+			// that the container failed.
+			framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/135713", pod.Name, pod.Spec.NodeName)
 		case t.ExitCode == 137 && (t.Reason == "ContainerStatusUnknown" || t.Reason == "Error"):
 			// expected, pod was force-killed after grace period
 		case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):

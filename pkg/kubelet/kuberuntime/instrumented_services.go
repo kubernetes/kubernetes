@@ -335,11 +335,11 @@ func (in instrumentedImageManagerService) ImageFsInfo(ctx context.Context) (*run
 	return fsInfo, nil
 }
 
-func (in instrumentedImageManagerService) Close() error {
+func (in instrumentedImageManagerService) Close(ctx context.Context) error {
 	const operation = "close"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.Close()
+	err := in.service.Close(ctx)
 	recordError(operation, err)
 	return err
 }
@@ -389,11 +389,11 @@ func (in instrumentedRuntimeService) RuntimeConfig(ctx context.Context) (*runtim
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Close() error {
+func (in instrumentedRuntimeService) Close(ctx context.Context) error {
 	const operation = "close"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.Close()
+	err := in.service.Close(ctx)
 	recordError(operation, err)
 	return err
 }

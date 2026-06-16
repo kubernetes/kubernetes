@@ -47,7 +47,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(ctx context.Context, nod
 		if cont.name == "" {
 			continue
 		}
-		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
+		s, _, err := sp.provider.GetCgroupStats(ctx, cont.name, cont.forceStatsUpdate)
 		if err != nil {
 			logger.Error(err, "Failed to get system container stats", "containerName", cont.name)
 			continue

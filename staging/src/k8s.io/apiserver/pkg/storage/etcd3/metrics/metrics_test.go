@@ -60,6 +60,69 @@ func TestRecordDecodeError(t *testing.T) {
 	}
 }
 
+func TestRecordEtcdEvent(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	defer registry.Reset()
+	registry.MustRegister(etcdEventsReceivedCounts)
+	testedMetrics := "apiserver_storage_events_received_total"
+	testCases := []struct {
+		desc     string
+		resource schema.GroupResource
+		want     string
+	}{
+		{
+			desc:     "record single event",
+			resource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+			want: `# HELP apiserver_storage_events_received_total [BETA] Number of etcd events received split by kind.
+# TYPE apiserver_storage_events_received_total counter
+apiserver_storage_events_received_total{group="apps",resource="deployments"} 1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			RecordEtcdEvent(test.resource)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRecordEtcdBookmark(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.MustRegister(etcdBookmarkTotal)
+
+	testCases := []struct {
+		desc          string
+		groupResource schema.GroupResource
+		callCount     int
+		want          string
+	}{
+		{
+			desc:          "test success",
+			groupResource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+			callCount:     1,
+			want: `# HELP etcd_bookmark_total [ALPHA] Number of etcd bookmarks (progress notify events) split by kind.
+# TYPE etcd_bookmark_total counter
+etcd_bookmark_total{group="apps",resource="deployments"} 1
+`,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			for i := 0; i < test.callCount; i++ {
+				RecordEtcdBookmark(test.groupResource)
+			}
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), "etcd_bookmark_total"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestRecordEtcdRequest(t *testing.T) {
 	registry := metrics.NewKubeRegistry()
 

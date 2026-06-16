@@ -48,7 +48,7 @@ type StatusREST struct {
 var groupResource = admissionregistration.Resource("validatingadmissionpolicies")
 
 // NewREST returns two RESTStorage objects that will work against validatingAdmissionPolicy and its status.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) (*REST, *StatusREST, error) {
 	r := &REST{}
 	strategy := validatingadmissionpolicy.NewStrategy(authorizer, resourceResolver)
 	store := &genericregistry.Store{

@@ -19,28 +19,9 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"math"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
-
-// sharesToMilliCPU converts CpuShares (cpu.shares) to milli-CPU value
-func sharesToMilliCPU(shares int64) int64 {
-	milliCPU := int64(0)
-	if shares >= int64(cm.MinShares) {
-		milliCPU = int64(math.Ceil(float64(shares*cm.MilliCPUToCPU) / float64(cm.SharesPerCPU)))
-	}
-	return milliCPU
-}
-
-// quotaToMilliCPU converts cpu.cfs_quota_us and cpu.cfs_period_us to milli-CPU value
-func quotaToMilliCPU(quota int64, period int64) int64 {
-	if quota == -1 {
-		return int64(0)
-	}
-	return (quota * cm.MilliCPUToCPU) / period
-}
 
 func subtractOverheadFromResourceConfig(resCfg *cm.ResourceConfig, pod *v1.Pod) *cm.ResourceConfig {
 	if resCfg == nil {
@@ -58,7 +39,7 @@ func subtractOverheadFromResourceConfig(resCfg *cm.ResourceConfig, pod *v1.Pod) 
 			}
 
 			if rc.CPUShares != nil {
-				totalCPUMilli := sharesToMilliCPU(int64(*rc.CPUShares))
+				totalCPUMilli := cm.SharesToMilliCPU(int64(*rc.CPUShares))
 				cpuShares := cm.MilliCPUToShares(totalCPUMilli - cpu.MilliValue())
 				rc.CPUShares = &cpuShares
 			}

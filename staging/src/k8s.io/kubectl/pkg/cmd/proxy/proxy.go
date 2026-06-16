@@ -178,6 +178,9 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 		}
 		o.filter = nil
 	} else {
+		if o.rejectPaths == "" || o.rejectMethods == "" {
+			klog.Warning("Request filter has been relaxed, your proxy may be vulnerable to attacks, please be cautious")
+		}
 		o.filter = &proxy.FilterServer{
 			AcceptPaths:   proxy.MakeRegexpArrayOrDie(o.acceptPaths),
 			RejectPaths:   proxy.MakeRegexpArrayOrDie(o.rejectPaths),

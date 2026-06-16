@@ -40,7 +40,7 @@ var key fwk.StateKey = "fakedata_key"
 
 // createCycleStateWithFakeData creates *CycleState with fakeData.
 // The given data is used in stored fakeData.
-func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *CycleState {
+func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipAllPostFilterPlugins bool, skipPlugins ...[]string) *CycleState {
 	c := NewCycleState()
 	c.Write(key, &fakeData{
 		data: data,
@@ -52,6 +52,7 @@ func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipPlu
 	if len(skipPlugins) > 1 {
 		c.SetSkipScorePlugins(sets.New(skipPlugins[1]...))
 	}
+	c.SetSkipAllPostFilterPlugins(skipAllPostFilterPlugins)
 	return c
 }
 
@@ -73,6 +74,9 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 	}
 	if diff := cmp.Diff(a.skipScorePlugins, b.skipScorePlugins); diff != "" {
 		return false, fmt.Sprintf("CycleState A and B have different SkipScorePlugins sets. -wanted,+got:\n%s", diff)
+	}
+	if diff := cmp.Diff(a.skipAllPostFilterPlugins, b.skipAllPostFilterPlugins); diff != "" {
+		return false, fmt.Sprintf("CycleState A and B have different SkipAllPostFilterPlugins sets. -wanted,+got:\n%s", diff)
 	}
 
 	var msg string
@@ -129,28 +133,33 @@ func TestCycleStateClone(t *testing.T) {
 	}{
 		{
 			name:            "clone with recordPluginMetrics true",
-			state:           createCycleStateWithFakeData("data", true),
-			wantClonedState: createCycleStateWithFakeData("data", true),
+			state:           createCycleStateWithFakeData("data", true, false),
+			wantClonedState: createCycleStateWithFakeData("data", true, false),
 		},
 		{
 			name:            "clone with recordPluginMetrics false",
-			state:           createCycleStateWithFakeData("data", false),
-			wantClonedState: createCycleStateWithFakeData("data", false),
+			state:           createCycleStateWithFakeData("data", false, false),
+			wantClonedState: createCycleStateWithFakeData("data", false, false),
 		},
 		{
 			name:            "clone with SkipFilterPlugins",
-			state:           createCycleStateWithFakeData("data", true, []string{"p1", "p2", "p3"}),
-			wantClonedState: createCycleStateWithFakeData("data", true, []string{"p1", "p2", "p3"}),
+			state:           createCycleStateWithFakeData("data", true, false, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, false, []string{"p1", "p2", "p3"}),
 		},
 		{
 			name:            "clone with SkipScorePlugins",
-			state:           createCycleStateWithFakeData("data", false, []string{}, []string{"p1", "p2", "p3"}),
-			wantClonedState: createCycleStateWithFakeData("data", false, []string{}, []string{"p1", "p2", "p3"}),
+			state:           createCycleStateWithFakeData("data", false, false, []string{}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", false, false, []string{}, []string{"p1", "p2", "p3"}),
 		},
 		{
 			name:            "clone with SkipScorePlugins and SkipFilterPlugins",
-			state:           createCycleStateWithFakeData("data", true, []string{"p0"}, []string{"p1", "p2", "p3"}),
-			wantClonedState: createCycleStateWithFakeData("data", true, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			state:           createCycleStateWithFakeData("data", true, false, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, false, []string{"p0"}, []string{"p1", "p2", "p3"}),
+		},
+		{
+			name:            "clone with SkipAllPostFilterPlugins",
+			state:           createCycleStateWithFakeData("data", true, true, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, true, []string{"p0"}, []string{"p1", "p2", "p3"}),
 		},
 		{
 			name:            "clone with nil CycleState",
@@ -183,4 +192,95 @@ func TestCycleStateClone(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPlacementCycleState(t *testing.T) {
+	t.Run("nil by default", func(t *testing.T) {
+		state := NewCycleState()
+		if state.GetPlacementCycleState() != nil {
+			t.Errorf("expected nil PlacementCycleState on fresh CycleState")
+		}
+	})
+
+	t.Run("set and get", func(t *testing.T) {
+		state := NewCycleState()
+		podGroupState := NewCycleState()
+		placementState := NewCycleState()
+		placementState.SetPodGroupSchedulingCycle(podGroupState)
+		placementState.Write("testkey", &fakeData{data: "placementdata"})
+
+		state.SetPlacementCycleState(placementState)
+
+		got := state.GetPlacementCycleState()
+		if got == nil {
+			t.Fatal("expected non-nil PlacementCycleState after Set")
+		}
+
+		data, err := got.Read("testkey")
+		if err != nil {
+			t.Fatalf("unexpected error reading from PlacementCycleState: %v", err)
+		}
+		if data.(*fakeData).data != "placementdata" {
+			t.Errorf("expected 'placementdata', got %q", data.(*fakeData).data)
+		}
+		if got.GetPodGroupSchedulingCycle() != podGroupState {
+			t.Errorf("expected PlacementCycleState to expose its PodGroupCycleState")
+		}
+	})
+
+	t.Run("set to nil clears", func(t *testing.T) {
+		state := NewCycleState()
+		state.SetPlacementCycleState(NewCycleState())
+		state.SetPlacementCycleState(nil)
+
+		if state.GetPlacementCycleState() != nil {
+			t.Errorf("expected nil PlacementCycleState after setting to nil")
+		}
+	})
+
+	t.Run("clone preserves reference", func(t *testing.T) {
+		state := NewCycleState()
+		state.Write(key, &fakeData{data: "pod-data"})
+
+		placementState := NewCycleState()
+		placementState.Write("pkey", &fakeData{data: "placement-data"})
+		state.SetPlacementCycleState(placementState)
+
+		cloned := state.Clone().(*CycleState)
+
+		// The cloned state should reference the same PlacementCycleState.
+		if cloned.GetPlacementCycleState() == nil {
+			t.Fatal("cloned state should have non-nil PlacementCycleState")
+		}
+
+		data, err := cloned.GetPlacementCycleState().Read("pkey")
+		if err != nil {
+			t.Fatalf("unexpected error reading from cloned PlacementCycleState: %v", err)
+		}
+		if data.(*fakeData).data != "placement-data" {
+			t.Errorf("expected 'placement-data', got %q", data.(*fakeData).data)
+		}
+
+		// Writes to the PlacementCycleState via the clone should be visible from the original,
+		// since it's a shared reference (same as podGroupCycleState behavior).
+		cloned.GetPlacementCycleState().Write("newkey", &fakeData{data: "new"})
+		newData, err := state.GetPlacementCycleState().Read("newkey")
+		if err != nil {
+			t.Fatalf("write via clone's PlacementCycleState should be visible from original: %v", err)
+		}
+		if newData.(*fakeData).data != "new" {
+			t.Errorf("expected 'new', got %q", newData.(*fakeData).data)
+		}
+	})
+
+	t.Run("clone with nil placement state", func(t *testing.T) {
+		state := NewCycleState()
+		state.Write(key, &fakeData{data: "data"})
+		// Do not set PlacementCycleState — leave nil.
+
+		cloned := state.Clone().(*CycleState)
+		if cloned.GetPlacementCycleState() != nil {
+			t.Errorf("cloned state should have nil PlacementCycleState when original has nil")
+		}
+	})
 }

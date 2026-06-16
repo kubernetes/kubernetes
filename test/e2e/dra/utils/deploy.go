@@ -75,8 +75,8 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -474,7 +474,9 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
 	content := example.PluginPermissions
+
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", tCtx.Namespace())
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin-driver-name", d.Name)
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 

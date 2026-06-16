@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
@@ -240,6 +241,9 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
 		return err
 	}
+	// Propagate feature gate state to the metrics subsystem. This must be called
+	// after feature gates are set and before any histogram metrics are registered.
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		nfs := cliflag.NamedFlagSets{

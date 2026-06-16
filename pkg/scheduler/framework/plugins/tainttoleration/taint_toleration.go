@@ -34,7 +34,6 @@ import (
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
 type TaintToleration struct {
 	handle                                   fwk.Handle
-	enableSchedulingQueueHint                bool
 	enableTaintTolerationComparisonOperators bool
 }
 
@@ -68,25 +67,9 @@ func (pl *TaintToleration) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sign
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	if pl.enableSchedulingQueueHint {
-		return []fwk.ClusterEventWithHint{
-			// When the QueueingHint feature is enabled, preCheck is eliminated and we don't need additional UpdateNodeLabel.
-			{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-			// When the QueueingHint feature is enabled,
-			// the scheduling queue uses Pod/Update Queueing Hint
-			// to determine whether a Pod's update makes the Pod schedulable or not.
-			// https://github.com/kubernetes/kubernetes/pull/122234
-			{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
-		}, nil
-	}
-
 	return []fwk.ClusterEventWithHint{
-		// A note about UpdateNodeLabel event:
-		// Ideally, it's supposed to register only Add | UpdateNodeTaint because UpdateNodeLabel will never change the result from this plugin.
-		// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-		// See: https://github.com/kubernetes/kubernetes/issues/109437
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-		// No need to register the Pod event; the update to the unschedulable Pods already triggers the scheduling retry when QHint is disabled.
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterTargetPodTolerationChange},
 	}, nil
 }
 
@@ -127,7 +110,7 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 		return nil
 	}
 
-	klog.FromContext(ctx).V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
+	logger.V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)")
 }
 
@@ -220,25 +203,13 @@ func (pl *TaintToleration) ScoreExtensions() fwk.ScoreExtensions {
 func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &TaintToleration{
 		handle:                                   h,
-		enableSchedulingQueueHint:                fts.EnableSchedulingQueueHint,
 		enableTaintTolerationComparisonOperators: fts.EnableTaintTolerationComparisonOperators,
 	}, nil
 }
 
-// isSchedulableAfterPodTolerationChange is invoked whenever a pod's toleration changed.
-func (pl *TaintToleration) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-
-	if pod.UID == modifiedPod.UID {
-		// The updated Pod is the unschedulable Pod.
-		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
-		return fwk.Queue, nil
-	}
-
-	logger.V(5).Info("a new toleration is added for a Pod, but it's an unrelated Pod and wouldn't change the TaintToleration plugin's decision", "pod", klog.KObj(modifiedPod))
-
-	return fwk.QueueSkip, nil
+// isSchedulableAfterTargetPodTolerationChange is invoked whenever a pod's toleration changed.
+func (pl *TaintToleration) isSchedulableAfterTargetPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	// The updated Pod is the unschedulable Pod.
+	logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
 }

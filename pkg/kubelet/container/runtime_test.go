@@ -25,9 +25,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestParseContainerID(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name     string
 		input    string
@@ -62,7 +64,7 @@ func TestParseContainerID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ParseContainerID(tt.input)
+			result := ParseContainerID(logger, tt.input)
 			assert.Equal(t, tt.expected, result, "ParseContainerID(%q)", tt.input)
 		})
 	}
@@ -603,11 +605,11 @@ func TestRuntimeStatusString(t *testing.T) {
 			{Name: "handler1", SupportsRecursiveReadOnlyMounts: true, SupportsUserNamespaces: false},
 			{Name: "handler2", SupportsRecursiveReadOnlyMounts: false, SupportsUserNamespaces: true},
 		},
-		Features: &RuntimeFeatures{SupplementalGroupsPolicy: true},
+		Features: &RuntimeFeatures{SupplementalGroupsPolicy: true, UserNamespacesHostNetwork: true},
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -688,18 +690,20 @@ func TestRuntimeFeaturesString(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "features with SupplementalGroupsPolicy true",
+			name: "features with both flags true",
 			features: &RuntimeFeatures{
-				SupplementalGroupsPolicy: true,
+				SupplementalGroupsPolicy:  true,
+				UserNamespacesHostNetwork: true,
 			},
-			expected: "SupplementalGroupsPolicy: true",
+			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true",
 		},
 		{
-			name: "features with SupplementalGroupsPolicy false",
+			name: "features with both flags false",
 			features: &RuntimeFeatures{
-				SupplementalGroupsPolicy: false,
+				SupplementalGroupsPolicy:  false,
+				UserNamespacesHostNetwork: false,
 			},
-			expected: "SupplementalGroupsPolicy: false",
+			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false",
 		},
 		{
 			name:     "nil features",

@@ -33,11 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/configz"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
@@ -708,4 +714,25 @@ func TestConfigz(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to deserialize into public config type: %v", err)
 	}
+}
+
+func TestKubeProxyNativeHistogramMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+	proxymetrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
+
+	proxymetrics.SyncProxyRulesLatency.WithLabelValues("4").Observe(0.001)
+	ts := httptest.NewServer(legacyregistry.Handler())
+	defer ts.Close()
+
+	histogramMetric := "kubeproxy_sync_proxy_rules_duration_seconds"
+	metrics, err := testutil.ScrapeMetricsProto(ts.URL+"/metrics", ts.Client())
+	if err != nil {
+		t.Fatalf("failed to scrape metrics: %v", err)
+	}
+	mf, ok := metrics[histogramMetric]
+	if !ok {
+		t.Fatalf("metric %q not found in kube-proxy metrics endpoint", histogramMetric)
+	}
+	testutil.AssertHasNativeHistogram(t, mf, map[string]string{"ip_family": "4"})
 }

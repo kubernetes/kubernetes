@@ -32,7 +32,7 @@ import (
 //
 // Foo is a specification for a Foo resource
 type FooApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *FooSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *FooStatusApplyConfiguration `json:"status,omitempty"`

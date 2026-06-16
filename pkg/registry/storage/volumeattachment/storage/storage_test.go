@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -167,7 +166,8 @@ func TestEtcdStatusUpdate(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewClusterScopeContext(storage.Store)
+	statusCtx := genericregistrytest.NewClusterScopeContext(storage.Store, "status")
 
 	attachment := validNewVolumeAttachment("foo")
 	if _, err := storage.Create(ctx, attachment, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
@@ -182,7 +182,7 @@ func TestEtcdStatusUpdate(t *testing.T) {
 	attachmentIn := obj.(*storageapi.VolumeAttachment).DeepCopy()
 	attachmentIn.Status.Attached = true
 
-	_, _, err = statusStorage.Update(ctx, attachmentIn.Name, rest.DefaultUpdatedObjectInfo(attachmentIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(statusCtx, attachmentIn.Name, rest.DefaultUpdatedObjectInfo(attachmentIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update status: %v", err)
 	}

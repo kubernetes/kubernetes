@@ -30,67 +30,89 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
-func TestStatefulSetUpdaterUpdatesSetStatus(t *testing.T) {
-	set := newStatefulSet(3)
-	status := apps.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2}
-	fakeClient := &fake.Clientset{}
-	updater := NewRealStatefulSetStatusUpdater(fakeClient, nil, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
-	})
-	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
+func TestStatefulSetStatusUpdater(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     apps.StatefulSetStatus
+		reactorErr error
+		wantErr    bool
+		checkFn    func(*testing.T, apps.StatefulSetStatus)
+	}{
+		{
+			name:   "updates status",
+			status: apps.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2},
+			checkFn: func(t *testing.T, status apps.StatefulSetStatus) {
+				if status.Replicas != 2 {
+					t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", status.Replicas)
+				}
+			},
+		},
+		{
+			name:   "updates observed generation",
+			status: apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2},
+			checkFn: func(t *testing.T, status apps.StatefulSetStatus) {
+				if status.ObservedGeneration != 3 {
+					t.Errorf("expected observedGeneration to be synced with generation for statefulset %d", status.ObservedGeneration)
+				}
+			},
+		},
+		{
+			name:   "updates available replicas",
+			status: apps.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2, AvailableReplicas: 3},
+			checkFn: func(t *testing.T, status apps.StatefulSetStatus) {
+				if status.AvailableReplicas != 3 {
+					t.Errorf("UpdateStatefulSetStatus mutated the sets available replicas %d", status.AvailableReplicas)
+				}
+			},
+		},
+		{
+			name:       "update replicas server failure",
+			status:     apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2},
+			reactorErr: apierrors.NewInternalError(errors.New("API server down")),
+			wantErr:    true,
+		},
+		{
+			name:       "update replicas conflict persists",
+			status:     apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2},
+			reactorErr: apierrors.NewConflict(schema.GroupResource{Group: "apps", Resource: "statefulset"}, "foo", errors.New("object already exists")),
+			wantErr:    true,
+		},
 	}
-	if set.Status.Replicas != 2 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
-}
-
-func TestStatefulSetStatusUpdaterUpdatesObservedGeneration(t *testing.T) {
-	set := newStatefulSet(3)
-	status := apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
-	fakeClient := &fake.Clientset{}
-	updater := NewRealStatefulSetStatusUpdater(fakeClient, nil, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		sts := update.GetObject().(*apps.StatefulSet)
-		if sts.Status.ObservedGeneration != 3 {
-			t.Errorf("expected observedGeneration to be synced with generation for statefulset %q", sts.Name)
-		}
-		return true, sts, nil
-	})
-	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
-	}
-}
-
-func TestStatefulSetStatusUpdaterUpdateReplicasFailure(t *testing.T) {
-	set := newStatefulSet(3)
-	status := apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	updater := NewRealStatefulSetStatusUpdater(fakeClient, setLister, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
-	})
-	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err == nil {
-		t.Error("Failed update did not return error")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			set := newStatefulSet(3)
+			fakeClient := &fake.Clientset{}
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			indexer.Add(set) // nolint:errcheck
+			updater := NewRealStatefulSetStatusUpdater(fakeClient, appslisters.NewStatefulSetLister(indexer), consistency.NewNoopConsistencyStore())
+			fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
+				update := action.(core.UpdateAction)
+				return true, update.GetObject(), tc.reactorErr
+			})
+			status := tc.status
+			if err := updater.UpdateStatefulSetStatus(ctx, set, &status); (err != nil) != tc.wantErr {
+				t.Errorf("UpdateStatefulSetStatus() error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if tc.checkFn != nil {
+				tc.checkFn(t, status)
+			}
+		})
 	}
 }
 
 func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	set := newStatefulSet(3)
 	status := apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
 	conflict := false
 	fakeClient := &fake.Clientset{}
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
+	indexer.Add(set) // nolint:errcheck
 	setLister := appslisters.NewStatefulSetLister(indexer)
 	updater := NewRealStatefulSetStatusUpdater(fakeClient, setLister, consistency.NewNoopConsistencyStore())
 	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
@@ -102,45 +124,11 @@ func TestStatefulSetStatusUpdaterUpdateReplicasConflict(t *testing.T) {
 		return true, update.GetObject(), nil
 
 	})
-	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
+	if err := updater.UpdateStatefulSetStatus(ctx, set, &status); err != nil {
 		t.Errorf("UpdateStatefulSetStatus returned an error: %s", err)
 	}
 	if set.Status.Replicas != 2 {
 		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.Replicas)
-	}
-}
-
-func TestStatefulSetStatusUpdaterUpdateReplicasConflictFailure(t *testing.T) {
-	set := newStatefulSet(3)
-	status := apps.StatefulSetStatus{ObservedGeneration: 3, Replicas: 2}
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	indexer.Add(set)
-	setLister := appslisters.NewStatefulSetLister(indexer)
-	updater := NewRealStatefulSetStatusUpdater(fakeClient, setLister, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), set.Name, errors.New("object already exists"))
-	})
-	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err == nil {
-		t.Error("UpdateStatefulSetStatus failed to return an error on get failure")
-	}
-}
-
-func TestStatefulSetStatusUpdaterGetAvailableReplicas(t *testing.T) {
-	set := newStatefulSet(3)
-	status := apps.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2, AvailableReplicas: 3}
-	fakeClient := &fake.Clientset{}
-	updater := NewRealStatefulSetStatusUpdater(fakeClient, nil, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
-	})
-	if err := updater.UpdateStatefulSetStatus(context.TODO(), set, &status); err != nil {
-		t.Errorf("Error returned on successful status update: %s", err)
-	}
-	if set.Status.AvailableReplicas != 3 {
-		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.AvailableReplicas)
 	}
 }
 

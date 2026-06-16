@@ -34,6 +34,16 @@ func Test(t *testing.T) {
 	st.Value(&Struct{M2: &M2{}}).ExpectValid()
 	st.Value(&Struct{M3: "a string"}).ExpectValid()
 	st.Value(&Struct{M4: ptr.To("a string")}).ExpectValid()
+	st.Value(&Struct{M5: []string{"a string"}}).ExpectValid()
+	st.Value(&Struct{M6: map[string]string{"k": "v"}}).ExpectValid()
+
+	// Empty slice/map are "not set" (same as nil for union membership)
+	st.Value(&Struct{M5: []string{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify one of"),
+	}.WithOrigin("union"))
+	st.Value(&Struct{M6: map[string]string{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify one of"),
+	}.WithOrigin("union"))
 
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify exactly one of"),
@@ -52,4 +62,14 @@ func Test(t *testing.T) {
 	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).OldValue(&Struct{M1: &M1{}, M2: &M2{}}).ExpectValid()
 	st.Value(&Struct{M3: "a string", M2: &M2{}}).OldValue(&Struct{M3: "different string", M2: &M2{}}).ExpectValid()
+
+	// Slice/map member ratcheting: unchanged membership, different values
+	st.Value(&Struct{M5: []string{"a"}}).OldValue(&Struct{M5: []string{"b"}}).ExpectValid()
+	st.Value(&Struct{M6: map[string]string{"k": "v1"}}).OldValue(&Struct{M6: map[string]string{"k": "v2"}}).ExpectValid()
+
+	// Test update with nil old value (simulates new map entry or newly-set pointer field during update).
+	// Union validation should still detect the empty union even though oldObj is nil.
+	st.Value(&Struct{}).OldValue(nil).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify one of").WithOrigin("union"),
+	})
 }

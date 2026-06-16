@@ -299,6 +299,7 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 					Limit: 100,
 				},
 				CreationTime: time.Unix(1257894000, 0),
+				StartTime:    time.Unix(1257895000, 0),
 				Labels: map[string]string{
 					"foo.label": "bar",
 				},
@@ -387,6 +388,10 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 								Avg300: 0.2,
 								Total:  2000,
 							},
+						},
+						Events: info.MemoryEvents{
+							High: 42,
+							Max:  5,
 						},
 					},
 					Hugetlb: map[string]info.HugetlbStats{

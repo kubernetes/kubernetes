@@ -19,7 +19,6 @@ package role
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -31,13 +30,13 @@ import (
 
 // strategy implements behavior for Roles
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // Role objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -51,7 +50,7 @@ func (strategy) NamespaceScoped() bool {
 }
 
 // AllowCreateOnUpdate is true for Roles.
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -72,8 +71,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new Role. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	role := obj.(*rbac.Role)
-	allErrs := validation.ValidateRole(role)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, role, nil, allErrs, operation.Create)
+	return validation.ValidateRole(role)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -88,8 +86,7 @@ func (strategy) Canonicalize(obj runtime.Object) {
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*rbac.Role)
 	oldObj := old.(*rbac.Role)
-	errs := validation.ValidateRoleUpdate(newObj, oldObj)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, oldObj, errs, operation.Update)
+	return validation.ValidateRoleUpdate(newObj, oldObj)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -102,6 +99,6 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

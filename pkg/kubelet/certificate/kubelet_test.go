@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -183,6 +184,7 @@ func createCertAndKeyFilesUsingRename(certDir string) (string, string, error) {
 }
 
 func TestKubeletServerCertificateFromFiles(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// test two common ways of certificate file updates:
 	// 1. delete and write the cert and key files directly
 	// 2. create the cert and key files under a child dir and perform dir rename during update
@@ -239,7 +241,7 @@ func TestKubeletServerCertificateFromFiles(t *testing.T) {
 				t.Fatalf("got errors when rotating certificate files in the test: %v", err)
 			}
 
-			err = wait.PollUntilContextTimeout(context.Background(),
+			err = wait.PollUntilContextTimeout(tCtx,
 				100*time.Millisecond, 10*time.Second, true,
 				func(_ context.Context) (bool, error) {
 					c3 := m.Current()

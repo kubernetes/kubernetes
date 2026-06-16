@@ -76,6 +76,7 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	controllerhealthz "k8s.io/controller-manager/pkg/healthz"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
@@ -154,7 +155,11 @@ controller, and serviceaccounts controller.`,
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
 			// add component version metrics
 			s.ComponentGlobalsRegistry.AddMetrics()
-			return Run(server.SetupSignalContext(), c.Complete())
+
+			if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+				ctx = server.SetupSignalContext()
+			}
+			return Run(ctx, c.Complete())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -406,6 +411,9 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 				}),
 				OnStoppedLeading: func() {
 					logger.Error(nil, "leaderelection lost/stopped")
+					if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					}
 				},
 			})
 	})
@@ -434,6 +442,9 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 						}),
 						OnStoppedLeading: func() {
 							logger.Error(nil, "migration leaderelection lost/stopped")
+							if !utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
+								klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+							}
 						},
 					})
 			})
@@ -843,14 +854,15 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 	}
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks:     callbacks,
-		WatchDog:      electionChecker,
-		Name:          leaseName,
-		Coordinated:   utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
+		Lock:            rl,
+		LeaseDuration:   c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline:   c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:     c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks:       callbacks,
+		WatchDog:        electionChecker,
+		ReleaseOnCancel: utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit),
+		Name:            leaseName,
+		Coordinated:     utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
 }
 

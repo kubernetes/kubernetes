@@ -17,6 +17,7 @@ limitations under the License.
 package poddisruptionbudget
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +32,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("PodDisruptionBudget must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("PodDisruptionBudget should not allow create on update")
 	}
 
@@ -123,7 +124,7 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("PodDisruptionBudgetStatus must be namespace scoped")
 	}
-	if StatusStrategy.AllowCreateOnUpdate() {
+	if StatusStrategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("PodDisruptionBudgetStatus should not allow create on update")
 	}
 

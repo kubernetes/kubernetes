@@ -778,12 +778,12 @@ func (f *fakeVolumeCache) GetPodsForCSIDriver(driverName string) []cache.ObjectN
 	return pods
 }
 
-func (f *fakeVolumeCache) SendConflicts(logger klog.Logger, ch chan<- volumecache.Conflict) {
+func (f *fakeVolumeCache) GetConflicts(logger klog.Logger) []volumecache.Conflict {
+	result := make([]volumecache.Conflict, 0)
 	for _, conflicts := range f.conflictsToSend {
-		for _, conflict := range conflicts {
-			ch <- conflict
-		}
+		result = append(result, conflicts...)
 	}
+	return result
 }
 
 func collectEvents(source <-chan string) []string {

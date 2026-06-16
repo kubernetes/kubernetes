@@ -17,6 +17,7 @@ limitations under the License.
 package mutatingadmissionpolicy
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,7 @@ func TestMutatingAdmissionPolicyStrategy(t *testing.T) {
 	if strategy.NamespaceScoped() {
 		t.Error("MutatingAdmissionPolicy strategy must be cluster scoped")
 	}
-	if strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("MutatingAdmissionPolicy should not allow create on update")
 	}
 

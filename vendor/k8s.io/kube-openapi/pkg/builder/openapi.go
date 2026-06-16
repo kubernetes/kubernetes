@@ -157,7 +157,8 @@ func (o *openAPI) finalizeSwagger() (*spec.Swagger, error) {
 
 func (o *openAPI) buildDefinitionRecursively(name string) error {
 	uniqueName, extensions := o.config.GetDefinitionName(name)
-	if _, ok := o.swagger.Definitions[uniqueName]; ok {
+	escapedName := common.EscapeJsonPointer(uniqueName)
+	if _, ok := o.swagger.Definitions[escapedName]; ok {
 		return nil
 	}
 	if item, ok := o.definitions[name]; ok {
@@ -179,7 +180,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 				schema = v2Schema
 			}
 		}
-		o.swagger.Definitions[uniqueName] = schema
+		o.swagger.Definitions[escapedName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
 				return err

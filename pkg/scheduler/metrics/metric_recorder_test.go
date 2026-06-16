@@ -33,6 +33,10 @@ type fakePodsRecorder struct {
 	counter int64
 }
 
+func (r *fakePodsRecorder) Add(val int) {
+	atomic.AddInt64(&r.counter, int64(val))
+}
+
 func (r *fakePodsRecorder) Inc() {
 	atomic.AddInt64(&r.counter, 1)
 }
@@ -45,12 +49,29 @@ func (r *fakePodsRecorder) Clear() {
 	atomic.StoreInt64(&r.counter, 0)
 }
 
+func TestAdd(t *testing.T) {
+	fakeRecorder := fakePodsRecorder{}
+	var wg sync.WaitGroup
+	loops := 100
+	wg.Add(loops)
+	for i := range loops {
+		go func() {
+			fakeRecorder.Add(i)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	if fakeRecorder.counter != int64(loops*(loops-1)/2) {
+		t.Errorf("Expected %v, got %v", loops, fakeRecorder.counter)
+	}
+}
+
 func TestInc(t *testing.T) {
 	fakeRecorder := fakePodsRecorder{}
 	var wg sync.WaitGroup
 	loops := 100
 	wg.Add(loops)
-	for i := 0; i < loops; i++ {
+	for range loops {
 		go func() {
 			fakeRecorder.Inc()
 			wg.Done()
@@ -67,7 +88,7 @@ func TestDec(t *testing.T) {
 	var wg sync.WaitGroup
 	loops := 100
 	wg.Add(loops)
-	for i := 0; i < loops; i++ {
+	for range loops {
 		go func() {
 			fakeRecorder.Dec()
 			wg.Done()
@@ -84,13 +105,13 @@ func TestClear(t *testing.T) {
 	var wg sync.WaitGroup
 	incLoops, decLoops := 100, 80
 	wg.Add(incLoops + decLoops)
-	for i := 0; i < incLoops; i++ {
+	for range incLoops {
 		go func() {
 			fakeRecorder.Inc()
 			wg.Done()
 		}()
 	}
-	for i := 0; i < decLoops; i++ {
+	for range decLoops {
 		go func() {
 			fakeRecorder.Dec()
 			wg.Done()

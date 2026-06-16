@@ -53,7 +53,7 @@ type IngressRuleApplyConfiguration struct {
 	// just traffic matching the host to the default backend or all traffic to the
 	// default backend, is left to the controller fulfilling the Ingress. Http is
 	// currently the only supported IngressRuleValue.
-	IngressRuleValueApplyConfiguration `json:",inline"`
+	IngressRuleValueApplyConfiguration `json:""`
 }
 
 // IngressRuleApplyConfiguration constructs a declarative configuration of the IngressRule type for use with

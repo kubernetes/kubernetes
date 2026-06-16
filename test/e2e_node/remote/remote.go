@@ -17,7 +17,6 @@ limitations under the License.
 package remote
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -31,8 +30,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
-var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
+var testTimeout = CommandLine.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
+var resultsDir = CommandLine.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
 const archiveName = "e2e_node_test.tar.gz"
 

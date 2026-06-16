@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/internal/channelz"
@@ -378,12 +379,28 @@ func (s *Stream) ReadMessageHeader(header []byte) (err error) {
 	return nil
 }
 
+// ceil returns the ceil after dividing the numerator and denominator while
+// avoiding integer overflows.
+func ceil(numerator, denominator int) int {
+	if numerator == 0 {
+		return 0
+	}
+	return (numerator-1)/denominator + 1
+}
+
 // Read reads n bytes from the wire for this stream.
 func (s *Stream) read(n int) (data mem.BufferSlice, err error) {
 	// Don't request a read if there was an error earlier
 	if er := s.trReader.er; er != nil {
 		return nil, er
 	}
+	// gRPC Go accepts data frames with a maximum length of 16KB. Larger
+	// messages must be split into multiple frames. We pre-allocate the
+	// buffer to avoid resizing during the read loop, but cap the initial
+	// capacity to 128 frames (2MB) to prevent over-allocation or panics
+	// when reading extremely large streams.
+	allocCap := min(ceil(n, http2MaxFrameLen), 128)
+	data = make(mem.BufferSlice, 0, allocCap)
 	s.readRequester.requestRead(n)
 	for n != 0 {
 		buf, err := s.trReader.Read(n)
@@ -574,9 +591,14 @@ type CallHdr struct {
 
 	DoneFunc func() // called when the stream is finished
 
-	// Authority is used to explicitly override the `:authority` header. If set,
-	// this value takes precedence over the Host field and will be used as the
-	// value for the `:authority` header.
+	// Authority is used to explicitly override the `:authority` header.
+	//
+	// This value comes from one of two sources:
+	// 1. The `CallAuthority` call option, if specified by the user.
+	// 2. An override provided by the LB picker (e.g. xDS authority rewriting).
+	//
+	// The `CallAuthority` call option always takes precedence over the LB
+	// picker override.
 	Authority string
 }
 
@@ -596,7 +618,7 @@ type ClientTransport interface {
 	GracefulClose()
 
 	// NewStream creates a Stream for an RPC.
-	NewStream(ctx context.Context, callHdr *CallHdr) (*ClientStream, error)
+	NewStream(ctx context.Context, callHdr *CallHdr, handler stats.Handler) (*ClientStream, error)
 
 	// Error returns a channel that is closed when some I/O error
 	// happens. Typically the caller should have a goroutine to monitor
@@ -720,6 +742,22 @@ const (
 	// "too_many_pings".
 	GoAwayTooManyPings GoAwayReason = 2
 )
+
+// GoAwayInfo contains metadata about why a connection was closed.
+type GoAwayInfo struct {
+	// Reason is the parsed reason for an HTTP/2 GOAWAY frame.
+	Reason GoAwayReason
+	// GoAwayCode is the raw HTTP/2 error code received in a GOAWAY frame.
+	GoAwayCode http2.ErrCode
+	// Err is the underlying error that caused the connection to close. It is
+	// populated if the connection was closed due to a socket error or context
+	// cancellation without receiving a GOAWAY frame. If the connection was
+	// closed due to a GOAWAY frame, this field will be nil.
+	Err error
+}
+
+// OnCloseFunc is a callback invoked when a ClientTransport closes.
+type OnCloseFunc func(GoAwayInfo)
 
 // ContextErr converts the error from context package into a status error.
 func ContextErr(err error) error {

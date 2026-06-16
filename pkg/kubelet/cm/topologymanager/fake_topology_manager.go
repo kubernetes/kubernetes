@@ -19,7 +19,7 @@ package topologymanager
 import (
 	"context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -28,6 +28,7 @@ import (
 type fakeManager struct {
 	hint   *TopologyHint
 	policy Policy
+	scope  string
 }
 
 // NewFakeManager returns an instance of FakeManager
@@ -36,6 +37,13 @@ func NewFakeManager() Manager {
 	logger := klog.TODO()
 	logger.Info("NewFakeManager")
 	return &fakeManager{}
+}
+
+// NewFakeManagerWithScope returns an instance of fake topology manager with specified scope
+func NewFakeManagerWithScope(scope string) Manager {
+	return &fakeManager{
+		scope: scope,
+	}
 }
 
 // NewFakeManagerWithHint returns an instance of fake topology manager with specified topology hints
@@ -76,6 +84,10 @@ func (m *fakeManager) GetPolicy() Policy {
 	return m.policy
 }
 
+func (m *fakeManager) Name() string {
+	return m.scope
+}
+
 func (m *fakeManager) AddHintProvider(logger klog.Logger, h HintProvider) {
 	logger.Info("AddHintProvider", "hintProvider", h)
 }
@@ -88,19 +100,12 @@ func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, contain
 	logger.Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *fakeManager) RemoveContainer(containerID string) error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
-	logger := klog.FromContext(ctx)
+func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) error {
 	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
-func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	// TODO: create context here as changing interface https://github.com/kubernetes/kubernetes/blob/09aaf7226056a7964adcb176d789de5507313d00/pkg/kubelet/lifecycle/interfaces.go#L43
-	// requires changes in too many other components
-	ctx := context.TODO()
+func (m *fakeManager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 	logger.Info("Topology Admit Handler")
 	return admission.GetPodAdmitResult(nil)

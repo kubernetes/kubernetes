@@ -49,7 +49,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 		klog.Warningf("Error checking path: %v", pathErr)
 	} else {
 		if !pathExists {
-			klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+			klog.Warningf("Unmount skipped because path does not exist: %v", dir)
 			return nil
 		}
 	}

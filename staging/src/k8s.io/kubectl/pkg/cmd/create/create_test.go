@@ -152,6 +152,50 @@ func TestCreateDirectory(t *testing.T) {
 	}
 }
 
+func TestEditOptionsInitializedByComplete(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdCreate(tf, ioStreams)
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml") // nolint:errcheck
+
+	t.Run("editOptions is nil when EditBeforeCreate is false", func(t *testing.T) {
+		o := NewCreateOptions(ioStreams)
+		o.FilenameOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+		if err := o.Complete(tf, cmd, []string{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if o.editOptions != nil {
+			t.Error("expected editOptions to be nil when EditBeforeCreate is false")
+		}
+	})
+
+	t.Run("editOptions is initialized when EditBeforeCreate is true", func(t *testing.T) {
+		o := NewCreateOptions(ioStreams)
+		o.EditBeforeCreate = true
+		o.FilenameOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+		if err := o.Complete(tf, cmd, []string{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if o.editOptions == nil {
+			t.Error("expected editOptions to be initialized when EditBeforeCreate is true")
+		}
+	})
+
+	t.Run("RunCreate returns error when EditBeforeCreate is true but Complete was not called", func(t *testing.T) {
+		o := NewCreateOptions(ioStreams)
+		o.EditBeforeCreate = true
+		err := o.RunCreate(tf)
+		if err == nil {
+			t.Fatal("expected error when editOptions is nil")
+		}
+		if err.Error() != "EditBeforeCreate requires edit options to be initialized via Complete()" {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+}
+
 func TestMissingFilenameError(t *testing.T) {
 	var errStr string
 	var exitCode int

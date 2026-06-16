@@ -551,7 +551,7 @@ func TestAddKnownTypesIdemPotent(t *testing.T) {
 
 // redefine InternalSimple with the same name, but obviously as a different type than in runtimetesting
 type InternalSimple struct {
-	runtime.TypeMeta `json:",inline"`
+	runtime.TypeMeta `json:""`
 	TestString       string `json:"testString"`
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // SecuritySchemeProps describes a swagger security scheme in the securityDefinitions section
@@ -60,14 +61,14 @@ func (s SecurityScheme) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
-func (s SecurityScheme) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s SecurityScheme) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",inline"`
 		SecuritySchemeProps
 	}
 	x.Extensions = internal.SanitizeExtensions(s.Extensions)
 	x.SecuritySchemeProps = s.SecuritySchemeProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // UnmarshalJSON marshal this from JSON
@@ -78,12 +79,12 @@ func (s *SecurityScheme) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &s.VendorExtensible)
 }
 
-func (s *SecurityScheme) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *SecurityScheme) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",inline"`
 		SecuritySchemeProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	s.Extensions = internal.SanitizeExtensions(x.Extensions)

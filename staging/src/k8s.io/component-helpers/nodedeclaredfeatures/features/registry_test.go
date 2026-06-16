@@ -14,21 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package features
+package features_test
 
 import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	testhelpers "k8s.io/component-helpers/nodedeclaredfeatures/testing"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // TestFeatureRequirementsConsistency checks that each feature's Discover method
 // actually checks the gates it declares in Requirements
 // and returns the correct boolean value.
 func TestFeatureRequirementsConsistency(t *testing.T) {
-	for _, registeredFeature := range AllFeatures {
+	for _, registeredFeature := range features.AllFeatures {
 		t.Run(registeredFeature.Name(), func(t *testing.T) {
 			reqs := registeredFeature.Requirements()
 			if reqs == nil {
@@ -45,9 +46,12 @@ func TestFeatureRequirementsConsistency(t *testing.T) {
 				mockFG.SetEnabled(gate, true)
 			}
 
-			discoverCfg := &nodedeclaredfeatures.NodeConfiguration{
+			discoverCfg := &types.NodeConfiguration{
 				FeatureGates: mockFG,
 				Version:      version.MustParse("1.36.0"),
+			}
+			if reqs.RequiredRuntimeFeatures != nil {
+				discoverCfg.RuntimeFeatures = *reqs.RequiredRuntimeFeatures
 			}
 
 			featureEnabled := registeredFeature.Discover(discoverCfg)

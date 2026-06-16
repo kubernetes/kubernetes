@@ -184,7 +184,7 @@ func makeDataSourceRef(apiGroup, kind, name string, namespace *string) *core.Typ
 	}
 }
 
-// TestDataSourceFilter checks to ensure the AnyVolumeDataSource feature gate and CrossNamespaceVolumeDataSource works
+// TestDataSourceFilter checks to ensure CrossNamespaceVolumeDataSource works
 func TestDataSourceFilter(t *testing.T) {
 	ns := "ns1"
 	volumeDataSource := makeDataSource(coreGroup, pvcKind, "my-vol")
@@ -199,81 +199,51 @@ func TestDataSourceFilter(t *testing.T) {
 		want       *core.TypedLocalObjectReference
 		wantRef    *core.TypedObjectReference
 	}{
-		"any disabled with empty ds": {
+		"empty ds": {
 			spec: core.PersistentVolumeClaimSpec{},
 		},
-		"any disabled with volume ds": {
+		"volume ds": {
 			spec: core.PersistentVolumeClaimSpec{DataSource: volumeDataSource},
 			want: volumeDataSource,
 		},
-		"any disabled with volume ds ref": {
-			spec: core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
+		"volume ds ref": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
+			wantRef: volumeDataSourceRef,
 		},
-		"any disabled with both data sources": {
-			spec: core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSourceRef},
-			want: volumeDataSource,
+		"both data sources": {
+			spec:    core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSourceRef},
+			want:    volumeDataSource,
+			wantRef: volumeDataSourceRef,
 		},
-		"any enabled with empty ds": {
-			spec:       core.PersistentVolumeClaimSpec{},
-			anyEnabled: true,
-		},
-		"any enabled with volume ds": {
-			spec:       core.PersistentVolumeClaimSpec{DataSource: volumeDataSource},
-			anyEnabled: true,
-			want:       volumeDataSource,
-		},
-		"any enabled with volume ds ref": {
-			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
-			anyEnabled: true,
-			wantRef:    volumeDataSourceRef,
-		},
-		"any enabled with both data sources": {
-			spec:       core.PersistentVolumeClaimSpec{DataSource: volumeDataSource, DataSourceRef: volumeDataSourceRef},
-			anyEnabled: true,
-			want:       volumeDataSource,
-			wantRef:    volumeDataSourceRef,
-		},
-		"both any and xns enabled with xns volume ds": {
+		"xns enabled with xns volume ds": {
 			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			anyEnabled: true,
 			xnsEnabled: true,
 			wantRef:    xnsVolumeDataSourceRef,
 		},
-		"both any and xns enabled with xns volume ds when xns volume exists in oldSpec": {
+		"xns enabled with xns volume ds when xns volume exists in oldSpec": {
 			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
 			oldSpec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			anyEnabled: true,
 			xnsEnabled: true,
 			wantRef:    xnsVolumeDataSourceRef,
 		},
-		"only xns enabled with xns volume ds": {
-			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			xnsEnabled: true,
+		"xns volume ds": {
+			spec: core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
 		},
-		"only any enabled with xns volume ds": {
-			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			anyEnabled: true,
+		"xns volume ds when xns volume exists in oldSpec": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			oldSpec: core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			wantRef: xnsVolumeDataSourceRef, // existing field isn't dropped.
 		},
-		"only any enabled with xns volume ds when xns volume exists in oldSpec": {
-			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			oldSpec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			anyEnabled: true,
-			wantRef:    xnsVolumeDataSourceRef, // existing field isn't dropped.
-		},
-		"only any enabled with xns volume ds when volume exists in oldSpec": {
-			spec:       core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
-			oldSpec:    core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
-			anyEnabled: true,
-			wantRef:    xnsVolumeDataSourceRef, // existing field isn't dropped.8
+		"xns volume ds when volume exists in oldSpec": {
+			spec:    core.PersistentVolumeClaimSpec{DataSourceRef: xnsVolumeDataSourceRef},
+			oldSpec: core.PersistentVolumeClaimSpec{DataSourceRef: volumeDataSourceRef},
+			wantRef: xnsVolumeDataSourceRef, // existing field isn't dropped.8
 		},
 	}
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			// TODO: this will be removed in 1.36
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.AnyVolumeDataSource:            test.anyEnabled,
 				features.CrossNamespaceVolumeDataSource: test.xnsEnabled,
 			})
 			DropDisabledFields(&test.spec, &test.oldSpec)
@@ -373,7 +343,6 @@ func TestDataSourceRef(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.AnyVolumeDataSource:            true,
 		features.CrossNamespaceVolumeDataSource: true,
 	})
 

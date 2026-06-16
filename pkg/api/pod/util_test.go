@@ -807,7 +807,10 @@ func TestDropProcMount(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)
+					if !enabled {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)
+					}
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -914,16 +917,66 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 	}
+	podWithDRANodeAllocatableResourceStatus := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+					},
+				},
+			},
+			InitContainers:      []api.Container{{}},
+			EphemeralContainers: []api.EphemeralContainer{{}},
+			ResourceClaims: []api.PodResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
+				},
+			},
+		},
+		Status: api.PodStatus{
+			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Resources: map[api.ResourceName]resource.Quantity{
+						api.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+			},
+		},
+	}
+
+	podWithoutDRANodeAllocatableResourceStatus := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+					},
+				},
+			},
+			InitContainers:      []api.Container{{}},
+			EphemeralContainers: []api.EphemeralContainer{{}},
+			ResourceClaims: []api.PodResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
+				},
+			},
+		},
+	}
 
 	var noPod *api.Pod
 
 	testcases := []struct {
-		description     string
-		enabled         bool
-		extendedEnabled bool
-		oldPod          *api.Pod
-		newPod          *api.Pod
-		wantPod         *api.Pod
+		description                      string
+		enabled                          bool
+		extendedEnabled                  bool
+		enableDRANodeAllocatableResouces bool
+		oldPod                           *api.Pod
+		newPod                           *api.Pod
+		wantPod                          *api.Pod
 	}{
 		{
 			description: "old with claims / new with claims / disabled",
@@ -1054,17 +1107,55 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			newPod:          podWithExtendedResource,
 			wantPod:         podWithExtendedResource,
 		},
+		{
+			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / disabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: false,
+			oldPod:                           noPod,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / enabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: true,
+			oldPod:                           noPod,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / disabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: false,
+			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / enabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: true,
+			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithDRANodeAllocatableResourceStatus,
+			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
 			if !tc.enabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else if !tc.extendedEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DynamicResourceAllocation: tc.enabled,
 				features.DRAExtendedResource:       tc.extendedEnabled,
-			})
+			}
+			if tc.enableDRANodeAllocatableResouces {
+				overrides[features.DRANodeAllocatableResources] = true
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			oldPod := tc.oldPod.DeepCopy()
 			newPod := tc.newPod.DeepCopy()
@@ -2584,10 +2675,10 @@ func TestDropHostUsers(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					// Set emulation version so that the feature gate can be disabled in the test
 					if !enabled {
-						// Set emulation version so that the feature gate can be disabled in the test
 						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, false)
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, enabled)
 					}
 
 					DropDisabledPodFields(newPod, oldPod)
@@ -3179,113 +3270,6 @@ func TestDropPodLevelResources(t *testing.T) {
 					default:
 						if newPod.Spec.Resources != nil {
 							t.Errorf("expected nil, got: %v", newPod.Spec.Resources)
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
-func TestDropSidecarContainers(t *testing.T) {
-	containerRestartPolicyAlways := api.ContainerRestartPolicyAlways
-
-	podWithSidecarContainers := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{
-					{
-						Name:          "c1",
-						Image:         "image",
-						RestartPolicy: &containerRestartPolicyAlways,
-					},
-				},
-			},
-		}
-	}
-
-	podWithoutSidecarContainers := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{
-					{
-						Name:  "c1",
-						Image: "image",
-					},
-				},
-			},
-		}
-	}
-
-	podInfo := []struct {
-		description         string
-		hasSidecarContainer bool
-		pod                 func() *api.Pod
-	}{
-		{
-			description:         "has a sidecar container",
-			hasSidecarContainer: true,
-			pod:                 podWithSidecarContainers,
-		},
-		{
-			description:         "does not have a sidecar container",
-			hasSidecarContainer: false,
-			pod:                 podWithoutSidecarContainers,
-		},
-		{
-			description:         "is nil",
-			hasSidecarContainer: false,
-			pod:                 func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasSidecarContainer, oldPod := oldPodInfo.hasSidecarContainer, oldPodInfo.pod()
-				newPodHasSidecarContainer, newPod := newPodInfo.hasSidecarContainer, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					if !enabled {
-						// TODO: Remove this in v1.36
-						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, false)
-					}
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasSidecarContainer:
-						// new pod shouldn't change if feature enabled or if old pod has
-						// any sidecar container
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasSidecarContainer:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have any sidecar container
-						if !reflect.DeepEqual(newPod, podWithoutSidecarContainers()) {
-							t.Errorf("new pod has a sidecar container: %v", cmp.Diff(newPod, podWithoutSidecarContainers()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
 						}
 					}
 				})
@@ -7370,6 +7354,107 @@ func TestDropDisabledPodStatusFields_ResourceHealthStatusMessage(t *testing.T) {
 			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
 				t.Errorf("dropDisabledPodStatusFields() = %v, want %v\ndiff: %v",
 					tt.podStatus, tt.wantPodStatus, cmp.Diff(tt.wantPodStatus, tt.podStatus))
+			}
+		})
+	}
+}
+
+func TestHasRestartContainerForNonSidecarInitContainer(t *testing.T) {
+	tests := []struct {
+		name     string
+		podSpec  *api.PodSpec
+		expected bool
+	}{
+		{
+			name:     "nil pod spec",
+			podSpec:  nil,
+			expected: false,
+		},
+		{
+			name:     "no init containers",
+			podSpec:  &api.PodSpec{InitContainers: []api.Container{}},
+			expected: false,
+		},
+		{
+			name: "regular init container without resize policy",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{Name: "init-1"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "sidecar (restartable) init container with RestartContainer policy",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "sidecar",
+						RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways),
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.RestartContainer},
+						},
+					},
+				},
+			},
+			expected: false, // Should be false because it's a sidecar
+		},
+		{
+			name: "non-sidecar init container with NotRequired policy",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name: "init-1",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "non-sidecar init container with RestartContainer policy",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name: "init-1",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceMemory, RestartPolicy: api.RestartContainer},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mix of sidecar and non-sidecar with RestartContainer policy",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "sidecar",
+						RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways),
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.RestartContainer},
+						},
+					},
+					{
+						Name: "init-2",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.RestartContainer},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasRestartContainerForNonSidecarInitContainer(tt.podSpec)
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
 			}
 		})
 	}

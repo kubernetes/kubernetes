@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/operation"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,12 +36,17 @@ import (
 // name generation behavior to update an object that follows Kubernetes
 // API conventions. A resource may have many UpdateStrategies, depending on
 // the call pattern in use.
+//
+// The context that is passed to these methods can be used to retrieve
+// information about the request with request.RequestInfoFrom(ctx) and
+// to return different responses depending on the APIVersion in the
+// request.
 type RESTUpdateStrategy interface {
 	runtime.ObjectTyper
 	// NamespaceScoped returns true if the object must be within a namespace.
 	NamespaceScoped() bool
 	// AllowCreateOnUpdate returns true if the object can be created by a PUT.
-	AllowCreateOnUpdate() bool
+	AllowCreateOnUpdate(ctx context.Context) bool
 	// PrepareForUpdate is invoked on update before validation to normalize
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
@@ -79,7 +85,7 @@ type RESTUpdateStrategy interface {
 	// AllowUnconditionalUpdate returns true if the object can be updated
 	// unconditionally (irrespective of the latest resource version), when
 	// there is no resource version specified in the object.
-	AllowUnconditionalUpdate() bool
+	AllowUnconditionalUpdate(ctx context.Context) bool
 }
 
 // TODO: add other common fields that require global validation.
@@ -151,6 +157,9 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
+	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
+		errs = dv.ValidateDeclaratively(ctx, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(ctx, obj, old))
+	}
 	if len(errs) > 0 {
 		RecordDuplicateValidationErrors(ctx, kind.GroupKind(), errs)
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)

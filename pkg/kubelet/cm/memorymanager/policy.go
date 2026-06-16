@@ -42,6 +42,8 @@ type Policy interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	// AllocatePod is called to trigger the allocation of memory to a pod-level resources pod.
+	AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) error
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 	GetAllocatableMemory(s state.State) []state.Block
 }

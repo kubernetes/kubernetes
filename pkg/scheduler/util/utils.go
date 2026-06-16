@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -100,11 +101,29 @@ func Retriable(err error) bool {
 		net.IsConnectionRefused(err)
 }
 
+// RetriableWithConflict defines the retriable errors during a scheduling cycle, including conflicts.
+func RetriableWithConflict(err error) bool {
+	return Retriable(err) || apierrors.IsConflict(err)
+}
+
+// BindPod binds a pod to a node with retry.
+func BindPod(ctx context.Context, cs kubernetes.Interface, binding *v1.Binding) error {
+	bindFn := func() error {
+		return cs.CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
+	}
+
+	return retry.OnError(retry.DefaultBackoff, Retriable, bindFn)
+}
+
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submit a request to API server to patch the pod changes.
 func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, namespace string, oldStatus *v1.PodStatus, newStatus *v1.PodStatus) error {
 	if newStatus == nil {
 		return nil
+	}
+
+	if oldStatus == nil {
+		oldStatus = &v1.PodStatus{}
 	}
 
 	oldData, err := json.Marshal(v1.Pod{Status: *oldStatus})
@@ -130,7 +149,46 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return err
 	}
 
-	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
+}
+
+// PatchPodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
+// and then submits a request to API server to patch the PodGroup status changes.
+func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name string,
+	namespace string, oldStatus *schedulingv1alpha3.PodGroupStatus,
+	newStatus *schedulingv1alpha3.PodGroupStatus) error {
+	if newStatus == nil {
+		return nil
+	}
+
+	if oldStatus == nil {
+		oldStatus = &schedulingv1alpha3.PodGroupStatus{}
+	}
+
+	oldData, err := json.Marshal(schedulingv1alpha3.PodGroup{Status: *oldStatus})
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(schedulingv1alpha3.PodGroup{Status: *newStatus})
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.PodGroup{})
+	if err != nil {
+		return fmt.Errorf("failed to create merge patch for podgroup %q/%q: %w", namespace, name, err)
+	}
+
+	if string(patchBytes) == "{}" {
+		return nil
+	}
+
+	patchFn := func() error {
+		_, err := cs.SchedulingV1alpha3().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		return err
+	}
+
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
 }
 
 // DeletePod deletes the given <pod> from API server
@@ -212,4 +270,16 @@ func GetHostPorts(pod *v1.Pod) []v1.ContainerPort {
 		}
 	}
 	return ports
+}
+
+// PodGroupPriority returns priority of a given pod group.
+func PodGroupPriority(pg *schedulingv1alpha3.PodGroup) int32 {
+	if pg.Spec.Priority != nil {
+		return *pg.Spec.Priority
+	}
+	// When priority of a pod group is nil, it means it was created at a time
+	// that there was no global default priority class and the priority class
+	// name of the pod group was empty (or when the WorkloadAwarePreemption
+	// feature gate was disabled). So, we resolve to the static default priority.
+	return 0
 }

@@ -33,31 +33,70 @@ var exceptionMetrics = []string{
 	// k8s.io/apiserver/pkg/server/egressselector
 	"apiserver_egress_dialer_dial_failure_count", // counter metrics should have "_total" suffix
 
-	// k8s.io/apiserver/pkg/server/healthz
-	"apiserver_request_total", // label names should be written in 'snake_case' not 'camelCase'
-
 	// k8s.io/apiserver/pkg/endpoints/filters
 	"authenticated_user_requests", // counter metrics should have "_total" suffix
 	"authentication_attempts",     // counter metrics should have "_total" suffix
 
 	// kube-apiserver
-	"aggregator_openapi_v2_regeneration_count",
-	"apiserver_admission_webhook_rejection_count", // counter metrics should have "_total" suffix,apiserver_admission_webhook_rejection_count:non-histogram and non-summary metrics should not have "_count" suffix
-	"apiserver_admission_step_admission_duration_seconds_summary",
-	"apiserver_current_inflight_requests",
-	"apiserver_longrunning_gauge",
-	"get_token_count",
-	"get_token_fail_count",
-	"ssh_tunnel_open_count",
-	"ssh_tunnel_open_fail_count",
+	"aggregator_openapi_v2_regeneration_count",                    // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"apiserver_admission_step_admission_duration_seconds_summary", // metric name should not include type 'summary'
+	"apiserver_admission_webhook_fail_open_count",                 // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"apiserver_admission_webhook_rejection_count",                 // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"apiserver_flowcontrol_latest_s",                              // metric names should not contain abbreviated units
+	"apiserver_flowcontrol_next_discounted_s_bounds",              // metric names should not contain abbreviated units
+	"apiserver_flowcontrol_next_s_bounds",                         // metric names should not contain abbreviated units
+	"authentication_token_cache_active_fetch_count",               // no help text; non-histogram and non-summary metrics should not have "_count" suffix
+	"authentication_token_cache_fetch_total",                      // no help text
+	"authentication_token_cache_request_duration_seconds",         // no help text
+	"authentication_token_cache_request_total",                    // no help text
+	"apiserver_watch_shards_total",                                // non-counter metrics should not have "_total" suffix
 
-	// kube-controller-manager
-	"attachdetach_controller_forced_detaches",
-	"authenticated_user_requests",
-	"authentication_attempts",
-	"get_token_count",
-	"get_token_fail_count",
-	"node_collector_evictions_number",
+	// apiextensions-apiserver
+	"apiextensions_openapi_v2_regeneration_count", // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"apiextensions_openapi_v3_regeneration_count", // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+
+	// attach-detach controller
+	"attach_detach_controller_attachdetach_controller_forced_detaches", // counter metrics should have "_total" suffix
+	"endpoint_slice_controller_changes",                                // counter metrics should have "_total" suffix
+	"endpoint_slice_controller_syncs",                                  // counter metrics should have "_total" suffix
+	"endpoint_slice_mirroring_controller_changes",                      // counter metrics should have "_total" suffix
+
+	// kubelet
+	"kubelet_container_aligned_compute_resources_count",         // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_container_aligned_compute_resources_failure_count", // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_cpu_manager_exclusive_cpu_allocation_count",        // non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_evented_pleg_connection_error_count",               // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_evented_pleg_connection_success_count",             // counter metrics should have "_total" suffix; non-histogram and non-summary metrics should not have "_count" suffix
+	"kubelet_evictions",                                          // counter metrics should have "_total" suffix
+	"kubelet_pleg_discard_events",                                // counter metrics should have "_total" suffix
+	"kubelet_pod_resources_endpoint_errors_get",                  // counter metrics should have "_total" suffix
+	"kubelet_pod_resources_endpoint_errors_get_allocatable",      // counter metrics should have "_total" suffix
+	"kubelet_pod_resources_endpoint_errors_list",                 // counter metrics should have "_total" suffix
+	"kubelet_pod_resources_endpoint_requests_get",                // counter metrics should have "_total" suffix
+	"kubelet_pod_resources_endpoint_requests_get_allocatable",    // counter metrics should have "_total" suffix
+	"kubelet_pod_resources_endpoint_requests_list",               // counter metrics should have "_total" suffix
+	"kubelet_preemptions",                                        // counter metrics should have "_total" suffix
+	"kubelet_server_expiration_renew_errors",                     // counter metrics should have "_total" suffix
+	"kubelet_topology_manager_admission_duration_ms",             // metric names should not contain abbreviated units
+	"kubelet_certificate_manager_client_expiration_renew_errors", // counter metrics should have "_total" suffix
+	"kubelet_pod_resize_duration_milliseconds",                   // use base unit "seconds" instead of "milliseconds"
+	"resource_manager_container_assignments",                     // counter metrics should have "_total" suffix
+
+	// kube-proxy
+	"kubeproxy_sync_proxy_rules_iptables_total",           // non-counter metrics should not have "_total" suffix
+	"kubeproxy_sync_proxy_rules_no_local_endpoints_total", // non-counter metrics should not have "_total" suffix
+
+	// volume-manager
+	"volume_manager_selinux_container_errors_total",                 // non-counter metrics should not have "_total" suffix
+	"volume_manager_selinux_container_warnings_total",               // non-counter metrics should not have "_total" suffix
+	"volume_manager_selinux_pod_context_mismatch_errors_total",      // non-counter metrics should not have "_total" suffix
+	"volume_manager_selinux_pod_context_mismatch_warnings_total",    // non-counter metrics should not have "_total" suffix
+	"volume_manager_selinux_volume_context_mismatch_errors_total",   // non-counter metrics should not have "_total" suffix
+	"volume_manager_selinux_volume_context_mismatch_warnings_total", // non-counter metrics should not have "_total" suffix
+	"volume_manager_selinux_volumes_admitted_total",                 // non-counter metrics should not have "_total" suffix
+
+	// persistent-volume-controller
+	"volume_operation_total_errors", // counter metrics should have "_total" suffix
 }
 
 // A Problem is an issue detected by a Linter.
@@ -133,8 +172,8 @@ func shouldIgnore(metricName string) bool {
 	return false
 }
 
-// getLintError will ignore the metrics in exception list and converts lint problem to error.
-func getLintError(problems []promlint.Problem) error {
+// GetLintError will ignore the metrics in exception list and converts lint problem to error.
+func GetLintError(problems []promlint.Problem) error {
 	var filteredProblems []Problem
 	for _, problem := range problems {
 		if shouldIgnore(problem.Metric) {
@@ -149,4 +188,26 @@ func getLintError(problems []promlint.Problem) error {
 	}
 
 	return fmt.Errorf("lint error: %s", mergeProblems(filteredProblems))
+}
+
+// CheckUnusedExceptions returns an error if any metric in exceptionMetrics did not have any lint problems.
+func CheckUnusedExceptions(problems []promlint.Problem) error {
+	usedExceptions := make(map[string]bool)
+	for _, p := range problems {
+		if shouldIgnore(p.Metric) {
+			usedExceptions[p.Metric] = true
+		}
+	}
+
+	var unused []string
+	for _, exc := range exceptionMetrics {
+		if !usedExceptions[exc] {
+			unused = append(unused, exc)
+		}
+	}
+
+	if len(unused) > 0 {
+		return fmt.Errorf("metrics in exception list but have no violations: %s", strings.Join(unused, ", "))
+	}
+	return nil
 }

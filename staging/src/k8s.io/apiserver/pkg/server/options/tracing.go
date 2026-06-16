@@ -27,14 +27,13 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/install"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -86,9 +85,6 @@ func (o *TracingOptions) AddFlags(fs *pflag.FlagSet) {
 func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Config) error {
 	if o == nil || o.ConfigFile == "" {
 		return nil
-	}
-	if !feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-		return fmt.Errorf("APIServerTracing feature is not enabled, but tracing config file was provided")
 	}
 
 	traceConfig, err := ReadTracingConfiguration(o.ConfigFile)

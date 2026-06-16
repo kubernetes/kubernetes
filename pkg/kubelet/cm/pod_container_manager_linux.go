@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 const (
@@ -57,6 +58,8 @@ type podContainerManagerImpl struct {
 	cpuCFSQuotaPeriod uint64
 	// podContainerManager is the ContainerManager running on the machine
 	podContainerManager ContainerManager
+	// memoryReservationPolicy controls memory reservation protection behavior
+	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -89,7 +92,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
+			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
 		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit

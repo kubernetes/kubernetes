@@ -21,9 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
-var _ = nodedeclaredfeatures.FeatureGate((*MockFeatureGate)(nil))
+var _ = types.FeatureGate((*MockFeatureGate)(nil))
 
 type MockFeatureGate struct {
 	t        *testing.T
@@ -48,16 +49,16 @@ func NewMockFeatureGate(t *testing.T) *MockFeatureGate {
 	}
 }
 
-var _ = nodedeclaredfeatures.Feature((*MockFeature)(nil))
+var _ = types.Feature((*MockFeature)(nil))
 
 type MockFeature struct {
-	t                  *testing.T
+	t                  testing.TB
 	name               *string
-	discover           func(cfg *nodedeclaredfeatures.NodeConfiguration) bool
-	inferForScheduling func(podInfo *nodedeclaredfeatures.PodInfo) bool
-	inferForUpdate     func(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool
+	discover           func(cfg *types.NodeConfiguration) bool
+	inferForScheduling func(podInfo *types.PodInfo) bool
+	inferForUpdate     func(oldPodInfo, newPodInfo *types.PodInfo) bool
 	maxVersion         **version.Version
-	requirements       **nodedeclaredfeatures.FeatureRequirements
+	requirements       **types.FeatureRequirements
 }
 
 func (m *MockFeature) Name() string {
@@ -70,34 +71,34 @@ func (m *MockFeature) Name() string {
 func (m *MockFeature) SetName(name string) {
 	m.name = &name
 }
-func (m *MockFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (m *MockFeature) Discover(cfg *types.NodeConfiguration) bool {
 	if m.discover == nil {
 		m.t.Errorf("unexpected call to Discover")
 		return false
 	}
 	return m.discover(cfg)
 }
-func (m *MockFeature) SetDiscover(discover func(cfg *nodedeclaredfeatures.NodeConfiguration) bool) {
+func (m *MockFeature) SetDiscover(discover func(cfg *types.NodeConfiguration) bool) {
 	m.discover = discover
 }
-func (m *MockFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
+func (m *MockFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	if m.inferForScheduling == nil {
 		m.t.Errorf("unexpected call to InferForScheduling")
 		return false
 	}
 	return m.inferForScheduling(podInfo)
 }
-func (m *MockFeature) SetInferForScheduling(inferForScheduling func(podInfo *nodedeclaredfeatures.PodInfo) bool) {
+func (m *MockFeature) SetInferForScheduling(inferForScheduling func(podInfo *types.PodInfo) bool) {
 	m.inferForScheduling = inferForScheduling
 }
-func (m *MockFeature) InferForUpdate(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool {
+func (m *MockFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
 	if m.inferForUpdate == nil {
 		m.t.Errorf("unexpected call to InferForUpdate")
 		return false
 	}
 	return m.inferForUpdate(oldPodInfo, newPodInfo)
 }
-func (m *MockFeature) SetInferForUpdate(inferForUpdate func(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool) {
+func (m *MockFeature) SetInferForUpdate(inferForUpdate func(oldPodInfo, newPodInfo *types.PodInfo) bool) {
 	m.inferForUpdate = inferForUpdate
 }
 func (m *MockFeature) MaxVersion() *version.Version {
@@ -121,7 +122,7 @@ func (m *MockFeature) SetRequirements(req *nodedeclaredfeatures.FeatureRequireme
 	m.requirements = &req
 }
 
-func NewMockFeature(t *testing.T) *MockFeature {
+func NewMockFeature(t testing.TB) *MockFeature {
 	return &MockFeature{
 		t: t,
 	}

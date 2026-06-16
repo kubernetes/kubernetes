@@ -114,6 +114,10 @@ func (p *mockPolicy) GetPodTopologyHints(klog.Logger, state.State, *v1.Pod) map[
 	return nil
 }
 
+func (p *mockPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) error {
+	return p.err
+}
+
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 func (p *mockPolicy) GetAllocatableMemory(state.State) []state.Block {
 	return []state.Block{}

@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaimtemplate
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -270,7 +271,7 @@ func TestClaimTemplateStrategy(t *testing.T) {
 	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaimTemplate must be namespace scoped")
 	}
-	if strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ResourceClaimTemplate should not allow create on update")
 	}
 }

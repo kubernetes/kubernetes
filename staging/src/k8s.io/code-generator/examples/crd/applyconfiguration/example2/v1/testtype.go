@@ -29,7 +29,7 @@ import (
 //
 // TestType is a top-level type. A client is created for it.
 type TestTypeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                               *TestTypeStatusApplyConfiguration `json:"status,omitempty"`
 }

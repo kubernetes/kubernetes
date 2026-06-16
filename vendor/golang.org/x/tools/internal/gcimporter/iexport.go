@@ -242,7 +242,6 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/types/objectpath"
-	"golang.org/x/tools/internal/aliases"
 )
 
 // IExportShallow encodes "shallow" export data for the specified package.
@@ -767,11 +766,11 @@ func (p *iexporter) doDecl(obj types.Object) {
 		}
 
 		if obj.IsAlias() {
-			alias, materialized := t.(*types.Alias) // may fail when aliases are not enabled
+			alias, materialized := t.(*types.Alias) // perhaps false for certain built-ins?
 
 			var tparams *types.TypeParamList
 			if materialized {
-				tparams = aliases.TypeParams(alias)
+				tparams = alias.TypeParams()
 			}
 			if tparams.Len() == 0 {
 				w.tag(aliasTag)
@@ -785,7 +784,7 @@ func (p *iexporter) doDecl(obj types.Object) {
 			if materialized {
 				// Preserve materialized aliases,
 				// even of non-exported types.
-				t = aliases.Rhs(alias)
+				t = alias.Rhs()
 			}
 			w.typ(t, obj.Pkg())
 			break
@@ -1011,11 +1010,11 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 	}
 	switch t := t.(type) {
 	case *types.Alias:
-		if targs := aliases.TypeArgs(t); targs.Len() > 0 {
+		if targs := t.TypeArgs(); targs.Len() > 0 {
 			w.startType(instanceType)
 			w.pos(t.Obj().Pos())
 			w.typeList(targs, pkg)
-			w.typ(aliases.Origin(t), pkg)
+			w.typ(t.Origin(), pkg)
 			return
 		}
 		w.startType(aliasType)

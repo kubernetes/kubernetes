@@ -63,7 +63,7 @@ type B struct {
 
 type C struct {
 	A []A `json:"ca"`
-	B `json:",inline"`
+	B `json:""`
 	C string         `json:"cc"`
 	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
@@ -103,20 +103,20 @@ type G struct {
 
 type H struct {
 	A A `json:"ha"`
-	C `json:",inline"`
+	C `json:""`
 }
 
 type I struct {
 	A A `json:"ia"`
-	H `json:",inline"`
+	H `json:""`
 
 	UL1 UnknownLevel1 `json:"ul1"`
 }
 
 type UnknownLevel1 struct {
 	A          int64 `json:"a"`
-	InlinedAA  `json:",inline"`
-	InlinedAAA `json:",inline"`
+	InlinedAA  `json:""`
+	InlinedAAA `json:""`
 }
 type InlinedAA struct {
 	AA int64 `json:"aa"`
@@ -128,8 +128,8 @@ type InlinedAAA struct {
 
 type UnknownLevel2 struct {
 	B          int64 `json:"b"`
-	InlinedBB  `json:",inline"`
-	InlinedBBB `json:",inline"`
+	InlinedBB  `json:""`
+	InlinedBBB `json:""`
 }
 type InlinedBB struct {
 	BB int64 `json:"bb"`
@@ -141,8 +141,8 @@ type InlinedBBB struct {
 
 type UnknownLevel3 struct {
 	C          int64 `json:"c"`
-	InlinedCC  `json:",inline"`
-	InlinedCCC `json:",inline"`
+	InlinedCC  `json:""`
+	InlinedCCC `json:""`
 }
 type InlinedCC struct {
 	CC int64 `json:"cc"`
@@ -1028,7 +1028,7 @@ func TestOmitempty(t *testing.T) {
 
 type InlineTestPrimitive struct {
 	NoNameTagPrimitive          int64 `json:""`
-	NoNameTagInlinePrimitive    int64 `json:",inline"`
+	NoNameTagInlinePrimitive    int64 `json:",inline"` // TODO: expect error when switching to json/v2
 	NoNameTagOmitemptyPrimitive int64 `json:",omitempty"`
 }
 type InlineTestAnonymous struct {
@@ -1113,13 +1113,20 @@ func TestInline(t *testing.T) {
 		{
 			name: "named-zero",
 			obj:  &InlineTestNamed{},
-			expect: map[string]any{
-				"NoTag":              map[string]any{"data0": int64(0)},
-				"nameTagEmbedded":    map[string]any{"data1": int64(0)},
-				"NoNameTag":          map[string]any{"data2": int64(0)},
-				"NoNameTagInline":    map[string]any{"data3": int64(0)},
-				"NoNameTagOmitempty": map[string]any{"data4": int64(0)},
-			},
+			expect: func() map[string]any {
+				m := map[string]any{
+					"NoTag":              map[string]any{"data0": int64(0)},
+					"nameTagEmbedded":    map[string]any{"data1": int64(0)},
+					"NoNameTag":          map[string]any{"data2": int64(0)},
+					"NoNameTagOmitempty": map[string]any{"data4": int64(0)},
+				}
+				if stdlibSupportsInlineTag {
+					m["data3"] = int64(0)
+				} else {
+					m["NoNameTagInline"] = map[string]any{"data3": int64(0)}
+				}
+				return m
+			}(),
 		},
 		{
 			name: "named-set",
@@ -1130,13 +1137,20 @@ func TestInline(t *testing.T) {
 				NoNameTagInline:    NoNameTagInline{Data3: 13},
 				NoNameTagOmitempty: NoNameTagOmitempty{Data4: 14},
 			},
-			expect: map[string]any{
-				"NoTag":              map[string]any{"data0": int64(10)},
-				"nameTagEmbedded":    map[string]any{"data1": int64(11)},
-				"NoNameTag":          map[string]any{"data2": int64(12)},
-				"NoNameTagInline":    map[string]any{"data3": int64(13)},
-				"NoNameTagOmitempty": map[string]any{"data4": int64(14)},
-			},
+			expect: func() map[string]any {
+				m := map[string]any{
+					"NoTag":              map[string]any{"data0": int64(10)},
+					"nameTagEmbedded":    map[string]any{"data1": int64(11)},
+					"NoNameTag":          map[string]any{"data2": int64(12)},
+					"NoNameTagOmitempty": map[string]any{"data4": int64(14)},
+				}
+				if stdlibSupportsInlineTag {
+					m["data3"] = int64(13)
+				} else {
+					m["NoNameTagInline"] = map[string]any{"data3": int64(13)}
+				}
+				return m
+			}(),
 		},
 	}
 	for _, tc := range testcases {

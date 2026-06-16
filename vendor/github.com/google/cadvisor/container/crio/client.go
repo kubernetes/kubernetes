@@ -45,6 +45,7 @@ type Info struct {
 	StorageDriver string `json:"storage_driver"`
 	StorageRoot   string `json:"storage_root"`
 	StorageImage  string `json:"storage_image"`
+	CgroupDriver  string `json:"cgroup_driver"`
 }
 
 // ContainerInfo represents a given container information

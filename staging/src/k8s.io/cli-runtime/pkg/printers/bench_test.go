@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,4 +150,72 @@ func benchmarkPrinter(b *testing.B, printerFunc func() ResourcePrinter, data run
 			}
 		}
 	})
+}
+
+// newLargeTable creates a metav1.Table with the given number of rows.
+// Each row has 5 string columns with realistic cell widths, representative
+// of a typical "kubectl get" response.
+func newLargeTable(rowCount int) *metav1.Table {
+	table := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name"},
+			{Name: "Status", Type: "string"},
+			{Name: "Roles", Type: "string"},
+			{Name: "Age", Type: "string"},
+			{Name: "Version", Type: "string"},
+		},
+		Rows: make([]metav1.TableRow, rowCount),
+	}
+
+	roles := []string{"control-plane", "worker", "worker", "worker", "worker", "infra", "worker", "worker"}
+	statuses := []string{"Ready", "Ready", "Ready", "Ready,SchedulingDisabled", "Ready", "NotReady", "Ready", "Ready"}
+	ages := []string{"120d", "89d", "45d", "30d", "15d", "7d", "3d", "1d"}
+	versions := []string{"v1.32.0", "v1.32.0", "v1.31.4", "v1.32.0", "v1.31.4", "v1.32.0", "v1.32.0", "v1.31.4"}
+
+	for i := range rowCount {
+		idx := i % len(roles)
+		table.Rows[i] = metav1.TableRow{
+			Cells: []interface{}{
+				fmt.Sprintf("resource-%05d.us-east-1.compute.internal", i),
+				statuses[idx],
+				roles[idx],
+				ages[idx],
+				versions[idx],
+			},
+		}
+	}
+
+	return table
+}
+
+func benchmarkLargeTablePrinter(b *testing.B, rowCount int) {
+	table := newLargeTable(rowCount)
+	printer := NewTablePrinter(PrintOptions{})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := printer.PrintObj(table, io.Discard); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkTablePrinter_10kRows(b *testing.B)  { benchmarkLargeTablePrinter(b, 10000) }
+func BenchmarkTablePrinter_100kRows(b *testing.B) { benchmarkLargeTablePrinter(b, 100000) }
+func BenchmarkTablePrinter_500kRows(b *testing.B) { benchmarkLargeTablePrinter(b, 500000) }
+
+// BenchmarkTablePrinter_100kRows_ToBuffer benchmarks writing to a real buffer
+// (not discard) to measure actual output generation overhead.
+func BenchmarkTablePrinter_100kRows_ToBuffer(b *testing.B) {
+	table := newLargeTable(100000)
+	printer := NewTablePrinter(PrintOptions{})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf := &bytes.Buffer{}
+		buf.Grow(100000 * 100) // pre-allocate ~10MB
+		if err := printer.PrintObj(table, buf); err != nil {
+			b.Fatal(err)
+		}
+	}
 }

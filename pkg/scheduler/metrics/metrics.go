@@ -23,6 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	volumebindingmetrics "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 )
@@ -64,6 +65,7 @@ var ExtensionPoints = []string{
 	Permit,
 	Sign,
 	PlacementGenerate,
+	PlacementFeasible,
 }
 
 const (
@@ -84,6 +86,7 @@ const (
 	Permit                           = "Permit"
 	Sign                             = "Sign"
 	PlacementGenerate                = "PlacementGenerate"
+	PlacementFeasible                = "PlacementFeasible"
 	PlacementScore                   = "PlacementScore"
 	PlacementScoreExtensionNormalize = "PlacementScoreExtensionNormalize"
 )
@@ -109,6 +112,7 @@ const (
 const (
 	BatchFlushPodFailed       = "pod_failed"
 	BatchFlushPodSkipped      = "pod_skipped"
+	BatchFlushPodNominated    = "pod_nominated"
 	BatchFlushNodeMissing     = "node_missing"
 	BatchFlushNodeNotFull     = "node_not_full"
 	BatchFlushEmptyList       = "empty_list"
@@ -152,7 +156,6 @@ var (
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec
 
-	// The below two are only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration *metrics.HistogramVec
 	SchedulerQueueIncomingPods    *metrics.CounterVec
 
@@ -166,7 +169,8 @@ var (
 	AsyncAPIPendingCalls *metrics.GaugeVec
 
 	// The below is only available when the DRAExtendedResource feature gate is enabled.
-	ResourceClaimCreatesTotal *metrics.CounterVec
+	// This is the same metric that also gets recorded in the kube-controller-manager.
+	ResourceClaimCreatesTotal = resourceclaimmetrics.ResourceClaimCreate
 
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
@@ -189,9 +193,6 @@ func Register() {
 		RegisterMetrics(metricsList...)
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-			RegisterMetrics(queueingHintExecutionDuration, InFlightEvents)
-		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
 			RegisterMetrics(PreemptionGoroutinesDuration, PreemptionGoroutinesExecutionTotal)
 		}
@@ -203,7 +204,7 @@ func Register() {
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-			RegisterMetrics(ResourceClaimCreatesTotal)
+			resourceclaimmetrics.RegisterMetrics()
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			RegisterMetrics(
@@ -277,7 +278,7 @@ func InitMetrics() {
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pending_pods",
-			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
+			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
 	InFlightEvents = metrics.NewGaugeVec(
@@ -292,7 +293,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "goroutines",
 			Help:           "Number of running goroutines split by the work they do such as binding.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"operation"})
 	BatchAttemptStats = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -333,7 +334,7 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pod_scheduled_after_flush_total",
-			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulablePods due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.",
+			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulableEntities due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.",
 			StabilityLevel: metrics.ALPHA,
 		})
 
@@ -360,7 +361,6 @@ func InitMetrics() {
 		},
 		[]string{"plugin", "extension_point", "status"})
 
-	// This is only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -387,7 +387,7 @@ func InitMetrics() {
 			Name:           "permit_wait_duration_seconds",
 			Help:           "Duration of waiting on permit.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"result"})
 
@@ -404,7 +404,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "unschedulable_pods",
 			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "profile"})
 
 	PluginEvaluationTotal = metrics.NewCounterVec(
@@ -412,7 +412,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "plugin_evaluation_total",
 			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "extension_point", "profile"})
 
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
@@ -462,15 +462,6 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"call_type"})
-
-	ResourceClaimCreatesTotal = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "resourceclaim_creates_total",
-			Help:           "Number of ResourceClaims creation requests within scheduler",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"status"})
 
 	DRABindingConditionsAllocationsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -563,6 +554,8 @@ func InitMetrics() {
 		BatchCacheFlushed,
 		GetNodeHintDuration,
 		StoreScheduleResultsDuration,
+		queueingHintExecutionDuration,
+		InFlightEvents,
 	}
 }
 

@@ -292,7 +292,8 @@
         "status": "statusValue",
         "lastTransitionTime": "2003-01-01T01:01:01Z",
         "reason": "reasonValue",
-        "message": "messageValue"
+        "message": "messageValue",
+        "observedGeneration": 6
       }
     ]
   }

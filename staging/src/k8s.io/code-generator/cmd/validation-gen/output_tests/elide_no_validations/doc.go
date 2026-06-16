@@ -17,6 +17,7 @@ limitations under the License.
 // +k8s:validation-gen=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-test-fixture=validateFalse
+// +k8s:validation-gen-test-targets
 
 // This is a test package.
 // +k8s:validation-gen-nolint
@@ -37,6 +38,16 @@ type T1 struct {
 
 	// +k8s:validateFalse="field T1.HasNoValFieldVal"
 	HasNoValFieldVal HasNoVal `json:"hasNoValFieldVal"`
+
+	ValidatedSlice  TypedefSliceWithValidations  `json:"validatedSlice"`
+	ValidatedMap    TypedefMapWithValidations    `json:"validatedMap"`
+	ValidatedMapKey TypedefMapWithKeyValidations `json:"validatedMapKey"`
+
+	DeepValidatedSlice DeepTypedefSlice `json:"deepValidatedSlice"`
+	DeepValidatedMap   DeepTypedefMap   `json:"deepValidatedMap"`
+
+	DoubleDeepValidatedSlice DoubleDeepTypedefSlice `json:"doubleDeepValidatedSlice           "`
+	DoubleDeepValidatedMap   DoubleDeepTypedefMap   `json:"doubleDeepValidatedMap"`
 }
 
 // +k8s:validateFalse="type HasTypeVal"
@@ -74,3 +85,29 @@ type HasNoValNotLinked struct {
 	// Note: no field validation.
 	S string `json:"s"`
 }
+
+// +k8s:validateFalse="type OtherStruct"
+type OtherStruct struct {
+	S string `json:"s"`
+}
+
+// +k8s:validateFalse="type ValidatedKeyType"
+type ValidatedKeyType string
+
+type TypedefSliceWithValidations []OtherStruct
+
+type TypedefMapWithValidations map[string]OtherStruct
+
+type TypedefMapWithKeyValidations map[ValidatedKeyType]string
+
+// FIXME: The following validation is not being generated for DoubleDeepTypedefSlice.
+// Validation-gen is ignoring this validation, because Go directly translates
+// DoubleDeepTypedefSlice to TypedefSliceWithValidations.
+// +k8s:eachVal=+k8s:validateFalse="type DeepTypedefSlice"
+type DeepTypedefSlice TypedefSliceWithValidations
+
+type DeepTypedefMap TypedefMapWithValidations
+
+type DoubleDeepTypedefSlice DeepTypedefSlice
+
+type DoubleDeepTypedefMap DeepTypedefMap

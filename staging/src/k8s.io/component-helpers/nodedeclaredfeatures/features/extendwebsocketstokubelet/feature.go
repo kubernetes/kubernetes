@@ -18,11 +18,11 @@ package extendwebsocketstokubelet
 
 import (
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // Ensure the feature struct implements the unified Feature interface.
-var _ nodedeclaredfeatures.Feature = &extendWebSocketsToKubeletFeature{}
+var _ types.Feature = &extendWebSocketsToKubeletFeature{}
 
 const (
 	ExtendWebSocketsToKubeletFeatureGate = "ExtendWebSocketsToKubelet"
@@ -37,22 +37,22 @@ func (f *extendWebSocketsToKubeletFeature) Name() string {
 	return ExtendWebSocketsToKubeletFeatureGate
 }
 
-func (f *extendWebSocketsToKubeletFeature) Requirements() *nodedeclaredfeatures.FeatureRequirements {
-	return &nodedeclaredfeatures.FeatureRequirements{
+func (f *extendWebSocketsToKubeletFeature) Requirements() *types.FeatureRequirements {
+	return &types.FeatureRequirements{
 		EnabledFeatureGates: []string{ExtendWebSocketsToKubeletFeatureGate},
 	}
 }
 
-func (f *extendWebSocketsToKubeletFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (f *extendWebSocketsToKubeletFeature) Discover(cfg *types.NodeConfiguration) bool {
 	return cfg.FeatureGates.Enabled(ExtendWebSocketsToKubeletFeatureGate)
 }
 
-func (f *extendWebSocketsToKubeletFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *extendWebSocketsToKubeletFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	// This feature does not affect scheduling.
 	return false
 }
 
-func (f *extendWebSocketsToKubeletFeature) InferForUpdate(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *extendWebSocketsToKubeletFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
 	// This feature does not affect updates.
 	return false
 }

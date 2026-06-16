@@ -38,53 +38,89 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type E01
-	scheme.AddValidationFunc((*E01)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_E01(ctx, op, nil /* fldPath */, obj.(*E01), safe.Cast[*E01](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*E01)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_E01(
+					ctx, op, nil, /* fldPath */
+					obj.(*E01),
+					safe.Cast[*E01](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type E02
-	scheme.AddValidationFunc((*E02)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_E02(ctx, op, nil /* fldPath */, obj.(*E02), safe.Cast[*E02](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*E02)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_E02(
+					ctx, op, nil, /* fldPath */
+					obj.(*E02),
+					safe.Cast[*E02](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type E03
-	scheme.AddValidationFunc((*E03)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_E03(ctx, op, nil /* fldPath */, obj.(*E03), safe.Cast[*E03](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*E03)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_E03(
+					ctx, op, nil, /* fldPath */
+					obj.(*E03),
+					safe.Cast[*E03](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type EMultiple
-	scheme.AddValidationFunc((*EMultiple)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_EMultiple(ctx, op, nil /* fldPath */, obj.(*EMultiple), safe.Cast[*EMultiple](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*EMultiple)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_EMultiple(
+					ctx, op, nil, /* fldPath */
+					obj.(*EMultiple),
+					safe.Cast[*EMultiple](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_E01 validates an instance of E01 according
 // to declarative validation rules in the API schema.
-func Validate_E01(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E01) (errs field.ErrorList) {
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E01, no flags")...)
+func Validate_E01(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *E01) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E01, no flags"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_E02 validates an instance of E02 according
 // to declarative validation rules in the API schema.
-func Validate_E02(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E02) (errs field.ErrorList) {
+func Validate_E02(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *E02) (errs field.ErrorList) {
+
 	earlyReturn := false
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E02, ShortCircuit"); len(e) != 0 {
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E02, ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
 	}
@@ -97,38 +133,52 @@ func Validate_E02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 
 // Validate_E03 validates an instance of E03 according
 // to declarative validation rules in the API schema.
-func Validate_E03(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E03) (errs field.ErrorList) {
+func Validate_E03(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *E03) (errs field.ErrorList) {
+
 	earlyReturn := false
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E03, ShortCircuit"); len(e) != 0 {
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E03, ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
 	}
 	if earlyReturn {
 		return // do not proceed
 	}
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E03, no flags")...)
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E03, no flags"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_EMultiple validates an instance of EMultiple according
 // to declarative validation rules in the API schema.
-func Validate_EMultiple(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *EMultiple) (errs field.ErrorList) {
+func Validate_EMultiple(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *EMultiple) (errs field.ErrorList) {
+
 	earlyReturn := false
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, ShortCircuit 1"); len(e) != 0 {
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, ShortCircuit 1").MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
 	}
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, ShortCircuit 2"); len(e) != 0 {
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, ShortCircuit 2").MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
 	}
 	if earlyReturn {
 		return // do not proceed
 	}
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, no flags 1")...)
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E0, string payload")...)
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, no flags 2")...)
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, no flags 1"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E0, string payload"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, no flags 2"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }

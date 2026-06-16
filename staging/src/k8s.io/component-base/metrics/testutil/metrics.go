@@ -114,6 +114,10 @@ func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
 	return textParser.TextToMetricFamilies(in)
 }
 
+func MetricFamilyToText(out io.Writer, in *dto.MetricFamily) (written int, err error) {
+	return expfmt.MetricFamilyToText(out, in)
+}
+
 // PrintSample returns formatted representation of metric Sample
 func PrintSample(sample *model.Sample) string {
 	buf := make([]string, 0)

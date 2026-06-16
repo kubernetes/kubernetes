@@ -20,6 +20,7 @@ import (
 	"time"
 
 	resourceapi "k8s.io/api/resource/v1beta2"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -51,5 +52,16 @@ func SetDefaults_DeviceSubRequest(obj *resourceapi.DeviceSubRequest) {
 func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
 	if obj.TimeAdded == nil {
 		obj.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
+	}
+}
+
+func SetDefaults_Device(obj *resourceapi.Device) {
+	// TODO: fix defaulter-gen not finding SetDefaults func on map value
+	for k, m := range obj.NodeAllocatableResourceMappings {
+		if m.AllocationMultiplier == nil {
+			q := resource.MustParse("1")
+			m.AllocationMultiplier = &q
+			obj.NodeAllocatableResourceMappings[k] = m
+		}
 	}
 }

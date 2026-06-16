@@ -276,6 +276,39 @@ var (
 		[]string{"traffic_policy", "ip_family"},
 	)
 
+	// WinKernelLBCreateFailure is the number of winkernel lb create failures that the proxy has seen.
+	WinKernelLBCreateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_lb_create_failures_total",
+			Help:           "Cumulative proxy winkernel lb create failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family", "lb_type", "error"},
+	)
+
+	// WinKernelLBUpdateFailure is the number of winkernel lb update failures that the proxy has seen.
+	WinKernelLBUpdateFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_lb_update_failures_total",
+			Help:           "Cumulative proxy winkernel lb update failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family", "lb_type", "error"},
+	)
+
+	// WinKernelLBDeleteFailure is the number of winkernel lb delete failures that the proxy has seen.
+	WinKernelLBDeleteFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_winkernel_lb_delete_failures_total",
+			Help:           "Cumulative proxy winkernel lb delete failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family", "lb_type", "error"},
+	)
+
 	// localhostNodePortsAcceptedPacketsDescription describe the metrics for the number of packets accepted
 	// by iptables which were destined for nodeports on loopback interface.
 	localhostNodePortsAcceptedPacketsDescription = metrics.NewDesc(
@@ -361,7 +394,13 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
-			// currently no winkernel-specific metrics
+			// Winkernel prometheus metrics.
+			// Cardinality for WinKernelLBCreateFailure, WinKernelLBUpdateFailure, and WinKernelLBDeleteFailure:
+			// ip_family(2) x lb_type(5) x error(5) = 50 max; in practice much lower
+			// since a proxier uses a single ip_family and most error/lb_type combos never fire.
+			legacyregistry.MustRegister(WinKernelLBCreateFailure)
+			legacyregistry.MustRegister(WinKernelLBUpdateFailure)
+			legacyregistry.MustRegister(WinKernelLBDeleteFailure)
 		}
 	})
 }

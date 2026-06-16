@@ -38,7 +38,7 @@ import (
 )
 
 type RESTStorageProvider struct {
-	Authorizer      authorizer.Authorizer
+	Authorizer      authorizer.UnconditionalAuthorizer
 	DiscoveryClient discovery.DiscoveryInterface
 }
 

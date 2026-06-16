@@ -24,7 +24,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 )
 
 // testcase wraps a callback which is called with a TContext that intercepts
@@ -52,8 +52,8 @@ func (tc testcase) run(t *testing.T) {
 
 		trace := buffer.log.String()
 		t.Logf("Trace:\n%s\n", trace)
-		assert.Equal(t, tc.expectDuration, duration, "callback invocation duration %s")
-		assert.Equal(t, tc.expectTrace, normalize(trace))
+		tCtx.Assert(duration).To(gomega.Equal(tc.expectDuration), "callback invocation duration %s")
+		tCtx.Assert(normalize(trace)).To(gomega.Equal(tc.expectTrace))
 	})
 }
 
@@ -80,11 +80,11 @@ type mockTB struct {
 }
 
 func (m *mockTB) Attr(key, value string) {
-	m.log.WriteString(fmt.Sprintf("(ATTR) %q %q\n", key, value))
+	fmt.Fprintf(&m.log, "(ATTR) %q %q\n", key, value)
 }
 
 func (m *mockTB) Chdir(dir string) {
-	m.log.WriteString(fmt.Sprintf("(CHDIR) %q\n", dir))
+	fmt.Fprintf(&m.log, "(CHDIR) %q\n", dir)
 }
 
 func (m *mockTB) Cleanup(func()) {
@@ -93,11 +93,11 @@ func (m *mockTB) Cleanup(func()) {
 }
 
 func (m *mockTB) Error(args ...any) {
-	m.log.WriteString(fmt.Sprintln(append([]any{"(ERROR)"}, args...)...))
+	fmt.Fprintln(&m.log, append([]any{"(ERROR)"}, args...)...)
 }
 
 func (m *mockTB) Errorf(format string, args ...any) {
-	m.log.WriteString(fmt.Sprintf("(ERRORF) "+format+"\n", args))
+	fmt.Fprintf(&m.log, "(ERRORF) "+format+"\n", args)
 }
 
 func (m *mockTB) Fail() {
@@ -115,12 +115,12 @@ func (m *mockTB) Failed() bool {
 }
 
 func (m *mockTB) Fatal(args ...any) {
-	m.log.WriteString(fmt.Sprintln(append([]any{"(FATAL)"}, args...)...))
+	fmt.Fprintln(&m.log, append([]any{"(FATAL)"}, args...)...)
 	panic(logBufferStop)
 }
 
 func (m *mockTB) Fatalf(format string, args ...any) {
-	m.log.WriteString(fmt.Sprintf("(FATALF) "+format+"\n", args))
+	fmt.Fprintf(&m.log, "(FATALF) "+format+"\n", args)
 	panic(logBufferStop)
 }
 
@@ -131,11 +131,11 @@ func (m *mockTB) Helper() {
 }
 
 func (m *mockTB) Log(args ...any) {
-	m.log.WriteString(fmt.Sprintln(append([]any{"(LOG)"}, args...)...))
+	fmt.Fprintln(&m.log, append([]any{"(LOG)"}, args...)...)
 }
 
 func (m *mockTB) Logf(format string, args ...any) {
-	m.log.WriteString(fmt.Sprintf("(LOGF) "+format+"\n", args))
+	fmt.Fprintf(&m.log, "(LOGF) "+format+"\n", args)
 }
 
 func (m *mockTB) Name() string {
@@ -149,7 +149,7 @@ func (m *mockTB) Setenv(key, value string) {
 }
 
 func (m *mockTB) Skip(args ...any) {
-	m.log.WriteString(fmt.Sprintln(append([]any{"(SKIP)"}, args...)...))
+	fmt.Fprintln(&m.log, append([]any{"(SKIP)"}, args...)...)
 	panic(logBufferStop)
 }
 
@@ -159,7 +159,7 @@ func (m *mockTB) SkipNow() {
 }
 
 func (m *mockTB) Skipf(format string, args ...any) {
-	m.log.WriteString(fmt.Sprintf("(SKIPF) "+format+"\n", args...))
+	fmt.Fprintf(&m.log, "(SKIPF) "+format+"\n", args)
 	panic(logBufferStop)
 }
 

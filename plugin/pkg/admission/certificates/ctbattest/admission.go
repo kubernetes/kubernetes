@@ -48,7 +48,7 @@ func Register(plugins *admission.Plugins) {
 // resource=signers resourceName=<the signer name> verb=attest.
 type Plugin struct {
 	*admission.Handler
-	authz authorizer.Authorizer
+	authz authorizer.UnconditionalAuthorizer
 
 	inspectedFeatureGates bool
 	enabled               bool
@@ -56,7 +56,7 @@ type Plugin struct {
 
 var _ admission.ValidationInterface = &Plugin{}
 var _ admission.InitializationValidator = &Plugin{}
-var _ genericadmissioninit.WantsAuthorizer = &Plugin{}
+var _ genericadmissioninit.WantsUnconditionalAuthorizer = &Plugin{}
 var _ genericadmissioninit.WantsFeatures = &Plugin{}
 
 func NewPlugin() *Plugin {
@@ -65,8 +65,8 @@ func NewPlugin() *Plugin {
 	}
 }
 
-// SetAuthorizer sets the plugin's authorizer.
-func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
+// SetUnconditionalAuthorizer sets the plugin's authorizer.
+func (p *Plugin) SetUnconditionalAuthorizer(authz authorizer.UnconditionalAuthorizer) {
 	p.authz = authz
 }
 

@@ -33,10 +33,7 @@ type stateMemory struct {
 var _ State = &stateMemory{}
 
 // NewStateMemory creates new State to track resources resourcesated to pods
-func NewStateMemory(resources PodResourceInfoMap) State {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func NewStateMemory(logger klog.Logger, resources PodResourceInfoMap) State {
 	if resources == nil {
 		resources = PodResourceInfoMap{}
 	}
@@ -89,11 +86,7 @@ func (s *stateMemory) GetPodResourceInfo(podUID types.UID) (PodResourceInfo, boo
 	return resourceInfo, ok
 }
 
-func (s *stateMemory) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-
+func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -115,10 +108,7 @@ func (s *stateMemory) SetContainerResources(podUID types.UID, containerName stri
 	return nil
 }
 
-func (s *stateMemory) SetPodLevelResources(podUID types.UID, resources *v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (s *stateMemory) SetPodLevelResources(logger klog.Logger, podUID types.UID, resources *v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -144,10 +134,7 @@ func (s *stateMemory) SetPodResourceInfo(logger klog.Logger, podUID types.UID, r
 	return nil
 }
 
-func (s *stateMemory) RemovePod(podUID types.UID) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (s *stateMemory) RemovePod(logger klog.Logger, podUID types.UID) error {
 	s.Lock()
 	defer s.Unlock()
 	delete(s.podResources, podUID)

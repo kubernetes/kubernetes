@@ -76,7 +76,7 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("VolumeAttachment must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("VolumeAttachment should not allow create on update")
 	}
 

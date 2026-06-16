@@ -42,6 +42,10 @@ import (
 )
 
 func newTestMetaAllocator() (*MetaAllocator, error) {
+	return newTestMetaAllocatorWithFamily(false)
+}
+
+func newTestMetaAllocatorWithFamily(isIPv6 bool) (*MetaAllocator, error) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
@@ -92,7 +96,7 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 		return false, ip, err
 	}))
 
-	c := newMetaAllocator(client.NetworkingV1(), serviceCIDRInformer, ipInformer, false, nil)
+	c := newMetaAllocator(client.NetworkingV1(), serviceCIDRInformer, ipInformer, isIPv6, nil)
 
 	c.serviceCIDRSynced = func() bool { return true }
 	c.ipAddressSynced = func() bool { return true }
@@ -601,14 +605,132 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 	}
 }
 
-// TODO: add IPv6 and dual stack test cases
-func newServiceCIDR(name, cidr string) *networkingv1.ServiceCIDR {
+func TestCIDRAllocateIPv6(t *testing.T) {
+	r, err := newTestMetaAllocatorWithFamily(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	if f := r.Free(); f != 0 {
+		t.Errorf("free: %d", f)
+	}
+	if _, err := r.AllocateNext(); err == nil {
+		t.Error(err)
+	}
+
+	// An IPv6 /120 network has 2^8 - 1 = 255 allocatable addresses: the network
+	// address is reserved and, unlike IPv4, IPv6 has no broadcast address.
+	cidr := newServiceCIDR("test", "fd00:1:2:3::/120")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr)
+	// wait for the cidr to be processed and set the informer synced
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("fd00:1:2:3::1"), true)
+		if err != nil {
+			t.Logf("unexpected error %v", err)
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := sets.NewString()
+	count := 0
+	for r.Free() > 0 {
+		ip, err := r.AllocateNext()
+		if err != nil {
+			t.Fatalf("error @ free: %d count: %d: %v", r.Free(), count, err)
+		}
+		if !netutils.IsIPv6(ip) {
+			t.Fatalf("expected an IPv6 address, got %s", ip.String())
+		}
+		count++
+		if found.Has(ip.String()) {
+			t.Fatalf("allocated %s twice: %d", ip, count)
+		}
+		found.Insert(ip.String())
+	}
+	if count != 255 {
+		t.Fatalf("expected 255 IPs got %d", count)
+	}
+	if _, err := r.AllocateNext(); err == nil {
+		t.Fatal(err)
+	}
+
+	// releasing every address must make the whole range available again
+	for _, ip := range found.List() {
+		if err := r.Release(netutils.ParseIPSloppy(ip)); err != nil {
+			t.Fatalf("unexpected error releasing ip %s: %v", ip, err)
+		}
+	}
+	if r.Used() > 0 {
+		t.Fatalf("expected allocator to be empty, got %d used", r.Used())
+	}
+}
+
+func TestCIDRAllocateDualStack(t *testing.T) {
+	// A dual-stack ServiceCIDR carries both an IPv4 and an IPv6 range. A
+	// family-specific MetaAllocator must only consume the range that matches its
+	// own family and ignore the other one.
+	r, err := newTestMetaAllocatorWithFamily(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	cidr := newServiceCIDR("test", "192.168.0.0/24", "fd00:1:2:3::/120")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr)
+	// wait for the IPv6 range of the dual-stack ServiceCIDR to be processed
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("fd00:1:2:3::1"), true)
+		if err != nil {
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the IPv4 range of the dual-stack ServiceCIDR must be ignored by an IPv6
+	// allocator, so no allocator should exist for it
+	if _, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), false); !errors.Is(err, ErrMismatchedNetwork) {
+		t.Fatalf("expected ErrMismatchedNetwork for the IPv4 range, got %v", err)
+	}
+
+	// allocations must come from the IPv6 range only
+	_, ipv6Net, err := netutils.ParseCIDRSloppy("fd00:1:2:3::/120")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ip, err := r.AllocateNext()
+	if err != nil {
+		t.Fatalf("unexpected error allocating an IPv6 address: %v", err)
+	}
+	if !ipv6Net.Contains(ip) {
+		t.Fatalf("expected IP %s to be in %s", ip.String(), ipv6Net.String())
+	}
+}
+
+func newServiceCIDR(name string, cidrs ...string) *networkingv1.ServiceCIDR {
 	return &networkingv1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: networkingv1.ServiceCIDRSpec{
-			CIDRs: []string{cidr},
+			CIDRs: cidrs,
 		},
 		Status: networkingv1.ServiceCIDRStatus{
 			Conditions: []metav1.Condition{

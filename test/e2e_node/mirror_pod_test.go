@@ -922,11 +922,6 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 			restartKubelet := mustStopKubelet(ctx, f)
 			restartKubelet(ctx)
 
-			ginkgo.By("ensuring kubelet is healthy")
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
-
 			// Let the goroutine run for a few more seconds to catch any delayed changes
 			time.Sleep(5 * time.Second)
 			close(stopCh)

@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
@@ -147,18 +148,17 @@ const (
 	// the previous rejection from noderesources plugin can be resolved.
 	// this plugin would implement QueueingHint for Pod/Update event
 	// that returns Queue when such label changes are made in unscheduled Pods.
+	//
+	// There is one general pod resource: Pod, that contains three specific pod resources: AssignedPod, UnscheduledPod, and TargetPod.
+	// Plugins can and are expected to register to specific pod events for better performance.
 	Pod EventResource = "Pod"
+	// AssignedPod resource is associated with the cluster event that gets triggered when a scheduled pod is updated.
+	AssignedPod EventResource = "AssignedPod"
+	// UnscheduledPod resource is associated with the cluster event that gets triggered when an unscheduled pod is updated, other than the target pod.
+	UnscheduledPod EventResource = "UnscheduledPod"
+	// TargetPod resource is associated with the cluster event that gets triggered when an unscheduled pod itself is updated.
+	TargetPod EventResource = "TargetPod"
 
-	// A note about NodeAdd event and UpdateNodeTaint event:
-	// When QHint is disabled, NodeAdd often isn't worked expectedly because of the internal feature called preCheck.
-	// It's definitely not something expected for plugin developers,
-	// and registering UpdateNodeTaint event is the only mitigation for now.
-	// So, kube-scheduler registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
-	// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuck in the
-	// unschedulable pod pool.
-	// This problematic preCheck feature is disabled when QHint is enabled,
-	// and eventually will be removed along with QHint graduation.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
 	Node                  EventResource = "Node"
 	PersistentVolume      EventResource = "PersistentVolume"
 	PersistentVolumeClaim EventResource = "PersistentVolumeClaim"
@@ -287,6 +287,8 @@ type NodeInfo interface {
 	Snapshot() NodeInfo
 	// String returns representation of human readable format of this NodeInfo.
 	String() string
+	// GetNodeAllocatableDRAClaimState returns the node allocatable DRA claim allocation states on this node.
+	GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*NodeAllocatableDRAClaimState
 
 	// AddPodInfo adds pod information to this NodeInfo.
 	// Consider using this instead of AddPod if a PodInfo is already computed.
@@ -297,31 +299,33 @@ type NodeInfo interface {
 	SetNode(node *v1.Node)
 }
 
-// QueuedPodInfo is a Pod wrapper with additional information related to
-// the pod's status in the scheduling queue, such as the timestamp when
-// it's added to the queue.
-type QueuedPodInfo interface {
-	// GetPodInfo returns the PodInfo object wrapped by this QueuedPodInfo instance.
-	GetPodInfo() PodInfo
-	// GetTimestamp returns the time pod added to the scheduling queue.
+// QueuedEntityInfo is an interface that represents a schedulable entity in the scheduling queue.
+// It can be a single Pod (QueuedPodInfo) or a group of Pods (QueuedPodGroupInfo).
+type QueuedEntityInfo interface {
+	// Type returns the type of the entity, e.g., "pod" or "podgroup".
+	Type() string
+	// GetPriority returns the priority of the entity.
+	GetPriority() int32
+	// GetTimestamp returns the time entity added to the scheduling queue.
 	GetTimestamp() time.Time
 	// GetAttempts returns the number of all schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric.
 	GetAttempts() int
-	// GetBackoffExpiration returns the time when the Pod will complete its backoff.
+	// GetBackoffExpiration returns the time when the entity will complete its backoff.
+	// It's empty for Pods that belong to a pod group. QueuedPodGroupInfo's BackoffExpiration is used instead.
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
-	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
-	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
+	// Then, two entities with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
+	// to make sure popping from the backoffQ considers priority of entities that are close to the expiration time.
 	GetBackoffExpiration() time.Time
-	// GetUnschedulableCount returns the total number of the scheduling attempts that this Pod gets unschedulable.
-	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
+	// GetUnschedulableCount returns the total number of the scheduling attempts that this entity gets unschedulable.
+	// Basically it equals Attempts, but when the entity fails with the Error status (e.g., the network error),
 	// this count won't be incremented.
-	// It's used to calculate the backoff time this Pod is obliged to get before retrying.
+	// It's used to calculate the backoff time this entity is obliged to get before retrying.
 	GetUnschedulableCount() int
-	// GetConsecutiveErrorsCount returns the number of the error status that this Pod gets sequentially.
-	// This count is reset when the Pod gets another status than Error.
+	// GetConsecutiveErrorsCount returns the number of the error status that this entity gets sequentially.
+	// This count is reset when the entity gets another status than Error.
 	//
-	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the Pod and hence need a backoff retry mechanism
+	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the entity and hence need a backoff retry mechanism
 	// because that might push more burden to the kube-apiserver.
 	// But, we don't want to calculate the backoff time in the same way as the normal unschedulable reason
 	// since the purpose is different; the backoff for a unschedulable status etc is for the punishment of wasting the scheduling cycles,
@@ -329,24 +333,24 @@ type QueuedPodInfo interface {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	GetConsecutiveErrorsCount() int
-	// GetInitialAttemptTimestamp returns the time when the pod is added to the queue for the first time. The pod may be added
+	// GetInitialAttemptTimestamp returns the time when the entity is added to the queue for the first time. The entity may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
-	// latency for a pod.
+	// latency for an entity.
 	GetInitialAttemptTimestamp() *time.Time
-	// GetUnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
+	// GetUnschedulablePlugins records the plugin names that the entity failed with Unschedulable or UnschedulableAndUnresolvable status
 	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
-	// If Pods are rejected at other extension points,
+	// If entities are rejected at other extension points,
 	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
 	// and retried soon after a backoff period.
 	// That is because such failures could be solved regardless of incoming cluster events (registered in EventsToRegister).
 	GetUnschedulablePlugins() sets.Set[string]
-	// GetPendingPlugins records the plugin names that the Pod failed with Pending status.
+	// GetPendingPlugins records the plugin names that the entity failed with Pending status.
 	GetPendingPlugins() sets.Set[string]
-	// GetGatingPlugin records the plugin name that gated the Pod at PreEnqueue.
+	// GetGatingPlugin records the plugin name that gated the entity at PreEnqueue.
 	GetGatingPlugin() string
-	// GetGatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
-	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
+	// GetGatingPluginEvents records the events registered by the plugin that gated the entity at PreEnqueue.
+	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the entity.
 	GetGatingPluginEvents() []ClusterEvent
 }
 
@@ -680,4 +684,20 @@ type PodGroupAssignments struct {
 	// during the pod group scheduling cycle.
 	// The pods are guaranteed to also be present in the PodGroupInfo.
 	ProposedAssignments []ProposedAssignment
+}
+
+// NodeAllocatableDRAClaimState holds information about a node allocatable resource DRA claim's allocation on a node.
+type NodeAllocatableDRAClaimState struct {
+	// ConsumerPods is a set of UIDs of pods that are consuming the DRA claim on this node.
+	ConsumerPods sets.Set[types.UID]
+}
+
+// Snapshot returns a copy of NodeAllocatableDRAClaimAllocationState with ConsumerPods cloned.
+func (s *NodeAllocatableDRAClaimState) Snapshot() *NodeAllocatableDRAClaimState {
+	if s == nil {
+		return nil
+	}
+	return &NodeAllocatableDRAClaimState{
+		ConsumerPods: s.ConsumerPods.Clone(),
+	}
 }

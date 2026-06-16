@@ -32,7 +32,7 @@ type MetricValueStatusApplyConfiguration struct {
 	// averageValue is the current value of the average of the
 	// metric across all relevant pods (as a quantity)
 	AverageValue *resource.Quantity `json:"averageValue,omitempty"`
-	// currentAverageUtilization is the current value of the average of the
+	// averageUtilization is the current value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
 	AverageUtilization *int32 `json:"averageUtilization,omitempty"`

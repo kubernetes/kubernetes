@@ -1120,6 +1120,9 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 		go func(ix int) {
 			defer deleteWait.Done()
 			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds); err != nil {
+				// We are cleaning up an expectation that this delete will be observed,
+				// since any failure to delete the pod means that we will never observe
+				// the delete.
 				dsc.expectations.DeletionObserved(logger, dsKey)
 				if !apierrors.IsNotFound(err) {
 					logger.V(2).Info("Failed deletion, decremented expectations for daemon set", "daemonset", klog.KObj(ds))

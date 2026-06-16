@@ -84,7 +84,7 @@ func GetLimits(res *ResourceOpts) v1.ResourceList {
 		if containerResources == nil || containerResources.Limits == nil {
 			return v1.ResourceList{}
 		}
-		return containerResources.Limits
+		return containerResources.Limits.DeepCopy()
 	}
 
 	containerLimits := limitsOrEmpty(res.ContainerResources)
@@ -99,13 +99,13 @@ func GetLimits(res *ResourceOpts) v1.ResourceList {
 	// When container-level CPU limit is not set, the pod-level
 	// limit CPU is applied at container-level
 	if containerLimits.Cpu().IsZero() && !podLevelLimits.Cpu().IsZero() {
-		containerLimits[v1.ResourceCPU] = podLevelLimits[v1.ResourceCPU]
+		containerLimits[v1.ResourceCPU] = podLevelLimits[v1.ResourceCPU].DeepCopy()
 	}
 
 	// When container-level Memory limit is not set, the pod-level
 	// limit Memory is applied at container-level
 	if containerLimits.Memory().IsZero() && !podLevelLimits.Memory().IsZero() {
-		containerLimits[v1.ResourceMemory] = podLevelLimits[v1.ResourceMemory]
+		containerLimits[v1.ResourceMemory] = podLevelLimits[v1.ResourceMemory].DeepCopy()
 	}
 	return containerLimits
 }

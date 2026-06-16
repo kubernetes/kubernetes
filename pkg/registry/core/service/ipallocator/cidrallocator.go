@@ -282,13 +282,13 @@ func (c *MetaAllocator) syncAllocators() error {
 			// Create new allocator for ServiceCIDR
 			_, ipnet, err := netutils.ParseCIDRSloppy(cidr) // this was already validated
 			if err != nil {
-				klog.Infof("error parsing cidr %s", cidr)
+				klog.Infof("error parsing cidr %s: %v", cidr, err)
 				continue
 			}
 			// New ServiceCIDR, create new allocator
 			allocator, err := NewIPAllocator(ipnet, c.client, c.ipAddressInformer)
 			if err != nil {
-				klog.Infof("error creating new IPAllocator for Service CIDR %s", cidr)
+				klog.Infof("error creating new IPAllocator for Service CIDR %s: %v", cidr, err)
 				continue
 			}
 			if c.metrics {

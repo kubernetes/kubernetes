@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	types0 "k8s.io/kubernetes/pkg/kubelet/types"
@@ -1668,16 +1669,16 @@ func (_c *MockRuntime_Type_Call) RunAndReturn(run func() string) *MockRuntime_Ty
 }
 
 // UpdateActuatedPodLevelResources provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) UpdateActuatedPodLevelResources(actuatedPod *v10.Pod) error {
-	ret := _mock.Called(actuatedPod)
+func (_mock *MockRuntime) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v10.Pod) error {
+	ret := _mock.Called(logger, actuatedPod)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateActuatedPodLevelResources")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*v10.Pod) error); ok {
-		r0 = returnFunc(actuatedPod)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v10.Pod) error); ok {
+		r0 = returnFunc(logger, actuatedPod)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1690,19 +1691,25 @@ type MockRuntime_UpdateActuatedPodLevelResources_Call struct {
 }
 
 // UpdateActuatedPodLevelResources is a helper method to define mock.On call
+//   - logger klog.Logger
 //   - actuatedPod *v10.Pod
-func (_e *MockRuntime_Expecter) UpdateActuatedPodLevelResources(actuatedPod interface{}) *MockRuntime_UpdateActuatedPodLevelResources_Call {
-	return &MockRuntime_UpdateActuatedPodLevelResources_Call{Call: _e.mock.On("UpdateActuatedPodLevelResources", actuatedPod)}
+func (_e *MockRuntime_Expecter) UpdateActuatedPodLevelResources(logger interface{}, actuatedPod interface{}) *MockRuntime_UpdateActuatedPodLevelResources_Call {
+	return &MockRuntime_UpdateActuatedPodLevelResources_Call{Call: _e.mock.On("UpdateActuatedPodLevelResources", logger, actuatedPod)}
 }
 
-func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) Run(run func(actuatedPod *v10.Pod)) *MockRuntime_UpdateActuatedPodLevelResources_Call {
+func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) Run(run func(logger klog.Logger, actuatedPod *v10.Pod)) *MockRuntime_UpdateActuatedPodLevelResources_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v10.Pod
+		var arg0 klog.Logger
 		if args[0] != nil {
-			arg0 = args[0].(*v10.Pod)
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -1713,7 +1720,7 @@ func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) Return(err error) *M
 	return _c
 }
 
-func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) RunAndReturn(run func(actuatedPod *v10.Pod) error) *MockRuntime_UpdateActuatedPodLevelResources_Call {
+func (_c *MockRuntime_UpdateActuatedPodLevelResources_Call) RunAndReturn(run func(logger klog.Logger, actuatedPod *v10.Pod) error) *MockRuntime_UpdateActuatedPodLevelResources_Call {
 	_c.Call.Return(run)
 	return _c
 }

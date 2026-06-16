@@ -24,13 +24,15 @@ import (
 )
 
 type RangeOptions struct {
-	Limit int64
-	Rev   int64
-	Count bool
+	Limit          int64
+	Rev            int64
+	CountOnly      bool
+	FastKeysOnly   bool
+	WithTotalCount bool
 }
 
 type RangeResult struct {
-	KVs   []mvccpb.KeyValue
+	KVs   []*mvccpb.KeyValue
 	Rev   int64
 	Count int
 }
@@ -86,7 +88,7 @@ type TxnWrite interface {
 	TxnRead
 	WriteView
 	// Changes gets the changes made since opening the write txn.
-	Changes() []mvccpb.KeyValue
+	Changes() []*mvccpb.KeyValue
 }
 
 // txnReadWrite coerces a read txn to a write, panicking on any write operation.
@@ -96,7 +98,7 @@ func (trw *txnReadWrite) DeleteRange(key, end []byte) (n, rev int64) { panic("un
 func (trw *txnReadWrite) Put(key, value []byte, lease lease.LeaseID) (rev int64) {
 	panic("unexpected Put")
 }
-func (trw *txnReadWrite) Changes() []mvccpb.KeyValue { return nil }
+func (trw *txnReadWrite) Changes() []*mvccpb.KeyValue { return nil }
 
 func NewReadOnlyTxnWrite(txn TxnRead) TxnWrite { return &txnReadWrite{txn} }
 

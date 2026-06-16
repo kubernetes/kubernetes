@@ -41,6 +41,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
@@ -108,43 +109,29 @@ const (
 // NewDualStackProxier returns a new Proxier for dual-stack operation
 func NewDualStackProxier(
 	ctx context.Context,
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	ipts map[v1.IPFamily]utiliptables.Interface,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	excludeCIDRs []string,
-	strictARP bool,
-	tcpTimeout time.Duration,
-	tcpFinTimeout time.Duration,
-	udpTimeout time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
 	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	scheduler string,
-	nodePortAddresses []string,
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, ipts[v1.IPv4Protocol], ipvs, ipset, sysctl,
-		syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol, ipts[v1.IPv4Protocol], ipvs, ipset, sysctl,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol], recorder,
-		healthzServer, scheduler, nodePortAddresses, initOnly)
+		healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, ipts[v1.IPv6Protocol], ipvs, ipset, sysctl,
-		syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
-		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol, ipts[v1.IPv6Protocol], ipvs, ipset, sysctl,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol], recorder,
-		healthzServer, scheduler, nodePortAddresses, initOnly)
+		healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -254,27 +241,17 @@ var _ proxy.Provider = &Proxier{}
 // NewProxier returns a new single-stack IPVS proxier.
 func NewProxier(
 	ctx context.Context,
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	ipFamily v1.IPFamily,
 	ipt utiliptables.Interface,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	excludeCIDRs []string,
-	strictARP bool,
-	tcpTimeout time.Duration,
-	tcpFinTimeout time.Duration,
-	udpTimeout time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
 	localDetector proxyutil.LocalTrafficDetector,
 	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	scheduler string,
-	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
@@ -315,7 +292,7 @@ func NewProxier(
 		return nil, err
 	}
 
-	if strictARP {
+	if config.IPVS.StrictARP {
 		// Set the arp_ignore sysctl we need for
 		if err := proxyutil.EnsureSysctl(sysctl, sysctlArpIgnore, 1); err != nil {
 			return nil, err
@@ -330,6 +307,9 @@ func NewProxier(
 	// Configure IPVS timeouts if any one of the timeout parameters have been set.
 	// This is the equivalent to running ipvsadm --set, a value of 0 indicates the
 	// current system timeout should be preserved
+	tcpTimeout := config.IPVS.TCPTimeout.Duration
+	tcpFinTimeout := config.IPVS.TCPFinTimeout.Duration
+	udpTimeout := config.IPVS.UDPTimeout.Duration
 	if tcpTimeout > 0 || tcpFinTimeout > 0 || udpTimeout > 0 {
 		if err := ipvs.ConfigureTimeouts(tcpTimeout, tcpFinTimeout, udpTimeout); err != nil {
 			logger.Error(err, "Failed to configure IPVS timeouts")
@@ -342,21 +322,25 @@ func NewProxier(
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
-	masqueradeValue := 1 << uint(masqueradeBit)
+	masqueradeValue := 1 << uint(*config.IPTables.MasqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 
 	logger.V(2).Info("Record nodeIP and family", "nodeIP", nodeIP, "family", ipFamily)
 
+	scheduler := config.IPVS.Scheduler
 	if len(scheduler) == 0 {
 		logger.Info("IPVS scheduler not specified, use rr by default")
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, config.NodePortAddresses)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
 
-	// excludeCIDRs has been validated before, here we just parse it to IPNet list
+	syncPeriod := config.SyncPeriod.Duration
+	minSyncPeriod := config.MinSyncPeriod.Duration
+
+	excludeCIDRs := filterCIDRs(ipFamily == v1.IPv6Protocol, config.IPVS.ExcludeCIDRs)
 	parsedExcludeCIDRs, _ := netutils.ParseCIDRs(excludeCIDRs)
 
 	proxier := &Proxier{
@@ -370,7 +354,7 @@ func NewProxier(
 		minSyncPeriod:         minSyncPeriod,
 		excludeCIDRs:          parsedExcludeCIDRs,
 		iptables:              ipt,
-		masqueradeAll:         masqueradeAll,
+		masqueradeAll:         config.Linux.MasqueradeAll,
 		masqueradeMark:        masqueradeMark,
 		conntrack:             conntrack.New(),
 		localDetector:         localDetector,

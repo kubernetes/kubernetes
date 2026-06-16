@@ -1,6 +1,7 @@
 ---
 dir: .
 filename: mocks.go
+include-auto-generated: true
 pkgname: driver
 template: testify
 template-data:

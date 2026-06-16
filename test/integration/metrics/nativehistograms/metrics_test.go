@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,13 +32,16 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	kubecontrollermanagertesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
 func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {
@@ -63,8 +67,6 @@ func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMet
 	}
 }
 
-// TestAPIServerNativeHistogramMetrics verifies that native histogram metrics are properly
-// exposed in apiserver when the NativeHistograms feature gate is enabled.
 func TestAPIServerNativeHistogramMetrics(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -109,8 +111,6 @@ func TestAPIServerNativeHistogramMetrics(t *testing.T) {
 	})
 }
 
-// TestSchedulerNativeHistogramMetrics verifies that native histogram metrics are properly
-// exposed in scheduler when the NativeHistograms feature gate is enabled.
 func TestSchedulerNativeHistogramMetrics(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -181,6 +181,61 @@ users:
 	}
 
 	histogramMetric := "scheduler_scheduling_algorithm_duration_seconds"
+	metrics, err := testutil.ScrapeMetricsProto(url+"/metrics", httpClient)
+	if err != nil {
+		t.Fatalf("failed to scrape metrics: %v", err)
+	}
+
+	mf, ok := metrics[histogramMetric]
+	if !ok {
+		t.Fatalf("metric %q not found", histogramMetric)
+	}
+
+	testutil.AssertHasNativeHistogram(t, mf, nil)
+}
+
+func TestControllerManagerNativeHistogramMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, true)
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer s.TearDownFn()
+
+	clientConfig := kubeconfig.CreateKubeConfig(s.ClientConfig)
+	kubeConfigFile := filepath.Join(t.TempDir(), "kubeconfig.yaml")
+	if err := clientcmd.WriteToFile(*clientConfig, kubeConfigFile); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	controllerManagerServer, err := kubecontrollermanagertesting.StartTestServer(
+		t, ctx,
+		[]string{"--kubeconfig", kubeConfigFile, "--leader-elect=false", "--authentication-skip-lookup=true", "--authorization-always-allow-paths=/metrics"},
+	)
+	if err != nil {
+		t.Fatalf("Failed to start kube-controller-manager server: %v", err)
+	}
+	if controllerManagerServer.TearDownFn != nil {
+		defer controllerManagerServer.TearDownFn()
+	}
+
+	secureInfo := controllerManagerServer.Config.SecureServing
+	secureOptions := controllerManagerServer.Options.SecureServing
+	url := fmt.Sprintf("https://%s", secureInfo.Listener.Addr().String())
+	url = strings.ReplaceAll(url, "[::]", "127.0.0.1")
+
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert: %v", err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: pool},
+		},
+	}
+
+	histogramMetric := "cronjob_controller_job_creation_skew_duration_seconds"
 	metrics, err := testutil.ScrapeMetricsProto(url+"/metrics", httpClient)
 	if err != nil {
 		t.Fatalf("failed to scrape metrics: %v", err)

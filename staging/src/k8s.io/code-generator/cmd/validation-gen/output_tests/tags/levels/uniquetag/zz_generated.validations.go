@@ -39,46 +39,80 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type UniqueStruct
-	scheme.AddValidationFunc((*UniqueStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_UniqueStruct(ctx, op, nil /* fldPath */, obj.(*UniqueStruct), safe.Cast[*UniqueStruct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*UniqueStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_UniqueStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*UniqueStruct),
+					safe.Cast[*UniqueStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_UniqueStruct validates an instance of UniqueStruct according
 // to declarative validation rules in the API schema.
-func Validate_UniqueStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UniqueStruct) (errs field.ErrorList) {
+func Validate_UniqueStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *UniqueStruct) (errs field.ErrorList) {
+
 	// field UniqueStruct.TypeMeta has no validation
 
-	// field UniqueStruct.AlphaUniqueSet
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UniqueStruct.AlphaUniqueSet
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha()...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("alphaUniqueSet"), obj.AlphaUniqueSet, safe.Field(oldObj, func(oldObj *UniqueStruct) []string { return oldObj.AlphaUniqueSet }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UniqueStruct) []string {
+				return oldObj.AlphaUniqueSet
+			})
+		errs = append(errs, fn(fldPath.Child("alphaUniqueSet"), obj.AlphaUniqueSet, oldVal, oldObj != nil)...)
+	}
 
-	// field UniqueStruct.BetaUniqueSet
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UniqueStruct.BetaUniqueSet
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta()...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("betaUniqueSet"), obj.BetaUniqueSet, safe.Field(oldObj, func(oldObj *UniqueStruct) []string { return oldObj.BetaUniqueSet }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UniqueStruct) []string {
+				return oldObj.BetaUniqueSet
+			})
+		errs = append(errs, fn(fldPath.Child("betaUniqueSet"), obj.BetaUniqueSet, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

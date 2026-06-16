@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	libcontainercgroups "github.com/opencontainers/cgroups"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -80,6 +82,16 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 	cgroupConfig := &CgroupConfig{
 		Name:               cm.cgroupRoot,
 		ResourceParameters: cm.getCgroupConfig(nodeAllocatable, false),
+	}
+
+	// Stale memory.min from a previously enabled MemoryQoS state can persist
+	// across kubelet restarts. Reset to 0 so rollback takes effect.
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
+		rp := cgroupConfig.ResourceParameters
+		if rp.Unified == nil {
+			rp.Unified = make(map[string]string)
+		}
+		rp.Unified[Cgroup2MemoryMin] = "0"
 	}
 
 	// Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.

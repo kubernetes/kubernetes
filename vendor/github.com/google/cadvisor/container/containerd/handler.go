@@ -46,6 +46,8 @@ type containerdContainerHandler struct {
 	reference info.ContainerReference
 	envs      map[string]string
 	labels    map[string]string
+	// Time at which this container was created.
+	creationTime time.Time
 	// Image name used for this container.
 	image string
 	// Filesystem handler.
@@ -148,6 +150,9 @@ func newContainerdContainerHandler(
 		libcontainerHandler: libcontainerHandler,
 		client:              client,
 	}
+	if !cntr.CreatedAt.IsZero() && !cntr.CreatedAt.Before(time.Unix(0, 0)) {
+		handler.creationTime = cntr.CreatedAt
+	}
 	// Add the name and bare ID as aliases of the container.
 	handler.image = cntr.Image
 
@@ -183,6 +188,13 @@ func (h *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	spec.Labels = h.labels
 	spec.Envs = h.envs
 	spec.Image = h.image
+	startTime := spec.CreationTime
+	if !h.creationTime.IsZero() {
+		spec.CreationTime = h.creationTime
+	}
+	if !startTime.IsZero() {
+		spec.StartTime = startTime
+	}
 
 	return spec, err
 }

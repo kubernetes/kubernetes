@@ -842,6 +842,7 @@ func TestRunSleepHandler(t *testing.T) {
 }
 
 func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pod",
@@ -909,12 +910,12 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, err := ndf.New(tc.registeredFeatures)
-			require.NoError(t, err)
-			handler := NewDeclaredFeaturesAdmitHandler(framework, ndf.NewFeatureSet(tc.nodeDeclaredFeatures...), tc.version)
+			framework := ndf.New(tc.registeredFeatures)
+			fs := framework.MustMapSorted(tc.nodeDeclaredFeatures)
+			handler := NewDeclaredFeaturesAdmitHandler(framework, fs, tc.version)
 			attrs := &PodAdmitAttributes{Pod: pod}
 
-			result := handler.Admit(attrs)
+			result := handler.Admit(tCtx, attrs)
 
 			require.Equal(t, tc.expectedAdmit, result.Admit)
 			if !result.Admit {

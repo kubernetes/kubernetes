@@ -32,7 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
-var _ = SIGDescribe("Terminate Pods", func() {
+var _ = SIGDescribe("Terminate Pods", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("terminate-pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

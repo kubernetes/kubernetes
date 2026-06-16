@@ -126,6 +126,12 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	} else if kp.config.ClientConnection.Kubeconfig != kubeproxyKubeConfigFileName {
 		warnDefaultComponentConfigValue(kind, "clientConnection.kubeconfig", kubeproxyKubeConfigFileName, kp.config.ClientConnection.Kubeconfig)
 	}
+
+	if kp.config.Mode == "ipvs" {
+		klog.Warningf("The %q field \"mode\" is set to \"ipvs\" which has been deprecated since version v1.35. "+
+			"For newer Linux kernel versions, we recommend using the \"nftables\" mode, which has been GA since v1.33. "+
+			"For older Linux kernel versions, you can use the \"iptables\" mode which is still the default one.", kind)
+	}
 }
 
 // Mutate is NOP for the kube-proxy config

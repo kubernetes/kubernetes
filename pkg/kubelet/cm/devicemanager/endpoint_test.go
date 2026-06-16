@@ -43,7 +43,7 @@ func newMockPluginManager() *mockPluginManager {
 	return &mockPluginManager{
 		func(string) error { return nil },
 		func(string, plugin.DevicePlugin) error { return nil },
-		func(klog.Logger, string) {},
+		func(klog.Logger, string, string) {},
 		func(string, *pluginapi.ListAndWatchResponse) {},
 	}
 }
@@ -51,7 +51,7 @@ func newMockPluginManager() *mockPluginManager {
 type mockPluginManager struct {
 	cleanupPluginDirectory     func(string) error
 	pluginConnected            func(string, plugin.DevicePlugin) error
-	pluginDisconnected         func(klog.Logger, string)
+	pluginDisconnected         func(klog.Logger, string, string)
 	pluginListAndWatchReceiver func(string, *pluginapi.ListAndWatchResponse)
 }
 
@@ -63,8 +63,8 @@ func (m *mockPluginManager) PluginConnected(_ context.Context, r string, p plugi
 	return m.pluginConnected(r, p)
 }
 
-func (m *mockPluginManager) PluginDisconnected(logger klog.Logger, r string) {
-	m.pluginDisconnected(logger, r)
+func (m *mockPluginManager) PluginDisconnected(logger klog.Logger, r string, s string) {
+	m.pluginDisconnected(logger, r, s)
 }
 
 func (m *mockPluginManager) PluginListAndWatchReceiver(_ klog.Logger, r string, lr *pluginapi.ListAndWatchResponse) {
@@ -288,7 +288,7 @@ func esetup(ctx context.Context, t *testing.T, devs []*pluginapi.Device, socket,
 	e := newEndpointImpl(dp)
 	e.client = c
 
-	m.pluginDisconnected = func(logger klog.Logger, r string) {
+	m.pluginDisconnected = func(logger klog.Logger, r string, s string) {
 		e.setStopTime(time.Now())
 	}
 

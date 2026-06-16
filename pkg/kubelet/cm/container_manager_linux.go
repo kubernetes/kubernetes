@@ -44,6 +44,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -54,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	memorymanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
@@ -235,7 +237,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
-	machineInfo, err := cadvisorInterface.MachineInfo()
+	machineInfo, err := cadvisorInterface.MachineInfo(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -404,8 +406,9 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			enforceCPULimits:  cm.EnforceCPULimits,
 			// cpuCFSQuotaPeriod is in microseconds. NodeConfig.CPUCFSQuotaPeriod is time.Duration (measured in nano seconds).
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
-			cpuCFSQuotaPeriod:   uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
-			podContainerManager: cm,
+			cpuCFSQuotaPeriod:       uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
+			podContainerManager:     cm,
+			memoryReservationPolicy: cm.MemoryReservationPolicy,
 		}
 	}
 	return &podContainerManagerNoop{
@@ -417,6 +420,18 @@ func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			if cm.cpuManager.GetResourceIsolationLevel(pod, &container) != cmqos.ResourceIsolationContainer {
+				return false
+			}
+		}
+
+		logger.V(4).Info("Pod has pinned cpus", "podName", pod.Name)
+		return true
+	}
+
 	return podHasExclusiveCPUs(logger, cm.cpuManager, pod)
 }
 
@@ -424,6 +439,16 @@ func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
 	logger := klog.TODO()
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) {
+		if cm.cpuManager.GetResourceIsolationLevel(pod, container) != cmqos.ResourceIsolationContainer {
+			return false
+		}
+
+		logger.V(4).Info("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		return true
+	}
+
 	return containerHasExclusiveCPUs(logger, cm.cpuManager, pod, container)
 }
 

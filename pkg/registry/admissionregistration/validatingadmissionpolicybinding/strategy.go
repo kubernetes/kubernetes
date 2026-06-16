@@ -18,7 +18,7 @@ package validatingadmissionpolicybinding
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/operation"
+
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -36,14 +36,16 @@ import (
 
 // validatingAdmissionPolicyBindingStrategy implements verification logic for ValidatingAdmissionPolicyBinding.
 type validatingAdmissionPolicyBindingStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
 
-var Strategy = validatingAdmissionPolicyBindingStrategy{}
+var Strategy = validatingAdmissionPolicyBindingStrategy{
+	DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+}
 
 type PolicyGetter interface {
 	// GetValidatingAdmissionPolicy returns a GetValidatingAdmissionPolicy
@@ -52,13 +54,13 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating ValidatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
 	return &validatingAdmissionPolicyBindingStrategy{
-		ObjectTyper:      legacyscheme.Scheme,
-		NameGenerator:    names.SimpleNameGenerator,
-		authorizer:       authorizer,
-		policyGetter:     policyGetter,
-		resourceResolver: resourceResolver,
+		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		NameGenerator:         names.SimpleNameGenerator,
+		authorizer:            authorizer,
+		policyGetter:          policyGetter,
+		resourceResolver:      resourceResolver,
 	}
 }
 
@@ -99,7 +101,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) Validate(ctx context.Context,
 			errs = append(errs, field.Forbidden(field.NewPath("spec", "paramRef"), err.Error()))
 		}
 	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, errs, operation.Create)
+	return errs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -116,7 +118,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Obje
 }
 
 // AllowCreateOnUpdate is false for ValidatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
-func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
+func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -131,7 +133,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) ValidateUpdate(ctx context.Co
 			errs = append(errs, field.Forbidden(field.NewPath("spec", "paramRef"), err.Error()))
 		}
 	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errs, operation.Update)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -142,6 +144,6 @@ func (v *validatingAdmissionPolicyBindingStrategy) WarningsOnUpdate(ctx context.
 
 // AllowUnconditionalUpdate is the default update policy for ValidatingAdmissionPolicyBinding objects. Status update should
 // only be allowed if version match.
-func (v *validatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate() bool {
+func (v *validatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

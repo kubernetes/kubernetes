@@ -167,6 +167,7 @@ message HPAScalingRules {
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
 // implementing the scale subresource based on the metrics specified.
+// +k8s:supportsSubresource="/status"
 message HorizontalPodAutoscaler {
   // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -224,6 +225,12 @@ message HorizontalPodAutoscalerCondition {
   // the transition
   // +optional
   optional string message = 5;
+
+  // observedGeneration represents the .metadata.generation that the condition was set based upon.
+  // For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+  // with respect to the current state of the instance.
+  // +optional
+  optional int64 observedGeneration = 6;
 }
 
 // HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
@@ -394,7 +401,7 @@ message MetricStatus {
   // +optional
   optional ResourceMetricStatus resource = 4;
 
-  // container resource refers to a resource metric (such as those specified in
+  // containerResource refers to a resource metric (such as those specified in
   // requests and limits) known to Kubernetes describing a single container in each pod in the
   // current scale target (e.g. CPU or memory). Such metrics are built in to
   // Kubernetes, and have special scaling options on top of those available
@@ -444,7 +451,7 @@ message MetricValueStatus {
   // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 2;
 
-  // currentAverageUtilization is the current value of the average of the
+  // averageUtilization is the current value of the average of the
   // resource metric across all relevant pods, represented as a percentage of
   // the requested value of the resource for the pods.
   // +optional
@@ -473,7 +480,7 @@ message ObjectMetricStatus {
   // current contains the current value for the given metric
   optional MetricValueStatus current = 2;
 
-  // DescribedObject specifies the descriptions of a object,such as kind,name apiVersion
+  // describedObject specifies the descriptions of a object,such as kind,name apiVersion
   optional CrossVersionObjectReference describedObject = 3;
 }
 

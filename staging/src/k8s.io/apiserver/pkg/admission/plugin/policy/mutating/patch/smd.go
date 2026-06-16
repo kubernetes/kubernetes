@@ -107,8 +107,8 @@ func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCos
 	}
 
 	patchObject := unstructured.Unstructured{Object: value}
-	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.GetObjectKind().GroupVersionKind())
-	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject, &patchObject)
+	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.Object().GetObjectKind().GroupVersionKind())
+	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject.Object(), &patchObject)
 	if err != nil {
 		return nil, fmt.Errorf("error applying patch: %w", err)
 	}

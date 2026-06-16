@@ -36,13 +36,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	cpnames "k8s.io/cloud-provider/names"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -66,9 +66,8 @@ const (
 
 // KubeControllerManagerOptions is the main context object for the kube-controller manager.
 type KubeControllerManagerOptions struct {
-	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
-	KubeCloudShared   *cpoptions.KubeCloudSharedOptions
-	ServiceController *cpoptions.ServiceControllerOptions
+	Generic         *cmoptions.GenericControllerManagerConfigurationOptions
+	KubeCloudShared *cpoptions.KubeCloudSharedOptions
 
 	AttachDetachController                    *AttachDetachControllerOptions
 	CSRSigningController                      *CSRSigningControllerOptions
@@ -135,9 +134,6 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s := KubeControllerManagerOptions{
 		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
 		KubeCloudShared: cpoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
-		ServiceController: &cpoptions.ServiceControllerOptions{
-			ServiceControllerConfiguration: &componentConfig.ServiceController,
-		},
 		AttachDetachController: &AttachDetachControllerOptions{
 			&componentConfig.AttachDetachController,
 		},
@@ -268,8 +264,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fss := cliflag.NamedFlagSets{}
 	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	s.ServiceController.AddFlags(fss.FlagSet(cpnames.ServiceLBController))
-
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
@@ -407,9 +401,6 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.SAController.ApplyTo(&c.ComponentConfig.SAController); err != nil {
 		return err
 	}
-	if err := s.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
-		return err
-	}
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
 		return err
 	}
@@ -468,7 +459,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ReplicationController.Validate()...)
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
-	errs = append(errs, s.ServiceController.Validate()...)
 	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)
@@ -529,6 +519,7 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
 	}
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultMutableFeatureGate)
 	s.Metrics.Apply()
 
 	if s.ParsedFlags != nil {

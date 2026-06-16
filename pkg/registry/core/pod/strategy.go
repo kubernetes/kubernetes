@@ -41,7 +41,6 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -60,13 +59,13 @@ import (
 
 // podStrategy implements behavior for Pods
 type podStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = podStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -135,7 +134,7 @@ func (podStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for pods.
-func (podStrategy) AllowCreateOnUpdate() bool {
+func (podStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -157,7 +156,7 @@ func (podStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
-func (podStrategy) AllowUnconditionalUpdate() bool {
+func (podStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -386,9 +385,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
 
 	newPod.Spec.Containers = containers
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		newPod.Spec.InitContainers = initContainers
-	}
+	newPod.Spec.InitContainers = initContainers
 
 	return newPod
 }
@@ -455,15 +452,11 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	var indexFields = []string{"spec.nodeName"}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
-		indexFields = append(indexFields, "metadata.namespace")
-	}
 	return storage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: indexFields,
+		IndexFields: []string{"spec.nodeName"},
 	}
 }
 
@@ -481,24 +474,11 @@ func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
-// NamespaceIndexFunc return value name of given object.
-func NamespaceIndexFunc(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return nil, fmt.Errorf("not a pod")
-	}
-	return []string{pod.Namespace}, nil
-}
-
 // Indexers returns the indexers for pod storage.
 func Indexers() *cache.Indexers {
-	var indexers = cache.Indexers{
+	return &cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
-		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
-	}
-	return &indexers
 }
 
 // ToSelectableFields returns a field set that represents the object

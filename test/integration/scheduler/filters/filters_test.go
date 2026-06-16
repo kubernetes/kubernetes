@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
@@ -3197,6 +3196,9 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	mockFeature.SetInferForUpdate(func(_, _ *ndf.PodInfo) bool { return false })
 	mockFeature.SetDiscover(func(*ndf.NodeConfiguration) bool { return false })
 
+	ndfFramework := ndf.New([]ndf.Feature{mockFeature})
+	ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
+
 	tests := []struct {
 		name           string
 		pod            *v1.Pod
@@ -3251,13 +3253,6 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.featureEnabled)
-			if tt.featureEnabled {
-				originalAllFeatures := ndffeatures.AllFeatures
-				ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
-				defer func() {
-					ndffeatures.AllFeatures = originalAllFeatures
-				}()
-			}
 			testCtx := testutils.InitTestSchedulerWithNS(t, "node-features-filter")
 			cs := testCtx.ClientSet
 			ns := testCtx.NS.Name

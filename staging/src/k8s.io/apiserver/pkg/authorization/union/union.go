@@ -33,6 +33,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+var _ = authorizer.Authorizer(unionAuthzHandler{})
+
 // unionAuthzHandler authorizer against a chain of authorizer.Authorizer
 type unionAuthzHandler []authorizer.Authorizer
 
@@ -66,6 +68,16 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 	}
 
 	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (authzHandler unionAuthzHandler) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(authzHandler.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (unionAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // unionAuthzRulesHandler authorizer against a chain of authorizer.RuleResolver

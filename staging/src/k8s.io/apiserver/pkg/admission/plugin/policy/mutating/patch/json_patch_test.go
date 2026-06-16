@@ -444,8 +444,8 @@ func TestJSONPatch(t *testing.T) {
 			vAttrs := &admission.VersionedAttributes{
 				Attributes:         attrs,
 				VersionedKind:      gvk,
-				VersionedObject:    tc.object,
-				VersionedOldObject: tc.oldObject,
+				VersionedObject:    admission.NewLazyObject(tc.object),
+				VersionedOldObject: admission.NewLazyObject(tc.oldObject),
 			}
 
 			r := Request{

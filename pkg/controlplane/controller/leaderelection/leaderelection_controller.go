@@ -103,7 +103,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	}
 
 	klog.Infof("Workers: %d", workers)
-	for i := 0; i < workers; i++ {
+	for range workers {
 		klog.Infof("Starting worker")
 		go wait.UntilWithContext(ctx, c.runElectionWorker, time.Second)
 	}
@@ -166,7 +166,9 @@ func (c *Controller) processNextElectionItem(ctx context.Context) bool {
 	}
 
 	intervalForRequeue, err := c.reconcileElectionStep(ctx, key)
-	utilruntime.HandleErrorWithContext(ctx, err, "Failed to reconcile election step")
+	if err != nil { // HandleErrorWithContext logs regardless of error value, filter out nil err.
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to reconcile election step", "key", key)
+	}
 	if intervalForRequeue != noRequeue {
 		defer c.queue.AddAfter(key, intervalForRequeue)
 	}

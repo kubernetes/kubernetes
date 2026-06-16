@@ -33,7 +33,7 @@ import (
 // LeaseCandidate defines a candidate for a Lease object.
 // Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 type LeaseCandidateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec contains the specification of the Lease.

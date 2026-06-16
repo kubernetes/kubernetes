@@ -58,6 +58,32 @@ func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourcea
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
+// IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
+// and partially consumed devices when consumable capacity is enabled.
+func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
+	// Check if device is fully allocated (traditional case).
+	if allocatedState.AllocatedDevices.Has(deviceID) {
+		return true
+	}
+
+	// Check if device is partially consumed via shared allocations (consumable capacity case).
+	// We need to check if any shared device ID corresponds to our device.
+	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
+		if sharedDeviceID.GetDeviceID() == deviceID {
+			return true
+		}
+	}
+
+	// For scheduler-generated state, consumed capacity is recorded together with
+	// a shared device ID. Keep this check to preserve IsDeviceAllocated semantics
+	// and handle manually constructed or future AllocatedState producers.
+	if _, hasConsumedCapacity := allocatedState.AggregatedCapacity[deviceID]; hasConsumedCapacity {
+		return true
+	}
+
+	return false
+}
+
 // GenerateShareID is a helper function that generates a new share ID.
 // This remains in the internal package as it's a utility function.
 func GenerateShareID() *types.UID {

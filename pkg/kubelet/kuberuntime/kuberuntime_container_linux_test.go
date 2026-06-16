@@ -28,24 +28,25 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/cpuset"
 	"k8s.io/utils/ptr"
 )
 
@@ -177,6 +178,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 		name               string
 		containerResources v1.ResourceRequirements
 		podResources       *v1.ResourceRequirements
+		cpuSets            map[string]cpuset.CPUSet
+		enableFeatures     map[featuregate.Feature]bool
 		expected           *runtimeapi.LinuxContainerResources
 	}{
 		{
@@ -227,6 +230,9 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 					v1.ResourceCPU:    resource.MustParse("3"),
 				},
 			},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources: true,
+			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
 				CpuQuota:           300000,
@@ -234,40 +240,145 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 				MemoryLimitInBytes: 256 * 1024 * 1024,
 			},
 		},
+		// The implementation of ContainerManager (containerManagerImpl) and its internal
+		// cpuManager field are not accessible from outside the cm package. Not possible
+		// to create a real containerManagerImpl and inject our mock CPU sets into it,
+		// so we are not able to test the disabled quota (-1). Only quota enabled tests were added.
+		{
+			name: "No exclusive CPUs, cpu quota disabled",
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  100000,
+				CpuShares: 1024,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers enabled, Exclusive CPUs, Guaranteed container, non integer CPUs",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  50000,
+				CpuShares: 512,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers enabled, Exclusive CPUs, non-Guaranteed container",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: true,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  200000,
+				CpuShares: 1024,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers disabled, Exclusive CPUs, Guaranteed container",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("100Mi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			cpuSets: map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: false,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           100000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 100 * 1024 * 1024,
+			},
+		},
+		{
+			name: "PodLevelResourceManagers disabled, Exclusive CPUs, Non Guaranteed container",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			},
+			containerResources: v1.ResourceRequirements{},
+			cpuSets:            map[string]cpuset.CPUSet{},
+			enableFeatures: map[featuregate.Feature]bool{
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: false,
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 100000,
+				CpuQuota:  200000,
+				CpuShares: 2048,
+			},
+		},
 	}
 
 	for _, test := range tests {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				UID:       "12345678",
-				Name:      "bar",
-				Namespace: "new",
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:            "foo",
-						Image:           "busybox",
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Command:         []string{"testCommand"},
-						WorkingDir:      "testWorkingDir",
-						Resources:       test.containerResources,
+		t.Run(test.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							ImagePullPolicy: v1.PullIfNotPresent,
+							Command:         []string{"testCommand"},
+							WorkingDir:      "testWorkingDir",
+							Resources:       test.containerResources,
+						},
 					},
 				},
-			},
-		}
+			}
 
-		if test.podResources != nil {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
-			pod.Spec.Resources = test.podResources
-		}
+			for feature, enabled := range test.enableFeatures {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, enabled)
 
-		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false)
-		assert.NoError(t, err)
-		assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
-		assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
-		assert.Equal(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
-		assert.Equal(t, test.expected.MemoryLimitInBytes, linuxConfig.GetResources().MemoryLimitInBytes, test.name)
+				if feature == features.PodLevelResources && test.podResources != nil {
+					pod.Spec.Resources = test.podResources
+				}
+			}
+
+			linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
+			assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
+			assert.Equal(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
+			assert.Equal(t, test.expected.MemoryLimitInBytes, linuxConfig.GetResources().MemoryLimitInBytes, test.name)
+		})
 	}
 }
 
@@ -425,6 +536,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
 
 	podRequestMemory := resource.MustParse("128Mi")
 	pod1LimitMemory := resource.MustParse("256Mi")
@@ -478,6 +590,26 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			},
 		},
 	}
+
+	// BestEffort: no memory request or limit (kubernetes/kubernetes#137685).
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "87654321",
+			Name:      "besteffort",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+				},
+			},
+		},
+	}
 	pageSize := int64(os.Getpagesize())
 	memoryNodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
 	pod1MemoryHigh := int64(math.Floor(
@@ -486,6 +618,8 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	pod2MemoryHigh := int64(math.Floor(
 		float64(podRequestMemory.Value())+
 			(float64(memoryNodeAllocatable.Value())-float64(podRequestMemory.Value()))*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+	pod3MemoryHigh := int64(math.Floor(
+		float64(memoryNodeAllocatable.Value())*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
 
 	type expectedResult struct {
 		containerConfig *runtimeapi.LinuxContainerConfig
@@ -494,6 +628,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	}
 	l1, _ := m.generateLinuxContainerConfig(tCtx, &pod1.Spec.Containers[0], pod1, new(int64), "", nil, true)
 	l2, _ := m.generateLinuxContainerConfig(tCtx, &pod2.Spec.Containers[0], pod2, new(int64), "", nil, true)
+	l3, _ := m.generateLinuxContainerConfig(tCtx, &pod3.Spec.Containers[0], pod3, new(int64), "", nil, true)
 	tests := []struct {
 		name     string
 		pod      *v1.Pod
@@ -517,15 +652,104 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 				int64(pod2MemoryHigh),
 			},
 		},
+		{
+			name: "BestEffortUsesNodeAllocatableForMemoryHigh",
+			pod:  pod3,
+			expected: &expectedResult{
+				l3,
+				0,
+				int64(pod3MemoryHigh),
+			},
+		},
 	}
 
 	for _, test := range tests {
 		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
+		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.low"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
 	}
+}
+
+func TestGenerateContainerConfigMemoryQoSPolicyNone(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.NoneMemoryReservationPolicy
+
+	podRequestMemory := resource.MustParse("128Mi")
+	podLimitMemory := resource.MustParse("256Mi")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: podRequestMemory},
+						Limits:   v1.ResourceList{v1.ResourceMemory: podLimitMemory},
+					},
+				},
+			},
+		},
+	}
+
+	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true)
+	require.NoError(t, err)
+	assert.Equal(t, "0", linuxConfig.GetResources().GetUnified()["memory.min"])
+	assert.NotEmpty(t, linuxConfig.GetResources().GetUnified()["memory.high"])
+}
+
+func TestMemoryHighClearedWhenMemoryQoSDisabled(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
+
+	setCgroupVersionDuringTest(cgroupV2)
+	t.Cleanup(func() {
+		setCgroupVersionDuringTest(cgroupV1)
+	})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "foo",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+					},
+				},
+			},
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
+	enabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NotNil(t, enabledResources)
+	memoryHigh := enabledResources.GetLinux().GetUnified()["memory.high"]
+	assert.NotEmpty(t, memoryHigh, "memory.high should be set when MemoryQoS is enabled")
+	assert.NotEqual(t, "max", memoryHigh, "memory.high should not be 'max' when MemoryQoS is enabled")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, false)
+	disabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NotNil(t, disabledResources)
+	assert.Equal(t, "max", disabledResources.GetLinux().GetUnified()["memory.high"],
+		"memory.high should be 'max' when MemoryQoS is disabled on cgroup v2")
 }
 
 func TestGetHugepageLimitsFromResources(t *testing.T) {
@@ -1031,7 +1255,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			false,
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1", "memory.high": "max"}},
 			cgroupV2,
 		},
 		{
@@ -1039,7 +1263,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			false,
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1", "memory.high": "max"}},
 			cgroupV2,
 		},
 		{
@@ -1047,7 +1271,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			nil,
 			false,
-			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1", "memory.high": "max"}},
 			cgroupV2,
 		},
 	} {
@@ -1879,7 +2103,7 @@ func TestGenerateUpdatePodSandboxResourcesRequest(t *testing.T) {
 			expectedLcr := m.calculateSandboxResources(tCtx, tc.pod)
 			expectedLcrOverhead := m.convertOverheadToLinuxResources(tc.pod)
 
-			podResourcesCfg := cm.ResourceConfigForPod(tc.pod, tc.enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
+			podResourcesCfg := cm.ResourceConfigForPod(tc.pod, tc.enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false, kubeletconfiginternal.NoneMemoryReservationPolicy)
 			assert.NotNil(t, podResourcesCfg, "podResourcesCfg is expected to be not nil")
 
 			if podResourcesCfg.CPUPeriod == nil {
@@ -1917,7 +2141,7 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	runtimePod, err := m.GetPod(tCtx, pod.UID)

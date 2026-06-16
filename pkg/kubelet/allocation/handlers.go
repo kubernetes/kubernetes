@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -24,7 +25,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -55,7 +55,7 @@ type podResizesAdmitHandler struct {
 	logger            klog.Logger
 }
 
-func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (h *podResizesAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	if attrs.Operation != lifecycle.ResizeOperation {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
@@ -97,25 +97,6 @@ func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) life
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_memory_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 		}
-	}
-
-	allocatable := h.containerManager.GetNodeAllocatableAbsolute()
-	cpuAvailable := allocatable.Cpu().MilliValue()
-	memAvailable := allocatable.Memory().Value()
-	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
-	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
-
-	if cpuRequests > cpuAvailable || memRequests > memAvailable {
-		var msg string
-		if memRequests > memAvailable {
-			msg = fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAvailable)
-		} else {
-			msg = fmt.Sprintf("cpu, requested: %d, capacity: %d", cpuRequests, cpuAvailable)
-		}
-		msg = "Node didn't have enough capacity: " + msg
-		h.logger.V(3).Info(msg, "pod", klog.KObj(pod))
-		metrics.PodInfeasibleResizes.WithLabelValues("insufficient_node_allocatable").Inc()
-		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 	}
 
 	return lifecycle.PodAdmitResult{Admit: true}

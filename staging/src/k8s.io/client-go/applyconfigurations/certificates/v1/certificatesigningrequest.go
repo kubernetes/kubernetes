@@ -41,7 +41,7 @@ import (
 // (with the "kubernetes.io/kube-apiserver-client" signerName),
 // or to obtain certificates from custom non-Kubernetes signers.
 type CertificateSigningRequestApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.

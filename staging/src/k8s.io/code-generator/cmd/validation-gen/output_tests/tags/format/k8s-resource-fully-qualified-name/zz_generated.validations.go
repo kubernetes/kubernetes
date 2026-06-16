@@ -38,64 +38,113 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_FullyQualifiedNameStringType validates an instance of FullyQualifiedNameStringType according
 // to declarative validation rules in the API schema.
-func Validate_FullyQualifiedNameStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *FullyQualifiedNameStringType) (errs field.ErrorList) {
-	errs = append(errs, validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj)...)
+func Validate_FullyQualifiedNameStringType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *FullyQualifiedNameStringType) (errs field.ErrorList) {
+
+	if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.FullyQualifiedNameField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.FullyQualifiedNameField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("fullyQualifiedNameField"), &obj.FullyQualifiedNameField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.FullyQualifiedNameField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.FullyQualifiedNameField
+			})
+		errs = append(errs, fn(fldPath.Child("fullyQualifiedNameField"), &obj.FullyQualifiedNameField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.FullyQualifiedNamePtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.FullyQualifiedNamePtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("fullyQualifiedNamePtrField"), obj.FullyQualifiedNamePtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.FullyQualifiedNamePtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.FullyQualifiedNamePtrField
+			})
+		errs = append(errs, fn(fldPath.Child("fullyQualifiedNamePtrField"), obj.FullyQualifiedNamePtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.FullyQualifiedNameTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *FullyQualifiedNameStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.FullyQualifiedNameTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *FullyQualifiedNameStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_FullyQualifiedNameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("fullyQualifiedNameTypedefField"), &obj.FullyQualifiedNameTypedefField, safe.Field(oldObj, func(oldObj *Struct) *FullyQualifiedNameStringType { return &oldObj.FullyQualifiedNameTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *FullyQualifiedNameStringType {
+				return &oldObj.FullyQualifiedNameTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("fullyQualifiedNameTypedefField"), &obj.FullyQualifiedNameTypedefField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

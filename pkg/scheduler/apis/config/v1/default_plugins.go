@@ -67,6 +67,9 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
 		applyGangScheduling(config)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		applyTopologyAwareWorkloadScheduling(config)
+	}
 }
 
 func applyDynamicResources(config *v1.Plugins) {
@@ -89,6 +92,11 @@ func applyDynamicResources(config *v1.Plugins) {
 
 func applyGangScheduling(config *v1.Plugins) {
 	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.GangScheduling})
+}
+
+func applyTopologyAwareWorkloadScheduling(config *v1.Plugins) {
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.TopologyPlacementGenerator})
+	config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)})
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.

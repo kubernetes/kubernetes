@@ -17,14 +17,14 @@ package mvcc
 import (
 	"sync"
 
-	"github.com/google/btree"
 	"go.uber.org/zap"
+	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
 type index interface {
 	Get(key []byte, atRev int64) (rev, created Revision, ver int64, err error)
-	Range(key, end []byte, atRev int64) ([][]byte, []Revision)
-	Revisions(key, end []byte, atRev int64, limit int) ([]Revision, int)
+	Range(key, end []byte, atRev int64, limit int, withTotalCount bool) (keys [][]byte, modifies, creates []Revision, versions []int64, totalCount int)
+	Revisions(key, end []byte, atRev int64, limit int, withTotalCount bool) ([]Revision, int)
 	CountRevisions(key, end []byte, atRev int64) int
 	Put(key []byte, rev Revision)
 	Tombstone(key []byte, rev Revision) error
@@ -38,13 +38,13 @@ type index interface {
 
 type treeIndex struct {
 	sync.RWMutex
-	tree *btree.BTreeG[*keyIndex]
+	tree *btree.BTree[*keyIndex]
 	lg   *zap.Logger
 }
 
 func newTreeIndex(lg *zap.Logger) index {
 	return &treeIndex{
-		tree: btree.NewG(32, func(aki *keyIndex, bki *keyIndex) bool {
+		tree: btree.New(32, func(aki *keyIndex, bki *keyIndex) bool {
 			return aki.Less(bki)
 		}),
 		lg: lg,
@@ -109,7 +109,7 @@ func (ti *treeIndex) unsafeVisit(key, end []byte, f func(ki *keyIndex) bool) {
 // Revisions returns limited number of revisions from key(included) to end(excluded)
 // at the given rev. The returned slice is sorted in the order of key. There is no limit if limit <= 0.
 // The second return parameter isn't capped by the limit and reflects the total number of revisions.
-func (ti *treeIndex) Revisions(key, end []byte, atRev int64, limit int) (revs []Revision, total int) {
+func (ti *treeIndex) Revisions(key, end []byte, atRev int64, limit int, withTotalCount bool) (revs []Revision, totalCount int) {
 	ti.RLock()
 	defer ti.RUnlock()
 
@@ -121,15 +121,19 @@ func (ti *treeIndex) Revisions(key, end []byte, atRev int64, limit int) (revs []
 		return []Revision{rev}, 1
 	}
 	ti.unsafeVisit(key, end, func(ki *keyIndex) bool {
+		reachedLimit := limit > 0 && len(revs) >= limit
+		if reachedLimit && !withTotalCount {
+			return false
+		}
 		if rev, _, _, err := ki.get(ti.lg, atRev); err == nil {
-			if limit <= 0 || len(revs) < limit {
+			if !reachedLimit {
 				revs = append(revs, rev)
 			}
-			total++
+			totalCount++
 		}
 		return true
 	})
-	return revs, total
+	return revs, totalCount
 }
 
 // CountRevisions returns the number of revisions
@@ -155,25 +159,34 @@ func (ti *treeIndex) CountRevisions(key, end []byte, atRev int64) int {
 	return total
 }
 
-func (ti *treeIndex) Range(key, end []byte, atRev int64) (keys [][]byte, revs []Revision) {
+func (ti *treeIndex) Range(key, end []byte, atRev int64, limit int, withTotalCount bool) (keys [][]byte, modifies, creates []Revision, versions []int64, totalCount int) {
 	ti.RLock()
 	defer ti.RUnlock()
 
 	if end == nil {
-		rev, _, _, err := ti.unsafeGet(key, atRev)
+		modified, created, version, err := ti.unsafeGet(key, atRev)
 		if err != nil {
-			return nil, nil
+			return nil, nil, nil, nil, 0
 		}
-		return [][]byte{key}, []Revision{rev}
+		return [][]byte{key}, []Revision{modified}, []Revision{created}, []int64{version}, 1
 	}
 	ti.unsafeVisit(key, end, func(ki *keyIndex) bool {
-		if rev, _, _, err := ki.get(ti.lg, atRev); err == nil {
-			revs = append(revs, rev)
-			keys = append(keys, ki.key)
+		reachedLimit := limit > 0 && len(keys) >= limit
+		if reachedLimit && !withTotalCount {
+			return false
+		}
+		if modified, created, version, err := ki.get(ti.lg, atRev); err == nil {
+			if !reachedLimit {
+				modifies = append(modifies, modified)
+				keys = append(keys, ki.key)
+				creates = append(creates, created)
+				versions = append(versions, version)
+			}
+			totalCount++
 		}
 		return true
 	})
-	return keys, revs
+	return keys, modifies, creates, versions, totalCount
 }
 
 func (ti *treeIndex) Tombstone(key []byte, rev Revision) error {

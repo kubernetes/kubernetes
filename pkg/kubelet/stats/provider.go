@@ -114,7 +114,7 @@ func (p *Provider) RlimitStats() (*statsapi.RlimitStats, error) {
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
 // this function doesn't generate filesystem stats.
-func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (p *Provider) GetCgroupStats(ctx context.Context, cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
 		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
@@ -122,9 +122,7 @@ func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsap
 		}
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a context parameter.
-	logger := klog.TODO()
+	logger := klog.FromContext(ctx)
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
 	s := cadvisorInfoToContainerStats(logger, cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(info)

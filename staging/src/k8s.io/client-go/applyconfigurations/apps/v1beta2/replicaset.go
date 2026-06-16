@@ -34,7 +34,7 @@ import (
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
 	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

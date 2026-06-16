@@ -32,10 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podgrouppodscount"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/topologyaware"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
@@ -69,6 +71,8 @@ func NewInTreeRegistry() runtime.Registry {
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
 		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
 		gangscheduling.Name:                  runtime.FactoryAdapter(fts, gangscheduling.New),
+		topologyaware.Name:                   runtime.FactoryAdapter(fts, topologyaware.New),
+		podgrouppodscount.Name:               runtime.FactoryAdapter(fts, podgrouppodscount.New),
 	}
 
 	return registry

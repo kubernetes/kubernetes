@@ -53,5 +53,5 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(logger klog.Logger, p
 }
 
 func (i *internalContainerLifecycleImpl) PostStopContainer(logger klog.Logger, containerID string) error {
-	return i.topologyManager.RemoveContainer(containerID)
+	return i.topologyManager.RemoveContainer(logger, containerID)
 }

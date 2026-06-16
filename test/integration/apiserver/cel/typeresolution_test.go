@@ -348,7 +348,7 @@ func TestBuiltinResolution(t *testing.T) {
 					continue
 				}
 				// skip private, reference, and alias types that cannot appear in the wild
-				if gvk.Kind == "SerializedReference" || gvk.Kind == "List" || gvk.Kind == "RangeAllocation" || gvk.Kind == "PodStatusResult" {
+				if gvk.Kind == "SerializedReference" || gvk.Kind == "List" || gvk.Kind == "RangeAllocation" {
 					continue
 				}
 				// skip internal types

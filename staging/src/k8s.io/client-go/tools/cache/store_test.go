@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -244,5 +245,21 @@ func TestCacheTransactionShouldIndexErrors(t *testing.T) {
 				t.Errorf("unexpected error: %v", txnErr)
 			}
 		})
+	}
+}
+
+func TestWithStoreMetricsDefaulting(t *testing.T) {
+	name, err := NewInformerName("test-informer")
+	if err != nil {
+		t.Fatalf("failed to create informer name: %v", err)
+	}
+	defer name.Release()
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	id := name.WithResource(gvr)
+
+	s := NewStore(testStoreKeyFunc, WithStoreMetrics(id, nil)).(*cache)
+
+	if s.metrics == nil {
+		t.Errorf("expected c.metrics to be populated, got nil")
 	}
 }

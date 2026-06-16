@@ -26,7 +26,7 @@ import (
 
 // AdmissionConfiguration provides versioned configuration for admission controllers.
 type AdmissionConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Plugins allows specifying a configuration per admission control plugin.
 	// +optional
@@ -54,7 +54,7 @@ type AdmissionPluginConfiguration struct {
 
 // EgressSelectorConfiguration provides versioned configuration for egress selector clients.
 type EgressSelectorConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// connectionServices contains a list of egress selection client configurations
 	EgressSelections []EgressSelection `json:"egressSelections"`
@@ -157,17 +157,17 @@ type TLSConfig struct {
 
 // TracingConfiguration provides versioned configuration for tracing clients.
 type TracingConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Embed the component config tracing configuration struct
-	tracingapi.TracingConfiguration `json:",inline"`
+	tracingapi.TracingConfiguration `json:""`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AuthenticationConfiguration provides versioned configuration for authentication.
 type AuthenticationConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	// jwt is a list of authenticator to authenticate Kubernetes users using
 	// JWT compliant tokens. The authenticator will attempt to parse a raw ID token,
@@ -532,7 +532,7 @@ type UserValidationRule struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type AuthorizationConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:""`
 
 	// Authorizers is an ordered list of authorizers to
 	// authorize requests against.

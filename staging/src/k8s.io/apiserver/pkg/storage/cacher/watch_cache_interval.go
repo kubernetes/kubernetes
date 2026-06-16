@@ -18,7 +18,6 @@ package cacher
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
@@ -119,20 +118,6 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-type sortableWatchCacheEvents []*watchCacheEvent
-
-func (s sortableWatchCacheEvents) Len() int {
-	return len(s)
-}
-
-func (s sortableWatchCacheEvents) Less(i, j int) bool {
-	return s[i].Key < s[j].Key
-}
-
-func (s sortableWatchCacheEvents) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
@@ -168,7 +153,6 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 		}
 		buffer.endIndex++
 	}
-	sort.Sort(sortableWatchCacheEvents(buffer.buffer))
 	ci := &watchCacheInterval{
 		startIndex: 0,
 		// Simulate that we already have all the events we're looking for.
@@ -243,6 +227,11 @@ func (wcib *watchCacheIntervalBuffer) next() (*watchCacheEvent, bool) {
 		return nil, false
 	}
 	next := wcib.buffer[wcib.startIndex]
+	// clean the unused event reference in the buffer. If this is not
+	// done, event if the watch event is aged out from the watch
+	// cache, it will not be GCed during the lifetime of the watcher
+	// that holds a reference to the buffer.
+	wcib.buffer[wcib.startIndex] = nil
 	wcib.startIndex++
 	return next, true
 }

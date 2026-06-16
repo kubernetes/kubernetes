@@ -63,7 +63,7 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -392,6 +392,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithResource("devicetaintrules"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().DeviceTaintRules().Informer()}, nil
+	case v1alpha3.SchemeGroupVersion.WithResource("resourcepoolstatusrequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourcePoolStatusRequests().Informer()}, nil
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithResource("deviceclasses"):
@@ -419,11 +421,11 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case schedulingv1.SchemeGroupVersion.WithResource("priorityclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1().PriorityClasses().Informer()}, nil
 
-		// Group=scheduling.k8s.io, Version=v1alpha2
-	case schedulingv1alpha2.SchemeGroupVersion.WithResource("podgroups"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha2().PodGroups().Informer()}, nil
-	case schedulingv1alpha2.SchemeGroupVersion.WithResource("workloads"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha2().Workloads().Informer()}, nil
+		// Group=scheduling.k8s.io, Version=v1alpha3
+	case schedulingv1alpha3.SchemeGroupVersion.WithResource("podgroups"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha3().PodGroups().Informer()}, nil
+	case schedulingv1alpha3.SchemeGroupVersion.WithResource("workloads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha3().Workloads().Informer()}, nil
 
 		// Group=scheduling.k8s.io, Version=v1beta1
 	case schedulingv1beta1.SchemeGroupVersion.WithResource("priorityclasses"):

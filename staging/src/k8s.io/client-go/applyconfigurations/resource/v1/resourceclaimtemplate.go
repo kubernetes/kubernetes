@@ -32,7 +32,7 @@ import (
 //
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 type ResourceClaimTemplateApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Describes the ResourceClaim that is to be generated.

@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	usernamespacefeature "k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/volume"
@@ -119,7 +120,7 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	// determine pod resource allocation
 	// we use the same function for pod cgroup assignment to maintain consistent behavior
 	// NOTE: this could be nil on systems that do not support pod memory containment (i.e. windows)
-	podResourceConfig := cm.ResourceConfigForPod(pod, false, uint64(100000), false)
+	podResourceConfig := cm.ResourceConfigForPod(pod, false, uint64(100000), false, config.NoneMemoryReservationPolicy)
 	if podResourceConfig != nil && podResourceConfig.Memory != nil {
 		podMemoryLimit := resource.NewQuantity(*(podResourceConfig.Memory), resource.BinarySI)
 		// ensure 0 < value < size
@@ -502,7 +503,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 
@@ -533,7 +534,7 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 		}
 		err := fsquota.ClearQuota(ed.mounter, dir, userNamespacesEnabled)
 		if err != nil {
-			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
+			klog.Warningf("Failed to clear quota on %s: %v", dir, err)
 		}
 	}
 	// Renaming the directory is not required anymore because the operation executor

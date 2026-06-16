@@ -31,10 +31,10 @@ import (
 
 	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
-func SetSysctls(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+func SetSysctls(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
 	return setSysctls(ctx, realConntrackConfigurer{}, config)
 }
 
@@ -57,8 +57,8 @@ type conntrackConfigurer interface {
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 }
 
-func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
-	max, err := getConntrackMax(ctx, config)
+func setSysctls(ctx context.Context, ct conntrackConfigurer, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
+	max, err := getConntrackMax(ctx, config, detectNumCPU())
 	if err != nil {
 		return err
 	}
@@ -106,14 +106,20 @@ func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfig
 	return nil
 }
 
-func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
+func getConntrackMax(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration, numCPU int) (int, error) {
 	logger := klog.FromContext(ctx)
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
 		if config.Min != nil {
 			floor = int(*config.Min)
 		}
-		scaled := int(*config.MaxPerCore) * detectNumCPU()
+		scaled := int(*config.MaxPerCore) * numCPU
+		// Cap the value to 1M to avoid excessive memory usage on high-core machines
+		const maxLimit = 1048576
+		if scaled > maxLimit {
+			logger.V(3).Info("GetConntrackMax: capping scaled conntrack-max-per-core", "scaled", scaled, "limit", maxLimit)
+			return maxLimit, nil
+		}
 		if scaled > floor {
 			logger.V(3).Info("GetConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil

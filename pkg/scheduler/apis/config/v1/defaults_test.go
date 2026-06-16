@@ -57,7 +57,8 @@ var pluginConfigs = []configv1.PluginConfig{
 				Kind:       "DynamicResourcesArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1",
 			},
-			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+			FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+			BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
 		}},
 	},
 	{
@@ -279,7 +280,8 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "DynamicResourcesArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1",
 									},
-									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+									FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+									BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
 								}},
 							},
 							{

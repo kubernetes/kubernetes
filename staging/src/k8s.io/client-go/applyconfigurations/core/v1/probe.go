@@ -25,7 +25,7 @@ package v1
 // alive or ready to receive traffic.
 type ProbeApplyConfiguration struct {
 	// The action taken to determine the health of a container
-	ProbeHandlerApplyConfiguration `json:",inline"`
+	ProbeHandlerApplyConfiguration `json:""`
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	InitialDelaySeconds *int32 `json:"initialDelaySeconds,omitempty"`

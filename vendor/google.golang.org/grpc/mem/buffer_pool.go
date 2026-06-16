@@ -19,10 +19,10 @@
 package mem
 
 import (
-	"sort"
-	"sync"
+	"fmt"
 
 	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/internal/mem"
 )
 
 // BufferPool is a pool of buffers that can be shared and reused, resulting in
@@ -38,22 +38,25 @@ type BufferPool interface {
 	Put(*[]byte)
 }
 
-const goPageSize = 4 << 10 // 4KiB. N.B. this must be a power of 2.
-
-var defaultBufferPoolSizes = []int{
-	256,
-	goPageSize,
-	16 << 10, // 16KB (max HTTP/2 frame size used by gRPC)
-	32 << 10, // 32KB (default buffer size for io.Copy)
-	1 << 20,  // 1MB
-}
-
-var defaultBufferPool BufferPool
+var (
+	defaultBufferPoolSizeExponents = []uint8{
+		8,
+		12, // Go page size, 4KB
+		14, // 16KB (max HTTP/2 frame size used by gRPC)
+		15, // 32KB (default buffer size for io.Copy)
+		20, // 1MB
+	}
+	defaultBufferPool BufferPool
+)
 
 func init() {
-	defaultBufferPool = NewTieredBufferPool(defaultBufferPoolSizes...)
+	var err error
+	defaultBufferPool, err = NewBinaryTieredBufferPool(defaultBufferPoolSizeExponents...)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create default buffer pool: %v", err))
+	}
 
-	internal.SetDefaultBufferPoolForTesting = func(pool BufferPool) {
+	internal.SetDefaultBufferPool = func(pool BufferPool) {
 		defaultBufferPool = pool
 	}
 
@@ -72,134 +75,22 @@ func DefaultBufferPool() BufferPool {
 // NewTieredBufferPool returns a BufferPool implementation that uses multiple
 // underlying pools of the given pool sizes.
 func NewTieredBufferPool(poolSizes ...int) BufferPool {
-	sort.Ints(poolSizes)
-	pools := make([]*sizedBufferPool, len(poolSizes))
-	for i, s := range poolSizes {
-		pools[i] = newSizedBufferPool(s)
-	}
-	return &tieredBufferPool{
-		sizedPools: pools,
-	}
+	return mem.NewTieredBufferPool(poolSizes...)
 }
 
-// tieredBufferPool implements the BufferPool interface with multiple tiers of
-// buffer pools for different sizes of buffers.
-type tieredBufferPool struct {
-	sizedPools   []*sizedBufferPool
-	fallbackPool simpleBufferPool
+// NewBinaryTieredBufferPool returns a BufferPool backed by multiple sub-pools.
+// This structure enables O(1) lookup time for Get and Put operations.
+//
+// The arguments provided are the exponents for the buffer capacities (powers
+// of 2), not the raw byte sizes. For example, to create a pool of 16KB buffers
+// (2^14 bytes), pass 14 as the argument.
+func NewBinaryTieredBufferPool(powerOfTwoExponents ...uint8) (BufferPool, error) {
+	return mem.NewBinaryTieredBufferPool(powerOfTwoExponents...)
 }
 
-func (p *tieredBufferPool) Get(size int) *[]byte {
-	return p.getPool(size).Get(size)
-}
-
-func (p *tieredBufferPool) Put(buf *[]byte) {
-	p.getPool(cap(*buf)).Put(buf)
-}
-
-func (p *tieredBufferPool) getPool(size int) BufferPool {
-	poolIdx := sort.Search(len(p.sizedPools), func(i int) bool {
-		return p.sizedPools[i].defaultSize >= size
-	})
-
-	if poolIdx == len(p.sizedPools) {
-		return &p.fallbackPool
-	}
-
-	return p.sizedPools[poolIdx]
-}
-
-// sizedBufferPool is a BufferPool implementation that is optimized for specific
-// buffer sizes. For example, HTTP/2 frames within gRPC have a default max size
-// of 16kb and a sizedBufferPool can be configured to only return buffers with a
-// capacity of 16kb. Note that however it does not support returning larger
-// buffers and in fact panics if such a buffer is requested. Because of this,
-// this BufferPool implementation is not meant to be used on its own and rather
-// is intended to be embedded in a tieredBufferPool such that Get is only
-// invoked when the required size is smaller than or equal to defaultSize.
-type sizedBufferPool struct {
-	pool        sync.Pool
-	defaultSize int
-}
-
-func (p *sizedBufferPool) Get(size int) *[]byte {
-	buf, ok := p.pool.Get().(*[]byte)
-	if !ok {
-		buf := make([]byte, size, p.defaultSize)
-		return &buf
-	}
-	b := *buf
-	clear(b[:cap(b)])
-	*buf = b[:size]
-	return buf
-}
-
-func (p *sizedBufferPool) Put(buf *[]byte) {
-	if cap(*buf) < p.defaultSize {
-		// Ignore buffers that are too small to fit in the pool. Otherwise, when
-		// Get is called it will panic as it tries to index outside the bounds
-		// of the buffer.
-		return
-	}
-	p.pool.Put(buf)
-}
-
-func newSizedBufferPool(size int) *sizedBufferPool {
-	return &sizedBufferPool{
-		defaultSize: size,
-	}
-}
-
-var _ BufferPool = (*simpleBufferPool)(nil)
-
-// simpleBufferPool is an implementation of the BufferPool interface that
-// attempts to pool buffers with a sync.Pool. When Get is invoked, it tries to
-// acquire a buffer from the pool but if that buffer is too small, it returns it
-// to the pool and creates a new one.
-type simpleBufferPool struct {
-	pool sync.Pool
-}
-
-func (p *simpleBufferPool) Get(size int) *[]byte {
-	bs, ok := p.pool.Get().(*[]byte)
-	if ok && cap(*bs) >= size {
-		clear((*bs)[:cap(*bs)])
-		*bs = (*bs)[:size]
-		return bs
-	}
-
-	// A buffer was pulled from the pool, but it is too small. Put it back in
-	// the pool and create one large enough.
-	if ok {
-		p.pool.Put(bs)
-	}
-
-	// If we're going to allocate, round up to the nearest page. This way if
-	// requests frequently arrive with small variation we don't allocate
-	// repeatedly if we get unlucky and they increase over time. By default we
-	// only allocate here if size > 1MiB. Because goPageSize is a power of 2, we
-	// can round up efficiently.
-	allocSize := (size + goPageSize - 1) & ^(goPageSize - 1)
-
-	b := make([]byte, size, allocSize)
-	return &b
-}
-
-func (p *simpleBufferPool) Put(buf *[]byte) {
-	p.pool.Put(buf)
+// NopBufferPool is a buffer pool that returns new buffers without pooling.
+type NopBufferPool struct {
+	mem.NopBufferPool
 }
 
 var _ BufferPool = NopBufferPool{}
-
-// NopBufferPool is a buffer pool that returns new buffers without pooling.
-type NopBufferPool struct{}
-
-// Get returns a buffer with specified length from the pool.
-func (NopBufferPool) Get(length int) *[]byte {
-	b := make([]byte, length)
-	return &b
-}
-
-// Put returns a buffer to the pool.
-func (NopBufferPool) Put(*[]byte) {
-}

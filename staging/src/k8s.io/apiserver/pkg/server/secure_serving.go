@@ -71,6 +71,9 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			}
 		}
 	}
+	if len(s.CurvePreferences) > 0 {
+		tlsConfig.CurvePreferences = s.CurvePreferences
+	}
 
 	if s.ClientCA != nil {
 		// Populate PeerCertificates in requests, but don't reject connections without certificates

@@ -64,6 +64,8 @@ func NewPeerAggregatedDiscoveryHandler(serverID string, localDiscoveryProvider R
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	codecs := serializer.NewCodecFactory(scheme)
 
+	registerPeerMetrics()
+
 	h := &peerAggregatedDiscoveryHandler{
 		serverID:              serverID,
 		localResourceManager:  localDiscoveryProvider,

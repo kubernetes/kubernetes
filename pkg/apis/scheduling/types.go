@@ -39,6 +39,10 @@ const (
 	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
 	// SystemNodeCritical is the system priority class name that represents node-critical.
 	SystemNodeCritical = SystemPriorityClassPrefix + "node-critical"
+
+	// PodGroupProtectionFinalizer is the finalizer added to PodGroups to prevent
+	// premature deletion while pods still reference them.
+	PodGroupProtectionFinalizer = GroupName + "/podgroup-protection"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -166,6 +170,10 @@ type TypedLocalObjectReference struct {
 	Name string
 }
 
+// MaxPodGroupResourceClaims is the maximum number of resource claims for a
+// PodGroup or a Workload's PodGroupTemplate.
+const MaxPodGroupResourceClaims = 4
+
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
 type PodGroupTemplate struct {
 	// Name is a unique identifier for the PodGroupTemplate within the Workload.
@@ -178,6 +186,64 @@ type PodGroupTemplate struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +optional
+	// +featureGate=TopologyAwareWorkloadScheduling
+	SchedulingConstraints *PodGroupSchedulingConstraints
+
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the group. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	//
+	// This is an alpha-level field and requires that the
+	// DRAWorkloadResourceClaims feature gate is enabled.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAWorkloadResourceClaims
+	ResourceClaims []PodGroupResourceClaim
+
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// One of Single, All.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	DisruptionMode *DisruptionMode
+
+	// PriorityClassName indicates the priority that should be considered when scheduling
+	// a pod group created from this template. If no priority class is specified, admission
+	// control can set this to the global default priority class if it exists. Otherwise,
+	// pod groups created from this template will have the priority set to zero.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	PriorityClassName string
+
+	// Priority is the value of priority of pod groups created from this template. Various
+	// system components use this field to find the priority of the pod group. When
+	// Priority Admission Controller is enabled, it prevents users from setting this field.
+	// The admission controller populates this field from PriorityClassName.
+	// The higher the value, the higher the priority.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	Priority *int32
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -214,6 +280,77 @@ type GangSchedulingPolicy struct {
 	//
 	// +required
 	MinCount int32
+}
+
+// PodGroupResourceClaim references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim
+// for the PodGroup.
+//
+// It adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup.
+// Pods that need access to the ResourceClaim define a matching reference in its
+// own Spec.ResourceClaims. The Pod's claim must match all fields of the
+// PodGroup's claim exactly.
+type PodGroupResourceClaim struct {
+	// Name uniquely identifies this resource claim inside the PodGroup.
+	// This must be a DNS_LABEL.
+	//
+	// +required
+	Name string
+
+	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// namespace as this PodGroup. The ResourceClaim will be reserved for the
+	// PodGroup instead of its individual pods.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	//
+	// +optional
+	ResourceClaimName *string
+
+	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace as this PodGroup.
+	//
+	// The template will be used to create a new ResourceClaim, which will
+	// be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim
+	// will also be deleted. The PodGroup name and resource name, along with a
+	// generated component, will be used to form a unique name for the
+	// ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.
+	//
+	// This field is immutable and no changes will be made to the
+	// corresponding ResourceClaim by the control plane after creating the
+	// ResourceClaim.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	//
+	// +optional
+	ResourceClaimTemplateName *string
+}
+
+// DisruptionMode defines how individual entities within a group can be disrupted.
+// Exactly one mode can be set.
+//
+// +union
+type DisruptionMode struct {
+	// Single specifies that children can be disrupted independently from each other.
+	//
+	// +optional
+	Single *SingleDisruptionMode
+
+	// All specifies that all children can only be disrupted together.
+	//
+	// +optional
+	All *AllDisruptionMode
+}
+
+// SingleDisruptionMode specifies that children can be disrupted independently.
+type SingleDisruptionMode struct {
+	// Intentionally empty now.
+}
+
+// AllDisruptionMode specifies that children can only be disrupted together.
+type AllDisruptionMode struct {
+	// Intentionally empty now.
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -269,6 +406,69 @@ type PodGroupSpec struct {
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
+	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
+	// This field is immutable.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +optional
+	// +featureGate=TopologyAwareWorkloadScheduling
+	SchedulingConstraints *PodGroupSchedulingConstraints
+
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the group. Pods must reference these claims in order to consume the
+	// allocated devices.
+	//
+	// This is an alpha-level field and requires that the
+	// DRAWorkloadResourceClaims feature gate is enabled.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAWorkloadResourceClaims
+	ResourceClaims []PodGroupResourceClaim
+
+	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
+	// One of Single, All. Defaults to Single if unset.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	DisruptionMode *DisruptionMode
+
+	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
+	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
+	// Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate
+	// (i.e. if no priority class is specified, admission control can set this to the global default
+	// priority class if it exists. Otherwise, the pod group's priority will be zero).
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	PriorityClassName string
+
+	// Priority is the value of priority of this pod group. Various system components
+	// use this field to find the priority of the pod group. When Priority Admission
+	// Controller is enabled, it prevents users from setting this field. The admission
+	// controller populates this field from PriorityClassName.
+	// The higher the value, the higher the priority.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	Priority *int32
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -296,6 +496,15 @@ type PodGroupStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition
+
+	// Status of resource claims.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRAWorkloadResourceClaims
+	ResourceClaimStatuses []PodGroupResourceClaimStatus
 }
 
 // Well-known condition types for PodGroups.
@@ -320,6 +529,26 @@ const (
 	PodGroupReasonPreemptionByScheduler string = "PreemptionByScheduler"
 )
 
+// PodGroupResourceClaimStatus is stored in the PodGroupStatus for each
+// PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the
+// generated name for the corresponding ResourceClaim.
+type PodGroupResourceClaimStatus struct {
+	// Name uniquely identifies this resource claim inside the PodGroup. This
+	// must match the name of an entry in podgroup.spec.resourceClaims, which
+	// implies that the string must be a DNS_LABEL.
+	//
+	// +required
+	Name string
+
+	// ResourceClaimName is the name of the ResourceClaim that was generated for
+	// the PodGroup in the namespace of the PodGroup. If this is unset, then
+	// generating a ResourceClaim was not necessary. The
+	// podgroup.spec.resourceClaims entry can be ignored in this case.
+	//
+	// +optional
+	ResourceClaimName *string
+}
+
 // PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).
 // Exactly one reference must be set.
 // +union
@@ -342,4 +571,25 @@ type WorkloadPodGroupTemplateReference struct {
 	//
 	// +required
 	PodGroupTemplateName string
+}
+
+// PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
+type PodGroupSchedulingConstraints struct {
+	// Topology defines the topology constraints for the pod group.
+	// Currently only a single topology constraint can be specified. This may change in the future.
+	//
+	// +optional
+	// +listType=atomic
+	Topology []TopologyConstraint
+}
+
+// TopologyConstraint defines a topology constraint for a PodGroup.
+type TopologyConstraint struct {
+	// Key specifies the key of the node label representing the topology domain.
+	// All pods within the PodGroup must be colocated within the same domain instance.
+	// Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate.
+	// Examples: "topology.kubernetes.io/rack"
+	//
+	// +required
+	Key string
 }

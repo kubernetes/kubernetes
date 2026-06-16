@@ -31,7 +31,7 @@ import (
 func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
+		klog.Warningf("Mount cleanup skipped because path does not exist: %v", mountPath)
 		return nil
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)
@@ -44,7 +44,7 @@ func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, extensiveMountPointCheck bool, umountTimeout time.Duration) error {
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
+		klog.Warningf("Mount cleanup skipped because path does not exist: %v", mountPath)
 		return nil
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)

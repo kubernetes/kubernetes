@@ -21,6 +21,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	rand "math/rand/v2"
@@ -52,7 +53,8 @@ import (
 var metadataFromOutgoingContextRaw = internal.FromOutgoingContextRaw.(func(context.Context) (metadata.MD, [][]string, bool))
 
 // StreamHandler defines the handler called by gRPC server to complete the
-// execution of a streaming RPC.
+// execution of a streaming RPC. srv is the service implementation on which the
+// RPC was invoked.
 //
 // If a StreamHandler returns an error, it should either be produced by the
 // status package, or be one of the context errors. Otherwise, gRPC will use
@@ -537,9 +539,17 @@ func (a *csAttempt) newStream() error {
 		md, _ := metadata.FromOutgoingContext(a.ctx)
 		md = metadata.Join(md, a.pickResult.Metadata)
 		a.ctx = metadata.NewOutgoingContext(a.ctx, md)
-	}
 
-	s, err := a.transport.NewStream(a.ctx, cs.callHdr)
+		// If the `CallAuthority` CallOption is not set, check if the LB picker
+		// has provided an authority override in the PickResult metadata and
+		// apply it, as specified in gRFC A81.
+		if cs.callInfo.authority == "" {
+			if authMD := a.pickResult.Metadata.Get(":authority"); len(authMD) > 0 {
+				cs.callHdr.Authority = authMD[0]
+			}
+		}
+	}
+	s, err := a.transport.NewStream(a.ctx, cs.callHdr, a.statsHandler)
 	if err != nil {
 		nse, ok := err.(*transport.NewStreamError)
 		if !ok {
@@ -740,7 +750,7 @@ func (a *csAttempt) shouldRetry(err error) (bool, error) {
 		return false, err
 	}
 	if cs.numRetries+1 >= rp.MaxAttempts {
-		return false, err
+		return false, fmt.Errorf("max retries exhausted: failed after %d attempts: %w", cs.numRetries+1, err)
 	}
 
 	var dur time.Duration
@@ -1341,10 +1351,12 @@ func newNonRetryClientStream(ctx context.Context, desc *StreamDesc, method strin
 		codec:            c.codec,
 		sendCompressorV0: cp,
 		sendCompressorV1: comp,
+		decompressorV0:   ac.cc.dopts.dc,
 		transport:        t,
 	}
 
-	s, err := as.transport.NewStream(as.ctx, as.callHdr)
+	// nil stats handler: internal streams like health and ORCA do not support telemetry.
+	s, err := as.transport.NewStream(as.ctx, as.callHdr, nil)
 	if err != nil {
 		err = toRPCErr(err)
 		return nil, err

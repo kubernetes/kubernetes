@@ -52,7 +52,7 @@ import (
 // For resources that are not local to a node, the node name is not set. Instead,
 // the driver may use a node selector to specify where the devices are available.
 type ResourceSliceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Contains the information published by the driver.

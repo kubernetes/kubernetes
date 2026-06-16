@@ -71,8 +71,10 @@ type ServeMux struct {
 	streamErrorHandler        StreamErrorHandlerFunc
 	routingErrorHandler       RoutingErrorHandlerFunc
 	disablePathLengthFallback bool
+	disableHTTPMethodOverride bool
 	unescapingMode            UnescapingMode
 	writeContentLength        bool
+	disableChunkedEncoding    bool
 }
 
 // ServeMuxOption is an option that can be given to a ServeMux on construction.
@@ -122,6 +124,16 @@ func WithUnescapingMode(mode UnescapingMode) ServeMuxOption {
 func WithMiddlewares(middlewares ...Middleware) ServeMuxOption {
 	return func(serveMux *ServeMux) {
 		serveMux.middlewares = append(serveMux.middlewares, middlewares...)
+	}
+}
+
+// WithDisableChunkedEncoding disables the Transfer-Encoding: chunked header
+// for streaming responses. This is useful for streaming implementations that use
+// Content-Length, which is mutually exclusive with Transfer-Encoding:chunked.
+// Note that this option will not automatically add Content-Length headers, so it should be used with caution.
+func WithDisableChunkedEncoding() ServeMuxOption {
+	return func(mux *ServeMux) {
+		mux.disableChunkedEncoding = true
 	}
 }
 
@@ -260,6 +272,19 @@ func WithDisablePathLengthFallback() ServeMuxOption {
 	}
 }
 
+// WithDisableHTTPMethodOverride returns a ServeMuxOption that disables the
+// X-HTTP-Method-Override header handling.
+//
+// When this option is used, the mux will no longer allow POST requests with
+// the X-HTTP-Method-Override header to override the HTTP method. The path
+// length fallback (POST with application/x-www-form-urlencoded falling back
+// to a matching GET handler) is not affected by this option.
+func WithDisableHTTPMethodOverride() ServeMuxOption {
+	return func(serveMux *ServeMux) {
+		serveMux.disableHTTPMethodOverride = true
+	}
+}
+
 // WithWriteContentLength returns a ServeMuxOption to enable writing content length on non-streaming responses
 func WithWriteContentLength() ServeMuxOption {
 	return func(serveMux *ServeMux) {
@@ -394,7 +419,7 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = r.URL.RawPath
 	}
 
-	if override := r.Header.Get("X-HTTP-Method-Override"); override != "" && s.isPathLengthFallback(r) {
+	if override := r.Header.Get("X-HTTP-Method-Override"); override != "" && !s.disableHTTPMethodOverride && s.isPathLengthFallback(r) {
 		if err := r.ParseForm(); err != nil {
 			_, outboundMarshaler := MarshalerForRequest(s, r)
 			sterr := status.Error(codes.InvalidArgument, err.Error())
@@ -456,6 +481,7 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					HTTPStatus: http.StatusBadRequest,
 					Err:        mse,
 				})
+				return
 			}
 			continue
 		}
@@ -498,6 +524,7 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						HTTPStatus: http.StatusBadRequest,
 						Err:        mse,
 					})
+					return
 				}
 				continue
 			}

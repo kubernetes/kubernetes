@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -88,8 +87,7 @@ func TestDeclaredFeatureDiscovery(t *testing.T) {
 			kubelet := testKubelet.kubelet
 			fakeCM := cm.NewFakeContainerManagerWithNodeConfig(cm.NodeConfig{})
 			kubelet.containerManager = fakeCM
-			framework, err := ndf.New(registeredFeatures)
-			require.NoError(t, err)
+			framework := ndf.New(registeredFeatures)
 			kubelet.nodeDeclaredFeaturesFramework = framework
 			kubelet.version = tc.kubeletVersion
 
@@ -130,8 +128,7 @@ func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 
-			framework, err := ndf.New(ndffeatures.AllFeatures)
-			require.NoError(t, err)
+			framework := ndf.New(ndffeatures.AllFeatures)
 			kubelet.nodeDeclaredFeaturesFramework = framework
 
 			features := kubelet.discoverNodeDeclaredFeatures()

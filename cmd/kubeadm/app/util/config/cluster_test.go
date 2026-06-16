@@ -33,30 +33,38 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
+
+// fakeConfigMap is a helper for seeding a fake kube client with a ConfigMap in kube-system
+type fakeConfigMap struct {
+	Name string
+	Data map[string]string
+}
+
+func (c *fakeConfigMap) Create(client clientset.Interface) error {
+	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: c.Data,
+	})
+}
 
 var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
 var nodeName = "mynode"
 var cfgFiles = map[string][]byte{
-	"InitConfiguration_v1beta3": []byte(fmt.Sprintf(`
-apiVersion: %s
-kind: InitConfiguration
-`, kubeadmapiv1old.SchemeGroupVersion.String())),
-	"ClusterConfiguration_v1beta3": []byte(fmt.Sprintf(`
-apiVersion: %s
-kind: ClusterConfiguration
-kubernetesVersion: %s
-`, kubeadmapiv1old.SchemeGroupVersion.String(), k8sVersionString)),
 	"InitConfiguration_v1beta4": []byte(fmt.Sprintf(`
 apiVersion: %s
 kind: InitConfiguration
@@ -91,17 +99,24 @@ var (
 
 	//go:embed testdata/kubelet-with-invalid-user.yaml
 	configWithInvalidUser []byte
+
+	//go:embed testdata/kubelet-instance-config.yaml
+	configWithContainerRuntimeEndpoint []byte
 )
 
 //go:embed testdata/mynode.pem
 var mynodePem []byte
 
 func TestGetNodeNameFromKubeletConfig(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
+		t.Fatalf("Couldn't create tmpDir")
 	}
-	defer os.RemoveAll(tmpdir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Fatalf("Couldn't remove tmpDir: %v", err)
+		}
+	}()
 
 	var tests = []struct {
 		name              string
@@ -143,7 +158,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 			if len(rt.pemContent) > 0 {
-				pemPath := filepath.Join(tmpdir, "kubelet.pem")
+				pemPath := filepath.Join(tmpDir, "kubelet.pem")
 				err := os.WriteFile(pemPath, rt.pemContent, 0644)
 				if err != nil {
 					t.Errorf("Couldn't create pem file: %v", err)
@@ -152,7 +167,7 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 				rt.kubeconfigContent = []byte(strings.Replace(string(rt.kubeconfigContent), "kubelet.pem", pemPath, -1))
 			}
 
-			kubeconfigPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
+			kubeconfigPath := filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName)
 			err := os.WriteFile(kubeconfigPath, rt.kubeconfigContent, 0644)
 			if err != nil {
 				t.Errorf("Couldn't create kubeconfig: %v", err)
@@ -176,51 +191,62 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 }
 
 func TestGetNodeRegistration(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
+		t.Fatalf("Couldn't create tmpDir")
 	}
-	defer os.RemoveAll(tmpdir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Fatalf("Couldn't remove tmpDir: %v", err)
+		}
+	}()
 
 	var tests = []struct {
-		name          string
-		fileContents  []byte
-		node          *v1.Node
-		expectedError bool
+		name                       string
+		configfileContents         []byte
+		instanceConfigFileContents []byte
+		node                       *v1.Node
+		expectedError              bool
 	}{
 		{
 			name:          "invalid - no kubelet.conf",
 			expectedError: true,
 		},
 		{
-			name:         "valid",
-			fileContents: configWithEmbeddedCert,
+			name:               "invalid - no node",
+			configfileContents: configWithEmbeddedCert,
+			expectedError:      true,
+		},
+		{
+			name:                       "valid",
+			configfileContents:         configWithEmbeddedCert,
+			instanceConfigFileContents: configWithContainerRuntimeEndpoint,
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: nodeName,
-					Annotations: map[string]string{
-						kubeadmconstants.AnnotationKubeadmCRISocket: "myCRIsocket",
-					},
 				},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
 				},
 			},
 		},
-		{
-			name:          "invalid - no node",
-			fileContents:  configWithEmbeddedCert,
-			expectedError: true,
-		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-			cfgPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
-			if len(rt.fileContents) > 0 {
-				err := os.WriteFile(cfgPath, rt.fileContents, 0644)
+			cfgPath := filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName)
+			if len(rt.configfileContents) > 0 {
+				err := os.WriteFile(cfgPath, rt.configfileContents, 0644)
 				if err != nil {
 					t.Errorf("Couldn't create file")
+					return
+				}
+			}
+			instanceCfgPath := filepath.Join(tmpDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+			if len(rt.instanceConfigFileContents) > 0 {
+				err := os.WriteFile(instanceCfgPath, rt.instanceConfigFileContents, 0644)
+				if err != nil {
+					t.Errorf("Couldn't create instance config file")
 					return
 				}
 			}
@@ -236,7 +262,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			}
 
 			cfg := &kubeadmapi.InitConfiguration{}
-			err = GetNodeRegistration(cfgPath, client, &cfg.NodeRegistration)
+			err = GetNodeRegistration(tmpDir, tmpDir, client, &cfg.NodeRegistration)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getNodeRegistration: %v", err)
 				return
@@ -248,7 +274,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			if cfg.NodeRegistration.Name != nodeName {
 				t.Errorf("invalid cfg.NodeRegistration.Name")
 			}
-			if cfg.NodeRegistration.CRISocket != "myCRIsocket" {
+			if cfg.NodeRegistration.CRISocket != "unix:///foo/bar" {
 				t.Errorf("invalid cfg.NodeRegistration.CRISocket")
 			}
 			if len(cfg.NodeRegistration.Taints) != 1 {
@@ -262,7 +288,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 	var tests = []struct {
 		name             string
 		nodeName         string
-		staticPod        *testresources.FakeStaticPod
+		staticPod        *staticpodutil.FakeStaticPod
 		expectedEndpoint *kubeadmapi.APIEndpoint
 		expectedErr      bool
 	}{
@@ -274,7 +300,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "valid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234",
@@ -285,7 +311,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3::1234",
@@ -296,7 +322,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid negative port with ipv4 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:-1234",
@@ -307,7 +333,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid high port with ipv4 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:65536",
@@ -318,7 +344,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "valid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:1234",
@@ -329,7 +355,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1:1234",
@@ -340,7 +366,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid negative port with ipv6 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:-1234",
@@ -351,7 +377,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid high port with ipv6 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:65536",
@@ -390,18 +416,22 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 }
 
 func TestGetInitConfigurationFromCluster(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
+		t.Fatalf("Couldn't create tmpDir")
 	}
-	defer os.RemoveAll(tmpdir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Fatalf("Couldn't remove tmpDir: %v", err)
+		}
+	}()
 
 	var tests = []struct {
 		name                string
 		fileContents        []byte
 		node                *v1.Node
-		staticPods          []testresources.FakeStaticPod
-		configMaps          []testresources.FakeConfigMap
+		staticPods          []staticpodutil.FakeStaticPod
+		configMaps          []fakeConfigMap
 		getNodeRegistration bool
 		getAPIEndpoint      bool
 		expectedError       bool
@@ -412,7 +442,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		},
 		{
 			name: "invalid - No ClusterConfiguration in kubeadm-config ConfigMap",
-			configMaps: []testresources.FakeConfigMap{
+			configMaps: []fakeConfigMap{
 				{
 					Name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
 					Data: map[string]string{},
@@ -422,7 +452,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		},
 		{
 			name: "valid v1beta4 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information
-			staticPods: []testresources.FakeStaticPod{
+			staticPods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:  nodeName,
 					Component: kubeadmconstants.KubeAPIServer,
@@ -431,7 +461,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			configMaps: []testresources.FakeConfigMap{
+			configMaps: []fakeConfigMap{
 				{
 					Name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
 					Data: map[string]string{
@@ -455,9 +485,6 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: nodeName,
-					Annotations: map[string]string{
-						kubeadmconstants.AnnotationKubeadmCRISocket: "myCRIsocket",
-					},
 				},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
@@ -467,8 +494,8 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			getAPIEndpoint:      true,
 		},
 		{
-			name: "valid v1beta3 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
-			staticPods: []testresources.FakeStaticPod{
+			name: "valid v1beta4 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
+			staticPods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:  nodeName,
 					Component: kubeadmconstants.KubeAPIServer,
@@ -477,7 +504,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			configMaps: []testresources.FakeConfigMap{
+			configMaps: []fakeConfigMap{
 				{
 					Name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
 					Data: map[string]string{
@@ -504,13 +531,20 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			cfgPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
+			cfgPath := filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName)
 			if len(rt.fileContents) > 0 {
 				err := os.WriteFile(cfgPath, rt.fileContents, 0644)
 				if err != nil {
 					t.Errorf("Couldn't create file")
 					return
 				}
+			}
+
+			instanceCfgPath := filepath.Join(tmpDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+			err := os.WriteFile(instanceCfgPath, configWithContainerRuntimeEndpoint, 0644)
+			if err != nil {
+				t.Errorf("Couldn't create instance config file")
+				return
 			}
 
 			client := clientsetfake.NewSimpleClientset()
@@ -540,7 +574,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			}
 
 			getComponentConfigs := true
-			cfg, err := getInitConfigurationFromCluster(tmpdir, client, rt.getNodeRegistration, rt.getAPIEndpoint, getComponentConfigs)
+			cfg, err := getInitConfigurationFromCluster(tmpDir, tmpDir, client, rt.getNodeRegistration, rt.getAPIEndpoint, getComponentConfigs)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getInitConfigurationFromCluster: %v", err)
 				return
@@ -563,7 +597,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			if rt.getNodeRegistration && rt.getAPIEndpoint && (cfg.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" || cfg.LocalAPIEndpoint.BindPort != 1234) {
 				t.Errorf("invalid cfg.LocalAPIEndpoint: %v", cfg.LocalAPIEndpoint)
 			}
-			if rt.getNodeRegistration && (cfg.NodeRegistration.Name != nodeName || cfg.NodeRegistration.CRISocket != "myCRIsocket" || len(cfg.NodeRegistration.Taints) != 1) {
+			if rt.getNodeRegistration && (cfg.NodeRegistration.Name != nodeName || cfg.NodeRegistration.CRISocket != "unix:///foo/bar" || len(cfg.NodeRegistration.Taints) != 1) {
 				t.Errorf("invalid cfg.NodeRegistration: %v", cfg.NodeRegistration)
 			}
 			if !rt.getNodeRegistration && len(cfg.NodeRegistration.CRISocket) > 0 {
@@ -583,7 +617,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 	var tests = []struct {
 		name             string
 		nodeName         string
-		pods             []testresources.FakeStaticPod
+		pods             []staticpodutil.FakeStaticPod
 		clientSetup      func(*clientsetfake.Clientset)
 		expectedEndpoint kubeadmapi.APIEndpoint
 		expectedErr      bool
@@ -591,7 +625,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -607,7 +641,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation; all requests fail",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -657,7 +691,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 	var tests = []struct {
 		name             string
 		nodeName         string
-		pods             []testresources.FakeStaticPod
+		pods             []staticpodutil.FakeStaticPod
 		clientSetup      func(*clientsetfake.Clientset)
 		expectedEndpoint string
 		expectedErr      bool
@@ -670,7 +704,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -681,7 +715,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "two pods: one with annotation, one missing annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -695,7 +729,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "two pods: different annotations",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -710,7 +744,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "two pods: both missing annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component: kubeadmconstants.KubeAPIServer,
 				},
@@ -723,7 +757,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation; request fails",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},

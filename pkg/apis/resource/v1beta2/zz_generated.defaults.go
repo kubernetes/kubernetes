@@ -136,6 +136,7 @@ func SetObjectDefaults_ResourceClaimTemplateList(in *resourcev1beta2.ResourceCla
 func SetObjectDefaults_ResourceSlice(in *resourcev1beta2.ResourceSlice) {
 	for i := range in.Spec.Devices {
 		a := &in.Spec.Devices[i]
+		SetDefaults_Device(a)
 		for j := range a.Taints {
 			b := &a.Taints[j]
 			SetDefaults_DeviceTaint(b)

@@ -20,13 +20,51 @@ package cadvisor
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/google/cadvisor/container/crio"
 	cadvisorfs "github.com/google/cadvisor/fs"
+	"github.com/opencontainers/cgroups"
+	"k8s.io/klog/v2"
 )
+
+func TestIsPsiEnabled(t *testing.T) {
+	testcases := []struct {
+		description   string
+		createPSIFile bool
+		expected      bool
+	}{{
+		description:   "PSI enabled when cgroup pressure file exists",
+		createPSIFile: true,
+		expected:      true,
+	}, {
+		description:   "PSI disabled when cgroup pressure file does not exist",
+		createPSIFile: false,
+		expected:      false,
+	}}
+
+	cgroups.TestMode = true
+	defer func() { cgroups.TestMode = false }()
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			if tc.createPSIFile {
+				err := os.WriteFile(filepath.Join(tmpDir, "cpu.pressure"), []byte("some avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"), 0644)
+				require.NoError(t, err)
+			}
+
+			result := isPsiEnabled(klog.Background(), tmpDir, "cpu.pressure")
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
 
 func TestImageFsInfoLabel(t *testing.T) {
 	testcases := []struct {

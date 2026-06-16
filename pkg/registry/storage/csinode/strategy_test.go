@@ -17,6 +17,7 @@ limitations under the License.
 package csinode
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -166,7 +167,7 @@ func TestCSINodeStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("CSINode must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("CSINode should not allow create on update")
 	}
 

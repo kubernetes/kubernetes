@@ -159,6 +159,11 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.DefaultBinder},
 		},
 	},
+	PlacementScore: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.NodeResourcesFit, Weight: 1},
+		},
+	},
 }
 
 // PluginConfigsV1 default plugin configurations.
@@ -173,7 +178,8 @@ var PluginConfigsV1 = []config.PluginConfig{
 	{
 		Name: "DynamicResources",
 		Args: &config.DynamicResourcesArgs{
-			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+			FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
+			BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
 		},
 	},
 	{

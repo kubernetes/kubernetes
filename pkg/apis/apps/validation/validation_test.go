@@ -557,7 +557,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "empty selector",
 		set:  mkStatefulSet(&validPodTemplate, tweakSelectorLabels(nil)),
 		errs: field.ErrorList{
-			field.Required(field.NewPath("spec", "selector"), ""),
+			field.Required(field.NewPath("spec", "selector"), "").MarkCoveredByDeclarative(),
 			field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, ""), // selector is empty, labels are not, so select doesn't match labels
 		},
 	}, {
@@ -1261,21 +1261,28 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakSelectorLabels(validLabels2),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "selector"), nil, "").MarkCoveredByDeclarative(),
+		},
+	}, {
+		name:   "update service name",
+		old:    mkStatefulSet(&validPodTemplate, tweakServiceName("valid-service")),
+		update: mkStatefulSet(&validPodTemplate, tweakServiceName("other-service")),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "serviceName"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update pod management policy 1",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("")),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update pod management policy 2",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update to negative replicas",
@@ -1289,21 +1296,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "update pvc template storage class",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "add new pvc template",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name:   "valid old spec but invalid new spec",

@@ -22,13 +22,17 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/utils/ptr"
 )
 
 func TestConversion(t *testing.T) {
+	nodeName := "test-node"
 	testcases := []struct {
 		name      string
 		in        runtime.Object
@@ -317,6 +321,112 @@ func TestConversion(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "ResourceSlice v1beta1 to internal with node allocatable resource mappings",
+			in: &resourcev1beta1.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resourcev1beta1.ResourceSliceSpec{
+					NodeName: nodeName,
+					Driver:   "test-driver",
+					Pool: resourcev1beta1.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resourcev1beta1.Device{
+						{
+							Name: "test-device",
+							Basic: &resourcev1beta1.BasicDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+								},
+								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
+									"cpu": {
+										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: &resource.ResourceSlice{},
+			expectOut: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resource.ResourceSliceSpec{
+					NodeName: &nodeName,
+					Driver:   "test-driver",
+					Pool: resource.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resource.Device{
+						{
+							Name: "test-device",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+							},
+							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+								"cpu": {
+									AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+								},
+							}},
+					},
+				},
+			},
+		},
+		{
+			name: "ResourceSlice internal to v1beta1 with node allocatable resource mappings",
+			in: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resource.ResourceSliceSpec{
+					NodeName: &nodeName,
+					Driver:   "test-driver",
+					Pool: resource.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resource.Device{
+						{
+							Name: "test-device",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+							},
+							NodeAllocatableResourceMappings: map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+								"cpu": {
+									AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+								},
+							}},
+					},
+				},
+			},
+			out: &resourcev1beta1.ResourceSlice{},
+			expectOut: &resourcev1beta1.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
+				Spec: resourcev1beta1.ResourceSliceSpec{
+					NodeName: nodeName,
+					Driver:   "test-driver",
+					Pool: resourcev1beta1.ResourcePool{
+						Name:               "test-pool",
+						ResourceSliceCount: 1,
+					},
+					Devices: []resourcev1beta1.Device{
+						{
+							Name: "test-device",
+							Basic: &resourcev1beta1.BasicDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									"cpu_per_instance": {IntValue: ptr.To[int64](2)},
+								},
+								NodeAllocatableResourceMappings: map[v1.ResourceName]resourcev1beta1.NodeAllocatableResourceMapping{
+									"cpu": {
+										AllocationMultiplier: ptr.To(apiresource.MustParse("1")),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -350,5 +460,4 @@ func TestConversion(t *testing.T) {
 			}
 		})
 	}
-
 }

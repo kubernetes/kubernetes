@@ -33,6 +33,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -72,6 +73,7 @@ func TestHealthyEventedPLEG(t *testing.T) {
 
 func TestUpdateRunningPodMetric(t *testing.T) {
 	metrics.Register()
+	logger, _ := ktesting.NewTestContext(t)
 	pleg := newTestEventedPLEG()
 
 	podStatuses := make([]*kubecontainer.PodStatus, 5)
@@ -87,7 +89,7 @@ func TestUpdateRunningPodMetric(t *testing.T) {
 			},
 		}
 
-		pleg.updateRunningPodMetric(podStatuses[i])
+		pleg.updateRunningPodMetric(logger, podStatuses[i])
 		pleg.cache.Set(podStatuses[i].ID, podStatuses[i], nil, time.Now())
 
 	}
@@ -114,7 +116,7 @@ kubelet_running_pods 5
 			},
 		}
 
-		pleg.updateRunningPodMetric(&newPodStatus)
+		pleg.updateRunningPodMetric(logger, &newPodStatus)
 		pleg.cache.Set(newPodStatus.ID, &newPodStatus, nil, time.Now())
 	}
 	pleg.cache.UpdateTime(time.Now())

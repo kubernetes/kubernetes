@@ -71,6 +71,7 @@ var (
 		ShutdownGracePeriod:                    metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods:        metav1.Duration{Duration: 10 * time.Second},
 		MemoryThrottlingFactor:                 ptr.To(0.9),
+		MemoryReservationPolicy:                kubeletconfig.NoneMemoryReservationPolicy,
 		FeatureGates: map[string]bool{
 			"GracefulNodeShutdown":       true,
 			"MemoryQoS":                  true,
@@ -564,6 +565,21 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: memoryThrottlingFactor 1.1 must be greater than 0 and less than or equal to 1.0",
 		}, {
+			name: "MemoryReservationPolicy requires MemoryQoS",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"MemoryQoS": false}
+				conf.MemoryReservationPolicy = kubeletconfig.TieredReservationMemoryReservationPolicy
+				return conf
+			},
+			errMsg: "invalid configuration: memoryReservationPolicy \"TieredReservation\" requires MemoryQoS feature gate to be enabled",
+		}, {
+			name: "invalid MemoryReservationPolicy",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.MemoryReservationPolicy = "invalid"
+				return conf
+			},
+			errMsg: "invalid configuration: option \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\" or \"TieredReservation\"",
+		}, {
 			name: "invalid Taint.TimeAdded",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				now := metav1.Now()
@@ -610,21 +626,38 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority",
 		}, {
-			name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
+			name: "enableSystemLogQuery is enabled with explicit default NodeLogQuery feature gate enabled",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeLogQuery": true}
+				conf.EnableSystemLogHandler = true
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
-			errMsg: "invalid configuration: NodeLogQuery feature gate is required for enableSystemLogQuery",
+			errMsg: "",
+		}, {
+			name: "enableSystemLogQuery is enabled without NodeLogQuery feature gate",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeLogQuery": false}
+				conf.EnableSystemLogQuery = true
+				return conf
+			},
+			errMsg: "cannot set feature gate NodeLogQuery to false, feature is locked to true",
 		}, {
 			name: "enableSystemLogQuery is enabled without enableSystemLogHandler",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"NodeLogQuery": true}
 				conf.EnableSystemLogHandler = false
 				conf.EnableSystemLogQuery = true
 				return conf
 			},
 			errMsg: "invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery",
+		}, {
+			name: "enableSystemLogQuery is enabled with enableSystemLogHandler",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.EnableSystemLogHandler = true
+				conf.EnableSystemLogQuery = true
+				return conf
+			},
+			errMsg: "",
 		}, {
 			name: "imageMaximumGCAge should not be negative",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

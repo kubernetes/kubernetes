@@ -223,7 +223,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 			defer func() {
 				framework.ExpectNoError(conn.Close())
@@ -254,7 +254,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 			defer func() {
 				framework.ExpectNoError(conn.Close())
@@ -456,7 +456,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 			defer func() {
 				framework.ExpectNoError(conn.Close())

@@ -17,8 +17,12 @@ limitations under the License.
 package benchmark
 
 import (
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type SchedulerPerfOption func(options *schedulerPerfOptions)
@@ -28,10 +32,19 @@ type SchedulerPerfOption func(options *schedulerPerfOptions)
 // Alternatively, it may also return a non-nil error.
 type HookFn func(tCtx ktesting.TContext) error
 
+// PreRunFn hook function is called for each workload after feature gates are set,
+// but before he scheduler is started. It returns an optional cleanup function and an error.
+type PreRunFn func(tCtx ktesting.TContext, w *Workload) (func(), error)
+
+// NodeUpdateFn is a function called after nodes are created in a workload using createNodesOp.
+type NodeUpdateFn func(tCtx ktesting.TContext, scheduler *scheduler.Scheduler, w *Workload, nodes *v1.NodeList) error
+
 type schedulerPerfOptions struct {
 	outOfTreePluginRegistry frameworkruntime.Registry
-	preRunFn                HookFn
+	preRunFn                PreRunFn
 	prepareFn               HookFn
+	nodeUpdateFn            NodeUpdateFn
+	podsSchedulingTimeout   time.Duration
 }
 
 // WithPrepareFn is the option to set a function that is called
@@ -43,11 +56,27 @@ func WithPrepareFn(prepareFn HookFn) SchedulerPerfOption {
 	}
 }
 
+// WithNodeUpdateFn is the option to set a function that is called
+// after nodes are created by createNodesOp within a workload execution.
+func WithNodeUpdateFn(fn NodeUpdateFn) SchedulerPerfOption {
+	return func(s *schedulerPerfOptions) {
+		s.nodeUpdateFn = fn
+	}
+}
+
 // WithPreRunFn is the option to set a function that is called
 // after configuring the process (logging, feature gates) and
 // before running any code (etcd, scheduler).
-func WithPreRunFn(preRunFn HookFn) SchedulerPerfOption {
+func WithPreRunFn(preRunFn PreRunFn) SchedulerPerfOption {
 	return func(s *schedulerPerfOptions) {
 		s.preRunFn = preRunFn
+	}
+}
+
+// WithPodsSchedulingTimeout is the option to set a custom timeout
+// specifically for waiting for pods to be scheduled.
+func WithPodsSchedulingTimeout(timeout time.Duration) SchedulerPerfOption {
+	return func(s *schedulerPerfOptions) {
+		s.podsSchedulingTimeout = timeout
 	}
 }

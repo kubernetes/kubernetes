@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,7 @@ func TestCronJobStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("CronJob must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("CronJob should not allow create on update")
 	}
 
@@ -155,7 +156,7 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("CronJob must be namespace scoped")
 	}
-	if StatusStrategy.AllowCreateOnUpdate() {
+	if StatusStrategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("CronJob should not allow create on update")
 	}
 	validPodTemplateSpec := api.PodTemplateSpec{

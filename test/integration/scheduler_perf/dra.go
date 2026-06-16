@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -82,7 +82,7 @@ func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *createResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	if op.CountParam != "" {
 		var err error
 		op.Count, err = w.Params.get(op.CountParam[1:])
@@ -159,7 +159,7 @@ func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 func (op *createResourceDriverOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceDriverOp) patchParams(w *Workload) (realOp, error) {
 	if op.MaxClaimsPerNodeParam != "" {
 		var err error
 		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
@@ -267,7 +267,7 @@ func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *allocResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *allocResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
@@ -323,7 +323,10 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
 
 	// Also wait for the assume cache to catch up.
 	// Without this we cannot reliably store the result of

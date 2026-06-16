@@ -34,7 +34,7 @@ import (
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
 // namespace only have effect in that namespace.
 type RoleBindingApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Subjects holds references to the objects the role applies to.

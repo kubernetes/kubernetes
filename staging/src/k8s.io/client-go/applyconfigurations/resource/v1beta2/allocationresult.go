@@ -36,7 +36,7 @@ type AllocationResultApplyConfiguration struct {
 	// AllocationTimestamp stores the time when the resources were allocated.
 	// This field is not guaranteed to be set, in which case that time is unknown.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gate.
 	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty"`
 }

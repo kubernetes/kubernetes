@@ -42,6 +42,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -154,13 +155,22 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		unified := map[string]string{}
 		memoryRequest := container.Resources.Requests.Memory().Value()
 		memoryLimit := container.Resources.Limits.Memory().Value()
-		if memoryRequest != 0 {
-			unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
+			// Guaranteed pods get memory.min (hard protection).
+			// Burstable pods get memory.low (soft protection).
+			if kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+			} else {
+				unified[cm.Cgroup2MemoryLow] = strconv.FormatInt(memoryRequest, 10)
+			}
+		} else {
+			unified[cm.Cgroup2MemoryMin] = "0"
+			unified[cm.Cgroup2MemoryLow] = "0"
 		}
 
-		// Guaranteed pods by their QoS definition requires that memory request equals memory limit and cpu request must equal cpu limit.
-		// Here, we only check from memory perspective. Hence MemoryQoS feature is disabled on those QoS pods by not setting memory.high.
-		if memoryRequest != memoryLimit {
+		// Skip memory.high only for equal, positive memory request/limit (container guaranteed memory).
+		// For Burstable pods, memory.high uses the memory limit, for BestEffort pods (request=limit=0), node allocatable is used.
+		if memoryRequest != memoryLimit || memoryRequest == 0 {
 			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
 			// It will be set based on formula:
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
@@ -194,6 +204,14 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			}
 			logger.V(4).Info("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
 		}
+	} else if isCgroup2UnifiedMode() {
+		// When MemoryQoS is off, explicitly reset memory.high to "max" so
+		// that InPlacePodResize clears the stale throttle limit on containers
+		// that were created while MemoryQoS was enabled.
+		if lcr.Unified == nil {
+			lcr.Unified = map[string]string{}
+		}
+		lcr.Unified[cm.Cgroup2MemoryHigh] = "max"
 	}
 
 	return lcr
@@ -386,13 +404,13 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	if runtimeStatusResources != nil {
 		var cpuLimit, memLimit, cpuRequest *resource.Quantity
 		if runtimeStatusResources.CpuPeriod > 0 {
-			milliCPU := quotaToMilliCPU(runtimeStatusResources.CpuQuota, runtimeStatusResources.CpuPeriod)
+			milliCPU := cm.QuotaToMilliCPU(runtimeStatusResources.CpuQuota, runtimeStatusResources.CpuPeriod)
 			if milliCPU > 0 {
 				cpuLimit = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 			}
 		}
 		if runtimeStatusResources.CpuShares > 0 {
-			milliCPU := sharesToMilliCPU(runtimeStatusResources.CpuShares)
+			milliCPU := cm.SharesToMilliCPU(runtimeStatusResources.CpuShares)
 			if milliCPU > 0 {
 				cpuRequest = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 			}

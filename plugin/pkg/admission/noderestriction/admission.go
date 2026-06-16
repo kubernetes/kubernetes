@@ -86,7 +86,7 @@ type Plugin struct {
 	pvGetter             corev1lister.PersistentVolumeLister
 	csiTranslator        csitrans.CSITranslator
 
-	authz authorizer.Authorizer
+	authz authorizer.UnconditionalAuthorizer
 
 	inspectedFeatureGates                          bool
 	expansionRecoveryEnabled                       bool
@@ -100,7 +100,7 @@ var (
 	_ admission.Interface                                 = &Plugin{}
 	_ apiserveradmission.WantsExternalKubeInformerFactory = &Plugin{}
 	_ apiserveradmission.WantsFeatures                    = &Plugin{}
-	_ apiserveradmission.WantsAuthorizer                  = &Plugin{}
+	_ apiserveradmission.WantsUnconditionalAuthorizer     = &Plugin{}
 )
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
@@ -160,8 +160,8 @@ func (p *Plugin) ValidateInitialization() error {
 	return nil
 }
 
-// SetAuthorizer sets the authorizer.
-func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
+// SetUnconditionalAuthorizer sets the authorizer.
+func (p *Plugin) SetUnconditionalAuthorizer(authz authorizer.UnconditionalAuthorizer) {
 	if p.serviceAccountNodeAudienceRestriction {
 		p.authz = authz
 	}
@@ -362,6 +362,9 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
+		if !nodeAllocatableResourceClaimStatusesEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update node allocatable resource claim statuses", nodeName))
+		}
 		return nil
 
 	default:
@@ -406,6 +409,36 @@ func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceC
 	// But this cannot be guaranteed, so for the sake of correctness in all
 	// cases this code here has to check.
 	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
+}
+
+func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAllocatableResourceClaimStatus) bool {
+	if len(statusA) != len(statusB) {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA {
+		if statusA[i].ResourceClaimName != statusB[i].ResourceClaimName {
+			return false
+		}
+		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
+			return false
+		}
+		if len(statusA[i].Resources) != len(statusB[i].Resources) {
+			return false
+		}
+		for name, qtyA := range statusA[i].Resources {
+			qtyB, ok := statusB[i].Resources[name]
+			if !ok {
+				return false
+			}
+			if qtyA.Cmp(qtyB) != 0 {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
@@ -712,10 +745,10 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("audience %q not found in pod spec volume, error authorizing %s to request tokens for this audience: %w", requestedAudience, userInfo.GetName(), err)
+		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", userInfo.GetName(), requestedAudience, err)
 	}
 
-	return fmt.Errorf("audience %q not found in pod spec volume, %s is not authorized to request tokens for this audience", requestedAudience, userInfo.GetName())
+	return fmt.Errorf("%s is not authorized to request tokens for audience %q", userInfo.GetName(), requestedAudience)
 }
 
 func (p *Plugin) podReferencesAudience(ctx context.Context, pod *v1.Pod, audience string) (bool, error) {

@@ -149,6 +149,15 @@ func (o *WebhookServingOptions) AddFlags(fs *pflag.FlagSet) {
 			"Preferred values: "+strings.Join(tlsCipherPreferredValues, ", ")+". \n"+
 			"Insecure values: "+strings.Join(tlsCipherInsecureValues, ", ")+".")
 
+	fs.Int32SliceVar(&o.CurvePreferences, "webhook-tls-curve-preferences", o.CurvePreferences,
+		"Comma-separated list of numeric Go crypto/tls CurveID values, "+
+			"as the allowed key exchange mechanisms for the webhook server. "+
+			"The supported values depend on the Go version used. "+
+			"See https://pkg.go.dev/crypto/tls#CurveID for values supported for each Go version. "+
+			"The order of the list is ignored, and key exchange mechanisms are chosen "+
+			"by Go from this list using an internal preference order. "+
+			"If omitted, the default Go curves will be used.")
+
 	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&o.MinTLSVersion, "webhook-tls-min-version", o.MinTLSVersion,
 		"Minimum TLS version supported for the webhook server. "+
@@ -226,6 +235,14 @@ func (o *WebhookServingOptions) ApplyTo(cfg **server.SecureServingInfo, webhookC
 			return fmt.Errorf("failed to parse cipher suites: %w", err)
 		}
 		c.CipherSuites = cipherSuites
+	}
+
+	if len(o.CurvePreferences) != 0 {
+		curvePreferences, err := cliflag.TLSCurvePreferences(o.CurvePreferences)
+		if err != nil {
+			return fmt.Errorf("failed to parse curve preferences: %w", err)
+		}
+		c.CurvePreferences = curvePreferences
 	}
 
 	c.MinTLSVersion, err = cliflag.TLSVersion(o.MinTLSVersion)

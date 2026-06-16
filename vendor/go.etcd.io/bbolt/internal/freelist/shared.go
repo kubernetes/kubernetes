@@ -220,10 +220,10 @@ func (t *shared) Reload(p *common.Page) {
 
 func (t *shared) NoSyncReload(pgIds common.Pgids) {
 	// Build a cache of only pending pages.
-	pcache := make(map[common.Pgid]bool)
+	pcache := make(map[common.Pgid]struct{})
 	for _, txp := range t.pending {
 		for _, pendingID := range txp.ids {
-			pcache[pendingID] = true
+			pcache[pendingID] = struct{}{}
 		}
 	}
 
@@ -231,7 +231,7 @@ func (t *shared) NoSyncReload(pgIds common.Pgids) {
 	// with any pages not in the pending lists.
 	a := []common.Pgid{}
 	for _, id := range pgIds {
-		if !pcache[id] {
+		if _, ok := pcache[id]; !ok {
 			a = append(a, id)
 		}
 	}

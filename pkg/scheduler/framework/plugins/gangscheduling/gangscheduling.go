@@ -22,13 +22,13 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -38,25 +38,32 @@ import (
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.GangScheduling
+	// permitTimeoutDuration defines how long the gang pods should
+	// wait at the permit stage for a quorum before being rejected.
+	permitTimeoutDuration = 5 * time.Minute
 )
 
 // GangScheduling is a plugin that enforces "all-or-nothing" scheduling for pods
 // belonging to a PodGroup with a Gang scheduling policy.
 type GangScheduling struct {
-	handle         fwk.Handle
-	podGroupLister schedulinglisters.PodGroupLister
+	handle          fwk.Handle
+	podGroupLister  schedulinglisters.PodGroupLister
+	podGroupManager fwk.PodGroupManager
+	snapshotLister  fwk.SharedLister
 }
 
 var _ fwk.EnqueueExtensions = &GangScheduling{}
 var _ fwk.PreEnqueuePlugin = &GangScheduling{}
-var _ fwk.ReservePlugin = &GangScheduling{}
 var _ fwk.PermitPlugin = &GangScheduling{}
+var _ framework.PlacementFeasiblePlugin = &GangScheduling{}
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &GangScheduling{
-		handle:         fh,
-		podGroupLister: fh.SharedInformerFactory().Scheduling().V1alpha2().PodGroups().Lister(),
+		handle:          fh,
+		podGroupLister:  fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
+		podGroupManager: fh.PodGroupManager(),
+		snapshotLister:  fh.SnapshotSharedLister(),
 	}, nil
 }
 
@@ -68,15 +75,18 @@ func (pl *GangScheduling) Name() string {
 // EventsToRegister returns the possible events that may make a Pod failed by this plugin schedulable.
 func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return []fwk.ClusterEventWithHint{
-		// A new pod being added might be the one that completes a gang, meeting its MinCount requirement.
+		// A new pod (either unscheduled or pre-bound) being added might be the one that completes a gang, meeting its MinCount requirement.
 		// PodSchedulingGroup field is immutable, so there is no need to subscribe on Pod/Update event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
 		// A PodGroup being added can be making a waiting gang schedulable.
 		// PodGroups are immutable, so there's no need to handle PodGroup/Update event.
 		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodGroupAdded},
 	}, nil
 }
 
+// isSchedulableAfterPodAdded checks whether a newly added pod (either unscheduled or pre-bound)
+// could make a previously unschedulable pod schedulable by completing the gang's MinCount.
 func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, addedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
@@ -137,7 +147,7 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 		return nil
 	}
 
-	podGroupState, err := pl.handle.PodGroupManager().PodGroupState(namespace, schedulingGroup)
+	podGroupState, err := pl.podGroupManager.PodGroupStates().Get(namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
@@ -148,35 +158,6 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 
 	// The quorum is met, allow the pod to enter the scheduling queue.
 	return nil
-}
-
-// Reserve is called after a node has been selected for the pod. For gang pods,
-// this stage marks the pod as "assumed" in the PodGroupManager,
-// contributing to the count of pods ready to be co-scheduled at the Permit stage.
-func (pl *GangScheduling) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	if pod.Spec.SchedulingGroup == nil {
-		return nil
-	}
-	podGroupState, err := pl.handle.PodGroupManager().PodGroupState(pod.Namespace, pod.Spec.SchedulingGroup)
-	if err != nil {
-		return fwk.AsStatus(err)
-	}
-	podGroupState.AssumePod(pod.UID)
-	return nil
-}
-
-// Unreserve removes the gang pod from the "assumed" state in the PodGroupManager,
-// ensuring it doesn't count towards the Permit quorum.
-func (pl *GangScheduling) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
-	if pod.Spec.SchedulingGroup == nil {
-		return
-	}
-	podGroupState, err := pl.handle.PodGroupManager().PodGroupState(pod.Namespace, pod.Spec.SchedulingGroup)
-	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group state", "pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup)
-		return
-	}
-	podGroupState.ForgetPod(pod.UID)
 }
 
 // Permit forces all pods in a gang to wait at this stage. Once the number of waiting (assumed) pods
@@ -203,7 +184,8 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return nil, 0
 	}
 
-	podGroupState, err := pl.handle.PodGroupManager().PodGroupState(namespace, schedulingGroup)
+	podGroupStateLister := pl.podGroupManager.PodGroupStates()
+	podGroupState, err := podGroupStateLister.Get(namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
 		return fwk.AsStatus(err), 0
 	}
@@ -213,7 +195,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		unscheduledPods := podGroupState.UnscheduledPods()
 		pl.handle.Activate(klog.FromContext(ctx), unscheduledPods)
 		logger.V(4).Info("Quorum is not met for a gang. Waiting for another pod to allow", "pod", klog.KObj(pod), "schedulingGroup", schedulingGroup, "activatedPods", len(unscheduledPods))
-		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"), podGroupState.SchedulingTimeout()
+		return fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"), permitTimeoutDuration
 	}
 
 	assumedPods := podGroupState.AssumedPods()
@@ -228,4 +210,72 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	}
 
 	return nil, 0
+}
+
+const placementFeasibleStateKey = "PlacementFeasible" + Name
+
+type placementFeasibleState struct {
+	evaluated, succeeded int
+}
+
+func (s *placementFeasibleState) Clone() fwk.StateData {
+	return &placementFeasibleState{
+		evaluated: s.evaluated,
+		succeeded: s.succeeded,
+	}
+}
+
+func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *placementFeasibleState {
+	state, err := placementCycleState.Read(placementFeasibleStateKey)
+	if err != nil {
+		state = &placementFeasibleState{}
+		placementCycleState.Write(placementFeasibleStateKey, state)
+	}
+	return state.(*placementFeasibleState)
+}
+
+// PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
+// The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
+// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns UnschedulableAndUnresolvable which will terminate the pod group scheduling cycle early.
+func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+	pg, err := pl.podGroupLister.PodGroups(podGroupInfo.GetNamespace()).Get(podGroupInfo.GetName())
+	if err != nil {
+		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s to compute gang feasibility: %w", klog.KObj(podGroupInfo), err))
+	}
+
+	gangPolicy := pg.Spec.SchedulingPolicy.Gang
+	// This plugin only cares about pods with a Gang scheduling policy.
+	if gangPolicy == nil {
+		return nil
+	}
+
+	podGroupState, err := pl.snapshotLister.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
+	if err != nil {
+		return fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(pg), err))
+	}
+
+	// We need to keep track of how many pods have already been evaluated in the current PodGroup scheduling cycle.
+	pgState := getPlacementFeasibleState(placementCycleState)
+	pgState.evaluated++
+
+	// remaining is the number of unscheduled pods that haven't been evaluated yet in the current PodGroup scheduling cycle.
+	remaining := len(podGroupInfo.GetUnscheduledPods()) - pgState.evaluated
+
+	// scheduled includes the pods that are assigned or assumed in the current PodGroup scheduling cycle.
+	scheduled := podGroupState.ScheduledPodsCount()
+
+	minCount := int(gangPolicy.MinCount)
+
+	if remaining+scheduled < minCount {
+		// minCount can't be satisfied because there are not enough remaining pods.
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+	}
+
+	if scheduled < minCount {
+		// minCount might be satisfied once more remaining pods are evaluated.
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+	}
+
+	// minCount is satisfied.
+	return nil
 }

@@ -293,7 +293,7 @@ func ValidateConditions(conditions []metav1.Condition, fldPath *field.Path) fiel
 	conditionTypeToFirstIndex := map[string]int{}
 	for i, condition := range conditions {
 		if _, ok := conditionTypeToFirstIndex[condition.Type]; ok {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("type"), condition.Type))
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), condition.Type).MarkCoveredByDeclarative().MarkAlpha())
 		} else {
 			conditionTypeToFirstIndex[condition.Type] = i
 		}
@@ -316,7 +316,11 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	var allErrs field.ErrorList
 
 	// type is set and is a valid format
-	allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type"))...)
+	if len(condition.Type) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "is required").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type"))...)
+	}
 
 	// status is set and is an accepted value
 	if !validConditionStatuses.Has(string(condition.Status)) {
