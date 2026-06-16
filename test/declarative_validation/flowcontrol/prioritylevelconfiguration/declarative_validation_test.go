@@ -23,8 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	flowcontrol "k8s.io/kubernetes/pkg/apis/flowcontrol"
 	registry "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -121,6 +122,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkPLC()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -197,6 +200,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "flowcontrol.apiserver.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "prioritylevelconfigurations",
+		Name:              "test-limited",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+	updateObj := mkPLC()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 // mkPLC creates a valid Limited PriorityLevelConfiguration with Reject limit response.
