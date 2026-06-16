@@ -74,7 +74,7 @@ func (d *desiredCalc) initPorts(subsetPorts []v1.EndpointPort) multiAddrTypePort
 	multiKey := multiAddrTypePortMapKey{}
 
 	for _, addrType := range addrTypes {
-		multiKey[addrType] = addrTypePortMapKey(endpointsliceutil.NewAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(endpointPorts), addrType))
+		multiKey[addrType] = addrTypePortMapKey(endpointsliceutil.NewPortMapKey(endpointPorts, addrType))
 		if _, ok := d.endpointsByKey[multiKey[addrType]]; !ok {
 			d.endpointsByKey[multiKey[addrType]] = endpointsliceutil.EndpointSet{}
 		}

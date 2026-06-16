@@ -158,18 +158,13 @@ func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, 
 type PortMapKey string
 
 // NewPortMapKey generates a PortMapKey from endpoint ports.
-func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
+func NewPortMapKey(endpointPorts []discovery.EndpointPort, addrType discovery.AddressType) PortMapKey {
 	// Normalize nil to empty slice so they hash the same.
 	if endpointPorts == nil {
 		endpointPorts = []discovery.EndpointPort{}
 	}
 	sort.Sort(portsInOrder(endpointPorts))
-	return PortMapKey(deepHashObjectToString(endpointPorts))
-}
-
-// NewAddrTypePortMapKey generates a PortMapKey from endpoint ports and address type.
-func NewAddrTypePortMapKey(portMapKey PortMapKey, addrType discovery.AddressType) PortMapKey {
-	pmk := fmt.Sprintf("%s-%s", addrType, portMapKey)
+	pmk := fmt.Sprintf("%s-%s", addrType, PortMapKey(deepHashObjectToString(endpointPorts)))
 	return PortMapKey(pmk)
 }
 

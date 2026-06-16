@@ -953,10 +953,28 @@ func TestNewPortMapKey_NilVsEmptySlice(t *testing.T) {
 	var nilPorts []discovery.EndpointPort
 	emptyPorts := []discovery.EndpointPort{}
 
-	nilKey := NewPortMapKey(nilPorts)
-	emptyKey := NewPortMapKey(emptyPorts)
+	nilKey := NewPortMapKey(nilPorts, discovery.AddressTypeIPv4)
+	emptyKey := NewPortMapKey(emptyPorts, discovery.AddressTypeIPv4)
 
 	if nilKey != emptyKey {
 		t.Errorf("NewPortMapKey should return the same key for nil and empty slice, got nil=%q empty=%q", nilKey, emptyKey)
+	}
+}
+
+func TestNewPortMapKey_AddressType(t *testing.T) {
+	emptyPorts := []discovery.EndpointPort{}
+
+	kepv4 := NewPortMapKey(emptyPorts, discovery.AddressTypeIPv4)
+	kepv6 := NewPortMapKey(emptyPorts, discovery.AddressTypeIPv6)
+	kepFQDN := NewPortMapKey(emptyPorts, discovery.AddressTypeFQDN)
+
+	if kepv4 == kepv6 {
+		t.Errorf("NewPortMapKey should return different keys for different address types, got kepv4=%q kepv6=%q", kepv4, kepv6)
+	}
+	if kepv4 == kepFQDN {
+		t.Errorf("NewPortMapKey should return different keys for different address types, got kepv4=%q kepFQDN=%q", kepv4, kepFQDN)
+	}
+	if kepv6 == kepFQDN {
+		t.Errorf("NewPortMapKey should return different keys for different address types, got kepv6=%q kepFQDN=%q", kepv6, kepFQDN)
 	}
 }

@@ -181,7 +181,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 	existingSlicesByPortMap := map[endpointsliceutil.PortMapKey][]*discovery.EndpointSlice{}
 	for _, existingSlice := range existingSlices {
 		if ownedBy(existingSlice, service) {
-			epHash := endpointsliceutil.NewPortMapKey(existingSlice.Ports)
+			epHash := endpointsliceutil.NewPortMapKey(existingSlice.Ports, addressType)
 			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
 		} else {
 			slicesToDelete = append(slicesToDelete, existingSlice)
@@ -198,7 +198,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 		}
 
 		endpointPorts := getEndpointPorts(logger, service, pod)
-		epHash := endpointsliceutil.NewPortMapKey(endpointPorts)
+		epHash := endpointsliceutil.NewPortMapKey(endpointPorts, addressType)
 		if _, ok := desiredEndpointsByPortMap[epHash]; !ok {
 			desiredEndpointsByPortMap[epHash] = endpointsliceutil.EndpointSet{}
 		}
@@ -249,7 +249,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 		totalRemoved += removed
 
 		spMetrics.Set(
-			endpointsliceutil.NewAddrTypePortMapKey(portMap, addressType),
+			endpointsliceutil.NewPortMapKey(desiredMetaByPortMap[portMap].ports, addressType),
 			metrics.EfficiencyInfo{
 				Endpoints: numEndpoints,
 				Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
@@ -279,7 +279,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 			slicesToCreate = append(slicesToCreate, placeholderSlice)
 		}
 		spMetrics.Set(
-			endpointsliceutil.NewAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(placeholderSlice.Ports), addressType),
+			endpointsliceutil.NewPortMapKey(placeholderSlice.Ports, addressType),
 			metrics.EfficiencyInfo{
 				Endpoints: 0,
 				Slices:    1,

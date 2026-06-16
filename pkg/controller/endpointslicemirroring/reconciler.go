@@ -306,7 +306,7 @@ func (r *reconciler) deleteEndpoints(ctx context.Context, namespace, name string
 func endpointSlicesByKey(existingSlices []*discovery.EndpointSlice) map[addrTypePortMapKey][]*discovery.EndpointSlice {
 	slicesByKey := map[addrTypePortMapKey][]*discovery.EndpointSlice{}
 	for _, existingSlice := range existingSlices {
-		epKey := addrTypePortMapKey(endpointsliceutil.NewAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(existingSlice.Ports), existingSlice.AddressType))
+		epKey := addrTypePortMapKey(endpointsliceutil.NewPortMapKey(existingSlice.Ports, existingSlice.AddressType))
 		slicesByKey[epKey] = append(slicesByKey[epKey], existingSlice)
 	}
 	return slicesByKey
