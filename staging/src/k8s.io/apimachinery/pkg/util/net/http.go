@@ -100,6 +100,8 @@ func IsProbableEOF(err error) bool {
 		return true
 	case strings.Contains(msg, "read on closed response body"):
 		return true
+	case strings.Contains(msg, "response body closed"):
+		return true
 	}
 	return false
 }
