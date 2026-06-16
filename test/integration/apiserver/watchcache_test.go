@@ -25,8 +25,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -168,7 +175,13 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 
 func BenchmarkListFromWatchCache(b *testing.B) {
 	tCtx := ktesting.Init(b)
-	c, _, tearDownFn := framework.StartTestServer(tCtx, b, framework.TestServerSetup{
+
+	// Enable CBOR on the server and allow the client to negotiate it so that the
+	// "cbor" content-type sub-benchmark exercises the CBOR (de)serialization path.
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(b, clientfeatures.ClientsAllowCBOR, true)
+
+	c, restConfig, tearDownFn := framework.StartTestServer(tCtx, b, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Switch off endpoints reconciler to avoid unnecessary operations.
 			config.Extra.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
@@ -215,16 +228,30 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 		b.Error(err)
 	}
 
-	b.ResetTimer()
-
 	opts := metav1.ListOptions{
 		ResourceVersion: "0",
 	}
-	for i := 0; i < b.N; i++ {
-		secrets, err := c.CoreV1().Secrets("").List(tCtx, opts)
-		if err != nil {
-			b.Errorf("failed to list secrets: %v", err)
-		}
-		b.Logf("Number of secrets: %d", len(secrets.Items))
+
+	// Benchmark the list request served from the watch cache across the wire
+	// formats the apiserver supports, reusing the same populated dataset.
+	for _, contentType := range []struct {
+		name  string
+		value string
+	}{
+		{name: "protobuf", value: runtime.ContentTypeProtobuf},
+		{name: "json", value: runtime.ContentTypeJSON},
+		{name: "cbor", value: runtime.ContentTypeCBOR},
+	} {
+		config := rest.CopyConfig(restConfig)
+		config.ContentType = contentType.value
+		client := clientset.NewForConfigOrDie(config)
+
+		b.Run(contentType.name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				if _, err := client.CoreV1().Secrets("").List(tCtx, opts); err != nil {
+					b.Errorf("failed to list secrets: %v", err)
+				}
+			}
+		})
 	}
 }
