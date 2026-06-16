@@ -60,12 +60,8 @@ type watchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
-func (w *watchCacheStorage) getIntervalLocked(resourceVersion uint64, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	ci, err := newCacheIntervalFromStore(resourceVersion, w.store, key, matchesSingle)
-	if err != nil {
-		return nil, err
-	}
-	return ci, nil
+func (w *watchCacheStorage) SnapshotLocked() store.Snapshot {
+	return w.store
 }
 
 func (w *watchCacheStorage) Compact(rev uint64) {
@@ -115,6 +111,16 @@ type orderedListSnapshot struct {
 
 var _ store.Snapshot = (*orderedListSnapshot)(nil)
 
+func (o orderedListSnapshot) GetByKey(key string) (interface{}, bool, error) {
+	for _, item := range o.Items {
+		elem, ok := item.(*store.Element)
+		if ok && elem.Key == key {
+			return item, true, nil
+		}
+	}
+	return nil, false, nil
+}
+
 func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
 	return o.Items, nil
 }
@@ -124,6 +130,16 @@ type listSnapshot struct {
 }
 
 var _ store.Snapshot = (*listSnapshot)(nil)
+
+func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
+	for _, item := range l.Items {
+		elem, ok := item.(*store.Element)
+		if ok && elem.Key == key {
+			return item, true, nil
+		}
+	}
+	return nil, false, nil
+}
 
 func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]interface{}, error) {
 	var result []interface{}

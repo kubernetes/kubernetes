@@ -74,6 +74,7 @@ type Indexer interface {
 }
 
 type Snapshot interface {
+	GetByKey(key string) (item interface{}, exists bool, err error)
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 

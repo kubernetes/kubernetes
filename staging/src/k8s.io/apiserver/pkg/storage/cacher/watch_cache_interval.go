@@ -122,20 +122,23 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, snap store.Snapshot, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
+	var err error
 	if matchesSingle {
-		item, exists, err := indexer.GetByKey(key)
+		item, exists, err := snap.GetByKey(key)
 		if err != nil {
 			return nil, err
 		}
-
 		if exists {
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems = indexer.List()
+		allItems, err = snap.OrderedListPrefix("", "")
+		if err != nil {
+			return nil, err
+		}
 	}
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
 	for i, item := range allItems {
