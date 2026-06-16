@@ -132,6 +132,14 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 			"For newer Linux kernel versions, we recommend using the \"nftables\" mode, which has been GA since v1.33. "+
 			"For older Linux kernel versions, you can use the \"iptables\" mode which is still the default one.", kind)
 	}
+
+	// kube-proxy throws warnings if the user has not explicitly set the mode.
+	// In a future release the default mode will switch from "iptables" to "nftables" too.
+	// TODO: apply the required changes in future releases:
+	// - https://github.com/kubernetes/kubeadm/issues/3309
+	if kp.config.Mode == "" {
+		kp.config.Mode = "iptables"
+	}
 }
 
 // Mutate is NOP for the kube-proxy config
