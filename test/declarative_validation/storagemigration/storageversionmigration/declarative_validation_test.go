@@ -28,6 +28,54 @@ import (
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
+func TestDeclarativeValidate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:   "storagemigration.k8s.io",
+				APIVersion: apiVersion,
+				Resource:   "storageversionmigrations",
+			})
+
+			meta.RunObjectMetaTestCases(t, ctx, &storagemigration.StorageVersionMigration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-svm",
+				},
+				Spec: storagemigration.StorageVersionMigrationSpec{
+					Resource: metav1.GroupResource{
+						Group:    "group",
+						Resource: "resources",
+					},
+				},
+			}, registry.Strategy, meta.WithStringentFinalizerValidation())
+		})
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup:   "storagemigration.k8s.io",
+				APIVersion: apiVersion,
+				Resource:   "storageversionmigrations",
+			})
+
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &storagemigration.StorageVersionMigration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "valid-svm",
+				},
+				Spec: storagemigration.StorageVersionMigrationSpec{
+					Resource: metav1.GroupResource{
+						Group:    "group",
+						Resource: "resources",
+					},
+				},
+			}, registry.Strategy, meta.WithStringentFinalizerValidation())
+		})
+	}
+}
+
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
