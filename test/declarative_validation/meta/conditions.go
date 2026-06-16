@@ -68,9 +68,16 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.Invalid(
 					fldPath.Index(0).Child("observedGeneration"),
 					int64(-1),
-					"must be greater than or equal to zero",
+					"",
 				).WithOrigin("minimum").MarkAlpha(),
 			},
+		},
+		{
+			Name: "valid observedGeneration zero",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakObservedGeneration(0)),
+			},
+			ExpectedErrs: nil,
 		},
 	}
 }
