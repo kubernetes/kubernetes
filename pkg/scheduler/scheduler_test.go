@@ -1067,16 +1067,31 @@ func Test_UnionedGVKs(t *testing.T) {
 			if !tt.enableDynamicResourceAllocation {
 				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+				// StorageCapacityScoring is alpha in 1.33 (disabled by default).
+				// Strip Shape from VolumeBinding args to avoid validation failure.
+				// BindTimeoutSeconds: 600 is the default value of VolumeBindingArgs when StorageCapacityScoring is disabled.
+				pluginConfig = slices.Clone(pluginConfig)
+				for i := range pluginConfig {
+					if pluginConfig[i].Name == "VolumeBinding" {
+						pluginConfig[i].Args = &schedulerapi.VolumeBindingArgs{BindTimeoutSeconds: 600}
+						break
+					}
+				}
 			} else if !tt.enableInPlacePodVerticalScaling {
 				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
 				// Strip BindingTimeout from DynamicResources args to avoid validation failure.
+				// StorageCapacityScoring is alpha in 1.34 (disabled by default).
+				// Strip Shape from VolumeBinding args to avoid validation failure.
+				// BindTimeoutSeconds: 600 is the default value of VolumeBindingArgs when StorageCapacityScoring is disabled.
 				pluginConfig = slices.Clone(pluginConfig)
 				for i := range pluginConfig {
-					if pluginConfig[i].Name == "DynamicResources" {
+					switch pluginConfig[i].Name {
+					case "DynamicResources":
 						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
-						break
+					case "VolumeBinding":
+						pluginConfig[i].Args = &schedulerapi.VolumeBindingArgs{BindTimeoutSeconds: 600}
 					}
 				}
 			} else {

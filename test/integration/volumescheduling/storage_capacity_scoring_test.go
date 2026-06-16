@@ -27,10 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	testutil "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -83,8 +80,6 @@ func setupClusterForStorageCapacityScoring(t *testing.T, nsName string, resyncPe
 }
 
 func TestStorageCapacityScoring(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageCapacityScoring, true)
-
 	config := setupClusterForStorageCapacityScoring(t, "storage-capacity-scoring", 0, 0)
 	defer config.teardown()
 
@@ -282,8 +277,6 @@ func TestStorageCapacityScoring(t *testing.T) {
 }
 
 func TestStorageCapacityScoringMultiDriver(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageCapacityScoring, true)
-
 	t.Run("multiple CSI drivers with storage capacity reporting enabled", func(t *testing.T) {
 		config := setupClusterForStorageCapacityScoring(t, "scoring-multi-all", 0, 0)
 		defer config.teardown()

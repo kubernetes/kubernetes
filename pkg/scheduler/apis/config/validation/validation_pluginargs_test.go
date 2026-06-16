@@ -538,18 +538,27 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 	}{
 		{
 			name: "zero is a valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: false,
+			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 0,
 			},
 		},
 		{
 			name: "positive value is valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: false,
+			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
 			},
 		},
 		{
 			name: "negative value is invalid config ",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: false,
+			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: -10,
 			},
