@@ -632,7 +632,6 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 // Then for each placement it tries to schedule the pod group through podGroupSchedulingDefaultAlgorithm.
 // Finally, it runs placement scorer plugins to select the best placement.
 func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, postFilterMode podGroupPostFilterMode) podGroupAlgorithmResult {
-	logger := klog.FromContext(ctx)
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
 		return podGroupAlgorithmResult{
@@ -652,18 +651,30 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
-	for _, placement := range placements {
-		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
-		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
-		if err != nil {
-			return podGroupAlgorithmResult{
-				status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
-			}
+	// Try the placement matching the pods' NominatedNodeName first, mirroring pod-by-pod
+	// scheduling, which evaluates the nominated node before all others. A nominated node is
+	// usually set by a previous preemption cycle and is the placement the pod group is
+	// expected to land on, so if the gang is feasible there we use it and skip the rest.
+	nominated := nominatedPlacement(placements, podGroupInfo)
+	if nominated != nil {
+		result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode, nominated)
+		if result.status.IsError() {
+			return result
 		}
-		placementCycleState := framework.NewCycleState()
-		placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
-		result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, postFilterMode)
-		sched.nodeInfoSnapshot.ForgetPlacement()
+		if result.status.IsSuccess() {
+			return result
+		}
+		anyResult = &result
+		if result.waitingOnPreemption {
+			successfulResults[nominated] = &result
+		}
+	}
+
+	for _, placement := range placements {
+		if placement == nominated {
+			continue
+		}
+		result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode, placement)
 		if result.status.IsError() {
 			return result
 		}
@@ -698,6 +709,53 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	}
 
 	return *successfulResults[bestPlacement]
+}
+
+// evaluatePlacement runs the pod group scheduling algorithm within a single placement,
+// assuming the placement in the snapshot for the duration of the simulation.
+func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, postFilterMode podGroupPostFilterMode, placement *fwk.Placement) podGroupAlgorithmResult {
+	klog.FromContext(ctx).V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
+	if err := sched.nodeInfoSnapshot.AssumePlacement(placement); err != nil {
+		return podGroupAlgorithmResult{
+			status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
+		}
+	}
+	placementCycleState := framework.NewCycleState()
+	placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, postFilterMode)
+	sched.nodeInfoSnapshot.ForgetPlacement()
+	return result
+}
+
+// nominatedPlacement returns the placement that should be evaluated first because it best
+// matches the pods' NominatedNodeName, or nil when no placement holds any nominated node.
+// A nominated node is typically set by a previous preemption cycle, so preferring its
+// placement mirrors pod-by-pod scheduling, which tries the nominated node before all others.
+// When nominations span placements, the one honoring the most pods' nominations is chosen.
+func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
+	nominatedNodeCounts := make(map[string]int)
+	for _, podInfo := range podGroupInfo.QueuedPodInfos {
+		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
+			nominatedNodeCounts[nnn]++
+		}
+	}
+	if len(nominatedNodeCounts) == 0 {
+		return nil
+	}
+
+	var best *fwk.Placement
+	bestCount := 0
+	for _, placement := range placements {
+		count := 0
+		for _, node := range placement.Nodes {
+			count += nominatedNodeCounts[node.Node().Name]
+		}
+		if count > bestCount {
+			bestCount = count
+			best = placement
+		}
+	}
+	return best
 }
 
 // findBestPlacement uses PlacementScore plugins to determine the best placement based on the scheduling results.
