@@ -18,6 +18,7 @@ package set
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -303,19 +304,10 @@ func addSubjects(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []
 	transformed := false
 	updated := existings
 	for _, item := range targets {
-		if !contain(existings, item) {
+		if !slices.Contains(existings, item) {
 			updated = append(updated, item)
 			transformed = true
 		}
 	}
 	return transformed, updated
-}
-
-func contain(slice []rbacv1.Subject, item rbacv1.Subject) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
 }

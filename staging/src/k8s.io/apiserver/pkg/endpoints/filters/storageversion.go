@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,7 +86,7 @@ func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Man
 		u, hasUser := request.UserFrom(ctx)
 		if requestInfo.APIGroup == "" && requestInfo.Resource == "namespaces" &&
 			requestInfo.Verb == "create" && hasUser &&
-			u.GetName() == user.APIServerUser && contains(u.GetGroups(), user.SystemPrivilegedGroup) {
+			u.GetName() == user.APIServerUser && slices.Contains(u.GetGroups(), user.SystemPrivilegedGroup) {
 			handler.ServeHTTP(w, req)
 			return
 		}
@@ -109,13 +110,4 @@ func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Man
 		gv := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 		responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable(fmt.Sprintf("wait for storage version registration to complete for resource: %v, last seen error: %v", gr, svm.LastUpdateError(gr))), s, gv, w, req)
 	})
-}
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }

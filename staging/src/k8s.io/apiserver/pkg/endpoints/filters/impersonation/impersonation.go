@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -143,15 +144,7 @@ func WithImpersonation(handler http.Handler, a authorizer.UnconditionalAuthorize
 				groups = append(groups, user.AllAuthenticated)
 			}
 		} else {
-			addUnauthenticated := true
-			for _, group := range groups {
-				if group == user.AllUnauthenticated {
-					addUnauthenticated = false
-					break
-				}
-			}
-
-			if addUnauthenticated {
+			if !slices.Contains(groups, user.AllUnauthenticated) {
 				groups = append(groups, user.AllUnauthenticated)
 			}
 		}

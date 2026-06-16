@@ -167,13 +167,10 @@ func ResourceNames(resources corev1.ResourceList) []corev1.ResourceName {
 }
 
 // Contains returns true if the specified item is in the list of items
+//
+//go:fix inline
 func Contains(items []corev1.ResourceName, item corev1.ResourceName) bool {
-	for _, i := range items {
-		if i == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(items, item)
 }
 
 // ContainsPrefix returns true if the specified item has a prefix that contained in given prefix Set
@@ -190,10 +187,10 @@ func ContainsPrefix(prefixSet []string, item corev1.ResourceName) bool {
 func Intersection(a []corev1.ResourceName, b []corev1.ResourceName) []corev1.ResourceName {
 	result := make([]corev1.ResourceName, 0, len(a))
 	for _, item := range a {
-		if Contains(result, item) {
+		if slices.Contains(result, item) {
 			continue
 		}
-		if !Contains(b, item) {
+		if !slices.Contains(b, item) {
 			continue
 		}
 		result = append(result, item)
@@ -206,7 +203,7 @@ func Intersection(a []corev1.ResourceName, b []corev1.ResourceName) []corev1.Res
 func Difference(a []corev1.ResourceName, b []corev1.ResourceName) []corev1.ResourceName {
 	result := make([]corev1.ResourceName, 0, len(a))
 	for _, item := range a {
-		if Contains(b, item) || Contains(result, item) {
+		if slices.Contains(b, item) || slices.Contains(result, item) {
 			continue
 		}
 		result = append(result, item)

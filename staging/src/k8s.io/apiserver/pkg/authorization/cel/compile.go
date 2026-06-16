@@ -18,6 +18,7 @@ package cel
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
@@ -94,15 +95,8 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor) (C
 	if issues != nil {
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
-	found := false
 	returnTypes := expressionAccessor.ReturnTypes()
-	for _, returnType := range returnTypes {
-		if ast.OutputType() == returnType {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(returnTypes, ast.OutputType()) {
 		var reason string
 		if len(returnTypes) == 1 {
 			reason = fmt.Sprintf("must evaluate to %v but got %v", returnTypes[0].String(), ast.OutputType())

@@ -91,12 +91,7 @@ func (s Set[T]) HasAll(items ...T) bool {
 
 // HasAny returns true if any items are contained in the set.
 func (s Set[T]) HasAny(items ...T) bool {
-	for _, item := range items {
-		if s.Has(item) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(items, s.Has)
 }
 
 // Clone returns a new set which is a copy of the current set.

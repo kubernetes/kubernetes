@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -1274,22 +1275,11 @@ func GetArticleForNoun(noun string, padding string) string {
 	}
 
 	article := "a"
-	if isVowel(rune(noun[0])) {
+	if slices.Contains([]rune{'a', 'e', 'i', 'o', 'u'}, unicode.ToLower(rune(noun[0]))) {
 		article = "an"
 	}
 
 	return fmt.Sprintf("%s%s%s", padding, article, padding)
-}
-
-// isVowel returns true if the rune is a vowel (case insensitive).
-func isVowel(c rune) bool {
-	vowels := []rune{'a', 'e', 'i', 'o', 'u'}
-	for _, value := range vowels {
-		if value == unicode.ToLower(c) {
-			return true
-		}
-	}
-	return false
 }
 
 func restfulListResource(r rest.Lister, rw rest.Watcher, scope handlers.RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
