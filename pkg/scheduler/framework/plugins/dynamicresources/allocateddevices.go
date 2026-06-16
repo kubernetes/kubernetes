@@ -42,7 +42,9 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 	dedicatedDeviceCallback func(deviceID structured.DeviceID),
 	enabledConsumableCapacity bool,
 	sharedDeviceCallback func(structured.SharedDeviceID),
-	consumedCapacityCallback func(structured.DeviceConsumedCapacity)) {
+	consumedCapacityCallback func(structured.DeviceConsumedCapacity),
+	enabledCompatibilityGroups bool,
+	compatibilityGroupsCallback func(structured.DeviceID, map[string][]string)) {
 	if claim.Status.Allocation == nil {
 		return
 	}
@@ -57,6 +59,17 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 			continue
 		}
 		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+
+		// Record the per-counter-set compatibility groups snapshot, if any. This
+		// is independent of whether the device is shared or dedicated, since
+		// compatibility groups apply to any device drawing from a counter set.
+		if enabledCompatibilityGroups && len(result.CompatibilityGroups) > 0 {
+			compatibilityGroups := make(map[string][]string, len(result.CompatibilityGroups))
+			for counterSet, groupList := range result.CompatibilityGroups {
+				compatibilityGroups[counterSet] = append([]string(nil), groupList.Groups...)
+			}
+			compatibilityGroupsCallback(deviceID, compatibilityGroups)
+		}
 
 		// None of the users of this helper need to abort iterating,
 		// therefore it's not supported as it only would add overhead.
@@ -95,12 +108,14 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 type allocatedDevices struct {
 	logger klog.Logger
 
-	mutex                     sync.RWMutex
-	revision                  int64
-	ids                       sets.Set[structured.DeviceID]
-	shareIDs                  sets.Set[structured.SharedDeviceID]
-	capacities                structured.ConsumedCapacityCollection
-	enabledConsumableCapacity bool
+	mutex                      sync.RWMutex
+	revision                   int64
+	ids                        sets.Set[structured.DeviceID]
+	shareIDs                   sets.Set[structured.SharedDeviceID]
+	capacities                 structured.ConsumedCapacityCollection
+	enabledConsumableCapacity  bool
+	compatGroups               structured.CompatibilityGroupsCollection
+	enabledCompatibilityGroups bool
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
@@ -110,6 +125,13 @@ func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 		shareIDs:                  sets.New[structured.SharedDeviceID](),
 		capacities:                structured.NewConsumedCapacityCollection(),
 		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		compatGroups:              structured.NewCompatibilityGroupsCollection(),
+		// Compatibility groups are tracked from claim statuses regardless of the
+		// feature gate. When the gate is enabled the allocator enforces
+		// compatibility; when it is disabled the allocator still needs to know
+		// which counter sets already have grouped allocations so it can avoid
+		// them during a version skew (KEP "Devices skipped" behavior).
+		enabledCompatibilityGroups: true,
 	}
 }
 
@@ -132,6 +154,13 @@ func (a *allocatedDevices) Capacities() (structured.ConsumedCapacityCollection, 
 	defer a.mutex.RUnlock()
 
 	return a.capacities.Clone(), a.revision
+}
+
+func (a *allocatedDevices) CompatibilityGroups() (structured.CompatibilityGroupsCollection, int64) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return a.compatGroups.Clone(), a.revision
 }
 
 func (a *allocatedDevices) Revision() int64 {
@@ -205,6 +234,10 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 	}
+	var compatGroupsByDevice map[structured.DeviceID]map[string][]string
+	if a.enabledCompatibilityGroups {
+		compatGroupsByDevice = make(map[structured.DeviceID]map[string][]string)
+	}
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -219,9 +252,14 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 			a.logger.V(6).Info("Observed consumed capacity", "device", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
 			deviceCapacities = append(deviceCapacities, capacity)
 		},
+		a.enabledCompatibilityGroups,
+		func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) {
+			a.logger.V(6).Info("Observed compatibility groups", "device", deviceID, "compatibilityGroups", compatibilityGroups, "claim", klog.KObj(claim))
+			compatGroupsByDevice[deviceID] = compatibilityGroups
+		},
 	)
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && len(compatGroupsByDevice) == 0 {
 		return
 	}
 
@@ -236,6 +274,9 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	}
 	for _, capacity := range deviceCapacities {
 		a.capacities.Insert(capacity)
+	}
+	for deviceID, compatibilityGroups := range compatGroupsByDevice {
+		a.compatGroups.Insert(deviceID, compatibilityGroups)
 	}
 }
 
@@ -253,6 +294,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		shareIDs = make([]structured.SharedDeviceID, 0, 20)
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 	}
+	var compatGroupDeviceIDs []structured.DeviceID
 	foreachAllocatedDevice(claim,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -266,9 +308,14 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		func(capacity structured.DeviceConsumedCapacity) {
 			a.logger.V(6).Info("Observed consumed capacity release", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
 			deviceCapacities = append(deviceCapacities, capacity)
+		},
+		a.enabledCompatibilityGroups,
+		func(deviceID structured.DeviceID, compatibilityGroups map[string][]string) {
+			a.logger.V(6).Info("Observed compatibility groups release", "device", deviceID, "claim", klog.KObj(claim))
+			compatGroupDeviceIDs = append(compatGroupDeviceIDs, deviceID)
 		})
 
-	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 {
+	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && len(compatGroupDeviceIDs) == 0 {
 		return
 	}
 
@@ -283,5 +330,8 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	}
 	for _, capacity := range deviceCapacities {
 		a.capacities.Remove(capacity)
+	}
+	for _, deviceID := range compatGroupDeviceIDs {
+		delete(a.compatGroups, deviceID)
 	}
 }
