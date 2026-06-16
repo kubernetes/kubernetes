@@ -92,13 +92,14 @@ func newCmdNode(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, ok := data.(*nodeData); !ok {
+			nodeData, ok := data.(*nodeData)
+			if !ok {
 				return errors.New("invalid data struct")
 			}
 			if err := nodeRunner.Run(args); err != nil {
 				return err
 			}
-			if nodeOptions.dryRun {
+			if nodeData.DryRun() {
 				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 				return nil
 			}
