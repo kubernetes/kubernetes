@@ -465,23 +465,8 @@ __EOF__
 
   set -o errexit
 
-  kube::test::assert_explain_output_equals() {
-    local output=$1
-    local expected=$2
-
-    if [[ "${output}" == "${expected}" ]]; then
-      echo "Successful"
-      return 0
-    fi
-
-    echo "FAIL!"
-    diff -u <(printf '%s\n' "${expected}") <(printf '%s\n' "${output}") || true
-    caller
-    return 1
-  }
-
   output_message=$(kubectl explain mock-resource --recursive --max-depth=1)
-  expected_message=$(cat <<'__EOF__'
+  expected_message=$(cat <<EOF
 GROUP:      test.com
 KIND:       MockResource
 VERSION:    v1
@@ -493,12 +478,12 @@ FIELDS:
   kind	<string>
   metadata	<ObjectMeta>
   spec	<Object>
-__EOF__
+EOF
 )
-  kube::test::assert_explain_output_equals "${output_message}" "${expected_message}"
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   output_message=$(kubectl explain mock-resource --recursive --max-depth=2)
-  expected_message=$(cat <<'__EOF__'
+  expected_message=$(cat <<EOF
 GROUP:      test.com
 KIND:       MockResource
 VERSION:    v1
@@ -526,12 +511,12 @@ FIELDS:
     uid	<string>
   spec	<Object>
     test	<map[string][]string>
-__EOF__
+EOF
 )
-  kube::test::assert_explain_output_equals "${output_message}" "${expected_message}"
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   output_message=$(kubectl explain mock-resource --recursive)
-  expected_message=$(cat <<'__EOF__'
+  expected_message=$(cat <<EOF
 GROUP:      test.com
 KIND:       MockResource
 VERSION:    v1
@@ -572,12 +557,12 @@ FIELDS:
     uid	<string>
   spec	<Object>
     test	<map[string][]string>
-__EOF__
+EOF
 )
-  kube::test::assert_explain_output_equals "${output_message}" "${expected_message}"
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   output_message=$(kubectl explain mock-resource --recursive --max-depth=1 -o plaintext-openapiv2)
-  expected_message=$(cat <<'__EOF__'
+  expected_message=$(cat <<EOF
 KIND:     MockResource
 VERSION:  test.com/v1
 
@@ -589,12 +574,12 @@ FIELDS:
    kind	<string>
    metadata	<Object>
    spec	<Object>
-__EOF__
+EOF
 )
-  kube::test::assert_explain_output_equals "${output_message}" "${expected_message}"
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   output_message=$(kubectl explain mock-resource --recursive --max-depth=2 -o plaintext-openapiv2)
-  expected_message=$(cat <<'__EOF__'
+  expected_message=$(cat <<EOF
 KIND:     MockResource
 VERSION:  test.com/v1
 
@@ -622,12 +607,12 @@ FIELDS:
       uid	<string>
    spec	<Object>
       test	<map[string][]string>
-__EOF__
+EOF
 )
-  kube::test::assert_explain_output_equals "${output_message}" "${expected_message}"
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   output_message=$(kubectl explain mock-resource --recursive -o plaintext-openapiv2)
-  expected_message=$(cat <<'__EOF__'
+  expected_message=$(cat <<EOF
 KIND:     MockResource
 VERSION:  test.com/v1
 
@@ -668,9 +653,9 @@ FIELDS:
       uid	<string>
    spec	<Object>
       test	<map[string][]string>
-__EOF__
+EOF
 )
-  kube::test::assert_explain_output_equals "${output_message}" "${expected_message}"
+  kube::test::if_equals_string "${output_message}" "${expected_message}"
 
   # Cleanup
   kubectl delete crd mock-resources.test.com

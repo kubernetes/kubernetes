@@ -359,6 +359,28 @@ kube::test::if_has_string() {
   fi
 }
 
+kube::test::if_equals_string() {
+  local message=$1
+  local expected=$2
+
+  if [[ "${message}" == "${expected}" ]]; then
+    echo -n "${green}"
+    echo "Successful"
+    echo -n "${reset}"
+    echo "message:${message}"
+    echo "equals:${expected}"
+    return 0
+  else
+    echo -n "${bold}${red}"
+    echo "FAIL!"
+    echo -n "${reset}"
+    echo "message:${message}"
+    echo "does not equal:${expected}"
+    caller
+    return 1
+  fi
+}
+
 kube::test::if_has_not_string() {
   local message=$1
   local match=$2

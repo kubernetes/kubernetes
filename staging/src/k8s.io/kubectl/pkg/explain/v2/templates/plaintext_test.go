@@ -659,8 +659,7 @@ func TestPlaintext(t *testing.T) {
 				"short": true,
 			},
 			Checks: []check{
-				checkEquals(`thefield	<string> -required-
-`),
+				checkEquals("thefield\t<string> -required-\n"),
 			},
 		},
 		{
@@ -708,8 +707,7 @@ func TestPlaintext(t *testing.T) {
 				"level": 5,
 			},
 			Checks: []check{
-				checkEquals(`          thefield	<string> -required-
-`),
+				checkEquals("          thefield\t<string> -required-\n"),
 			},
 		},
 		{
@@ -764,8 +762,7 @@ func TestPlaintext(t *testing.T) {
 				"short": true,
 			},
 			Checks: []check{
-				checkEquals(`thefield	<string>
-`),
+				checkEquals("thefield\t<string>\n"),
 			},
 		},
 		{
@@ -873,10 +870,7 @@ func TestPlaintext(t *testing.T) {
 				"isLongView": true,
 			},
 			Checks: []check{
-				checkEquals(`ENUM:
-    Block
-    File
-    ""`),
+				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
 			},
 		},
 		{
