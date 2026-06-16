@@ -18,6 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -474,6 +475,79 @@ type JobSpec struct {
 	// This field is immutable.
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty" protobuf:"bytes,15,opt,name=managedBy"`
+
+	// scheduling defines the Workload-aware Scheduling configuration for this Job.
+	// When set, it specifies the scheduling policy (basic or gang), topology
+	// constraints, disruption mode, and shared resource claims.
+	// When omitted, the Job defaults to the basic scheduling policy, which behaves
+	// as standard pod-by-pod scheduling.
+	// This field is alpha-level and requires the WorkloadWithJob feature gate.
+	// This field is immutable, including whether it is set at all, only
+	// policy.gang.minCount may be changed after creation.
+	//
+	// +featureGate=WorkloadWithJob
+	// +optional
+	// +k8s:ifDisabled(WorkloadWithJob)=+k8s:forbidden
+	// +k8s:optional
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
+	Scheduling *JobSchedulingConfiguration `json:"scheduling,omitempty" protobuf:"bytes,17,opt,name=scheduling"`
+}
+
+// JobSchedulingConfiguration composes the reusable workload-aware
+// scheduling building blocks.
+type JobSchedulingConfiguration struct {
+	// SchedulingPolicy defines the scheduling policy for this Job.
+	// Exactly one of Basic or Gang must be set.
+	// This field is immutable after creation: the policy may not be added or
+	// removed. The policy variant (basic/gang) is frozen by hand-written
+	// validation; only schedulingPolicy.gang.minCount may be changed.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
+	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
+
+	// SchedulingConstraints defines scheduling constraints (e.g. topology)
+	// for the Job's pods.
+	// This field is immutable after creation.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
+
+	// DisruptionMode defines the mode in which the Job's pods can be disrupted.
+	// One of Single, All.
+	// This field is immutable after creation: it may not be added or removed,
+	// and the selected mode may not be changed.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
+
+	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// the Job. Pods consume the devices allocated to a PodGroup's claim by
+	// defining a claim in its own Spec.ResourceClaims that matches the
+	// PodGroup's claim exactly. The claim must have the same name and refer to
+	// the same ResourceClaim or ResourceClaimTemplate.
+	// At most 4 claims may be set, matching the limit on the resulting PodGroup.
+	// This list is immutable after creation: entries may neither be added,
+	// removed, nor modified.
+	//
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=4
+	// +k8s:immutable
+	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 }
 
 // JobStatus represents the current state of a Job.
