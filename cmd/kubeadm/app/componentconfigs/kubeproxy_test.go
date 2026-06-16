@@ -48,6 +48,8 @@ func testKubeProxyConfigMap(contents string) *v1.ConfigMap {
 }
 
 func TestKubeProxyDefault(t *testing.T) {
+	const defaultMode = "iptables"
+
 	tests := []struct {
 		name       string
 		clusterCfg kubeadmapi.ClusterConfiguration
@@ -65,6 +67,7 @@ func TestKubeProxyDefault(t *testing.T) {
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
+					Mode: defaultMode,
 				},
 			},
 		},
@@ -81,6 +84,7 @@ func TestKubeProxyDefault(t *testing.T) {
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
+					Mode: defaultMode,
 				},
 			},
 		},
@@ -100,6 +104,7 @@ func TestKubeProxyDefault(t *testing.T) {
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
 					ClusterCIDR: "192.168.0.0/16",
+					Mode:        defaultMode,
 				},
 			},
 		},
