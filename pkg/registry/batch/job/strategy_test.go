@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -89,10 +90,19 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 		},
 	}
 
+	gangScheduling := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{
+			Policy: &scheduling.WorkloadPodGroupSchedulingPolicy{
+				Gang: &scheduling.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
+
 	cases := map[string]struct {
-		job        batch.Job
-		updatedJob batch.Job
-		wantJob    batch.Job
+		enableWorkloadWithJob bool
+		job                   batch.Job
+		updatedJob            batch.Job
+		wantJob               batch.Job
 	}{
 		"update job with a new field and successPolicy": {
 			job: batch.Job{
@@ -366,10 +376,92 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
+		"scheduling retained on update when feature gate disabled and old value set": {
+			enableWorkloadWithJob: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(4),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(4),
+				},
+			},
+		},
+		"scheduling dropped on update when feature gate disabled and old value unset": {
+			enableWorkloadWithJob: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+		},
+		"scheduling retained on update when feature gate enabled and old value unset": {
+			enableWorkloadWithJob: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.enableWorkloadWithJob,
+				features.WorkloadWithJob: tc.enableWorkloadWithJob,
+			})
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForUpdate(ctx, &tc.updatedJob, &tc.job)
@@ -632,6 +724,13 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	validPodTemplateSpecNever := *validPodTemplateSpec.DeepCopy()
 	validPodTemplateSpecNever.Spec.RestartPolicy = api.RestartPolicyNever
 	now := metav1.Now()
+	gangScheduling := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{
+			Policy: &scheduling.WorkloadPodGroupSchedulingPolicy{
+				Gang: &scheduling.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
 	cases := map[string]struct {
 		enableMutablePodResourcesForSuspendedJobs bool
 		job                                       *batch.Job
@@ -828,6 +927,50 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			},
 			update: func(job *batch.Job) {
 				job.Annotations["hello"] = "world"
+			},
+		},
+		"gang minCount update within parallelism is valid": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: new(true),
+					Parallelism:    ptr.To[int32](4),
+					Scheduling:     gangScheduling(2),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.Policy.Gang.MinCount = ptr.To[int32](4)
+			},
+		},
+		"gang minCount update exceeding parallelism is rejected": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: new(true),
+					Parallelism:    ptr.To[int32](4),
+					Scheduling:     gangScheduling(2),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.Policy.Gang.MinCount = ptr.To[int32](8)
+			},
+			// ValidateUpdate runs both ValidateJob and ValidateJobUpdate, and each
+			// evaluates the spec, so the minCount error surfaces from both paths.
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.scheduling.policy.gang.minCount"},
+				{Type: field.ErrorTypeInvalid, Field: "spec.scheduling.policy.gang.minCount"},
 			},
 		},
 	}
