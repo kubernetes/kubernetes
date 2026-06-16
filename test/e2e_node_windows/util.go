@@ -26,6 +26,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -67,6 +68,15 @@ var (
 
 const (
 	kubeletServiceName = "kubelet"
+
+	// CPU/memory manager state files live in the kubelet root directory
+	// (--root-dir, /var/lib/kubelet). They must be removed when the kubelet is
+	// reconfigured in a way that invalidates the persisted checkpoint (e.g.
+	// toggling the static CPU manager's strict-cpu-reservation option), otherwise
+	// the kubelet refuses to start with "invalid state, please drain node and
+	// remove policy state file".
+	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
+	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
 
 // getKubeletServicePID returns the PID of the kubelet service, or 0 if it
@@ -218,7 +228,10 @@ func startContainerRuntime() error {
 
 // deleteStateFile deletes the state file with the filename.
 func deleteStateFile(stateFileName string) {
-	// no-op on Windows for now
+	err := os.Remove(stateFileName)
+	if err != nil && !os.IsNotExist(err) {
+		framework.ExpectNoError(err, "failed to delete the state file %q", stateFileName)
+	}
 }
 
 // systemValidation validates the system spec.

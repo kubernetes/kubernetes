@@ -1,6 +1,8 @@
 //go:build windows
 
 /*
+Copyright The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -550,6 +552,132 @@ var _ = SIGWindowsDescribe(feature.CPUManager, feature.Windows, ginkgo.Ordered, 
 				"app container must hold exactly 1 exclusive CPU")
 		})
 	})
+	// -------------------------------------------------------------------------
+	// Strict vs non-strict CPU reservation
+	// With the strict-cpu-reservation policy option the reserved CPUs are removed
+	// from the shared pool, so shared-pool (burstable) containers are confined to
+	// (online - reserved). Without it (the default) the reserved CPUs remain part
+	// of the shared pool and stay usable by burstable containers.
+	// -------------------------------------------------------------------------
+	ginkgo.When("running with the strict-cpu-reservation policy option", ginkgo.Label("non-guaranteed", "strict-cpu-reservation"), func() {
+		// Toggling strict-cpu-reservation changes whether the reserved CPU belongs
+		// to the default pool, which invalidates the persisted CPU manager
+		// checkpoint. Reset to a clean non-strict state on the way out so the
+		// checkpoint left behind is compatible with the rest of the suite.
+		ginkgo.AfterEach(func(ctx context.Context) {
+			updateWindowsKubeletConfigClearState(ctx, f, buildWindowsCPUManagerKubeletConfig(oldCfg, true))
+		})
+
+		ginkgo.It("should exclude the reserved CPU from the burstable shared pool when strict-cpu-reservation is enabled", func(ctx context.Context) {
+			node := getLocalNode(ctx, f)
+			hostCPUs := int(node.Status.Capacity.Cpu().Value())
+			if hostCPUs < 2 {
+				ginkgo.Skip(fmt.Sprintf("strict-cpu-reservation test needs >= 2 CPUs (1 reserved + shared pool), node has %d", hostCPUs))
+			}
+
+			ginkgo.By("enabling the static CPU manager with strict-cpu-reservation and CPU 0 reserved")
+			updateWindowsKubeletConfigClearState(ctx, f, buildWindowsStrictCPUReservationConfig(oldCfg))
+
+			pod := createPodSync(ctx, makeWindowsCPUManagerPod("strict-burstable-pod", []windowsCtnAttribute{
+				{name: "bu-ctr", cpuRequest: "100m", cpuLimit: "300m"},
+			}))
+
+			// The reconcile loop applies the shared pool shortly after the container
+			// starts; with strict reservation the reserved CPU 0 is excluded from it.
+			ginkgo.By("verifying the burstable container is confined to (host - reserved) CPUs")
+			gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
+				aff, err := getWindowsContainerCPUAffinity(ctx, criClient, pod, "bu-ctr")
+				if err != nil {
+					return 0, err
+				}
+				return countCPUsInAffinities(aff), nil
+			}, 60*time.Second, 2*time.Second).Should(gomega.Equal(hostCPUs-1),
+				"with strict-cpu-reservation the burstable shared pool must exclude the 1 reserved CPU (host=%d)", hostCPUs)
+		})
+
+		ginkgo.It("should keep the reserved CPU in the burstable shared pool when strict-cpu-reservation is disabled (default)", func(ctx context.Context) {
+			node := getLocalNode(ctx, f)
+			hostCPUs := int(node.Status.Capacity.Cpu().Value())
+			if hostCPUs < 2 {
+				ginkgo.Skip(fmt.Sprintf("test needs >= 2 CPUs, node has %d", hostCPUs))
+			}
+
+			ginkgo.By("enabling the static CPU manager without strict-cpu-reservation (CPU 0 reserved)")
+			updateWindowsKubeletConfigClearState(ctx, f, buildWindowsCPUManagerKubeletConfig(oldCfg, true))
+
+			pod := createPodSync(ctx, makeWindowsCPUManagerPod("nonstrict-burstable-pod", []windowsCtnAttribute{
+				{name: "bu-ctr", cpuRequest: "100m", cpuLimit: "300m"},
+			}))
+
+			// Without strict reservation and with no exclusive allocations, the
+			// shared pool is the whole machine, including the reserved CPU.
+			ginkgo.By("verifying the burstable container can use all host CPUs (reserved included)")
+			gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
+				aff, err := getWindowsContainerCPUAffinity(ctx, criClient, pod, "bu-ctr")
+				if err != nil {
+					return 0, err
+				}
+				return countCPUsInAffinities(aff), nil
+			}, 60*time.Second, 2*time.Second).Should(gomega.Equal(hostCPUs),
+				"without strict-cpu-reservation the burstable shared pool must include the reserved CPU (host=%d)", hostCPUs)
+		})
+	})
+
+	// -------------------------------------------------------------------------
+	// Dynamic shared-pool resizing (reconcile loop)
+	// The CPU manager reconcile loop updates a *running* shared-pool container's
+	// affinity as guaranteed pods take and release exclusive CPUs. This verifies
+	// the live transition, not just the steady state at pod start.
+	// -------------------------------------------------------------------------
+	ginkgo.When("dynamically resizing the shared pool", ginkgo.Label("guaranteed", "non-guaranteed", "shared-pool", "reconcile"), func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			updateWindowsKubeletConfigIfNeeded(ctx, f, buildWindowsCPUManagerKubeletConfig(oldCfg, true))
+		})
+
+		ginkgo.It("should shrink and grow a running burstable container's affinity as a guaranteed pod comes and goes", func(ctx context.Context) {
+			node := getLocalNode(ctx, f)
+			hostCPUs := int(node.Status.Capacity.Cpu().Value())
+			// Need >= 2 CPUs: CPU 0 reserved (which stays in the shared pool in
+			// non-strict mode) plus at least one non-reserved CPU for the guaranteed
+			// pod's exclusive allocation. The shared pool is then never empty, so the
+			// burstable mask shrinks from hostCPUs to hostCPUs-1 and back.
+			if hostCPUs < 2 {
+				ginkgo.Skip(fmt.Sprintf("dynamic shared-pool test needs >= 2 CPUs, node has %d", hostCPUs))
+			}
+
+			buPod := createPodSync(ctx, makeWindowsCPUManagerPod("dyn-bu-pod", []windowsCtnAttribute{
+				{name: "bu-ctr", cpuRequest: "100m", cpuLimit: "300m"},
+			}))
+			burstableCPUCount := func(ctx context.Context) (int, error) {
+				aff, err := getWindowsContainerCPUAffinity(ctx, criClient, buPod, "bu-ctr")
+				if err != nil {
+					return 0, err
+				}
+				return countCPUsInAffinities(aff), nil
+			}
+
+			ginkgo.By("waiting for the burstable container to occupy the full shared pool")
+			gomega.Eventually(ctx, burstableCPUCount, 60*time.Second, 2*time.Second).Should(gomega.Equal(hostCPUs),
+				"with no exclusive allocations the burstable shared pool should span all %d host CPUs", hostCPUs)
+
+			ginkgo.By("creating a guaranteed pod that takes 1 exclusive CPU")
+			guPod := createPodSync(ctx, makeWindowsCPUManagerPod("dyn-gu-pod", []windowsCtnAttribute{
+				{name: "gu-ctr", cpuRequest: "1000m", cpuLimit: "1000m"},
+			}))
+
+			ginkgo.By("verifying the running burstable container's affinity shrinks by the 1 exclusive CPU")
+			gomega.Eventually(ctx, burstableCPUCount, 60*time.Second, 2*time.Second).Should(gomega.Equal(hostCPUs-1),
+				"the reconcile loop should remove the guaranteed pod's exclusive CPU from the running burstable container's mask")
+
+			ginkgo.By("deleting the guaranteed pod to release its exclusive CPU")
+			e2epod.NewPodClient(f).DeleteSync(ctx, guPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			delete(podMap, string(guPod.UID))
+
+			ginkgo.By("verifying the running burstable container's affinity grows back to the full shared pool")
+			gomega.Eventually(ctx, burstableCPUCount, 60*time.Second, 2*time.Second).Should(gomega.Equal(hostCPUs),
+				"the reconcile loop should return the released CPU to the running burstable container's mask")
+		})
+	})
 })
 
 // -------------------------------------------------------------------------
@@ -678,11 +806,39 @@ func buildWindowsCPUManagerKubeletConfig(oldCfg *kubeletconfig.KubeletConfigurat
 	return newCfg
 }
 
+// buildWindowsStrictCPUReservationConfig returns a static CPU manager config
+// (feature gate on) with the strict-cpu-reservation policy option enabled, which
+// removes the reserved CPUs from the shared pool. CPUManagerPolicyOptions is GA
+// and locked on, so only the option map needs to be set.
+func buildWindowsStrictCPUReservationConfig(oldCfg *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+	newCfg := buildWindowsCPUManagerKubeletConfig(oldCfg, true)
+	newCfg.CPUManagerPolicyOptions = map[string]string{
+		cpumanager.StrictCPUReservationOption: "true",
+	}
+	return newCfg
+}
+
 // updateWindowsKubeletConfig stops the kubelet Windows service, writes the new
 // configuration file, and restarts the service.
 func updateWindowsKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
 	ginkgo.GinkgoHelper()
 	kubeletStart := mustStopKubelet(ctx, f)
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg), "failed to write kubelet config file")
+	kubeletStart(ctx)
+}
+
+// updateWindowsKubeletConfigClearState is like updateWindowsKubeletConfig but
+// also removes the CPU/memory manager state files while the kubelet is stopped.
+// This is required when the new configuration invalidates the persisted
+// checkpoint (e.g. toggling strict-cpu-reservation, which changes whether the
+// reserved CPU belongs to the default pool) — otherwise the kubelet refuses to
+// start with "invalid state, please drain node and remove policy state file".
+// It mirrors the Linux updateKubeletConfig(..., deleteStateFiles=true).
+func updateWindowsKubeletConfigClearState(ctx context.Context, f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
+	ginkgo.GinkgoHelper()
+	kubeletStart := mustStopKubelet(ctx, f)
+	deleteStateFile(cpuManagerStateFile)
+	deleteStateFile(memoryManagerStateFile)
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg), "failed to write kubelet config file")
 	kubeletStart(ctx)
 }
