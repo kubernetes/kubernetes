@@ -83,7 +83,7 @@ dependencies:
 
   # agnhost - E2E test image
   - name: "agnhost"
-    version: 2.64.0
+    version: 2.65.0
     refPaths:
     - path: test/utils/image/manifest.go
       match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+\.\d+"}
