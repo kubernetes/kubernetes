@@ -761,6 +761,225 @@ type TopologyConstraint struct {
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 }
 
+// WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a
+// group of pods managed by a workload controller.
+// Exactly one policy must be set.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a controller's own
+// API, next to its other scheduling fields (for example, in a Job's
+// spec.scheduling). It's recommended to block changing the policy
+// after creation, while still allowing gang.minCount to change. DV cannot
+// express that only gang.minCount is mutable while the basic/gang variant is
+// frozen, so the embedder must enforce variant immutability with hand-written
+// validation. For example,
+//
+//	type JobSchedulingConfiguration struct {
+//		// SchedulingPolicy defines the scheduling policy for this Job.
+//		// Exactly one of Basic or Gang must be set.
+//		// This field is immutable after creation: the policy may not be added or
+//		// removed. The policy variant (basic/gang) is frozen by the controller's
+//		// hand-written validation; only schedulingPolicy.gang.minCount may be changed.
+//		// +optional
+//		// +k8s:optional
+//		// +k8s:update=NoSet
+//		// +k8s:update=NoUnset
+//		SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,N,opt,name=schedulingPolicy"`
+//
+//		// other scheduling fields
+//	}
+//
+// +union
+type WorkloadPodGroupSchedulingPolicy struct {
+	// basic specifies that standard, pod-by-pod Kubernetes scheduling
+	// behavior should be used.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Basic *WorkloadPodGroupBasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,1,opt,name=basic"`
+
+	// gang specifies all-or-nothing scheduling semantics.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Gang *WorkloadPodGroupGangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,2,opt,name=gang"`
+}
+
+// WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes
+// scheduling behavior.
+type WorkloadPodGroupBasicSchedulingPolicy struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang
+// (all-or-nothing) scheduling.
+type WorkloadPodGroupGangSchedulingPolicy struct {
+	// minCount is the minimum number of pods that must be scheduled
+	// at the same time for the scheduler to admit the entire group.
+	// This field is optional. If it is not specified, the controller
+	// should inject a context-specific sane default (e.g.,
+	// parallelism for a Job).
+	// If set, it must be a positive integer.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:minimum=1
+	MinCount *int32 `json:"minCount,omitempty" protobuf:"varint,1,opt,name=minCount"`
+}
+
+// WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling
+// constraints, such as topology.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a controller's own
+// API, next to its other scheduling fields (for example, in a Job's
+// spec.scheduling). It's recommended to freeze the field after creation
+// (+k8s:immutable), since constraints are immutable in the compiled Workload.
+// For example,
+//
+//	type JobSchedulingConfiguration struct {
+//		// SchedulingConstraints defines scheduling constraints (e.g. topology)
+//		// for the Job's pods.
+//		// This field is immutable after creation.
+//		// +optional
+//		// +k8s:optional
+//		// +k8s:immutable
+//		SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,N,opt,name=schedulingConstraints"`
+//
+//		// other scheduling fields
+//	}
+type WorkloadPodGroupSchedulingConstraints struct {
+	// topology specifies desired topological placements for all pods
+	// within the pod group.
+	// If unset, no topology placement is requested.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:maxItems=1
+	// +listType=atomic
+	// +k8s:listType=atomic
+	Topology []TopologyConstraint `json:"topology,omitempty" protobuf:"bytes,1,rep,name=topology"`
+}
+
+// WorkloadPodGroupResourceClaim references a dynamic resource claim
+// that is shared across pods in the group.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a controller's own
+// API as a list, next to its other scheduling fields (for example, in a Job's
+// spec.scheduling). It's recommended to freeze the whole list after creation
+// (+k8s:immutable), since the list is immutable in the compiled Workload. For
+// example,
+//
+//	type JobSchedulingConfiguration struct {
+//		// ResourceClaims lists the ResourceClaims shared among the group's pods.
+//		// At most 4 claims may be set, matching the limit on the resulting PodGroup.
+//		// This list is immutable after creation: entries may neither be added,
+//		// removed, nor modified.
+//		// +optional
+//		// +patchMergeKey=name
+//		// +patchStrategy=merge
+//		// +listType=map
+//		// +listMapKey=name
+//		// +k8s:optional
+//		// +k8s:listType=map
+//		// +k8s:listMapKey=name
+//		// +k8s:maxItems=4
+//		// +k8s:immutable
+//		ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" protobuf:"bytes,N,rep,name=resourceClaims"`
+//
+//		// other scheduling fields
+//	}
+type WorkloadPodGroupResourceClaim struct {
+	// name uniquely identifies this resource claim inside the group.
+	// This field is required. It must be a DNS_LABEL.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// resourceClaimName is the name of a ResourceClaim object in the same
+	// namespace.
+	// This field is optional. If it is not specified, no resource claim
+	// is used. If set, it must be a DNS subdomain.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	// +k8s:format=k8s-long-name
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
+
+	// resourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// object in the same namespace.
+	// This field is optional. If it is not specified, no resource claim
+	// template is used. If set, it must be a DNS subdomain.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	// +k8s:format=k8s-long-name
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,3,opt,name=resourceClaimTemplateName"`
+}
+
+// WorkloadPodGroupDisruptionMode defines how individual pods within a
+// group can be disrupted. Exactly one mode must be set.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a controller's own
+// API, next to its other scheduling fields (for example, in a Job's
+// spec.scheduling). It's recommended to freeze the field after creation
+// (+k8s:immutable), since the selected mode is immutable in the compiled
+// Workload. For example,
+//
+//	type JobSchedulingConfiguration struct {
+//		// DisruptionMode defines the mode in which the Job's pods can be disrupted.
+//		// One of Single, All.
+//		// This field is immutable after creation: it may not be added or removed,
+//		// and the selected mode may not be changed.
+//		// +optional
+//		// +k8s:optional
+//		// +k8s:immutable
+//		DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,N,opt,name=disruptionMode"`
+//
+//		// other scheduling fields
+//	}
+//
+// +union
+type WorkloadPodGroupDisruptionMode struct {
+	// single specifies that pods can be disrupted independently from each other.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Single *WorkloadPodGroupSingleDisruptionMode `json:"single,omitempty" protobuf:"bytes,1,opt,name=single"`
+
+	// all specifies that all pods in the group must be disrupted together.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	All *WorkloadPodGroupAllDisruptionMode `json:"all,omitempty" protobuf:"bytes,2,opt,name=all"`
+}
+
+// WorkloadPodGroupSingleDisruptionMode indicates that individual pods
+// can be disrupted independently.
+type WorkloadPodGroupSingleDisruptionMode struct {
+	// Intentionally empty for now.
+}
+
+// WorkloadPodGroupAllDisruptionMode indicates that all pods in the
+// group must be disrupted together.
+type WorkloadPodGroupAllDisruptionMode struct {
+	// Intentionally empty for now.
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:supportsSubresource="/status"
