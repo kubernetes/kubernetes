@@ -59,6 +59,8 @@ const (
 	MinMilliCPULimit = 10
 )
 
+var defaultPageSize = int64(os.Getpagesize())
+
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
 // Input parameters and resulting value is number of microseconds.
 func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
@@ -220,8 +222,12 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 			if qosClass == v1.PodQOSGuaranteed {
 				cgroupKey = Cgroup2MemoryMin
 			}
+			memoryReservation := memoryRequest
+			if qosClass == v1.PodQOSGuaranteed {
+				memoryReservation = int64(math.Floor(0.9*float64(memoryRequest)/float64(defaultPageSize))) * defaultPageSize
+			}
 			result.Unified = map[string]string{
-				cgroupKey: strconv.FormatInt(memoryRequest, 10),
+				cgroupKey: strconv.FormatInt(memoryReservation, 10),
 			}
 		}
 	}
