@@ -198,6 +198,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
+	dropDisabledDRADeviceCompatibilityGroupsFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
 }
@@ -325,6 +326,39 @@ func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.Resour
 				capacity.RequestPolicy = nil
 				newSlice.Spec.Devices[i].Capacity[ci] = capacity
 			}
+		}
+	}
+}
+
+func draDeviceCompatibilityGroupsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		for _, consumption := range device.ConsumesCounters {
+			if len(consumption.CompatibilityGroups) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// dropDisabledDRADeviceCompatibilityGroupsFields drops the CompatibilityGroups
+// field from each device.consumesCounters[] entry of the new slice if the
+// DRADeviceCompatibilityGroups feature is disabled and the field was not
+// already in use in the old slice.
+func dropDisabledDRADeviceCompatibilityGroupsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups) ||
+		draDeviceCompatibilityGroupsFeatureInUse(oldSlice) {
+		// No need to drop anything.
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		for j := range newSlice.Spec.Devices[i].ConsumesCounters {
+			newSlice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = nil
 		}
 	}
 }

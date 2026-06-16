@@ -1286,6 +1286,55 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"valid-compatibility-groups": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet:          "counterset-0",
+						Counters:            testCounters(),
+						CompatibilityGroups: []string{"mig", "vgpu"},
+					},
+				}
+				return slice
+			}(),
+		},
+		"too-many-compatibility-groups": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups"), resourceapi.DeviceCompatibilityGroupsMaxSize+1, resourceapi.DeviceCompatibilityGroupsMaxSize),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				groups := make([]string, resourceapi.DeviceCompatibilityGroupsMaxSize+1)
+				for i := range groups {
+					groups[i] = fmt.Sprintf("group-%d", i)
+				}
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet:          "counterset-0",
+						Counters:            testCounters(),
+						CompatibilityGroups: groups,
+					},
+				}
+				return slice
+			}(),
+		},
+		"bad-name-compatibility-group": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups").Index(0), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet:          "counterset-0",
+						Counters:            testCounters(),
+						CompatibilityGroups: []string{badName},
+					},
+				}
+				return slice
+			}(),
+		},
 		"max-number-of-devices-with-consumes-counters": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)

@@ -81,6 +81,11 @@ var (
 	validateRequestName     = corevalidation.ValidateDNS1123Label
 	validateCounterName     = corevalidation.ValidateDNS1123Label
 
+	// Compatibility group names are opaque, driver-authored strings. They are
+	// validated as DNS-1123 labels for consistency with the CounterSet name they
+	// sit alongside on a DeviceCounterConsumption entry.
+	validateCompatibilityGroupName = corevalidation.ValidateDNS1123Label
+
 	// this is the max length limit for domain/ID
 	attributeAndCapacityMaxKeyLength = resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
 )
@@ -968,6 +973,8 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
 			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
+	allErrs = append(allErrs, validateSlice(deviceCounterConsumption.CompatibilityGroups, resource.DeviceCompatibilityGroupsMaxSize,
+		validateCompatibilityGroupName, fldPath.Child("compatibilityGroups"))...)
 	return allErrs
 }
 

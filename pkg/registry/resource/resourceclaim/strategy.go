@@ -270,6 +270,7 @@ func dropDisabledStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim)
 	dropDeviceBindingConditionsFields(newClaim, oldClaim)
+	dropDisabledDRADeviceCompatibilityGroupsStatusFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -456,6 +457,38 @@ func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClai
 		for i := range allocation.Devices.Results {
 			newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
 			newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
+		}
+	}
+}
+
+func draDeviceCompatibilityGroupsInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if result.CompatibilityGroups != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// dropDisabledDRADeviceCompatibilityGroupsStatusFields drops the
+// CompatibilityGroups snapshot from each allocation result of the new claim
+// status if the DRADeviceCompatibilityGroups feature is disabled and the field
+// was not already in use in the old claim.
+func dropDisabledDRADeviceCompatibilityGroupsStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups) ||
+		draDeviceCompatibilityGroupsInUse(oldClaim) {
+		// No need to drop anything.
+		return
+	}
+
+	if allocation := newClaim.Status.Allocation; allocation != nil {
+		for i := range allocation.Devices.Results {
+			newClaim.Status.Allocation.Devices.Results[i].CompatibilityGroups = nil
 		}
 	}
 }

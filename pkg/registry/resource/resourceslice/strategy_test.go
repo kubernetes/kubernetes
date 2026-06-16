@@ -173,6 +173,12 @@ var sliceWithCapacity = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithCompatibilityGroups = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.Devices[0].ConsumesCounters[0].CompatibilityGroups = []string{"mig"}
+	return obj
+}()
+
 var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 	obj := sliceWithCapacity.DeepCopy()
 	obj.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
@@ -230,6 +236,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		consumableCapacity          bool
 		draNodeAllocatableResources bool
 		listTypeAttributes          bool
+		deviceCompatibilityGroups   bool
 		expectedValidationError     bool
 		expectObj                   *resource.ResourceSlice
 	}{
@@ -403,6 +410,26 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-compatibility-groups": {
+			obj:                       sliceWithCompatibilityGroups,
+			partitionableDevices:      true,
+			deviceCompatibilityGroups: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-compatibility-groups-disabled-feature": {
+			obj:                       sliceWithCompatibilityGroups,
+			partitionableDevices:      true,
+			deviceCompatibilityGroups: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 		"drop-fields-list-type-attributes": {
 			obj:                     sliceWithListTypeAttributes,
 			listTypeAttributes:      false,
@@ -420,6 +447,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
 				features.DRANodeAllocatableResources:  tc.draNodeAllocatableResources,
 				features.DRAListTypeAttributes:        tc.listTypeAttributes,
+				features.DRADeviceCompatibilityGroups: tc.deviceCompatibilityGroups,
 			})
 
 			obj := tc.obj.DeepCopy()
@@ -444,16 +472,17 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                *resource.ResourceSlice
-		newObj                *resource.ResourceSlice
-		deviceTaints          bool
-		partitionableDevices  bool
-		deviceStatus          bool
-		bindingConditions     bool
-		consumableCapacity    bool
-		listTypeAttributes    bool
-		expectValidationError bool
-		expectObj             *resource.ResourceSlice
+		oldObj                    *resource.ResourceSlice
+		newObj                    *resource.ResourceSlice
+		deviceTaints              bool
+		partitionableDevices      bool
+		deviceStatus              bool
+		bindingConditions         bool
+		consumableCapacity        bool
+		listTypeAttributes        bool
+		deviceCompatibilityGroups bool
+		expectValidationError     bool
+		expectObj                 *resource.ResourceSlice
 	}{
 		"no-changes-okay": {
 			oldObj: slice,
@@ -477,6 +506,23 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			expectValidationError: true,
+		},
+		// Ratcheting: the old object already uses compatibilityGroups, so they are
+		// retained on update even though the feature gate is disabled.
+		"keep-existing-compatibility-groups-on-update-with-disabled-feature": {
+			oldObj:                    sliceWithCompatibilityGroups,
+			partitionableDevices:      true,
+			deviceCompatibilityGroups: false,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
 		},
 		"drop-fields-device-taints": {
 			oldObj: slice,
@@ -874,6 +920,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
 				features.DRAListTypeAttributes:        tc.listTypeAttributes,
+				features.DRADeviceCompatibilityGroups: tc.deviceCompatibilityGroups,
 			})
 
 			oldObj := tc.oldObj.DeepCopy()
