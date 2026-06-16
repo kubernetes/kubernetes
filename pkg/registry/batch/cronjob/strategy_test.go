@@ -23,9 +23,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -60,6 +64,83 @@ var (
 
 func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
 	return &m
+}
+
+func TestCronJobStrategy_ValidateUpdate_GangMinCount(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	mkCronJob := func(parallelism, minCount int32) *batch.CronJob {
+		return &batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{
+					Parallelism: new(parallelism),
+					Template:    validPodTemplateSpec,
+					Scheduling:  &batch.JobSchedulingConfiguration{Policy: &scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: minCount}}},
+				}},
+			},
+		}
+	}
+	const minCountPath = "spec.jobTemplate.spec.scheduling.policy.gang.minCount"
+
+	cases := map[string]struct {
+		gateEnabled    bool
+		oldParallelism int32
+		oldMinCount    int32
+		newParallelism int32
+		newMinCount    int32
+		wantField      string
+	}{
+		"gate on, old valid, new exceeds parallelism is rejected": {
+			gateEnabled:    true,
+			oldParallelism: 4, oldMinCount: 4,
+			newParallelism: 2, newMinCount: 4,
+			wantField: minCountPath,
+		},
+		"gate on, old already invalid is still rejected": {
+			gateEnabled:    true,
+			oldParallelism: 2, oldMinCount: 4,
+			newParallelism: 2, newMinCount: 4,
+			wantField: minCountPath,
+		},
+		"gate on, new within parallelism is accepted": {
+			gateEnabled:    true,
+			oldParallelism: 8, oldMinCount: 4,
+			newParallelism: 8, newMinCount: 6,
+		},
+		"gate off, new exceeds parallelism is still rejected": {
+			gateEnabled:    false,
+			oldParallelism: 4, oldMinCount: 4,
+			newParallelism: 2, newMinCount: 4,
+			wantField: minCountPath,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.gateEnabled,
+				features.WorkloadWithJob: tc.gateEnabled,
+			})
+			old := mkCronJob(tc.oldParallelism, tc.oldMinCount)
+			update := mkCronJob(tc.newParallelism, tc.newMinCount)
+			update.ResourceVersion = "2"
+
+			errs := Strategy.ValidateUpdate(ctx, update, old)
+			if tc.wantField == "" {
+				if len(errs) != 0 {
+					t.Fatalf("expected no errors, got %v", errs)
+				}
+				return
+			}
+			if len(errs) != 1 {
+				t.Fatalf("expected exactly one error on %s, got %v", tc.wantField, errs)
+			}
+			if errs[0].Field != tc.wantField {
+				t.Errorf("error field = %q, want %q", errs[0].Field, tc.wantField)
+			}
+		})
+	}
 }
 
 func TestCronJobStrategy(t *testing.T) {
