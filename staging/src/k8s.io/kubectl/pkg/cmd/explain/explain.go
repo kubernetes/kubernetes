@@ -179,11 +179,11 @@ func (o *ExplainOptions) Validate() error {
 	if len(o.args) > 1 {
 		return fmt.Errorf("We accept only this format: explain RESOURCE\n")
 	}
-	if o.MaxDepth < 0 {
-		return fmt.Errorf("--max-depth must be non-negative")
-	}
 	if o.MaxDepth > 0 && !o.Recursive {
 		return fmt.Errorf("--max-depth requires --recursive")
+	}
+	if o.MaxDepth < 0 {
+		return fmt.Errorf("--max-depth must be non-negative")
 	}
 
 	return nil
