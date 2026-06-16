@@ -27,6 +27,7 @@ import (
 	node "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
 	registry "k8s.io/kubernetes/pkg/registry/node/runtimeclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func mkRuntimeClassHandlerOnly(tweaks ...func(*node.RuntimeClass)) node.RuntimeClass {
@@ -132,6 +133,9 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						apitesting.WithNormalizationRules(validation.NodeNormalizationRules...))
 				})
 			}
+
+			obj := mkRuntimeClassHandlerOnly()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithValidationConfig(apitesting.WithNormalizationRules(validation.NodeNormalizationRules...)))
 		})
 	}
 }
@@ -146,6 +150,11 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 					APIVersion: apiVersion,
 				},
 			)
+
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "myrc"},
+				Handler:    "runc",
+			}, registry.Strategy, meta.WithValidationConfig(apitesting.WithNormalizationRules(validation.NodeNormalizationRules...)))
 
 			tests := map[string]struct {
 				oldObj, newObj node.RuntimeClass
