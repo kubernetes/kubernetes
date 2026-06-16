@@ -195,6 +195,11 @@ func TestDeleteResourceDeleteOptions(t *testing.T) {
 			body:       `{ "apiVersion": false, "kind": "DeleteOptions" }`,
 			expectCode: 400,
 		},
+		{
+			name:       "dryRun invalid Go type",
+			body:       `{ "dryRun": "All" }`,
+			expectCode: 400,
+		},
 	}
 
 	for _, test := range tests {
@@ -329,6 +334,11 @@ func TestDeleteCollectionDeleteOptions(t *testing.T) {
 		{
 			name:       "apiVersion invalid type",
 			body:       `{ "apiVersion": false, "kind": "DeleteOptions" }`,
+			expectCode: 400,
+		},
+		{
+			name:       "dryRun invalid Go type",
+			body:       `{ "dryRun": "All" }`,
 			expectCode: 400,
 		},
 	}
