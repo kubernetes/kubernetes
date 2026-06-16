@@ -172,6 +172,8 @@ type PodSpecApplyConfiguration struct {
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty"`
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
+	// When Priority Admission Controller is enabled, it prevents users from setting
+	// this field. The admission controller populates this field from PriorityClassName.
 	// Defaults to PreemptLowerPriority if unset.
 	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
