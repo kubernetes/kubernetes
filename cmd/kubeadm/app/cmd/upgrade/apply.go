@@ -106,7 +106,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 			if err := applyRunner.Run(args); err != nil {
 				return err
 			}
-			if flags.dryRun {
+			if applyData.DryRun() {
 				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 				return nil
 			}
