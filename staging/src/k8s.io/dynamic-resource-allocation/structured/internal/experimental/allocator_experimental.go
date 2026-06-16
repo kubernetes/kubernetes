@@ -486,6 +486,14 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			}
 		}
 
+		// If a config applies to all requests, clear its Requests
+		// field to take advantage of the "empty means all" semantic.
+		for i := range allocationResult.Devices.Config {
+			if len(allocationResult.Devices.Config[i].Requests) == len(claim.Spec.Devices.Requests) {
+				allocationResult.Devices.Config[i].Requests = nil
+			}
+		}
+
 		// Determine node selector.
 		nodeSelector, err := alloc.createNodeSelector(internalResult.devices, node.Name)
 		if err != nil {
