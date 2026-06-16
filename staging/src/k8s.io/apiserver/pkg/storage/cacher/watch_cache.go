@@ -150,7 +150,7 @@ func newWatchCache(
 		resourceVersion: 0,
 		config:          config,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
-		storage:         newWatchCacheStorage(config, indexers),
+		storage:         newWatchCacheStorage(config.keyFunc, indexers),
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
