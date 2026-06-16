@@ -624,9 +624,9 @@ func createPodsRapidly(tCtx ktesting.TContext, namespace string, cpo *createPods
 		return err
 	}
 	tCtx.Logf("creating %d pods in namespace %q", cpo.Count, namespace)
-	config := testutils.NewTestPodCreatorConfig()
+	config := NewTestPodCreatorConfig()
 	config.AddStrategy(namespace, cpo.Count, strategy)
-	podCreator := testutils.NewTestPodCreator(tCtx.Client(), config)
+	podCreator := NewTestPodCreator(tCtx.Client(), config)
 	return podCreator.CreatePods(tCtx)
 }
 
@@ -884,8 +884,8 @@ func waitUntilPodsAttemptedInNamespace(tCtx ktesting.TContext, podInformer corei
 	return err
 }
 
-func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Interface) (testutils.TestNodePreparer, error) {
-	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
+func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Interface) (TestNodePreparer, error) {
+	var nodeStrategy PrepareNodeStrategy = &TrivialNodePrepareStrategy{}
 	if cno.NodeAllocatableStrategy != nil {
 		nodeStrategy = cno.NodeAllocatableStrategy
 	} else if cno.LabelNodePrepareStrategy != nil {
@@ -901,7 +901,7 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 
 	return NewIntegrationTestNodePreparer(
 		clientset,
-		[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
+		[]CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
 		nodeTemplate,
 	), nil
 }
@@ -945,13 +945,13 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 	return err
 }
 
-func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
-	podTemplate := testutils.StaticPodTemplate(makeBasePod())
+func getPodStrategy(cpo *createPodsOp) (TestPodCreateStrategy, error) {
+	podTemplate := StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
 		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams, batchSize: cpo.SignatureBatchSize}
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
-		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
+		return NewCustomCreatePodStrategy(podTemplate), nil
 	}
 
 	pvTemplate, err := getPersistentVolumeSpecFromFile(cpo.PersistentVolumeTemplatePath)
@@ -962,7 +962,7 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	if err != nil {
 		return nil, err
 	}
-	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
+	return NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
 type nodeTemplateWithParams struct {

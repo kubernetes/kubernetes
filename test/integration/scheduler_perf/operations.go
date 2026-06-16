@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
-	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -215,9 +214,9 @@ type createNodesOp struct {
 	// At most one of the following strategies can be defined. Defaults
 	// to TrivialNodePrepareStrategy if unspecified.
 	// Optional
-	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
-	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
-	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
+	NodeAllocatableStrategy  *NodeAllocatableStrategy
+	LabelNodePrepareStrategy *LabelNodePrepareStrategy
+	UniqueNodeLabelStrategy  *UniqueNodeLabelStrategy
 	// Params to be passed to the template.
 	// Values with `$` prefix will be resolved to the workload parameters.
 	TemplateParams map[string]any

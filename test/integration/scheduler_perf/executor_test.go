@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -109,7 +108,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode:                   createNodesOpcode,
 				Count:                    3,
-				LabelNodePrepareStrategy: testutils.NewLabelNodePrepareStrategy("test-label", "value1", "value2", "value3"),
+				LabelNodePrepareStrategy: NewLabelNodePrepareStrategy("test-label", "value1", "value2", "value3"),
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(3),
@@ -121,7 +120,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode:                  createNodesOpcode,
 				Count:                   2,
-				UniqueNodeLabelStrategy: testutils.NewUniqueNodeLabelStrategy("unique-test-label"),
+				UniqueNodeLabelStrategy: NewUniqueNodeLabelStrategy("unique-test-label"),
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(2),
@@ -133,7 +132,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode: createNodesOpcode,
 				Count:  2,
-				NodeAllocatableStrategy: testutils.NewNodeAllocatableStrategy(
+				NodeAllocatableStrategy: NewNodeAllocatableStrategy(
 					map[v1.ResourceName]string{
 						v1.ResourceCPU:    "2",
 						v1.ResourceMemory: "4Gi",
