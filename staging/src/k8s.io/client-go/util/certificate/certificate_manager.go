@@ -834,17 +834,28 @@ func validateKeyStrength(key crypto.Signer) error {
 		minRSAKeyBits   = 2048
 		minECDSAKeyBits = 256
 	)
+	if key == nil {
+		return errors.New("key is nil")
+	}
 	switch k := key.(type) {
 	case *rsa.PrivateKey:
+		if k == nil || k.N == nil {
+			return errors.New("RSA private key is invalid")
+		}
 		if bits := k.N.BitLen(); bits < minRSAKeyBits {
 			return fmt.Errorf("RSA key size %d bits is below the minimum of %d",
 				bits, minRSAKeyBits)
 		}
 	case *ecdsa.PrivateKey:
+		if k == nil || k.Curve == nil {
+			return errors.New("ECDSA private key is invalid")
+		}
 		if bits := k.Curve.Params().BitSize; bits < minECDSAKeyBits {
 			return fmt.Errorf("ECDSA key curve %s (%d bits) is below the minimum of %d",
 				k.Curve.Params().Name, bits, minECDSAKeyBits)
 		}
+	default:
+		return fmt.Errorf("unsupported key type: %T", key)
 	}
 	return nil
 }
