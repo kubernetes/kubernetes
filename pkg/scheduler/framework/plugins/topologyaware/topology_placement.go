@@ -128,7 +128,7 @@ func (pl *TopologyPlacement) getTopologyKey(podGroupResource *schedulingapi.PodG
 
 func (pl *TopologyPlacement) getScheduledPods(podGroup fwk.PodGroupInfo) ([]*v1.Pod, error) {
 	name := podGroup.GetName()
-	podGroupState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), name)
+	podGroupState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get("podgroup", podGroup.GetNamespace(), name)
 	if err != nil {
 		return nil, err
 	}

@@ -33,8 +33,8 @@ func TestPendingPodGroupMemberPods_Add(t *testing.T) {
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
 	pInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod2)}
 	pInfo3 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod3)}
-	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1)
-	pgInfo3 := newQueuedPodGroupInfoForLookup(pod3)
+	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1, nil, nil)
+	pgInfo3 := newQueuedPodGroupInfoForLookup(pod3, nil, nil)
 
 	tests := []struct {
 		name      string
@@ -62,7 +62,7 @@ func TestPendingPodGroupMemberPods_Add(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ppm := newPendingPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo)
+				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod, nil, nil), pInfo)
 			}
 
 			for pgInfo, wantPods := range tt.want {
@@ -84,7 +84,7 @@ func TestPendingPodGroupMemberPods_GetPod(t *testing.T) {
 	pod3 := st.MakePod().Name("pod3").Namespace("ns1").PodGroupName("pg3").Obj()
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
 	pInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod2)}
-	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1)
+	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1, nil, nil)
 
 	tests := []struct {
 		name         string
@@ -113,7 +113,7 @@ func TestPendingPodGroupMemberPods_GetPod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ppm := newPendingPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo)
+				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod, nil, nil), pInfo)
 			}
 
 			got := ppm.getPod(tt.pgInfoLookup, tt.targetPod)
@@ -131,7 +131,7 @@ func TestPendingPodGroupMemberPods_Update(t *testing.T) {
 
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
 	updatedPodInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, updatedPod1)}
-	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1)
+	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1, nil, nil)
 
 	tests := []struct {
 		name         string
@@ -161,7 +161,7 @@ func TestPendingPodGroupMemberPods_Update(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ppm := newPendingPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo.DeepCopy())
+				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod, nil, nil), pInfo.DeepCopy())
 			}
 
 			pInfo := ppm.update(tt.pgInfoLookup, tt.updatePod)
@@ -178,8 +178,8 @@ func TestPendingPodGroupMemberPods_Delete(t *testing.T) {
 	pod3 := st.MakePod().Name("pod3").Namespace("ns3").PodGroupName("pg3").Obj()
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
 	pInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod2)}
-	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1)
-	pgInfo3 := newQueuedPodGroupInfoForLookup(pod3)
+	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1, nil, nil)
+	pgInfo3 := newQueuedPodGroupInfoForLookup(pod3, nil, nil)
 
 	tests := []struct {
 		name         string
@@ -222,7 +222,7 @@ func TestPendingPodGroupMemberPods_Delete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ppm := newPendingPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo.DeepCopy())
+				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod, nil, nil), pInfo.DeepCopy())
 			}
 
 			ppm.delete(tt.pgInfoLookup, tt.podToDelete)
@@ -247,8 +247,8 @@ func TestPendingPodGroupMemberPods_Clear(t *testing.T) {
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
 	pInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod2)}
 	pInfo3 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod3)}
-	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1)
-	pgInfo3 := newQueuedPodGroupInfoForLookup(pod3)
+	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1, nil, nil)
+	pgInfo3 := newQueuedPodGroupInfoForLookup(pod3, nil, nil)
 
 	tests := []struct {
 		name        string
@@ -274,7 +274,7 @@ func TestPendingPodGroupMemberPods_Clear(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ppm := newPendingPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo)
+				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod, nil, nil), pInfo)
 			}
 
 			ppm.clear(tt.clearGroup)
@@ -323,7 +323,7 @@ func TestPendingPodGroupMemberPods_Len(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ppm := newPendingPodGroupMemberPods()
 			for _, pInfo := range tt.podsToAdd {
-				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo)
+				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod, nil, nil), pInfo)
 			}
 
 			if got := ppm.len(); got != tt.wantLen {

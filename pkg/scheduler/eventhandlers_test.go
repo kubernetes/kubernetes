@@ -178,7 +178,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				// disable backoff queue
 				internalqueue.WithPodInitialBackoffDuration(0),
 				internalqueue.WithPodMaxBackoffDuration(0))
-			schedulerCache := internalcache.New(ctx, nil, false)
+			schedulerCache := internalcache.New(ctx, nil, false, false)
 
 			// Put test pods into unschedulable queue
 			for _, pod := range unschedulablePods {
@@ -248,7 +248,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, false),
+				Cache:           internalcache.New(ctx, nil, false, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -524,7 +524,18 @@ func TestAddAllEventHandlers(t *testing.T) {
 			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
 			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
 
-			if diff := cmp.Diff(tt.expectStaticInformers, staticInformers); diff != "" {
+			expectedStaticInformers := make(map[reflect.Type]bool)
+			for k, v := range tt.expectStaticInformers {
+				expectedStaticInformers[k] = v
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+				expectedStaticInformers[reflect.TypeOf(&schedulingapi.PodGroup{})] = true
+				if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+					expectedStaticInformers[reflect.TypeOf(&schedulingapi.CompositePodGroup{})] = true
+				}
+			}
+
+			if diff := cmp.Diff(expectedStaticInformers, staticInformers); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.expectDynamicInformers, dynamicInformers); diff != "" {
@@ -728,7 +739,7 @@ func TestAddPod(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -756,7 +767,7 @@ func TestAddPod(t *testing.T) {
 				return
 			}
 
-			pgs, err := sched.Cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
+			pgs, err := sched.Cache.PodGroupStates().Get("podgroup", tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
 
 			if !tt.genericWorkloadEnabled {
 				if err == nil {
@@ -984,7 +995,7 @@ func TestUpdatePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1054,7 +1065,7 @@ func TestUpdatePod(t *testing.T) {
 				// Pod has no pod group, so there is no pod group state to check, the test can complete.
 				return
 			}
-			pgs, err := sched.Cache.PodGroupStates().Get(tt.oldPod.Namespace, *tt.oldPod.Spec.SchedulingGroup.PodGroupName)
+			pgs, err := sched.Cache.PodGroupStates().Get("podgroup", tt.oldPod.Namespace, *tt.oldPod.Spec.SchedulingGroup.PodGroupName)
 
 			if !tt.genericWorkloadEnabled || tt.expectPodGroupStateDeleted {
 				if err == nil {
@@ -1195,7 +1206,7 @@ func TestDeletePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1258,7 +1269,7 @@ func TestDeletePod(t *testing.T) {
 				// Pod has no pod group, so there is no pod group state to check, the test can complete.
 				return
 			}
-			pgs, err := sched.Cache.PodGroupStates().Get(tt.initialPod.Namespace, *tt.initialPod.Spec.SchedulingGroup.PodGroupName)
+			pgs, err := sched.Cache.PodGroupStates().Get(framework.PodGroupKeyType, tt.initialPod.Namespace, *tt.initialPod.Spec.SchedulingGroup.PodGroupName)
 			if tt.expectInPodGroupStateAssumed {
 				if err != nil {
 					t.Fatalf("Unexpected error getting pod group state: %v", err)

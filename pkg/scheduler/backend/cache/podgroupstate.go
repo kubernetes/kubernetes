@@ -37,8 +37,9 @@ func nextPodGroupGeneration() int64 {
 
 // podGroupKey uniquely identifies a specific instance of a PodGroup.
 type podGroupKey struct {
-	name      string
-	namespace string
+	name         string
+	namespace    string
+	podGroupType string
 }
 
 func (pgk podGroupKey) GetName() string {
@@ -49,16 +50,21 @@ func (pgk podGroupKey) GetNamespace() string {
 	return pgk.namespace
 }
 
+func (pgk podGroupKey) GetType() string {
+	return pgk.podGroupType
+}
+
 func (pgk podGroupKey) String() string {
-	return pgk.namespace + "/" + pgk.GetName()
+	return pgk.podGroupType + "/" + pgk.namespace + "/" + pgk.GetName()
 }
 
 var _ klog.KMetadata = &podGroupKey{}
 
-func newPodGroupKey(namespace string, name string) podGroupKey {
+func newPodGroupKey(podGroupType string, namespace string, name string) podGroupKey {
 	return podGroupKey{
-		namespace: namespace,
-		name:      name,
+		namespace:    namespace,
+		name:         name,
+		podGroupType: podGroupType,
 	}
 }
 
@@ -77,6 +83,10 @@ type podGroupStateData struct {
 	assumedPods map[types.UID]*v1.Pod
 	// assignedPods tracks all pods belonging to the group that are assigned (bound).
 	assignedPods sets.Set[types.UID]
+	// parent references the parent composite pod group.
+	parent *podGroupKey
+	// children references the child pod groups, if this is a composite pod group.
+	children sets.Set[podGroupKey]
 }
 
 func newPodGroupStateData() podGroupStateData {
@@ -85,6 +95,7 @@ func newPodGroupStateData() podGroupStateData {
 		unscheduledPods: sets.New[types.UID](),
 		assumedPods:     make(map[types.UID]*v1.Pod),
 		assignedPods:    sets.New[types.UID](),
+		children:        make(sets.Set[podGroupKey]),
 	}
 }
 
@@ -198,12 +209,23 @@ func (d *podGroupStateData) scheduledPodsCount() int {
 
 // deepCopy returns a deep copy of the pod group state data.
 func (d *podGroupStateData) deepCopy() podGroupStateData {
+	var parentCopy *podGroupKey
+	if d.parent != nil {
+		p := *d.parent
+		parentCopy = &p
+	}
+	var childrenCopy sets.Set[podGroupKey]
+	if d.children != nil {
+		childrenCopy = d.children.Clone()
+	}
 	return podGroupStateData{
 		generation:      d.generation,
 		allPods:         maps.Clone(d.allPods),
 		unscheduledPods: d.unscheduledPods.Clone(),
 		assumedPods:     maps.Clone(d.assumedPods),
 		assignedPods:    d.assignedPods.Clone(),
+		parent:          parentCopy,
+		children:        childrenCopy,
 	}
 }
 
@@ -215,6 +237,23 @@ func (d *podGroupStateData) unscheduledPodsMap() map[string]*v1.Pod {
 		result[pod.Name] = pod
 	}
 	return result
+}
+
+// getParent returns the parent composite pod group name, if any.
+func (d *podGroupStateData) getParent() (string, bool) {
+	if d.parent == nil {
+		return "", false
+	}
+	return d.parent.name, true
+}
+
+// getChildren returns the serialized keys of all child groups.
+func (d *podGroupStateData) getChildren() []string {
+	var children []string
+	for child := range d.children {
+		children = append(children, child.String())
+	}
+	return children
 }
 
 // podGroupState holds the runtime state of a pod group.
@@ -348,6 +387,22 @@ func (pgs *podGroupState) ScheduledPodsCount() int {
 	return pgs.podGroupStateData.scheduledPodsCount()
 }
 
+// GetParent returns the parent composite pod group name, if any.
+func (pgs *podGroupState) GetParent() (string, bool) {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return pgs.podGroupStateData.getParent()
+}
+
+// GetChildren returns the serialized keys of all child groups.
+func (pgs *podGroupState) GetChildren() []string {
+	pgs.lock.RLock()
+	defer pgs.lock.RUnlock()
+
+	return pgs.podGroupStateData.getChildren()
+}
+
 // podGroupStateSnapshot is an immutable, point-in-time copy of a podGroupState.
 // It is taken before a pod group scheduling cycle and used to track states of pods
 // during the cycle without modifying the live state of pods.
@@ -398,4 +453,14 @@ func (s *podGroupStateSnapshot) AllPodsCount() int {
 // ScheduledPodsCount returns the number of pods for this group that are either assumed or assigned.
 func (s *podGroupStateSnapshot) ScheduledPodsCount() int {
 	return s.podGroupStateData.scheduledPodsCount()
+}
+
+// GetParent returns the parent composite pod group name, if any.
+func (s *podGroupStateSnapshot) GetParent() (string, bool) {
+	return s.podGroupStateData.getParent()
+}
+
+// GetChildren returns the serialized keys of all child groups.
+func (s *podGroupStateSnapshot) GetChildren() []string {
+	return s.podGroupStateData.getChildren()
 }

@@ -140,6 +140,15 @@ type Cache interface {
 
 	// GetPodGroup returns a cached pod group object.
 	GetPodGroup(namespace, name string) (*schedulingv1alpha3.PodGroup, error)
+
+	// AddCompositePodGroup adds a composite pod group to the cache.
+	AddCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup)
+
+	// UpdateCompositePodGroup updates a composite pod group object in the cache.
+	UpdateCompositePodGroup(oldPodGroup, newPodGroup *schedulingv1alpha3.CompositePodGroup)
+
+	// RemoveCompositePodGroup removes a composite pod group from the cache.
+	RemoveCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup)
 }
 
 // Dump is a dump of the cache state.

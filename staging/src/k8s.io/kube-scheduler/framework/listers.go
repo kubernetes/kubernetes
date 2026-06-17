@@ -56,7 +56,7 @@ type SharedLister interface {
 // PodGroupStateLister provides read access to pod group states.
 type PodGroupStateLister interface {
 	// Get returns the PodGroupState of the given pod group.
-	Get(namespace string, podGroupName string) (PodGroupState, error)
+	Get(groupType string, namespace string, podGroupName string) (PodGroupState, error)
 }
 
 type CSINodeLister interface {
@@ -145,6 +145,12 @@ type PodGroupLister interface {
 	Get(namespace, podGroupName string) (*schedulingapi.PodGroup, error)
 }
 
+// CompositePodGroupLister can be used to obtain CompositePodGroups.
+type CompositePodGroupLister interface {
+	// Get returns the highest-level CompositePodGroup for the given podGroupName.
+	Get(namespace, compositePodGroupName string) (*schedulingapi.CompositePodGroup, error)
+}
+
 // SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
 // The plugin's default implementation obtains the objects from the API. A different implementation can be
 // plugged into the framework in order to simulate the state of DRA objects. For example, Cluster Autoscaler
@@ -190,4 +196,8 @@ type PodGroupState interface {
 	ScheduledPods() []*v1.Pod
 	// ScheduledPodsCount returns the number of pods for this group that are either assumed or assigned.
 	ScheduledPodsCount() int
+	// GetParent returns the parent composite pod group name, if any.
+	GetParent() (string, bool)
+	// GetChildren returns the names of child groups.
+	GetChildren() []string
 }

@@ -17,10 +17,13 @@ limitations under the License.
 package cache
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -65,6 +68,10 @@ func TestPodGroupState_Clone(t *testing.T) {
 	pgs.addPod(pod2)
 	pgs.assumePod(pod2)
 
+	parentKey := newPodGroupKey(framework.CompositePodGroupKeyType, "ns1", "parent-pg")
+	pgs.parent = &parentKey
+	pgs.children = sets.New(newPodGroupKey(framework.PodGroupKeyType, "ns1", "child1"), newPodGroupKey(framework.PodGroupKeyType, "ns1", "child2"))
+
 	snap := pgs.snapshot()
 
 	// Clone has the same generation.
@@ -85,6 +92,24 @@ func TestPodGroupState_Clone(t *testing.T) {
 	// Clone preserves pod2 as assumed.
 	if !snap.AssumedPods().Has(pod2.UID) {
 		t.Error("expected pod2 in clone's AssumedPods")
+	}
+
+	// Clone preserves parent and children.
+	if snap.parent == nil || *snap.parent != parentKey {
+		t.Errorf("expected parent %v, got %v", parentKey, snap.parent)
+	}
+	if !snap.children.Equal(pgs.children) {
+		t.Errorf("expected children %v, got %v", pgs.children, snap.children)
+	}
+
+	// Mutating the clone's children/parent does not affect the original.
+	snap.parent = nil
+	snap.children.Insert(newPodGroupKey(framework.PodGroupKeyType, "ns1", "child3"))
+	if pgs.parent == nil {
+		t.Error("mutation to clone's parent should not affect original's parent")
+	}
+	if pgs.children.Has(newPodGroupKey(framework.PodGroupKeyType, "ns1", "child3")) {
+		t.Error("mutation to clone's children should not affect original's children")
 	}
 
 	// Mutating the clone does not affect the original.
@@ -240,5 +265,38 @@ func TestPodGroupState_ScheduledPods(t *testing.T) {
 
 	if diff := cmp.Diff(expectedScheduledPods, snapshotScheduledPods); diff != "" {
 		t.Errorf("unexpected snapshot ScheduledPods result (-want,+got):\n%s", diff)
+	}
+}
+
+func TestPodGroupState_ParentAndChildren(t *testing.T) {
+	pgs := newPodGroupState()
+
+	// 1. Initial state (parent should be empty, children should be empty)
+	if parent, ok := pgs.GetParent(); ok || parent != "" {
+		t.Errorf("Expected no parent initially, got parent=%q, ok=%v", parent, ok)
+	}
+	if children := pgs.GetChildren(); len(children) != 0 {
+		t.Errorf("Expected no children initially, got %v", children)
+	}
+
+	// 2. Set parent and test GetParent
+	parentKey := newPodGroupKey(framework.CompositePodGroupKeyType, "ns1", "parent-cpg")
+	pgs.parent = &parentKey
+	parent, ok := pgs.GetParent()
+	if !ok || parent != "parent-cpg" {
+		t.Errorf("Expected parent %q, got %q (ok=%v)", "parent-cpg", parent, ok)
+	}
+
+	// 3. Set children and test GetChildren
+	childKey1 := newPodGroupKey(framework.PodGroupKeyType, "ns1", "child1")
+	childKey2 := newPodGroupKey(framework.CompositePodGroupKeyType, "ns1", "child2")
+	pgs.children.Insert(childKey1)
+	pgs.children.Insert(childKey2)
+
+	children := pgs.GetChildren()
+	sort.Strings(children)
+	expectedChildren := []string{"compositepodgroup/ns1/child2", "podgroup/ns1/child1"}
+	if diff := cmp.Diff(expectedChildren, children); diff != "" {
+		t.Errorf("Unexpected children result (-want,+got):\n%s", diff)
 	}
 }

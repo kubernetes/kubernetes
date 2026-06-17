@@ -803,6 +803,11 @@ func (pqi *QueuedPodInfo) SetFlushTimestamp(t time.Time) {
 	pqi.FlushTimestamp = t
 }
 
+const (
+	PodGroupKeyType          = "podgroup"
+	CompositePodGroupKeyType = "compositepodgroup"
+)
+
 // QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
 // the pod group's status in the scheduling queue and stores all queued pods from that pod group.
 type QueuedPodGroupInfo struct {
@@ -814,7 +819,10 @@ type QueuedPodGroupInfo struct {
 }
 
 func (pgqi *QueuedPodGroupInfo) Type() string {
-	return "podgroup"
+	if pgqi.PodGroupInfo != nil && pgqi.PodGroupInfo.Type == CompositePodGroupKeyType {
+		return CompositePodGroupKeyType
+	}
+	return PodGroupKeyType
 }
 
 // AddPod adds a pod to the queued pod group info.
@@ -837,6 +845,7 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 }
 
 // SetPods sets the pods in the queued pod group info, overwriting the existing ones.
+// This can be set only for standalone and leaf pod groups.
 func (pgqi *QueuedPodGroupInfo) SetPods(pInfos []*QueuedPodInfo) {
 	pgqi.QueuedPodInfos = pInfos
 	slices.SortStableFunc(pgqi.QueuedPodInfos, PodGroupMemberPodsOrderingFunc)
@@ -900,7 +909,16 @@ func (pgqi *QueuedPodGroupInfo) Gated() bool {
 
 // GetPriority returns the pod group's priority.
 func (pgqi *QueuedPodGroupInfo) GetPriority() int32 {
-	return util.PodGroupPriority(pgqi.PodGroup)
+	if pgqi.PodGroupInfo == nil {
+		return 0
+	}
+	if pgqi.PodGroupInfo.PodGroup != nil {
+		return util.PodGroupPriority(pgqi.PodGroupInfo.PodGroup)
+	}
+	if pgqi.PodGroupInfo.CompositePodGroup != nil && pgqi.PodGroupInfo.CompositePodGroup.Spec.Priority != nil {
+		return *pgqi.PodGroupInfo.CompositePodGroup.Spec.Priority
+	}
+	return 0
 }
 
 func (pgqi *QueuedPodGroupInfo) Size() int {
@@ -958,12 +976,15 @@ type PodGroupInfo struct {
 	Namespace string
 	// Name is a name of this pod group.
 	Name string
+	// Type is a type of the pod group: either composite pod group or pod group.
+	Type string
 	// UnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
 	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
-	UnscheduledPods []*v1.Pod
-	PodGroup        *schedulingv1alpha3.PodGroup
+	UnscheduledPods   []*v1.Pod
+	PodGroup          *schedulingv1alpha3.PodGroup
+	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
 }
 
 func (pgi *PodGroupInfo) GetName() string {
@@ -974,12 +995,24 @@ func (pgi *PodGroupInfo) GetNamespace() string {
 	return pgi.Namespace
 }
 
+func (pgi *PodGroupInfo) GetType() string {
+	return pgi.Type
+}
+
+func (pgi *PodGroupInfo) GetKey() string {
+	return fmt.Sprintf("%s/%s/%s", pgi.Type, pgi.Namespace, pgi.Name)
+}
+
 func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
 	return pgi.UnscheduledPods
 }
 
 func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1alpha3.PodGroup {
 	return pgi.PodGroup
+}
+
+func (pgi *PodGroupInfo) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+	return pgi.CompositePodGroup
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
