@@ -5543,6 +5543,7 @@ type PodTemplateSpec struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // PodTemplate describes a template for creating copies of a predefined pod.
+// +k8s:hubType
 type PodTemplate struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -5560,6 +5561,7 @@ type PodTemplate struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // PodTemplateList is a list of PodTemplates.
+// +k8s:hubType
 type PodTemplateList struct {
 	metav1.TypeMeta `json:""`
 	// Standard list metadata.

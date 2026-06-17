@@ -51,6 +51,7 @@ const (
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
 // +k8s:supportsSubresource="/status"
+// +k8s:hubType
 type TokenReview struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -220,6 +221,7 @@ type BoundObjectReference struct {
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
 // request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
 // +k8s:supportsSubresource="/status"
+// +k8s:hubType
 type SelfSubjectReview struct {
 	metav1.TypeMeta `json:""`
 	// metadata is standard object's metadata.

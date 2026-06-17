@@ -447,6 +447,7 @@ type AuditAnnotation struct {
 // CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
+// +k8s:hubType
 type ValidatingAdmissionPolicyBinding struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -461,6 +462,7 @@ type ValidatingAdmissionPolicyBinding struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
 
 // ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.
+// +k8s:hubType
 type ValidatingAdmissionPolicyBindingList struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
@@ -1110,6 +1112,7 @@ type MutatingWebhook struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.36
 
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
+// +k8s:hubType
 type MutatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -1123,6 +1126,7 @@ type MutatingAdmissionPolicy struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.36
 
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
+// +k8s:hubType
 type MutatingAdmissionPolicyList struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
@@ -1383,6 +1387,7 @@ type JSONPatch struct {
 //
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
+// +k8s:hubType
 type MutatingAdmissionPolicyBinding struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -1396,6 +1401,7 @@ type MutatingAdmissionPolicyBinding struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.36
 
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
+// +k8s:hubType
 type MutatingAdmissionPolicyBindingList struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
