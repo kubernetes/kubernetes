@@ -45,14 +45,16 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.podGroupTemplates": {
-				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueForbidden", Origin: "update"},
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
 			"spec.podGroupTemplates[*]": {
 				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueForbidden", Origin: "update"},
 			},
 			"spec.podGroupTemplates[*].disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
 			"spec.podGroupTemplates[*].name": {
@@ -60,12 +62,15 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.podGroupTemplates[*].priority": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 			},
 			"spec.podGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.podGroupTemplates[*].resourceClaims": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
 			"spec.podGroupTemplates[*].resourceClaims[*]": {
@@ -84,6 +89,7 @@ func init() {
 			},
 			"spec.podGroupTemplates[*].schedulingConstraints": {
 				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.podGroupTemplates[*].schedulingConstraints.topology": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -94,6 +100,12 @@ func init() {
 			},
 			"spec.podGroupTemplates[*].schedulingPolicy": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.podGroupTemplates[*].schedulingPolicy.basic": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.podGroupTemplates[*].schedulingPolicy.gang": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"spec.podGroupTemplates[*].schedulingPolicy.gang.minCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
