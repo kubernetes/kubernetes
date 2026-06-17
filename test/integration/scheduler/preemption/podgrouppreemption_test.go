@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -66,6 +67,7 @@ func TestPodGroupPreemption(t *testing.T) {
 		expectedUnschedulable      []string
 		expectedToHaveNNNInfo      []string
 		expectedPodsPreemptedByWAP int
+		useControlPlugin           bool
 	}{
 		{
 			name: "Full PodGroup Preemption",
@@ -733,6 +735,32 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedPreempted:          []string{"vb"},
 			expectedPodsPreemptedByWAP: 1,
 		},
+		{
+			name: "Subsequent Scheduling Preemption (WAP triggers for extra pods even if some are schedulable)",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				// Initial batch of pg1 (schedules successfully, marking pg1 as Scheduled)
+				st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				// Both p3 and p4 need 1 CPU. Only one of them fits in the remaining capacity (1 CPU) without preemption.
+				// To schedule both, low-1 needs to be preempted.
+				st.MakePod().Name("p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"p1", "p2", "p3", "p4"},
+			expectedPreempted:          []string{"low-1"},
+			expectedToHaveNNNInfo:      []string{"p3", "p4"},
+			expectedPodsPreemptedByWAP: 1,
+			useControlPlugin:           true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -758,6 +786,23 @@ func TestPodGroupPreemption(t *testing.T) {
 				t.Fatalf("Error registering a bind plugin: %v", err)
 			}
 
+			// Register mock control plugin.
+			mockControlPluginName := "mockControlPlugin"
+			var controlPlugin = mockControlPlugin{
+				name:            mockControlPluginName,
+				allowScheduling: !tt.useControlPlugin,
+				targetPods:      sets.New[string](),
+			}
+			for _, p := range tt.preemptorPods {
+				controlPlugin.targetPods.Insert(p.Name)
+			}
+			err = registry.Register(mockControlPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				return &controlPlugin, nil
+			})
+			if err != nil {
+				t.Fatalf("Error registering control plugin: %v", err)
+			}
+
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
 					SchedulerName: ptr.To(v1.DefaultSchedulerName),
@@ -765,6 +810,7 @@ func TestPodGroupPreemption(t *testing.T) {
 						MultiPoint: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
 								{Name: mockBindPluginName},
+								{Name: mockControlPluginName},
 							},
 							Disabled: []configv1.Plugin{
 								{Name: names.DefaultBinder},
@@ -830,7 +876,41 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 5. Wait for preemption to complete if WAP calls are expected
+			// 5. Wait for preemptor pods, and release control plugin to allow scheduling.
+			if tt.useControlPlugin {
+				// Wait for both preemptor pods to fail PreEnqueue and be in unschedulableEntities queue
+				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+					allInQueue := true
+					for _, p := range tt.preemptorPods {
+						if !allInQueue {
+							break
+						}
+						_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, ns, p.Spec.SchedulingGroup)
+						allInQueue = allInQueue && ok
+					}
+					return allInQueue, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for p3 and p4 to be in unschedulable queue: %v", err)
+				}
+
+				// Allow scheduling in the control plugin
+				controlPlugin.mu.Lock()
+				controlPlugin.allowScheduling = true
+				controlPlugin.mu.Unlock()
+
+				// Trigger a dummy node update to move the pod group to activeQ
+				node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, "node1", metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get node: %v", err)
+				}
+				node.Annotations = map[string]string{"trigger-requeue": "true"}
+				if _, err := cs.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+					t.Fatalf("Failed to update node: %v", err)
+				}
+			}
+
+			// 6. Wait for preemption to complete if WAP calls are expected
 			if tt.expectedPodsPreemptedByWAP > 0 {
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls := 0
@@ -855,7 +935,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 6. Verify unschedulable pods
+			// 7. Verify unschedulable pods
 			for _, podName := range tt.expectedUnschedulable {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
 					testutils.PodUnschedulable(cs, ns, podName)); err != nil {
@@ -863,7 +943,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 7. Verify scheduled pods
+			// 8. Verify scheduled pods
 			for _, podName := range tt.expectedScheduled {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
 					testutils.PodScheduled(cs, ns, podName)); err != nil {
@@ -871,7 +951,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 8. Verify preempted pods
+			// 9. Verify preempted pods
 			for _, podName := range tt.expectedPreempted {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
 					func(ctx context.Context) (bool, error) {
@@ -889,7 +969,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 
-			// 9. Verify preemptor pods have nominated node name
+			// 10. Verify preemptor pods have nominated node name
 			for _, podName := range tt.expectedToHaveNNNInfo {
 				if node, ok := bindPlugin.nnnInfo.Load(podName); !ok || node.(string) == "" {
 					t.Errorf("Pod %s was expected to have nominated node name but didn't", podName)
@@ -918,3 +998,33 @@ func (bp *mockBindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.
 }
 
 var _ fwk.BindPlugin = &mockBindPlugin{}
+
+// mockControlPlugin blocks target pods at PreEnqueue until released.
+type mockControlPlugin struct {
+	name            string
+	mu              sync.Mutex
+	allowScheduling bool
+	targetPods      sets.Set[string]
+}
+
+func (p *mockControlPlugin) Name() string {
+	return p.name
+}
+
+func (p *mockControlPlugin) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Status {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.allowScheduling && p.targetPods.Has(pod.Name) {
+		return fwk.NewStatus(fwk.Unschedulable, "waiting for control plugin release")
+	}
+	return nil
+}
+
+func (p *mockControlPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Update}},
+	}, nil
+}
+
+var _ fwk.PreEnqueuePlugin = &mockControlPlugin{}
+var _ fwk.EnqueueExtensions = &mockControlPlugin{}
