@@ -71,7 +71,8 @@ type WorkloadSpec struct {
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
 	// PodGroupTemplates is the list of templates that make up the Workload.
-	// The maximum number of templates is 8. This field is immutable.
+	// The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
+	// Existing templates may still be updated where their individual fields allow it.
 	//
 	// +required
 	// +listType=map
@@ -80,7 +81,8 @@ type WorkloadSpec struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=8
-	// +k8s:immutable
+	// +k8s:update=NoAddItem
+	// +k8s:update=NoRemoveItem
 	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates" protobuf:"bytes,2,rep,name=podGroupTemplates"`
 }
 
@@ -132,11 +134,13 @@ type PodGroupTemplate struct {
 
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
 	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	// This field is immutable.
 	//
 	// +featureGate=TopologyAwareWorkloadScheduling
 	// +optional
 	// +k8s:ifDisabled(TopologyAwareWorkloadScheduling)=+k8s:forbidden
 	// +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:optional
+	// +k8s:immutable
 	SchedulingConstraints *PodGroupSchedulingConstraints `json:"schedulingConstraints" protobuf:"bytes,3,opt,name=schedulingConstraints"`
 
 	// ResourceClaims defines which ResourceClaims may be shared among Pods in
@@ -160,23 +164,28 @@ type PodGroupTemplate struct {
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=4
 	// +featureGate=DRAWorkloadResourceClaims
+	// +k8s:immutable
 	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
+	// This field is immutable.
 	//
 	// +optional
 	// +k8s:optional
+	// +k8s:immutable
 	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
 
 	// PriorityClassName indicates the priority that should be considered when scheduling
 	// a pod group created from this template. If no priority class is specified, admission
 	// control can set this to the global default priority class if it exists. Otherwise,
 	// pod groups created from this template will have the priority set to zero.
+	// This field is immutable.
 	//
 	// +optional
 	// +k8s:optional
 	// +k8s:format=k8s-long-name
+	// +k8s:immutable
 	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,6,opt,name=priorityClassName"`
 
 	// Priority is the value of priority of pod groups created from this template. Various
@@ -184,31 +193,42 @@ type PodGroupTemplate struct {
 	// Priority Admission Controller is enabled, it prevents users from setting this field.
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
+	// This field is immutable.
 	//
 	// +optional
 	// +k8s:optional
 	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:immutable
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
-// Exactly one policy must be set.
+// Exactly one policy must be set. The policy is chosen at creation time by setting either the
+// Basic or Gang field. The PodGroup may not change policy after creation.
+// Fields within chosen policy may be updated after creation when their individual fields allow it.
+//
 // +union
 type PodGroupSchedulingPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
-	// standard Kubernetes scheduling behavior.
+	// standard Kubernetes scheduling behavior. Setting this field at group creation time
+	// opts this group to basic scheduling; this field cannot be changed afterward.
 	//
 	// +optional
 	// +k8s:optional
 	// +k8s:unionMember
+	// +k8s:immutable
 	Basic *BasicSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,1,opt,name=basic"`
 
 	// Gang specifies that the pods in this group should be scheduled using
-	// all-or-nothing semantics.
+	// all-or-nothing semantics. Setting this field at group creation time
+	// opts this group to gang scheduling; this field cannot be set or unset afterward.
+	// The minCount field within Gang scheduling policy remains mutable after group creation.
 	//
 	// +optional
 	// +k8s:optional
 	// +k8s:unionMember
+	// +k8s:update=NoSet
+	// +k8s:update=NoUnset
 	Gang *GangSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,2,opt,name=gang"`
 }
 
@@ -225,7 +245,15 @@ type BasicSchedulingPolicy struct {
 type GangSchedulingPolicy struct {
 	// MinCount is the minimum number of pods that must be schedulable or scheduled
 	// at the same time for the scheduler to admit the entire group.
-	// It must be a positive integer.
+	// It must be a positive integer. This field is mutable to support workload scaling.
+	//
+	// Note that the scheduler operates on an eventually consistent model. Updates
+	// to minCount may not be immediately reflected in scheduling decisions due to
+	// propagation delays. If minCount is updated while a scheduling cycle is in
+	// progress for that group, the new value may not take effect until the next
+	// cycle. Moreover, minCount is only enforced during scheduling, meaning that
+	// modifications to this field do not affect already-scheduled pods, applying
+	// only to those evaluated in future cycles.
 	//
 	// +required
 	// +k8s:required
@@ -369,10 +397,8 @@ type PodGroupSpec struct {
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// This field is immutable.
 	//
 	// +required
-	// +k8s:immutable
 	SchedulingPolicy PodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
 
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.

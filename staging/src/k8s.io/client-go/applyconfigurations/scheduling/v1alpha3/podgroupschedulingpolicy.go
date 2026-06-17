@@ -26,13 +26,18 @@ import (
 // with apply.
 //
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
-// Exactly one policy must be set.
+// Exactly one policy must be set. The policy is chosen at creation time by setting either the
+// Basic or Gang field. The PodGroup may not change policy after creation.
+// Fields within chosen policy may be updated after creation when their individual fields allow it.
 type PodGroupSchedulingPolicyApplyConfiguration struct {
 	// Basic specifies that the pods in this group should be scheduled using
-	// standard Kubernetes scheduling behavior.
+	// standard Kubernetes scheduling behavior. Setting this field at group creation time
+	// opts this group to basic scheduling; this field cannot be changed afterward.
 	Basic *schedulingv1alpha3.BasicSchedulingPolicy `json:"basic,omitempty"`
 	// Gang specifies that the pods in this group should be scheduled using
-	// all-or-nothing semantics.
+	// all-or-nothing semantics. Setting this field at group creation time
+	// opts this group to gang scheduling; this field cannot be set or unset afterward.
+	// The minCount field within Gang scheduling policy remains mutable after group creation.
 	Gang *GangSchedulingPolicyApplyConfiguration `json:"gang,omitempty"`
 }
 

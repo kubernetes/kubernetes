@@ -55,7 +55,7 @@ func (DisruptionMode) SwaggerDoc() map[string]string {
 
 var map_GangSchedulingPolicy = map[string]string{
 	"":         "GangSchedulingPolicy defines the parameters for gang scheduling.",
-	"minCount": "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+	"minCount": "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minCount may not be immediately reflected in scheduling decisions due to propagation delays. If minCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 }
 
 func (GangSchedulingPolicy) SwaggerDoc() map[string]string {
@@ -114,9 +114,9 @@ func (PodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
 }
 
 var map_PodGroupSchedulingPolicy = map[string]string{
-	"":      "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set.",
-	"basic": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior.",
-	"gang":  "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics.",
+	"":      "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The PodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
+	"basic": "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
+	"gang":  "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minCount field within Gang scheduling policy remains mutable after group creation.",
 }
 
 func (PodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
@@ -126,7 +126,7 @@ func (PodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
 var map_PodGroupSpec = map[string]string{
 	"":                      "PodGroupSpec defines the desired state of a PodGroup.",
 	"podGroupTemplateRef":   "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
-	"schedulingPolicy":      "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable.",
+	"schedulingPolicy":      "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate.",
 	"schedulingConstraints": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 	"resourceClaims":        "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
 	"disruptionMode":        "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
@@ -152,11 +152,11 @@ var map_PodGroupTemplate = map[string]string{
 	"":                      "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
 	"name":                  "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
 	"schedulingPolicy":      "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
-	"schedulingConstraints": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+	"schedulingConstraints": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled. This field is immutable.",
 	"resourceClaims":        "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
-	"disruptionMode":        "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All.",
-	"priorityClassName":     "PriorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, pod groups created from this template will have the priority set to zero.",
-	"priority":              "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority.",
+	"disruptionMode":        "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is immutable.",
+	"priorityClassName":     "PriorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, pod groups created from this template will have the priority set to zero. This field is immutable.",
+	"priority":              "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
 }
 
 func (PodGroupTemplate) SwaggerDoc() map[string]string {
@@ -233,7 +233,7 @@ func (WorkloadPodGroupTemplateReference) SwaggerDoc() map[string]string {
 var map_WorkloadSpec = map[string]string{
 	"":                  "WorkloadSpec defines the desired state of a Workload.",
 	"controllerRef":     "ControllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. This field is immutable.",
-	"podGroupTemplates": "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. This field is immutable.",
+	"podGroupTemplates": "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. Templates cannot be added or removed after the workload is created. Existing templates may still be updated where their individual fields allow it.",
 }
 
 func (WorkloadSpec) SwaggerDoc() map[string]string {
