@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// CronJobs returns a CronJobInformer.
-	CronJobs() CronJobInformer
+	CronJobs() TypedCronJobInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // CronJobs returns a CronJobInformer.
-func (v *version) CronJobs() CronJobInformer {
+func (v *version) CronJobs() TypedCronJobInformer {
 	return &cronJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

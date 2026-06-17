@@ -34,11 +34,23 @@ import (
 )
 
 // StorageVersionMigrationInformer provides access to a shared informer and lister for
-// StorageVersionMigrations.
+// StorageVersionMigrations. Prefer using the type-safe variant (see [TypedStorageVersionMigrationInformer]).
 type StorageVersionMigrationInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagemigrationv1beta1.StorageVersionMigrationLister
 }
+
+// TypedStorageVersionMigrationInformer provides access to a shared informer and lister for
+// StorageVersionMigrations, including the type-safe TypedInformer variant.
+type TypedStorageVersionMigrationInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() StorageVersionMigrationIndexInformer
+	Lister() storagemigrationv1beta1.StorageVersionMigrationLister
+}
+
+// apistoragemigrationv1beta1.StorageVersionMigrationIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type StorageVersionMigrationIndexInformer cache.TypedSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration]
 
 type storageVersionMigrationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type storageVersionMigrationInformer struct {
 // NewStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStorageVersionMigrationInformer]).
 func NewStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedStorageVersionMigrationInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) StorageVersionMigrationIndexInformer {
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredStorageVersionMigrationInformer]).
 func NewFilteredStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredStorageVersionMigrationInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredStorageVersionMigrationInformer constructs a new informer for StorageVersionMigration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredStorageVersionMigrationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) StorageVersionMigrationIndexInformer {
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewStorageVersionMigrationInformerWithOptions constructs a new informer for StorageVersionMigration type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedStorageVersionMigrationInformerWithOptions]).
 func NewStorageVersionMigrationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, options)
+}
+
+// NewTypedStorageVersionMigrationInformerWithOptions constructs a new informer for StorageVersionMigration type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedStorageVersionMigrationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) StorageVersionMigrationIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "storagemigration.k8s.io", Version: "v1beta1", Resource: "storageversionmigrations"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewStorageVersionMigrationInformerWithOptions(client kubernetes.Interface, 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *storageVersionMigrationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedStorageVersionMigrationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *storageVersionMigrationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragemigrationv1beta1.StorageVersionMigration{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *storageVersionMigrationInformer) TypedInformer() StorageVersionMigrationIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apistoragemigrationv1beta1.StorageVersionMigration](f.factory.InformerFor(&apistoragemigrationv1beta1.StorageVersionMigration{}, f.defaultInformer))
 }
 
 func (f *storageVersionMigrationInformer) Lister() storagemigrationv1beta1.StorageVersionMigrationLister {

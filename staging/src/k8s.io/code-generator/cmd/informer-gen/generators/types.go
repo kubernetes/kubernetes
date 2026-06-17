@@ -30,7 +30,9 @@ var (
 	cacheNewGenericLister                        = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewGenericLister"}
 	cacheNewSharedIndexInformer                  = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformer"}
 	cacheNewSharedIndexInformerWithOptions       = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformerWithOptions"}
+	cacheNewTypedSharedIndexInformer             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedNewSharedIndexInformer"}
 	cacheSharedIndexInformer                     = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformer"}
+	cacheTypedSharedIndexInformer                = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedSharedIndexInformer"}
 	cacheSharedIndexInformerOptions              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformerOptions"}
 	cacheSyncResult                              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SyncResult"}
 	cacheTransformFunc                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TransformFunc"}

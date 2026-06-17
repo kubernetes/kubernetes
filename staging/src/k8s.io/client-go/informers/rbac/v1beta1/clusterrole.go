@@ -34,11 +34,23 @@ import (
 )
 
 // ClusterRoleInformer provides access to a shared informer and lister for
-// ClusterRoles.
+// ClusterRoles. Prefer using the type-safe variant (see [TypedClusterRoleInformer]).
 type ClusterRoleInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() rbacv1beta1.ClusterRoleLister
 }
+
+// TypedClusterRoleInformer provides access to a shared informer and lister for
+// ClusterRoles, including the type-safe TypedInformer variant.
+type TypedClusterRoleInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ClusterRoleIndexInformer
+	Lister() rbacv1beta1.ClusterRoleLister
+}
+
+// apirbacv1beta1.ClusterRoleIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ClusterRoleIndexInformer cache.TypedSharedIndexInformer[*apirbacv1beta1.ClusterRole]
 
 type clusterRoleInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type clusterRoleInformer struct {
 // NewClusterRoleInformer constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterRoleInformer]).
 func NewClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedClusterRoleInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedClusterRoleInformer constructs a new informer for ClusterRole type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) ClusterRoleIndexInformer {
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredClusterRoleInformer constructs a new informer for ClusterRole type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredClusterRoleInformer]).
 func NewFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredClusterRoleInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredClusterRoleInformer constructs a new informer for ClusterRole type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredClusterRoleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ClusterRoleIndexInformer {
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewClusterRoleInformerWithOptions constructs a new informer for ClusterRole type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterRoleInformerWithOptions]).
 func NewClusterRoleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedClusterRoleInformerWithOptions(client, options)
+}
+
+// NewTypedClusterRoleInformerWithOptions constructs a new informer for ClusterRole type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterRoleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ClusterRoleIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "clusterroles"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apirbacv1beta1.ClusterRole](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewClusterRoleInformerWithOptions(client kubernetes.Interface, options inte
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *clusterRoleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedClusterRoleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *clusterRoleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apirbacv1beta1.ClusterRole{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *clusterRoleInformer) TypedInformer() ClusterRoleIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apirbacv1beta1.ClusterRole](f.factory.InformerFor(&apirbacv1beta1.ClusterRole{}, f.defaultInformer))
 }
 
 func (f *clusterRoleInformer) Lister() rbacv1beta1.ClusterRoleLister {

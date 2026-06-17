@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// ClusterTrustBundles returns a ClusterTrustBundleInformer.
-	ClusterTrustBundles() ClusterTrustBundleInformer
+	ClusterTrustBundles() TypedClusterTrustBundleInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // ClusterTrustBundles returns a ClusterTrustBundleInformer.
-func (v *version) ClusterTrustBundles() ClusterTrustBundleInformer {
+func (v *version) ClusterTrustBundles() TypedClusterTrustBundleInformer {
 	return &clusterTrustBundleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

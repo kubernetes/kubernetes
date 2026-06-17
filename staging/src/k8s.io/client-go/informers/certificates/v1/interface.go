@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// CertificateSigningRequests returns a CertificateSigningRequestInformer.
-	CertificateSigningRequests() CertificateSigningRequestInformer
+	CertificateSigningRequests() TypedCertificateSigningRequestInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // CertificateSigningRequests returns a CertificateSigningRequestInformer.
-func (v *version) CertificateSigningRequests() CertificateSigningRequestInformer {
+func (v *version) CertificateSigningRequests() TypedCertificateSigningRequestInformer {
 	return &certificateSigningRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

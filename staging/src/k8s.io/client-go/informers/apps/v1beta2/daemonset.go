@@ -34,11 +34,23 @@ import (
 )
 
 // DaemonSetInformer provides access to a shared informer and lister for
-// DaemonSets.
+// DaemonSets. Prefer using the type-safe variant (see [TypedDaemonSetInformer]).
 type DaemonSetInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() appsv1beta2.DaemonSetLister
 }
+
+// TypedDaemonSetInformer provides access to a shared informer and lister for
+// DaemonSets, including the type-safe TypedInformer variant.
+type TypedDaemonSetInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() DaemonSetIndexInformer
+	Lister() appsv1beta2.DaemonSetLister
+}
+
+// apiappsv1beta2.DaemonSetIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type DaemonSetIndexInformer cache.TypedSharedIndexInformer[*apiappsv1beta2.DaemonSet]
 
 type daemonSetInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type daemonSetInformer struct {
 // NewDaemonSetInformer constructs a new informer for DaemonSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDaemonSetInformer]).
 func NewDaemonSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewDaemonSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedDaemonSetInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedDaemonSetInformer constructs a new informer for DaemonSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDaemonSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) DaemonSetIndexInformer {
+	return NewTypedDaemonSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredDaemonSetInformer constructs a new informer for DaemonSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredDaemonSetInformer]).
 func NewFilteredDaemonSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewDaemonSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredDaemonSetInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredDaemonSetInformer constructs a new informer for DaemonSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredDaemonSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) DaemonSetIndexInformer {
+	return NewTypedDaemonSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewDaemonSetInformerWithOptions constructs a new informer for DaemonSet type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDaemonSetInformerWithOptions]).
 func NewDaemonSetInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedDaemonSetInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedDaemonSetInformerWithOptions constructs a new informer for DaemonSet type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDaemonSetInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) DaemonSetIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "daemonsets"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apiappsv1beta2.DaemonSet](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewDaemonSetInformerWithOptions(client kubernetes.Interface, namespace stri
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *daemonSetInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewDaemonSetInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedDaemonSetInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiappsv1beta2.DaemonSet{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *daemonSetInformer) TypedInformer() DaemonSetIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apiappsv1beta2.DaemonSet](f.factory.InformerFor(&apiappsv1beta2.DaemonSet{}, f.defaultInformer))
 }
 
 func (f *daemonSetInformer) Lister() appsv1beta2.DaemonSetLister {

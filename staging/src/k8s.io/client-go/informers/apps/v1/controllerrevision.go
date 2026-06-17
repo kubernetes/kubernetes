@@ -34,11 +34,23 @@ import (
 )
 
 // ControllerRevisionInformer provides access to a shared informer and lister for
-// ControllerRevisions.
+// ControllerRevisions. Prefer using the type-safe variant (see [TypedControllerRevisionInformer]).
 type ControllerRevisionInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() appsv1.ControllerRevisionLister
 }
+
+// TypedControllerRevisionInformer provides access to a shared informer and lister for
+// ControllerRevisions, including the type-safe TypedInformer variant.
+type TypedControllerRevisionInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ControllerRevisionIndexInformer
+	Lister() appsv1.ControllerRevisionLister
+}
+
+// apiappsv1.ControllerRevisionIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ControllerRevisionIndexInformer cache.TypedSharedIndexInformer[*apiappsv1.ControllerRevision]
 
 type controllerRevisionInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type controllerRevisionInformer struct {
 // NewControllerRevisionInformer constructs a new informer for ControllerRevision type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedControllerRevisionInformer]).
 func NewControllerRevisionInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewControllerRevisionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedControllerRevisionInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedControllerRevisionInformer constructs a new informer for ControllerRevision type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedControllerRevisionInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) ControllerRevisionIndexInformer {
+	return NewTypedControllerRevisionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredControllerRevisionInformer constructs a new informer for ControllerRevision type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredControllerRevisionInformer]).
 func NewFilteredControllerRevisionInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewControllerRevisionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredControllerRevisionInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredControllerRevisionInformer constructs a new informer for ControllerRevision type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredControllerRevisionInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ControllerRevisionIndexInformer {
+	return NewTypedControllerRevisionInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewControllerRevisionInformerWithOptions constructs a new informer for ControllerRevision type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedControllerRevisionInformerWithOptions]).
 func NewControllerRevisionInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedControllerRevisionInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedControllerRevisionInformerWithOptions constructs a new informer for ControllerRevision type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedControllerRevisionInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ControllerRevisionIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "controllerrevisions"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apiappsv1.ControllerRevision](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewControllerRevisionInformerWithOptions(client kubernetes.Interface, names
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *controllerRevisionInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewControllerRevisionInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedControllerRevisionInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiappsv1.ControllerRevision{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *controllerRevisionInformer) TypedInformer() ControllerRevisionIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apiappsv1.ControllerRevision](f.factory.InformerFor(&apiappsv1.ControllerRevision{}, f.defaultInformer))
 }
 
 func (f *controllerRevisionInformer) Lister() appsv1.ControllerRevisionLister {

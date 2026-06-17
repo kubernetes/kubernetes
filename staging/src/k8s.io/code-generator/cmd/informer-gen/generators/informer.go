@@ -84,8 +84,10 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"cacheMetaNamespaceIndexFunc":              c.Universe.Function(cacheMetaNamespaceIndexFunc),
 		"cacheNamespaceIndex":                      c.Universe.Variable(cacheNamespaceIndex),
 		"cacheNewSharedIndexInformer":              c.Universe.Function(cacheNewSharedIndexInformer),
+		"cacheTypedNewSharedIndexInformer":         c.Universe.Function(cacheNewTypedSharedIndexInformer),
 		"cacheNewSharedIndexInformerWithOptions":   c.Universe.Function(cacheNewSharedIndexInformerWithOptions),
 		"cacheSharedIndexInformer":                 c.Universe.Type(cacheSharedIndexInformer),
+		"cacheTypedSharedIndexInformer":            c.Universe.Type(cacheTypedSharedIndexInformer),
 		"cacheSharedIndexInformerOptions":          c.Universe.Type(cacheSharedIndexInformerOptions),
 		"cacheToListWatcherWithWatchListSemantics": c.Universe.Function(cacheToListWatcherWithWatchListSemanticsFunc),
 		"cacheInformerName":                        c.Universe.Type(cacheInformerName),
@@ -128,11 +130,23 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 
 var typeInformerInterface = `
 // $.type|public$Informer provides access to a shared informer and lister for
-// $.type|publicPlural$.
+// $.type|publicPlural$. Prefer using the type-safe variant (see [Typed$.type|public$Informer]).
 type $.type|public$Informer interface {
 	Informer() $.cacheSharedIndexInformer|raw$
 	Lister() $.lister|raw$
 }
+
+// Typed$.type|public$Informer provides access to a shared informer and lister for
+// $.type|publicPlural$, including the type-safe TypedInformer variant.
+type Typed$.type|public$Informer interface {
+	Informer() $.cacheSharedIndexInformer|raw$
+	TypedInformer() $.type|public$IndexInformer
+	Lister() $.lister|raw$
+}
+
+// $.type|raw$IndexInformer is a wrapper around the underlying [$.cacheSharedIndexInformer|raw$]
+// with type-safe variants of several methods.
+type $.type|public$IndexInformer $.cacheTypedSharedIndexInformer|raw$[*$.type|raw$]
 `
 
 var typeInformerStruct = `
@@ -147,8 +161,16 @@ var typeInformerPublicConstructor = `
 // New$.type|public$Informer constructs a new informer for $.type|public$ type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTyped$.type|public$Informer]).
 func New$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$) $.cacheSharedIndexInformer|raw$ {
-	return New$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, $.interfacesInformerOptions|raw${ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTyped$.type|public$Informer(client$if .namespaced$, namespace$end$, resyncPeriod, indexers)
+}
+
+// NewTyped$.type|public$Informer constructs a new informer for $.type|public$ type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTyped$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$) $.type|public$IndexInformer {
+	return NewTyped$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, $.interfacesInformerOptions|raw${ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 `
 
@@ -156,8 +178,16 @@ var typeFilteredInformerPublicConstructor = `
 // NewFiltered$.type|public$Informer constructs a new informer for $.type|public$ type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFiltered$.type|public$Informer]).
 func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) $.cacheSharedIndexInformer|raw$ {
-	return New$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, $.interfacesInformerOptions|raw${ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFiltered$.type|public$Informer(client$if .namespaced$, namespace$end$, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFiltered$.type|public$Informer constructs a new informer for $.type|public$ type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) $.type|public$IndexInformer {
+	return NewTyped$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, $.interfacesInformerOptions|raw${ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 `
 
@@ -165,11 +195,19 @@ var typeInformerPublicConstructorWithOptions = `
 // New$.type|public$InformerWithOptions constructs a new informer for $.type|public$ type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTyped$.type|public$InformerWithOptions]).
 func New$.type|public$InformerWithOptions(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, options $.interfacesInformerOptions|raw$) $.cacheSharedIndexInformer|raw$ {
+	return NewTyped$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, options)
+}
+
+// NewTyped$.type|public$InformerWithOptions constructs a new informer for $.type|public$ type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTyped$.type|public$InformerWithOptions(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, options $.interfacesInformerOptions|raw$) $.type|public$IndexInformer {
 	gvr := $.schemaGroupVersionResource|raw${Group: "$.groupName$", Version: "$.versionName$", Resource: "$.resourceName$"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return $.cacheNewSharedIndexInformerWithOptions|raw$(
+	return $.cacheTypedNewSharedIndexInformer|raw$[*$.type|raw$]($.cacheNewSharedIndexInformerWithOptions|raw$(
 		$.cacheToListWatcherWithWatchListSemantics|raw$(&$.cacheListWatch|raw${
 			ListFunc: func(opts $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
 				if tweakListOptions != nil {
@@ -202,19 +240,23 @@ func New$.type|public$InformerWithOptions(client $.clientSetInterface|raw$$if .n
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 `
 
 var typeInformerConstructor = `
 func (f *$.type|private$Informer) defaultInformer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	return New$.type|public$InformerWithOptions(client$if .namespaced$, f.namespace$end$, $.interfacesInformerOptions|raw${ResyncPeriod: resyncPeriod, Indexers: $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTyped$.type|public$InformerWithOptions(client$if .namespaced$, f.namespace$end$, $.interfacesInformerOptions|raw${ResyncPeriod: resyncPeriod, Indexers: $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 `
 
 var typeInformerInformer = `
 func (f *$.type|private$Informer) Informer() $.cacheSharedIndexInformer|raw$ {
-	return f.factory.$.informerFor$(&$.type|raw${}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *$.type|private$Informer) TypedInformer() $.type|public$IndexInformer {
+	return $.cacheTypedNewSharedIndexInformer|raw$[*$.type|raw$](f.factory.$.informerFor$(&$.type|raw${}, f.defaultInformer))
 }
 `
 

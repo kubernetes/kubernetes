@@ -34,11 +34,23 @@ import (
 )
 
 // PersistentVolumeInformer provides access to a shared informer and lister for
-// PersistentVolumes.
+// PersistentVolumes. Prefer using the type-safe variant (see [TypedPersistentVolumeInformer]).
 type PersistentVolumeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.PersistentVolumeLister
 }
+
+// TypedPersistentVolumeInformer provides access to a shared informer and lister for
+// PersistentVolumes, including the type-safe TypedInformer variant.
+type TypedPersistentVolumeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PersistentVolumeIndexInformer
+	Lister() corev1.PersistentVolumeLister
+}
+
+// apicorev1.PersistentVolumeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PersistentVolumeIndexInformer cache.TypedSharedIndexInformer[*apicorev1.PersistentVolume]
 
 type persistentVolumeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type persistentVolumeInformer struct {
 // NewPersistentVolumeInformer constructs a new informer for PersistentVolume type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPersistentVolumeInformer]).
 func NewPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewPersistentVolumeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedPersistentVolumeInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedPersistentVolumeInformer constructs a new informer for PersistentVolume type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) PersistentVolumeIndexInformer {
+	return NewTypedPersistentVolumeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredPersistentVolumeInformer constructs a new informer for PersistentVolume type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPersistentVolumeInformer]).
 func NewFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewPersistentVolumeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredPersistentVolumeInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredPersistentVolumeInformer constructs a new informer for PersistentVolume type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PersistentVolumeIndexInformer {
+	return NewTypedPersistentVolumeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewPersistentVolumeInformerWithOptions constructs a new informer for PersistentVolume type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPersistentVolumeInformerWithOptions]).
 func NewPersistentVolumeInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPersistentVolumeInformerWithOptions(client, options)
+}
+
+// NewTypedPersistentVolumeInformerWithOptions constructs a new informer for PersistentVolume type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPersistentVolumeInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) PersistentVolumeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.PersistentVolume](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewPersistentVolumeInformerWithOptions(client kubernetes.Interface, options
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *persistentVolumeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPersistentVolumeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedPersistentVolumeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.PersistentVolume{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *persistentVolumeInformer) TypedInformer() PersistentVolumeIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.PersistentVolume](f.factory.InformerFor(&apicorev1.PersistentVolume{}, f.defaultInformer))
 }
 
 func (f *persistentVolumeInformer) Lister() corev1.PersistentVolumeLister {

@@ -34,11 +34,23 @@ import (
 )
 
 // CSIDriverInformer provides access to a shared informer and lister for
-// CSIDrivers.
+// CSIDrivers. Prefer using the type-safe variant (see [TypedCSIDriverInformer]).
 type CSIDriverInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagev1beta1.CSIDriverLister
 }
+
+// TypedCSIDriverInformer provides access to a shared informer and lister for
+// CSIDrivers, including the type-safe TypedInformer variant.
+type TypedCSIDriverInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CSIDriverIndexInformer
+	Lister() storagev1beta1.CSIDriverLister
+}
+
+// apistoragev1beta1.CSIDriverIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CSIDriverIndexInformer cache.TypedSharedIndexInformer[*apistoragev1beta1.CSIDriver]
 
 type cSIDriverInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type cSIDriverInformer struct {
 // NewCSIDriverInformer constructs a new informer for CSIDriver type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCSIDriverInformer]).
 func NewCSIDriverInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewCSIDriverInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedCSIDriverInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedCSIDriverInformer constructs a new informer for CSIDriver type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCSIDriverInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) CSIDriverIndexInformer {
+	return NewTypedCSIDriverInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredCSIDriverInformer constructs a new informer for CSIDriver type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCSIDriverInformer]).
 func NewFilteredCSIDriverInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewCSIDriverInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredCSIDriverInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredCSIDriverInformer constructs a new informer for CSIDriver type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCSIDriverInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CSIDriverIndexInformer {
+	return NewTypedCSIDriverInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewCSIDriverInformerWithOptions constructs a new informer for CSIDriver type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCSIDriverInformerWithOptions]).
 func NewCSIDriverInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCSIDriverInformerWithOptions(client, options)
+}
+
+// NewTypedCSIDriverInformerWithOptions constructs a new informer for CSIDriver type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCSIDriverInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) CSIDriverIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csidrivers"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apistoragev1beta1.CSIDriver](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewCSIDriverInformerWithOptions(client kubernetes.Interface, options intern
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *cSIDriverInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCSIDriverInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedCSIDriverInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *cSIDriverInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragev1beta1.CSIDriver{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *cSIDriverInformer) TypedInformer() CSIDriverIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apistoragev1beta1.CSIDriver](f.factory.InformerFor(&apistoragev1beta1.CSIDriver{}, f.defaultInformer))
 }
 
 func (f *cSIDriverInformer) Lister() storagev1beta1.CSIDriverLister {

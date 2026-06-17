@@ -34,11 +34,23 @@ import (
 )
 
 // PodInformer provides access to a shared informer and lister for
-// Pods.
+// Pods. Prefer using the type-safe variant (see [TypedPodInformer]).
 type PodInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.PodLister
 }
+
+// TypedPodInformer provides access to a shared informer and lister for
+// Pods, including the type-safe TypedInformer variant.
+type TypedPodInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PodIndexInformer
+	Lister() corev1.PodLister
+}
+
+// apicorev1.PodIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PodIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Pod]
 
 type podInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type podInformer struct {
 // NewPodInformer constructs a new informer for Pod type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPodInformer]).
 func NewPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewPodInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedPodInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedPodInformer constructs a new informer for Pod type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) PodIndexInformer {
+	return NewTypedPodInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredPodInformer constructs a new informer for Pod type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPodInformer]).
 func NewFilteredPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewPodInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredPodInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredPodInformer constructs a new informer for Pod type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPodInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PodIndexInformer {
+	return NewTypedPodInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewPodInformerWithOptions constructs a new informer for Pod type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPodInformerWithOptions]).
 func NewPodInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPodInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedPodInformerWithOptions constructs a new informer for Pod type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPodInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) PodIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.Pod](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewPodInformerWithOptions(client kubernetes.Interface, namespace string, op
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *podInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPodInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedPodInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *podInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Pod{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *podInformer) TypedInformer() PodIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.Pod](f.factory.InformerFor(&apicorev1.Pod{}, f.defaultInformer))
 }
 
 func (f *podInformer) Lister() corev1.PodLister {

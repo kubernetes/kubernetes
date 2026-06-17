@@ -34,11 +34,23 @@ import (
 )
 
 // ValidatingAdmissionPolicyBindingInformer provides access to a shared informer and lister for
-// ValidatingAdmissionPolicyBindings.
+// ValidatingAdmissionPolicyBindings. Prefer using the type-safe variant (see [TypedValidatingAdmissionPolicyBindingInformer]).
 type ValidatingAdmissionPolicyBindingInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() admissionregistrationv1.ValidatingAdmissionPolicyBindingLister
 }
+
+// TypedValidatingAdmissionPolicyBindingInformer provides access to a shared informer and lister for
+// ValidatingAdmissionPolicyBindings, including the type-safe TypedInformer variant.
+type TypedValidatingAdmissionPolicyBindingInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ValidatingAdmissionPolicyBindingIndexInformer
+	Lister() admissionregistrationv1.ValidatingAdmissionPolicyBindingLister
+}
+
+// apiadmissionregistrationv1.ValidatingAdmissionPolicyBindingIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ValidatingAdmissionPolicyBindingIndexInformer cache.TypedSharedIndexInformer[*apiadmissionregistrationv1.ValidatingAdmissionPolicyBinding]
 
 type validatingAdmissionPolicyBindingInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type validatingAdmissionPolicyBindingInformer struct {
 // NewValidatingAdmissionPolicyBindingInformer constructs a new informer for ValidatingAdmissionPolicyBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedValidatingAdmissionPolicyBindingInformer]).
 func NewValidatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewValidatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedValidatingAdmissionPolicyBindingInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedValidatingAdmissionPolicyBindingInformer constructs a new informer for ValidatingAdmissionPolicyBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedValidatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) ValidatingAdmissionPolicyBindingIndexInformer {
+	return NewTypedValidatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredValidatingAdmissionPolicyBindingInformer constructs a new informer for ValidatingAdmissionPolicyBinding type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredValidatingAdmissionPolicyBindingInformer]).
 func NewFilteredValidatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewValidatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredValidatingAdmissionPolicyBindingInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredValidatingAdmissionPolicyBindingInformer constructs a new informer for ValidatingAdmissionPolicyBinding type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredValidatingAdmissionPolicyBindingInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ValidatingAdmissionPolicyBindingIndexInformer {
+	return NewTypedValidatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewValidatingAdmissionPolicyBindingInformerWithOptions constructs a new informer for ValidatingAdmissionPolicyBinding type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedValidatingAdmissionPolicyBindingInformerWithOptions]).
 func NewValidatingAdmissionPolicyBindingInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedValidatingAdmissionPolicyBindingInformerWithOptions(client, options)
+}
+
+// NewTypedValidatingAdmissionPolicyBindingInformerWithOptions constructs a new informer for ValidatingAdmissionPolicyBinding type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedValidatingAdmissionPolicyBindingInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ValidatingAdmissionPolicyBindingIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1", Resource: "validatingadmissionpolicybindings"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apiadmissionregistrationv1.ValidatingAdmissionPolicyBinding](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewValidatingAdmissionPolicyBindingInformerWithOptions(client kubernetes.In
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *validatingAdmissionPolicyBindingInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewValidatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedValidatingAdmissionPolicyBindingInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *validatingAdmissionPolicyBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiadmissionregistrationv1.ValidatingAdmissionPolicyBinding{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *validatingAdmissionPolicyBindingInformer) TypedInformer() ValidatingAdmissionPolicyBindingIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apiadmissionregistrationv1.ValidatingAdmissionPolicyBinding](f.factory.InformerFor(&apiadmissionregistrationv1.ValidatingAdmissionPolicyBinding{}, f.defaultInformer))
 }
 
 func (f *validatingAdmissionPolicyBindingInformer) Lister() admissionregistrationv1.ValidatingAdmissionPolicyBindingLister {

@@ -34,11 +34,23 @@ import (
 )
 
 // PriorityLevelConfigurationInformer provides access to a shared informer and lister for
-// PriorityLevelConfigurations.
+// PriorityLevelConfigurations. Prefer using the type-safe variant (see [TypedPriorityLevelConfigurationInformer]).
 type PriorityLevelConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() flowcontrolv1beta2.PriorityLevelConfigurationLister
 }
+
+// TypedPriorityLevelConfigurationInformer provides access to a shared informer and lister for
+// PriorityLevelConfigurations, including the type-safe TypedInformer variant.
+type TypedPriorityLevelConfigurationInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PriorityLevelConfigurationIndexInformer
+	Lister() flowcontrolv1beta2.PriorityLevelConfigurationLister
+}
+
+// apiflowcontrolv1beta2.PriorityLevelConfigurationIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PriorityLevelConfigurationIndexInformer cache.TypedSharedIndexInformer[*apiflowcontrolv1beta2.PriorityLevelConfiguration]
 
 type priorityLevelConfigurationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type priorityLevelConfigurationInformer struct {
 // NewPriorityLevelConfigurationInformer constructs a new informer for PriorityLevelConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPriorityLevelConfigurationInformer]).
 func NewPriorityLevelConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewPriorityLevelConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedPriorityLevelConfigurationInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedPriorityLevelConfigurationInformer constructs a new informer for PriorityLevelConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPriorityLevelConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) PriorityLevelConfigurationIndexInformer {
+	return NewTypedPriorityLevelConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredPriorityLevelConfigurationInformer constructs a new informer for PriorityLevelConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPriorityLevelConfigurationInformer]).
 func NewFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewPriorityLevelConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredPriorityLevelConfigurationInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredPriorityLevelConfigurationInformer constructs a new informer for PriorityLevelConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PriorityLevelConfigurationIndexInformer {
+	return NewTypedPriorityLevelConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewPriorityLevelConfigurationInformerWithOptions constructs a new informer for PriorityLevelConfiguration type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPriorityLevelConfigurationInformerWithOptions]).
 func NewPriorityLevelConfigurationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPriorityLevelConfigurationInformerWithOptions(client, options)
+}
+
+// NewTypedPriorityLevelConfigurationInformerWithOptions constructs a new informer for PriorityLevelConfiguration type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPriorityLevelConfigurationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) PriorityLevelConfigurationIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2", Resource: "prioritylevelconfigurations"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apiflowcontrolv1beta2.PriorityLevelConfiguration](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewPriorityLevelConfigurationInformerWithOptions(client kubernetes.Interfac
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *priorityLevelConfigurationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPriorityLevelConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedPriorityLevelConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *priorityLevelConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiflowcontrolv1beta2.PriorityLevelConfiguration{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *priorityLevelConfigurationInformer) TypedInformer() PriorityLevelConfigurationIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apiflowcontrolv1beta2.PriorityLevelConfiguration](f.factory.InformerFor(&apiflowcontrolv1beta2.PriorityLevelConfiguration{}, f.defaultInformer))
 }
 
 func (f *priorityLevelConfigurationInformer) Lister() flowcontrolv1beta2.PriorityLevelConfigurationLister {

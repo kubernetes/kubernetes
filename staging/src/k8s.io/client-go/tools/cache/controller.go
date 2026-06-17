@@ -282,6 +282,17 @@ type ResourceEventHandler interface {
 	OnDelete(obj interface{})
 }
 
+// TypedResourceEventHandler is a type-safe variant of ResourceEventHandler.
+type TypedResourceEventHandler[T any] interface {
+	OnAdd(obj T, isInInitialList bool)
+	OnUpdate(oldObj, newObj T)
+	// If and only if the final state of a deleted object is unknown,
+	// the last known state is passed as the object and finalStateUnknown
+	// is a non-nil pointer to the [DeletedFinalStateUnknown].
+	// Otherwise finalStateUnknown is nil.
+	OnDelete(obj T, finalStateUnknown *DeletedFinalStateUnknown)
+}
+
 // ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or
 // as few of the notification functions as you want while still implementing
 // ResourceEventHandler.  This adapter does not remove the prohibition against
@@ -316,6 +327,30 @@ func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
 	}
 }
 
+type TypedResourceEventHandlerFuncs[T any] struct {
+	AddFunc    func(obj T)
+	UpdateFunc func(oldObj, newObj T)
+	DeleteFunc func(obj T, finalStateUnknown *DeletedFinalStateUnknown)
+}
+
+func (r TypedResourceEventHandlerFuncs[T]) OnAdd(obj T, isInInitialList bool) {
+	if r.AddFunc != nil {
+		r.AddFunc(obj)
+	}
+}
+
+func (r TypedResourceEventHandlerFuncs[T]) OnUpdate(oldObj, newObj T) {
+	if r.UpdateFunc != nil {
+		r.UpdateFunc(oldObj, newObj)
+	}
+}
+
+func (r TypedResourceEventHandlerFuncs[T]) OnDelete(obj T, finalStateUnknown *DeletedFinalStateUnknown) {
+	if r.DeleteFunc != nil {
+		r.DeleteFunc(obj, finalStateUnknown)
+	}
+}
+
 // ResourceEventHandlerDetailedFuncs is exactly like ResourceEventHandlerFuncs
 // except its AddFunc accepts the isInInitialList parameter, for propagating
 // HasSynced.
@@ -343,6 +378,30 @@ func (r ResourceEventHandlerDetailedFuncs) OnUpdate(oldObj, newObj interface{}) 
 func (r ResourceEventHandlerDetailedFuncs) OnDelete(obj interface{}) {
 	if r.DeleteFunc != nil {
 		r.DeleteFunc(obj)
+	}
+}
+
+type TypedResourceEventHandlerDetailedFuncs[T any] struct {
+	AddFunc    func(obj T, isInInitialList bool)
+	UpdateFunc func(oldObj, newObj T)
+	DeleteFunc func(obj T, finalStateUnknownKey *string)
+}
+
+func (r TypedResourceEventHandlerDetailedFuncs[T]) OnAdd(obj T, isInInitialList bool) {
+	if r.AddFunc != nil {
+		r.AddFunc(obj, isInInitialList)
+	}
+}
+
+func (r TypedResourceEventHandlerDetailedFuncs[T]) OnUpdate(oldObj, newObj T) {
+	if r.UpdateFunc != nil {
+		r.UpdateFunc(oldObj, newObj)
+	}
+}
+
+func (r TypedResourceEventHandlerDetailedFuncs[T]) OnDelete(obj T, finalStateUnknownKey *string) {
+	if r.DeleteFunc != nil {
+		r.DeleteFunc(obj, finalStateUnknownKey)
 	}
 }
 
