@@ -27,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	testutil "k8s.io/kubernetes/test/integration/util"
 )
@@ -76,6 +77,25 @@ func setupClusterForStorageCapacityScoring(t *testing.T, nsName string, resyncPe
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
 		},
+		testCtx: testCtx,
+	}
+}
+
+func waitForCSIDriversInSchedulerCache(t *testing.T, config *testConfig, names ...string) {
+	t.Helper()
+	lister := config.testCtx.InformerFactory.Storage().V1().CSIDrivers().Lister()
+	if err := wait.PollUntilContextTimeout(
+		config.testCtx.Ctx, 100*time.Millisecond, 30*time.Second, false,
+		func(ctx context.Context) (bool, error) {
+			for _, name := range names {
+				if _, err := lister.Get(name); err != nil {
+					return false, nil
+				}
+			}
+			return true, nil
+		},
+	); err != nil {
+		t.Fatalf("timed out waiting for CSIDrivers %v in scheduler cache: %v", names, err)
 	}
 }
 
@@ -318,8 +338,7 @@ func TestStorageCapacityScoringMultiDriver(t *testing.T) {
 			}
 		}
 
-		// Wait until scheduler observes CSIDriver updates.
-		time.Sleep(5 * time.Second)
+		waitForCSIDriversInSchedulerCache(t, config, driverA, driverB)
 
 		if _, err := c.StorageV1().CSIStorageCapacities("default").Create(context.TODO(), &storagev1.CSIStorageCapacity{
 			ObjectMeta:       metav1.ObjectMeta{GenerateName: "driver-a-capacity-zone-a-"},
@@ -435,8 +454,7 @@ func TestStorageCapacityScoringMultiDriver(t *testing.T) {
 			}
 		}
 
-		// Wait until scheduler observes CSIDriver updates.
-		time.Sleep(5 * time.Second)
+		waitForCSIDriversInSchedulerCache(t, config, enabledDriver, disabledDriver)
 
 		if _, err := c.StorageV1().CSIStorageCapacities("default").Create(context.TODO(), &storagev1.CSIStorageCapacity{
 			ObjectMeta:       metav1.ObjectMeta{GenerateName: "enabled-driver-capacity-zone-a-"},

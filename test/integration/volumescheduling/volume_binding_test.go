@@ -50,6 +50,7 @@ type testConfig struct {
 	ns       string
 	stop     <-chan struct{}
 	teardown func()
+	testCtx  *testutil.TestContext
 }
 
 var (
