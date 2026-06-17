@@ -299,12 +299,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		allocationResult.Devices.Results = make([]resourceapi.DeviceRequestAllocationResult, len(internalResult.devices))
 		for i, internal := range internalResult.devices {
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
-				Request:     internal.requestName(),
-				Driver:      internal.id.Driver.String(),
-				Pool:        internal.id.Pool.String(),
-				Device:      internal.id.Device.String(),
-				AdminAccess: internal.adminAccess,
-				Tolerations: internal.lookupRequest(claim).tolerations(),
+				Request:            internal.requestName(),
+				Driver:             internal.id.Driver.String(),
+				Pool:               internal.id.Pool.String(),
+				Device:             internal.id.Device.String(),
+				AdminAccess:        internal.adminAccess,
+				Tolerations:        internal.lookupRequest(claim).tolerations(),
+				SkipNodeOperations: internal.slice.Spec.SkipNodeOperations,
 			}
 		}
 

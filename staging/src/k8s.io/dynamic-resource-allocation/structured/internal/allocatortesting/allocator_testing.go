@@ -658,6 +658,12 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 	return r
 }
 
+func deviceAllocationResultWithSkipNodeOperations(request, driver, pool, device string, skip bool) resourceapi.DeviceRequestAllocationResult {
+	r := deviceAllocationResult(request, driver, pool, device, false)
+	r.SkipNodeOperations = &skip
+	return r
+}
+
 // deviceRequestAllocationResult can replace deviceAllocationResult
 func deviceRequestAllocationResult(request, driver, pool, device string) wrapDeviceRequestAllocationResult {
 	return wrapDeviceRequestAllocationResult{
@@ -985,6 +991,21 @@ func TestAllocator(t *testing.T,
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"optional-node-operations": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				s := unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA))
+				s[0].Spec.SkipNodeOperations = ptr.To(true)
+				return s
+			}(),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResultWithSkipNodeOperations(req0, driverA, pool1, device1, true),
 			)},
 		},
 		"other-node": {

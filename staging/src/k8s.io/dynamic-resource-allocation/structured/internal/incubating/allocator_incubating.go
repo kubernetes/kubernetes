@@ -378,14 +378,15 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 			}
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
-				Request:          internal.requestName(),
-				Driver:           internal.id.Driver.String(),
-				Pool:             internal.id.Pool.String(),
-				Device:           internal.id.Device.String(),
-				AdminAccess:      internal.adminAccess,
-				Tolerations:      internal.lookupRequest(claim).tolerations(),
-				ShareID:          internal.shareID,
-				ConsumedCapacity: consumedCapacity,
+				Request:            internal.requestName(),
+				Driver:             internal.id.Driver.String(),
+				Pool:               internal.id.Pool.String(),
+				Device:             internal.id.Device.String(),
+				AdminAccess:        internal.adminAccess,
+				Tolerations:        internal.lookupRequest(claim).tolerations(),
+				ShareID:            internal.shareID,
+				ConsumedCapacity:   consumedCapacity,
+				SkipNodeOperations: internal.slice.Spec.SkipNodeOperations,
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
