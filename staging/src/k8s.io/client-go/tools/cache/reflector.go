@@ -53,7 +53,8 @@ const defaultExpectedTypeName = "<unspecified>"
 
 var (
 	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+	// watch requests - it is random in [minWatchTimeout, maxWatchTimeout] where
+	// maxWatchTimeout defaults to 2*minWatchTimeout.
 	defaultMinWatchTimeout = 5 * time.Minute
 	defaultMaxWatchTimeout = 2 * defaultMinWatchTimeout
 	// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
@@ -174,6 +175,11 @@ func (r *Reflector) Name() string {
 	return r.name
 }
 
+// watchTimeoutSeconds computes a random watch timeout in [minWatchTimeout, maxWatchTimeout].
+func (r *Reflector) watchTimeoutSeconds() float64 {
+	return r.minWatchTimeout.Seconds() + rand.Float64()*(r.maxWatchTimeout-r.minWatchTimeout).Seconds()
+}
+
 func (r *Reflector) TypeDescription() string {
 	return r.typeDescription
 }
@@ -273,14 +279,22 @@ type ReflectorOptions struct {
 	// However, values lower than 5m will not be honored to avoid negative performance impact on controlplane.
 	MinWatchTimeout time.Duration
 
+	// MaxWatchTimeout, if non-zero, defines the maximum timeout for watch requests send to kube-apiserver.
+	// Actual timeout is chosen randomly in [MinWatchTimeout, MaxWatchTimeout].
+	// If zero, defaults to 2*MinWatchTimeout.
+	MaxWatchTimeout time.Duration
+
+	// Backoff, if non-nil, configures the backoff strategy for retrying list/watch errors.
+	// If nil, the default exponential backoff is used.
+	Backoff *wait.Backoff
+
+	// BackoffResetDuration is how long without backoff activity before the backoff delay is
+	// reset to its initial value. Only used when Backoff is non-nil.
+	// If zero, defaults to 2 minutes.
+	BackoffResetDuration time.Duration
+
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
-
-	// Backoff is an optional custom backoff configuration.
-	// If set, it will be used instead of the default exponential backoff.
-	// DelayWithReset(clock, resetDuration) will be called on it to create the delay function.
-	// TODO(#136943): Expose this configuration through SharedInformerFactory.
-	Backoff *wait.Backoff
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -305,6 +319,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		minWatchTimeout = options.MinWatchTimeout
 		maxWatchTimeout = 2 * minWatchTimeout
 	}
+	if options.MaxWatchTimeout > minWatchTimeout {
+		maxWatchTimeout = options.MaxWatchTimeout
+	}
 	if maxWatchTimeout < minWatchTimeout {
 		klog.TODO().V(3).Info(
 			"maxWatchTimeout was less than minWatchTimeout, overriding to minWatchTimeout. Watch timeout randomization is disabled.",
@@ -324,16 +341,20 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 			Jitter:   defaultBackoffJitter,
 		}
 	}
+	resetDuration := defaultBackoffReset
+	if options.BackoffResetDuration > 0 {
+		resetDuration = options.BackoffResetDuration
+	}
 
 	r := &Reflector{
-		name:              options.Name,
-		resyncPeriod:      options.ResyncPeriod,
-		minWatchTimeout:   minWatchTimeout,
-		maxWatchTimeout:   maxWatchTimeout,
-		typeDescription:   options.TypeDescription,
-		listerWatcher:     ToListerWatcherWithContext(lw),
-		store:             store,
-		delayHandler:      backoff.DelayWithReset(reflectorClock, defaultBackoffReset),
+		name:            options.Name,
+		resyncPeriod:    options.ResyncPeriod,
+		minWatchTimeout: minWatchTimeout,
+		maxWatchTimeout: maxWatchTimeout,
+		typeDescription: options.TypeDescription,
+		listerWatcher:   ToListerWatcherWithContext(lw),
+		store:           store,
+		delayHandler:    backoff.DelayWithReset(reflectorClock, resetDuration),
 		clock:             reflectorClock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 		expectedType:      reflect.TypeOf(expectedType),
@@ -369,6 +390,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 
 	return r
 }
+
 
 func getTypeDescriptionFromObject(expectedType interface{}) string {
 	if expectedType == nil {
@@ -585,7 +607,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 		// if w is already initialized, it must be past any synthetic non-rv-ordered added events
 		propagateRVFromStart := true
 		if w == nil {
-			timeoutSeconds := int64(r.minWatchTimeout.Seconds() + rand.Float64()*(r.maxWatchTimeout.Seconds()-r.minWatchTimeout.Seconds()))
+			timeoutSeconds := int64(r.watchTimeoutSeconds())
 			options := metav1.ListOptions{
 				ResourceVersion: r.LastSyncResourceVersion(),
 				// We want to avoid situations of hanging watchers. Stop any watchers that do not
@@ -850,7 +872,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
-		timeoutSeconds := int64(r.minWatchTimeout.Seconds() + rand.Float64()*(r.maxWatchTimeout.Seconds()-r.minWatchTimeout.Seconds()))
+		timeoutSeconds := int64(r.watchTimeoutSeconds())
 		options := metav1.ListOptions{
 			ResourceVersion:      lastKnownRV,
 			AllowWatchBookmarks:  true,

@@ -20,6 +20,7 @@ package informers
 
 import (
 	context "context"
+	"fmt"
 	reflect "reflect"
 	sync "sync"
 	time "time"
@@ -57,14 +58,15 @@ import (
 type SharedInformerOption func(*sharedInformerFactory) *sharedInformerFactory
 
 type sharedInformerFactory struct {
-	client           kubernetes.Interface
-	namespace        string
-	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	lock             sync.Mutex
-	defaultResync    time.Duration
-	customResync     map[reflect.Type]time.Duration
-	transform        cache.TransformFunc
-	informerName     *cache.InformerName
+	client            kubernetes.Interface
+	namespace         string
+	tweakListOptions  internalinterfaces.TweakListOptionsFunc
+	lock              sync.Mutex
+	defaultResync     time.Duration
+	customResync      map[reflect.Type]time.Duration
+	transform         cache.TransformFunc
+	informerName      *cache.InformerName
+	reflectionOptions cache.ReflectionOptions
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -124,6 +126,15 @@ func WithInformerName(informerName *cache.InformerName) SharedInformerOption {
 
 func (f *sharedInformerFactory) InformerName() *cache.InformerName {
 	return f.informerName
+}
+
+// WithReflectionOptions sets custom reflector configuration for all informers created by the factory.
+// This controls backoff behavior and watch request timeouts for the underlying reflectors.
+func WithReflectionOptions(config cache.ReflectionOptions) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.reflectionOptions = config
+		return factory
+	}
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
@@ -258,6 +269,11 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	informer = newFunc(f.client, resyncPeriod)
 	if f.transform != nil {
 		informer.SetTransform(f.transform)
+	}
+	if setter, ok := informer.(cache.ReflectionOptionsSetter); ok {
+		if err := setter.SetReflectionOptions(f.reflectionOptions); err != nil {
+			panic(fmt.Sprintf("SetReflectionOptions called on already-started informer: %v", err))
+		}
 	}
 	f.informers[informerType] = informer
 

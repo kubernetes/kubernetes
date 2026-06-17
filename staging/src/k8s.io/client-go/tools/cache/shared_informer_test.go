@@ -1385,3 +1385,54 @@ func numOccurrences(hay, needle string) int {
 		hay = hay[index+len(needle):]
 	}
 }
+
+func TestSetReflectionOptionsBeforeStart(t *testing.T) {
+	lw := &fcache.FakeControllerSource{}
+	informer := NewSharedIndexInformer(lw, &v1.Pod{}, 0, Indexers{})
+
+	cfg := ReflectionOptions{
+		MinWatchTimeout: 10 * time.Minute,
+		MaxWatchTimeout: 20 * time.Minute,
+		Backoff: wait.Backoff{
+			Duration: 500 * time.Millisecond,
+			Factor:   2.0,
+			Jitter:   1.0,
+			Steps:    10,
+			Cap:      30 * time.Second,
+		},
+		BackoffResetDuration: 1 * time.Minute,
+	}
+
+	if err := informer.(ReflectionOptionsSetter).SetReflectionOptions(cfg); err != nil {
+		t.Fatalf("expected no error setting reflector config before start, got: %v", err)
+	}
+
+	si := informer.(*sharedIndexInformer)
+	if si.reflectionOptions.MinWatchTimeout != 10*time.Minute {
+		t.Errorf("MinWatchTimeout not set: got %v", si.reflectionOptions.MinWatchTimeout)
+	}
+	if si.reflectionOptions.MaxWatchTimeout != 20*time.Minute {
+		t.Errorf("MaxWatchTimeout not set: got %v", si.reflectionOptions.MaxWatchTimeout)
+	}
+	if si.reflectionOptions.Backoff == (wait.Backoff{}) {
+		t.Error("Backoff not set")
+	}
+	if si.reflectionOptions.BackoffResetDuration != 1*time.Minute {
+		t.Errorf("BackoffResetDuration not set: got %v", si.reflectionOptions.BackoffResetDuration)
+	}
+}
+
+func TestSetReflectionOptionsAfterStartReturnsError(t *testing.T) {
+	lw := &fcache.FakeControllerSource{}
+	informer := NewSharedIndexInformer(lw, &v1.Pod{}, 0, Indexers{})
+
+	// Simulate informer having been started by directly setting the started flag.
+	si := informer.(*sharedIndexInformer)
+	si.startedLock.Lock()
+	si.started = true
+	si.startedLock.Unlock()
+
+	if err := informer.(ReflectionOptionsSetter).SetReflectionOptions(ReflectionOptions{}); err == nil {
+		t.Error("expected error when setting reflector config after start, got nil")
+	}
+}

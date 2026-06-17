@@ -80,6 +80,20 @@ type Config struct {
 	// Optional - if unset a default value of 5m will be used.
 	MinWatchTimeout time.Duration
 
+	// MaxWatchTimeout, if non-zero, defines the maximum timeout for watch requests.
+	// Actual timeout is chosen randomly in [MinWatchTimeout, MaxWatchTimeout].
+	// If zero, defaults to 2*MinWatchTimeout.
+	MaxWatchTimeout time.Duration
+
+	// Backoff, if non-nil, configures the backoff strategy for retrying list/watch errors.
+	// If nil, the default exponential backoff is used.
+	Backoff *wait.Backoff
+
+	// BackoffResetDuration is how long without backoff activity before the backoff delay is
+	// reset to its initial value. Only used when Backoff is non-nil.
+	// If zero, defaults to 2 minutes.
+	BackoffResetDuration time.Duration
+
 	// ShouldResync is periodically used by the reflector to determine
 	// whether to Resync the Queue. If ShouldResync is `nil` or
 	// returns true, it means the reflector should proceed with the
@@ -179,11 +193,14 @@ func (c *controller) RunWithContext(ctx context.Context) {
 		c.config.ObjectType,
 		c.config.Queue,
 		ReflectorOptions{
-			Logger:          &logger,
-			ResyncPeriod:    c.config.FullResyncPeriod,
-			MinWatchTimeout: c.config.MinWatchTimeout,
-			TypeDescription: c.config.ObjectDescription,
-			Clock:           c.clock,
+			Logger:               &logger,
+			ResyncPeriod:         c.config.FullResyncPeriod,
+			MinWatchTimeout:      c.config.MinWatchTimeout,
+			MaxWatchTimeout:      c.config.MaxWatchTimeout,
+			Backoff:              c.config.Backoff,
+			BackoffResetDuration: c.config.BackoffResetDuration,
+			TypeDescription:      c.config.ObjectDescription,
+			Clock:                c.clock,
 		},
 	)
 	r.ShouldResync = c.config.ShouldResync
