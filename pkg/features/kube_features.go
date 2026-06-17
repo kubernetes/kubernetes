@@ -241,6 +241,13 @@ const (
 	// Enables support for node allocatable resources backed by DRA.
 	DRANodeAllocatableResources featuregate.Feature = "DRANodeAllocatableResources"
 
+	// owner: @troychiu
+	// kep: http://kep.k8s.io/5945
+	//
+	// Enables support for declaring that node-local operations (preparation and
+	// clean-up) are optional for devices.
+	DRAOptionalNodeOperations featuregate.Feature = "DRAOptionalNodeOperations"
+
 	// owner: @mortent, @cici37
 	// kep: http://kep.k8s.io/4815
 	//
@@ -1322,6 +1329,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRAOptionalNodeOperations: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAPartitionableDevices: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2303,6 +2314,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAListTypeAttributes: {DynamicResourceAllocation},
 
 	DRANodeAllocatableResources: {DynamicResourceAllocation},
+
+	DRAOptionalNodeOperations: {DynamicResourceAllocation},
 
 	DRAPartitionableDevices: {DynamicResourceAllocation},
 
