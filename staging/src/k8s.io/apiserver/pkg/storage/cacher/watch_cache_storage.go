@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage/cacher/key"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -151,7 +152,7 @@ func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]in
 		if len(continueKey) > 0 && continueKey >= elem.Key {
 			continue
 		}
-		if !hasPathPrefix(elem.Key, prefix) {
+		if !key.HasPathPrefix(elem.Key, prefix) {
 			continue
 		}
 		result = append(result, item)
