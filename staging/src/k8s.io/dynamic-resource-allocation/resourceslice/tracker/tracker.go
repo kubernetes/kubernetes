@@ -62,7 +62,7 @@ type Tracker struct {
 	resourceSlicesHandle  cache.ResourceEventHandlerRegistration
 	deviceTaints          cache.SharedIndexInformer
 	deviceTaintsHandle    cache.ResourceEventHandlerRegistration
-	deviceClasses         cache.SharedIndexInformer
+	deviceClasses         resourceinformers.DeviceClassIndexInformer
 	deviceClassesHandle   cache.ResourceEventHandlerRegistration
 	patchedResourceSlices cache.Store
 	broadcaster           record.EventBroadcaster
@@ -120,7 +120,7 @@ type Options struct {
 
 	SliceInformer resourceinformers.ResourceSliceInformer
 	TaintInformer resourcebetainformers.DeviceTaintRuleInformer
-	ClassInformer resourceinformers.DeviceClassInformer
+	ClassInformer resourceinformers.TypedDeviceClassInformer
 
 	// KubeClient is used to generate Events when CEL expressions
 	// encounter runtime errors.
@@ -160,7 +160,7 @@ func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr er
 		resourceSliceLister:    opts.SliceInformer.Lister(),
 		resourceSlices:         opts.SliceInformer.Informer(),
 		deviceTaints:           opts.TaintInformer.Informer(),
-		deviceClasses:          opts.ClassInformer.Informer(),
+		deviceClasses:          opts.ClassInformer.TypedInformer(),
 		patchedResourceSlices:  cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:            utilruntime.HandleErrorWithContext,
 		synced:                 make(chan struct{}),
@@ -212,12 +212,12 @@ func (t *Tracker) initInformers(ctx context.Context) error {
 		return fmt.Errorf("add event handler for DeviceTaintRules: %w", err)
 	}
 
-	classHandler := cache.ResourceEventHandlerFuncs{
+	classHandler := cache.TypedResourceEventHandlerFuncs[*resourceapi.DeviceClass]{
 		AddFunc:    t.deviceClassAdd(ctx),
 		UpdateFunc: t.deviceClassUpdate(ctx),
 		DeleteFunc: t.deviceClassDelete(ctx),
 	}
-	t.deviceClassesHandle, err = t.deviceClasses.AddEventHandler(classHandler)
+	t.deviceClassesHandle, err = t.deviceClasses.TypedAddEventHandler(classHandler, cache.HandlerOptions{})
 	if err != nil {
 		return fmt.Errorf("add event handler for DeviceClasses: %w", err)
 	}
@@ -530,13 +530,9 @@ func (t *Tracker) deviceTaintDelete(ctx context.Context) func(obj any) {
 	}
 }
 
-func (t *Tracker) deviceClassAdd(ctx context.Context) func(obj any) {
+func (t *Tracker) deviceClassAdd(ctx context.Context) func(obj *resourceapi.DeviceClass) {
 	logger := klog.FromContext(ctx)
-	return func(obj any) {
-		class, ok := obj.(*resourceapi.DeviceClass)
-		if !ok {
-			return
-		}
+	return func(class *resourceapi.DeviceClass) {
 		logger.V(5).Info("DeviceClass add", "class", klog.KObj(class))
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
 			t.syncSlice(ctx, sliceName, false)
@@ -544,17 +540,9 @@ func (t *Tracker) deviceClassAdd(ctx context.Context) func(obj any) {
 	}
 }
 
-func (t *Tracker) deviceClassUpdate(ctx context.Context) func(oldObj, newObj any) {
+func (t *Tracker) deviceClassUpdate(ctx context.Context) func(oldObj, newObj *resourceapi.DeviceClass) {
 	logger := klog.FromContext(ctx)
-	return func(oldObj, newObj any) {
-		oldClass, ok := oldObj.(*resourceapi.DeviceClass)
-		if !ok {
-			return
-		}
-		newClass, ok := newObj.(*resourceapi.DeviceClass)
-		if !ok {
-			return
-		}
+	return func(oldClass, newClass *resourceapi.DeviceClass) {
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			loggerV.Info("DeviceClass update", "class", klog.KObj(newClass), "diff", diff.Diff(oldClass, newClass))
 		} else {
@@ -566,16 +554,9 @@ func (t *Tracker) deviceClassUpdate(ctx context.Context) func(oldObj, newObj any
 	}
 }
 
-func (t *Tracker) deviceClassDelete(ctx context.Context) func(obj any) {
+func (t *Tracker) deviceClassDelete(ctx context.Context) func(obj *resourceapi.DeviceClass, finalStateUnknown *cache.DeletedFinalStateUnknown) {
 	logger := klog.FromContext(ctx)
-	return func(obj any) {
-		if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-			obj = tombstone.Obj
-		}
-		class, ok := obj.(*resourceapi.ResourceSlice)
-		if !ok {
-			return
-		}
+	return func(class *resourceapi.DeviceClass, finalStateUnknown *cache.DeletedFinalStateUnknown) {
 		logger.V(5).Info("DeviceClass delete", "class", klog.KObj(class))
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
 			t.syncSlice(ctx, sliceName, false)
