@@ -50,6 +50,7 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // ResourceNormalizationRules handles the structural differences between v1beta1
@@ -528,6 +529,12 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+		if result.SkipNodeOperations != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -737,6 +744,14 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		func(counterSet resource.CounterSet) string {
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+		if oldSpec == nil || !ptr.Equal(oldSpec.SkipNodeOperations, spec.SkipNodeOperations) {
+			if spec.SkipNodeOperations != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled"))
+			}
+		}
+	}
 
 	return allErrs
 }

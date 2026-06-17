@@ -1630,3 +1630,38 @@ func createConsumesCounters(count int) []resourceapi.DeviceCounterConsumption {
 	}
 	return consumeCapacity
 }
+
+func TestValidateResourceSliceSkipNodeOperations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+	sliceAll := testResourceSlice("valid", "valid", "valid", 1)
+	sliceAll.ResourceVersion = "1"
+	sliceAll.Spec.SkipNodeOperations = ptr.To(resourceapi.SkipNodeOperationsAll)
+
+	errs := ValidateResourceSlice(sliceAll)
+	assertFailures(t, field.ErrorList{field.Forbidden(field.NewPath("spec", "skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled")}, errs)
+
+	oldSliceAll := sliceAll.DeepCopy()
+	errsUpdate := ValidateResourceSliceUpdate(sliceAll, oldSliceAll)
+	assertFailures(t, nil, errsUpdate)
+
+	sliceNoSkip := sliceAll.DeepCopy()
+	sliceNoSkip.Spec.SkipNodeOperations = nil
+	errsUpdate = ValidateResourceSliceUpdate(sliceAll, sliceNoSkip)
+	assertFailures(t, field.ErrorList{field.Forbidden(field.NewPath("spec", "skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled")}, errsUpdate)
+	errsUpdate = ValidateResourceSliceUpdate(sliceNoSkip, oldSliceAll)
+	assertFailures(t, nil, errsUpdate)
+
+	sliceUnprepare := sliceAll.DeepCopy()
+	sliceUnprepare.Spec.SkipNodeOperations = ptr.To(resourceapi.SkipNodeOperationsUnprepare)
+	errsUpdate = ValidateResourceSliceUpdate(sliceUnprepare, oldSliceAll)
+	assertFailures(t, field.ErrorList{field.Forbidden(field.NewPath("spec", "skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled")}, errsUpdate)
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+	errs = ValidateResourceSlice(sliceAll)
+	assertFailures(t, nil, errs)
+
+	errs = ValidateResourceSlice(sliceUnprepare)
+	assertFailures(t, nil, errs)
+	errsUpdate = ValidateResourceSliceUpdate(sliceUnprepare, oldSliceAll)
+	assertFailures(t, nil, errsUpdate)
+}

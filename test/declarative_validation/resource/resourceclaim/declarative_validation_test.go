@@ -30,10 +30,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceclaim"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	pointer "k8s.io/utils/ptr"
@@ -866,11 +869,13 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 	driverPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("driver")
 	configOpaqueDriverPath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("opaque", "driver")
 	resultTolerationPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("tolerations").Index(0)
+	skipNodeOperationsPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("skipNodeOperations")
 
 	testCases := map[string]struct {
-		old          resource.ResourceClaim
-		update       resource.ResourceClaim
-		expectedErrs field.ErrorList
+		old                             resource.ResourceClaim
+		update                          resource.ResourceClaim
+		expectedErrs                    field.ErrorList
+		enableDRAOptionalNodeOperations *bool
 	}{
 		// .Status.Allocation.Devices.Results[%d].Driver
 		"valid driver name, lowercase": {
@@ -1241,6 +1246,33 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				field.NotSupported(resultTolerationPath.Child("effect"), resource.DeviceTaintEffect("InvalidEffect"), []string{"NoExecute", "NoSchedule"}).MarkAlpha(),
 			},
 		},
+		// .Status.Allocation.Devices.Results[%d].SkipNodeOperations
+		"valid status.allocation.devices.results skipNodeOperations All": {
+			old:                             mkValidResourceClaim(),
+			update:                          mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations(resource.SkipNodeOperationsAll)),
+			enableDRAOptionalNodeOperations: new(true),
+		},
+		"valid status.allocation.devices.results skipNodeOperations UnprepareOnly": {
+			old:                             mkValidResourceClaim(),
+			update:                          mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations(resource.SkipNodeOperationsUnprepare)),
+			enableDRAOptionalNodeOperations: new(true),
+		},
+		"invalid status.allocation.devices.results skipNodeOperations": {
+			old:                             mkValidResourceClaim(),
+			update:                          mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations("InvalidOption")),
+			enableDRAOptionalNodeOperations: new(true),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(skipNodeOperationsPath, resource.SkipNodeOperations("InvalidOption"), []string{"All", "UnprepareOnly"}),
+			},
+		},
+		"invalid status.allocation.devices.results skipNodeOperations feature gate disabled": {
+			old:                             mkValidResourceClaim(),
+			update:                          mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations(resource.SkipNodeOperationsAll)),
+			enableDRAOptionalNodeOperations: new(false),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(skipNodeOperationsPath, "feature gate DRAOptionalNodeOperations is disabled").MarkFromImperative(),
+			},
+		},
 		// .Status.Devices
 		"valid devices: without share Id": {
 			old: mkValidResourceClaim(),
@@ -1524,6 +1556,11 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
+			if tc.enableDRAOptionalNodeOperations != nil {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAOptionalNodeOperations: *tc.enableDRAOptionalNodeOperations,
+				})
+			}
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs, apitesting.WithSubResources("status"))
@@ -1618,6 +1655,14 @@ func tweakStatusDeviceRequestAllocationResultShareID(shareID types.UID) func(rc 
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Allocation.Devices.Results {
 			rc.Status.Allocation.Devices.Results[i].ShareID = &shareID
+		}
+	}
+}
+
+func tweakStatusDeviceRequestAllocationResultSkipNodeOperations(skipNodeOperations resource.SkipNodeOperations) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].SkipNodeOperations = &skipNodeOperations
 		}
 	}
 }
