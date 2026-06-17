@@ -715,7 +715,7 @@ func fetchInitConfiguration(client clientset.Interface) (*kubeadmapi.InitConfigu
 	getNodeRegistration := false
 	getAPIEndpoint := false
 	getComponentConfigs := true
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(client, nil, "preflight", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(client, nil, "preflight", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
