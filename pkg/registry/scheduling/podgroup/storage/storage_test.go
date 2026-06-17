@@ -120,7 +120,7 @@ func TestUpdate(t *testing.T) {
 			pg.Status = scheduling.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             scheduling.PodGroupReasonUnschedulable,
 						Message:            "Test status condition message",
@@ -217,7 +217,7 @@ func TestUpdateStatus(t *testing.T) {
 	podGroup.Status = scheduling.PodGroupStatus{
 		Conditions: []metav1.Condition{
 			{
-				Type:               scheduling.PodGroupScheduled,
+				Type:               scheduling.PodGroupInitiallyScheduled,
 				Status:             metav1.ConditionFalse,
 				Reason:             scheduling.PodGroupReasonUnschedulable,
 				Message:            "Test status condition message",

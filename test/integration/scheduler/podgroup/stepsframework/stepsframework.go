@@ -179,7 +179,7 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 			return false, err
 		}
 		for _, c := range pg.Status.Conditions {
-			if c.Type == schedulingapi.PodGroupScheduled &&
+			if c.Type == schedulingapi.PodGroupInitiallyScheduled &&
 				c.Status == status && c.Reason == reason {
 				return true, nil
 			}

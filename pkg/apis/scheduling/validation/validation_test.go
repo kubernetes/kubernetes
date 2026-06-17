@@ -454,7 +454,7 @@ func TestValidatePodGroupUpdate(t *testing.T) {
 		"status update": {
 			old: mkPodGroup(func(pg *scheduling.PodGroup) {
 				pg.Status.Conditions = append(pg.Status.Conditions, metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",
@@ -514,7 +514,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			old: mkPodGroup(),
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				pg.Status.Conditions = append(pg.Status.Conditions, metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",
@@ -570,7 +570,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			old: mkPodGroup(),
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				condition := metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",
@@ -584,7 +584,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				conditions := []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionStatus("TrueOrFalse"),
 						Reason:             scheduling.PodGroupReasonUnschedulable,
 						Message:            "Test status condition message",
@@ -599,7 +599,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				conditions := []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Message:            "Test status condition message",
 						LastTransitionTime: now,
@@ -613,7 +613,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				conditions := []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             "Sche duled",
 						Message:            "Test status condition message",
@@ -628,7 +628,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				conditions := []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             strings.Repeat("a", 1024+1),
 						Message:            "Test status condition message",
@@ -643,7 +643,7 @@ func TestValidatePodGroupStatusUpdate(t *testing.T) {
 			update: mkPodGroup(func(pg *scheduling.PodGroup) {
 				conditions := []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             scheduling.PodGroupReasonUnschedulable,
 						Message:            strings.Repeat("a", 32*1024+1),
