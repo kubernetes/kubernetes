@@ -1580,3 +1580,17 @@ func createConsumesCounters(count int) []resourceapi.DeviceCounterConsumption {
 	}
 	return consumeCapacity
 }
+
+func TestValidateResourceSliceSkipNodeOperations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+	slice := testResourceSlice("valid", "valid", "valid", 1)
+	slice.ResourceVersion = "1"
+	slice.Spec.SkipNodeOperations = ptr.To(true)
+
+	errs := ValidateResourceSlice(slice)
+	assertFailures(t, field.ErrorList{field.Forbidden(field.NewPath("spec", "skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled")}, errs)
+
+	oldSlice := slice.DeepCopy()
+	errsUpdate := ValidateResourceSliceUpdate(slice, oldSlice)
+	assertFailures(t, nil, errsUpdate)
+}

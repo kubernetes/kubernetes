@@ -2392,3 +2392,30 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateResourceClaimStatusUpdateSkipNodeOperations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+	claim := testClaim("valid", "valid", validClaimSpec)
+	claim.ResourceVersion = "1"
+	oldClaim := claim.DeepCopy()
+	claim.Status.Allocation = &resource.AllocationResult{
+		Devices: resource.DeviceAllocationResult{
+			Results: []resource.DeviceRequestAllocationResult{
+				{
+					Request:            goodName,
+					Driver:             "driver.example.com",
+					Pool:               "pool",
+					Device:             "dev",
+					SkipNodeOperations: ptr.To(true),
+				},
+			},
+		},
+	}
+
+	errs := ValidateResourceClaimStatusUpdate(claim, oldClaim)
+	assertFailures(t, field.ErrorList{field.Forbidden(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled")}, errs)
+
+	oldClaimAllocated := claim.DeepCopy()
+	errsUpdate := ValidateResourceClaimStatusUpdate(claim, oldClaimAllocated)
+	assertFailures(t, nil, errsUpdate)
+}

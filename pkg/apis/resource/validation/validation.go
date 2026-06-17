@@ -528,6 +528,11 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+		if result.SkipNodeOperations != nil && *result.SkipNodeOperations {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled"))
+		}
+	}
 	return allErrs
 }
 
@@ -737,6 +742,14 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		func(counterSet resource.CounterSet) string {
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+		if oldSpec == nil || oldSpec.SkipNodeOperations == nil || !*oldSpec.SkipNodeOperations {
+			if spec.SkipNodeOperations != nil && *spec.SkipNodeOperations {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("skipNodeOperations"), "feature gate DRAOptionalNodeOperations is disabled"))
+			}
+		}
+	}
 
 	return allErrs
 }
