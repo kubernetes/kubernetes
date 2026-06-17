@@ -19,13 +19,17 @@ package gangscheduling
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
@@ -44,9 +48,11 @@ const (
 // GangScheduling is a plugin that enforces "all-or-nothing" scheduling for pods
 // belonging to a PodGroup with a Gang scheduling policy.
 type GangScheduling struct {
-	handle          fwk.Handle
-	podGroupManager fwk.PodGroupManager
-	snapshotLister  fwk.SharedLister
+	handle                  fwk.Handle
+	compositePodGroupLister schedulinglisters.CompositePodGroupLister
+	podGroupLister          schedulinglisters.PodGroupLister
+	podGroupManager         fwk.PodGroupManager
+	snapshotLister          fwk.SharedLister
 }
 
 var _ fwk.EnqueueExtensions = &GangScheduling{}
@@ -56,10 +62,16 @@ var _ framework.PlacementFeasiblePlugin = &GangScheduling{}
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	var compositePodGroupLister schedulinglisters.CompositePodGroupLister
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		compositePodGroupLister = fh.SharedInformerFactory().Scheduling().V1alpha3().CompositePodGroups().Lister()
+	}
 	return &GangScheduling{
-		handle:          fh,
-		podGroupManager: fh.PodGroupManager(),
-		snapshotLister:  fh.SnapshotSharedLister(),
+		handle:                  fh,
+		compositePodGroupLister: compositePodGroupLister,
+		podGroupLister:          fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
+		podGroupManager:         fh.PodGroupManager(),
+		snapshotLister:          fh.SnapshotSharedLister(),
 	}, nil
 }
 
@@ -70,7 +82,7 @@ func (pl *GangScheduling) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod failed by this plugin schedulable.
 func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	return []fwk.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		// A new pod (either unscheduled or pre-bound) being added might be the one that completes a gang, meeting its MinCount requirement.
 		// PodSchedulingGroup field is immutable, so there is no need to subscribe on Pod/Update event.
 		{Event: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
@@ -79,7 +91,16 @@ func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEven
 		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodGroupAdded},
 		// A PodGroup update to MinCount may make it schedulable
 		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPodGroupUpdated},
-	}, nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		// A CompositePodGroup being added can be making a waiting gang schedulable.
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterCompositePodGroupAdded})
+		// A CompositePodGroup update can be making a waiting gang schedulable.
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCompositePodGroupUpdated})
+	}
+
+	return events, nil
 }
 
 // isSchedulableAfterPodAdded checks whether a newly added pod (either unscheduled or pre-bound)
@@ -90,15 +111,38 @@ func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1
 		return fwk.Queue, err
 	}
 
-	if !helper.MatchingSchedulingGroup(pod, addedPod) {
-		logger.V(5).Info("another pod was added but it doesn't match the target pod's scheduling group",
-			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
-		return fwk.QueueSkip, nil
+	if helper.MatchingSchedulingGroup(pod, addedPod) {
+		return fwk.Queue, nil
 	}
 
-	logger.V(5).Info("another pod was added and it matches the target pod's scheduling group, which may make the pod schedulable",
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		// Check if they belong to the same CPG hierarchy.
+		rootPod, err := pl.getRootCPGNameForPod(pod)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.V(5).Info("pod group not found for target pod, assuming it might belong to the same CPG", "pod", klog.KObj(pod))
+				return fwk.Queue, nil
+			}
+			return fwk.QueueSkip, err
+		}
+		rootAddedPod, err := pl.getRootCPGNameForPod(addedPod)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.V(5).Info("pod group not found for added pod, assuming it might belong to the same CPG", "addedPod", klog.KObj(addedPod))
+				return fwk.Queue, nil
+			}
+			return fwk.QueueSkip, err
+		}
+		if rootPod != "" && rootPod == rootAddedPod {
+			logger.V(5).Info("another pod was added and it matches the target pod's root CPG, which may make the pod schedulable",
+				"pod", klog.KObj(pod), "rootCPG", rootPod, "addedPod", klog.KObj(addedPod))
+			return fwk.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("another pod was added but it doesn't match the target pod's scheduling group or root CPG",
 		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
-	return fwk.Queue, nil
+	return fwk.QueueSkip, nil
 }
 
 // isSchedulableAfterPodGroupUpdated triggers re-enqueueing of the group's pods if the minCount requirement has decreased.
@@ -140,15 +184,122 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, po
 		return fwk.Queue, err
 	}
 
-	if pod.Spec.SchedulingGroup == nil || pod.Namespace != addedPodGroup.Namespace || *pod.Spec.SchedulingGroup.PodGroupName != addedPodGroup.Name {
-		logger.V(5).Info("pod group was added but it doesn't match the target pod's scheduling group",
-			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
+	if pod.Spec.SchedulingGroup != nil && pod.Namespace == addedPodGroup.Namespace && *pod.Spec.SchedulingGroup.PodGroupName == addedPodGroup.Name {
+		return fwk.Queue, nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		// Check if they belong to the same CPG hierarchy.
+		rootPod, err := pl.getRootCPGNameForPod(pod)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.V(5).Info("pod group not found for target pod, assuming it might belong to the same CPG", "pod", klog.KObj(pod))
+				return fwk.Queue, nil
+			}
+			return fwk.QueueSkip, err
+		}
+		var rootAddedPodGroup string
+		if addedPodGroup.Spec.ParentCompositePodGroupName != nil {
+			rootAddedPodGroup, err = pl.getRootCPGName(addedPodGroup.Namespace, *addedPodGroup.Spec.ParentCompositePodGroupName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					logger.V(5).Info("root CPG not found for added pod group, assuming it might belong to the same CPG", "addedPodGroup", klog.KObj(addedPodGroup))
+					return fwk.Queue, nil
+				}
+				return fwk.QueueSkip, err
+			}
+		}
+		if rootPod != "" && rootPod == rootAddedPodGroup {
+			logger.V(5).Info("pod group was added and it matches the target pod's root CPG, which may make the pod schedulable",
+				"pod", klog.KObj(pod), "rootCPG", rootPod, "addedPodGroup", klog.KObj(addedPodGroup))
+			return fwk.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("pod group was added but it doesn't match the target pod's scheduling group or root CPG",
+		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
+	return fwk.QueueSkip, nil
+}
+
+func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(5).Info("pod group was added and it matches the target pod's scheduling group, which may make the pod schedulable",
-		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPodGroup", klog.KObj(addedPodGroup))
-	return fwk.Queue, nil
+	_, addedCPG, err := util.As[*schedulingapi.CompositePodGroup](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	if pod.Spec.SchedulingGroup == nil {
+		return fwk.QueueSkip, nil
+	}
+
+	root1, err := pl.getRootCPGNameForPod(pod)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fwk.Queue, nil
+		}
+		return fwk.QueueSkip, err
+	}
+	root2, err := pl.getRootCPGName(pod.Namespace, addedCPG.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fwk.Queue, nil
+		}
+		return fwk.QueueSkip, err
+	}
+	if root1 != "" && root1 == root2 {
+		return fwk.Queue, nil
+	}
+
+	return fwk.QueueSkip, nil
+}
+
+// isSchedulableAfterCompositePodGroupUpdated triggers re-enqueueing of the group's pods if the minGroupCount requirement has decreased.
+func (pl *GangScheduling) isSchedulableAfterCompositePodGroupUpdated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		return fwk.QueueSkip, nil
+	}
+
+	oldCPG, newCPG, err := util.As[*schedulingapi.CompositePodGroup](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	if pod.Spec.SchedulingGroup == nil {
+		return fwk.QueueSkip, nil
+	}
+
+	root1, err := pl.getRootCPGNameForPod(pod)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fwk.Queue, nil
+		}
+		return fwk.QueueSkip, err
+	}
+	root2, err := pl.getRootCPGName(pod.Namespace, newCPG.Name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fwk.Queue, nil
+		}
+		return fwk.QueueSkip, err
+	}
+	if root1 != "" && root1 == root2 {
+		oldPolicy := oldCPG.Spec.SchedulingPolicy
+		newPolicy := newCPG.Spec.SchedulingPolicy
+
+		if newPolicy.Gang == nil || oldPolicy.Gang == nil {
+			return fwk.Queue, nil
+		}
+
+		if newPolicy.Gang.MinGroupCount >= oldPolicy.Gang.MinGroupCount {
+			return fwk.QueueSkip, nil
+		}
+
+		return fwk.Queue, nil
+	}
+	return fwk.QueueSkip, nil
 }
 
 // PreEnqueue checks if the pod belongs to a gang and, if so, whether the gang has met its MinCount of available pods.
@@ -170,20 +321,131 @@ func (pl *GangScheduling) PreEnqueue(ctx context.Context, pod *v1.Pod) *fwk.Stat
 	policy := podGroup.Spec.SchedulingPolicy
 	// This plugin only cares about pods with a Gang scheduling policy.
 	if policy.Gang == nil {
-		return nil
+		// But if the basic PodGroup is a member of a CPG hierarchy, we still need to check if the root CPG is ready.
+		if podGroup.Spec.ParentCompositePodGroupName == nil {
+			return nil
+		}
+		return pl.checkCPGHierarchyReadiness(namespace, *podGroup.Spec.ParentCompositePodGroupName)
 	}
 
-	podGroupState, err := pl.podGroupManager.PodGroupStates().Get(namespace, *schedulingGroup.PodGroupName)
+	podGroupState, err := pl.podGroupManager.PodGroupStates().Get(framework.PodGroupKeyType, namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
 	allPodsCount := podGroupState.AllPodsCount()
-	if allPodsCount < int(policy.Gang.MinCount) {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
+
+	// Standalone pod group (no CPG parent).
+	if podGroup.Spec.ParentCompositePodGroupName == nil {
+		if allPodsCount < int(policy.Gang.MinCount) {
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue")
+		}
+		return nil
 	}
 
-	// The quorum is met, allow the pod to enter the scheduling queue.
+	// Find top level CPG in the hierarchy - it must be ready.
+	return pl.checkCPGHierarchyReadiness(namespace, *podGroup.Spec.ParentCompositePodGroupName)
+}
+
+func (pl *GangScheduling) getRootCPGName(namespace, cpgName string) (string, error) {
+	if pl.compositePodGroupLister == nil {
+		return "", fmt.Errorf("CompositePodGroup lister is not available")
+	}
+	currentCPGName := cpgName
+	for {
+		cpgSpec, err := pl.compositePodGroupLister.CompositePodGroups(namespace).Get(currentCPGName)
+		if err != nil {
+			return "", err
+		}
+		if cpgSpec.Spec.ParentCompositePodGroupName == nil {
+			break
+		}
+		currentCPGName = *cpgSpec.Spec.ParentCompositePodGroupName
+	}
+	return currentCPGName, nil
+}
+
+func (pl *GangScheduling) getRootCPGNameForPod(pod *v1.Pod) (string, error) {
+	if pod.Spec.SchedulingGroup == nil {
+		return "", nil
+	}
+	pg, err := pl.podGroupLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
+	if err != nil {
+		return "", err
+	}
+	if pg.Spec.ParentCompositePodGroupName == nil {
+		return "", nil
+	}
+	return pl.getRootCPGName(pod.Namespace, *pg.Spec.ParentCompositePodGroupName)
+}
+
+// For every pod in a CPG we traverse the entire tree! This is highly inefficient but good enough for alpha.
+// This results in O(#pods * #podgroups) complexity.
+func (pl *GangScheduling) checkCPGHierarchyReadiness(namespace, startCPGName string) *fwk.Status {
+	rootCPGName, err := pl.getRootCPGName(namespace, startCPGName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for composite pod group %q spec to appear", startCPGName))
+		}
+		return fwk.AsStatus(err)
+	}
+
+	if !pl.isCPGTreeReady(namespace, rootCPGName) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for composite pod group %q tree to meet quorum", rootCPGName))
+	}
 	return nil
+}
+
+func (pl *GangScheduling) isCPGTreeReady(namespace, cpgName string) bool {
+	cpgState, err := pl.podGroupManager.PodGroupStates().Get(framework.CompositePodGroupKeyType, namespace, cpgName)
+	if err != nil {
+		return false
+	}
+
+	cpgSpec, err := pl.compositePodGroupLister.CompositePodGroups(namespace).Get(cpgName)
+	if err != nil {
+		return false
+	}
+	minGroupCount := 1
+	policy := cpgSpec.Spec.SchedulingPolicy
+	if policy.Gang != nil {
+		minGroupCount = int(policy.Gang.MinGroupCount)
+	}
+
+	successfulChildren := 0
+	for _, childKey := range cpgState.GetChildren() {
+		childType, _, childName := unpackChildKey(childKey)
+
+		if childType == framework.CompositePodGroupKeyType {
+			if pl.isCPGTreeReady(namespace, childName) {
+				successfulChildren++
+			}
+		} else {
+			if pl.isPGReadyForPreEnqueue(namespace, childName) {
+				successfulChildren++
+			}
+		}
+	}
+
+	return successfulChildren >= minGroupCount
+}
+
+func (pl *GangScheduling) isPGReadyForPreEnqueue(namespace, pgName string) bool {
+	pg, err := pl.podGroupLister.PodGroups(namespace).Get(pgName)
+	if err != nil {
+		return false
+	}
+
+	minCount := 1
+	if pg.Spec.SchedulingPolicy.Gang != nil {
+		minCount = int(pg.Spec.SchedulingPolicy.Gang.MinCount)
+	}
+
+	pgState, err := pl.podGroupManager.PodGroupStates().Get(framework.PodGroupKeyType, namespace, pgName)
+	if err != nil {
+		return false
+	}
+
+	return pgState.AllPodsCount() >= minCount
 }
 
 // Permit forces all pods in a gang to wait at this stage. Once the number of waiting (assumed) pods
@@ -204,6 +466,11 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s/%s from snapshot: %w", namespace, *schedulingGroup.PodGroupName, err)), 0
 	}
 
+	// For pods that are part of a composite pod group hierarchy we just skip this plugin.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) && podGroup.Spec.ParentCompositePodGroupName != nil {
+		return nil, 0
+	}
+
 	policy := podGroup.Spec.SchedulingPolicy
 	// This plugin only cares about pods with a Gang scheduling policy.
 	if policy.Gang == nil {
@@ -211,7 +478,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	}
 
 	podGroupStateLister := pl.podGroupManager.PodGroupStates()
-	podGroupState, err := podGroupStateLister.Get(namespace, *schedulingGroup.PodGroupName)
+	podGroupState, err := podGroupStateLister.Get(framework.PodGroupKeyType, namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
 		return fwk.AsStatus(err), 0
 	}
@@ -260,19 +527,84 @@ func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *pla
 	return state.(*placementFeasibleState)
 }
 
+const placementFeasibleStatusesKey = "PlacementFeasible" + Name + "Statuses"
+
+// PlacementFeasibleStatuses holds the status of the PlacementFeasible plugin for each pod group.
+type PlacementFeasibleStatuses struct {
+	Status map[string]*fwk.Status
+}
+
+func (s *PlacementFeasibleStatuses) Clone() fwk.StateData {
+	res := make(map[string]*fwk.Status, len(s.Status))
+	for k, v := range s.Status {
+		res[k] = v
+	}
+	return &PlacementFeasibleStatuses{Status: res}
+}
+
+func getPlacementFeasibleStatuses(podGroupCycleState fwk.PodGroupCycleState) *PlacementFeasibleStatuses {
+	state, err := podGroupCycleState.Read(placementFeasibleStatusesKey)
+	if err != nil {
+		state = &PlacementFeasibleStatuses{Status: make(map[string]*fwk.Status)}
+		podGroupCycleState.Write(placementFeasibleStatusesKey, state)
+	}
+	return state.(*PlacementFeasibleStatuses)
+}
+
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
-	pg := podGroupInfo.GetPodGroup()
+	statuses := getPlacementFeasibleStatuses(placementCycleState.GetPodGroupSchedulingCycle())
+	status := pl.placementFeasible(ctx, placementCycleState, podGroupInfo, statuses)
+	statuses.Status[podGroupInfo.GetKey()] = status
+	return status
+}
 
-	gangPolicy := pg.Spec.SchedulingPolicy.Gang
-	// This plugin only cares about pods with a Gang scheduling policy.
-	if gangPolicy == nil {
-		return nil
+func (pl *GangScheduling) placementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, statuses *PlacementFeasibleStatuses) *fwk.Status {
+	if podGroupInfo.GetType() == framework.PodGroupKeyType {
+		return pl.placementFeasibleForPodGroup(ctx, placementCycleState, podGroupInfo)
 	}
 
-	podGroupState, err := pl.snapshotLister.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
+	cpgState, err := pl.snapshotLister.PodGroupStates().Get(podGroupInfo.GetType(), podGroupInfo.GetNamespace(), podGroupInfo.GetName())
+	if err != nil {
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod group state for %s %s of type %s", podGroupInfo.GetNamespace(), podGroupInfo.GetName(), podGroupInfo.GetType()))
+	}
+
+	scheduled := 0
+	for _, childKey := range cpgState.GetChildren() {
+		status, exists := statuses.Status[childKey]
+		// If the child is not in the status map, it means its PodGroup was already scheduled.
+		// This can happen if we partially schedule a CPG and then some more pods arrive.
+		if !exists || status.IsSuccess() {
+			scheduled++
+		}
+	}
+
+	cpg, err := pl.compositePodGroupLister.CompositePodGroups(podGroupInfo.GetNamespace()).Get(podGroupInfo.GetName())
+	if err != nil {
+		return fwk.AsStatus(fmt.Errorf("failed to get composite pod group %s: %w", klog.KObj(podGroupInfo), err))
+	}
+
+	gangPolicy := cpg.Spec.SchedulingPolicy.Gang
+	minCount := 1
+	if gangPolicy != nil {
+		minCount = int(gangPolicy.MinGroupCount)
+	}
+
+	if scheduled < minCount {
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled", minCount, scheduled))
+	}
+
+	return nil
+}
+
+func (pl *GangScheduling) placementFeasibleForPodGroup(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+	pg := podGroupInfo.GetPodGroup()
+	if pg.Spec.SchedulingPolicy.Gang == nil {
+		return nil
+	}
+	podGroupState, err := pl.snapshotLister.PodGroupStates().Get(framework.PodGroupKeyType, podGroupInfo.GetNamespace(), podGroupInfo.GetName())
 	if err != nil {
 		return fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(pg), err))
 	}
@@ -287,7 +619,11 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 	// scheduled includes the pods that are assigned or assumed in the current PodGroup scheduling cycle.
 	scheduled := podGroupState.ScheduledPodsCount()
 
-	minCount := int(gangPolicy.MinCount)
+	gangPolicy := pg.Spec.SchedulingPolicy.Gang
+	minCount := 1
+	if gangPolicy != nil {
+		minCount = int(gangPolicy.MinCount)
+	}
 
 	if remaining+scheduled < minCount {
 		// minCount can't be satisfied because there are not enough remaining pods.
@@ -301,4 +637,12 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 
 	// minCount is satisfied.
 	return nil
+}
+
+func unpackChildKey(childKey string) (string, string, string) {
+	parts := strings.Split(childKey, "/")
+	if len(parts) == 3 {
+		return parts[0], parts[1], parts[2]
+	}
+	return framework.PodGroupKeyType, "", childKey
 }

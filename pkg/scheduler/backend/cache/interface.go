@@ -140,6 +140,15 @@ type Cache interface {
 
 	// RemovePodGroup removes a pod group object from the cache.
 	RemovePodGroup(podGroup *schedulingv1alpha3.PodGroup)
+
+	// AddCompositePodGroup adds a composite pod group to the cache.
+	AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
+
+	// UpdateCompositePodGroup updates a composite pod group object in the cache.
+	UpdateCompositePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.CompositePodGroup)
+
+	// RemoveCompositePodGroup removes a composite pod group from the cache.
+	RemoveCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup)
 }
 
 // Dump is a dump of the cache state.

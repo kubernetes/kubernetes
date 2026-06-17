@@ -46,7 +46,7 @@ func TestIncompletePodGroupPods_Add(t *testing.T) {
 			name:      "pod group with multiple pods",
 			podsToAdd: []*framework.QueuedPodInfo{pInfo1, pInfo2},
 			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg1": {
+				"podgroup/ns1/pg1": {
 					"ns1/pod1": pInfo1,
 					"ns1/pod2": pInfo2,
 				},
@@ -56,10 +56,10 @@ func TestIncompletePodGroupPods_Add(t *testing.T) {
 			name:      "two pod groups",
 			podsToAdd: []*framework.QueuedPodInfo{pInfo1, pInfo3},
 			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg1": {
+				"podgroup/ns1/pg1": {
 					"ns1/pod1": pInfo1,
 				},
-				"pg/ns1/pg2": {
+				"podgroup/ns1/pg2": {
 					"ns1/pod3": pInfo3,
 				},
 			},
@@ -70,7 +70,7 @@ func TestIncompletePodGroupPods_Add(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ie := newIncompletePodGroupPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ie.add(pInfo, podGroupKeyForPod(pInfo.Pod))
 			}
 
 			if diff := cmp.Diff(tt.want, ie.podGroupToPodInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
@@ -117,7 +117,7 @@ func TestIncompletePodGroupPods_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ie := newIncompletePodGroupPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ie.add(pInfo, podGroupKeyForPod(pInfo.Pod))
 			}
 
 			got := ie.get(tt.targetPod)
@@ -208,10 +208,10 @@ func TestIncompletePodGroupPods_Update(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ie := newIncompletePodGroupPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo.DeepCopy())
+				ie.add(pInfo.DeepCopy(), podGroupKeyForPod(pInfo.Pod))
 			}
 
-			got := ie.update(tt.updatePod)
+			got := ie.update(tt.updatePod, podGroupKeyForPod(tt.updatePod))
 			if diff := cmp.Diff(tt.wantUpdated, got, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected updated pod info (-want,+got)\n%s", diff)
 			}
@@ -272,10 +272,10 @@ func TestIncompletePodGroupPods_Delete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ie := newIncompletePodGroupPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo.DeepCopy())
+				ie.add(pInfo.DeepCopy(), pg1Key)
 			}
 
-			gotDeleted := ie.delete(tt.podToDelete)
+			gotDeleted := ie.delete(tt.podToDelete, pg1Key)
 			if diff := cmp.Diff(tt.wantDeleted, gotDeleted, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected deleted pod info (-want,+got)\n%s", diff)
 			}
@@ -313,7 +313,7 @@ func TestIncompletePodGroupPods_Clear(t *testing.T) {
 			clearGroup:  podGroup1,
 			wantCleared: sets.New(pInfo1, pInfo2),
 			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg2": {
+				"podgroup/ns1/pg2": {
 					"ns1/pod3": pInfo3,
 				},
 			},
@@ -324,7 +324,7 @@ func TestIncompletePodGroupPods_Clear(t *testing.T) {
 			clearGroup:  podGroup3,
 			wantCleared: nil,
 			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg1": {
+				"podgroup/ns1/pg1": {
 					"ns1/pod1": pInfo1,
 				},
 			},
@@ -335,7 +335,7 @@ func TestIncompletePodGroupPods_Clear(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ie := newIncompletePodGroupPods()
 			for _, pInfo := range tt.podsToAdd {
-				ie.add(pInfo)
+				ie.add(pInfo, podGroupKeyForPod(pInfo.Pod))
 			}
 
 			gotCleared := ie.clear(tt.clearGroup)

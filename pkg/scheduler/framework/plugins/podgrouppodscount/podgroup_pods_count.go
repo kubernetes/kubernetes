@@ -50,7 +50,7 @@ func (pl *PodGroupPodsCount) Name() string {
 // when computing the score. This ensures that the relative difference between choices is reduced,
 // and small changes to the total count result in small changes to the score.
 func (pl *PodGroupPodsCount) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
-	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
+	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get("podgroup", podGroup.GetNamespace(), podGroup.GetName())
 	if err != nil {
 		return 0, fwk.AsStatus(err)
 	}

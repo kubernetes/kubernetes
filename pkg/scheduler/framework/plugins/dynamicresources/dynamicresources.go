@@ -1006,7 +1006,7 @@ func (pl *DynamicResources) unreservePodGroupClaims(ctx context.Context, pod *v1
 	// happened before or outside the scheduling cycle. We use it to check
 	// whether there were no assumed or assigned pods that would use the
 	// ResourceClaim.
-	podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get("podgroup", pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	if err != nil {
 		return statusError(logger, err)
 	}

@@ -92,7 +92,7 @@ func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingapi.PodGrou
 
 type podGroupStateListerContract struct{}
 
-func (c *podGroupStateListerContract) Get(_ string, _ string) (fwk.PodGroupState, error) {
+func (c *podGroupStateListerContract) Get(_ string, _ string, _ string) (fwk.PodGroupState, error) {
 	return nil, nil
 }
 
@@ -123,6 +123,14 @@ func (c *podGroupStateContract) ScheduledPodsCount() int {
 }
 
 func (c *podGroupStateContract) ScheduledPods() []*v1.Pod {
+	return nil
+}
+
+func (c *podGroupStateContract) GetParent() (string, bool) {
+	return "", false
+}
+
+func (c *podGroupStateContract) GetChildren() []string {
 	return nil
 }
 

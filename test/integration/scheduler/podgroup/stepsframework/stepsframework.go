@@ -139,6 +139,10 @@ type Step struct {
 	UpdatePodGroup *schedulingapi.PodGroup
 	// DeletePodGroup is used to delete a pod group by name and wait for it to propagate.
 	DeletePodGroup string
+	// CreateCompositePodGroup is used to create a composite pod group and wait for it to be ready.
+	CreateCompositePodGroup *schedulingapi.CompositePodGroup
+	// UpdateCompositePodGroup is used to update an existing composite pod group and wait for it to propagate.
+	UpdateCompositePodGroup *schedulingapi.CompositePodGroup
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
 	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
@@ -271,6 +275,63 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, prese
 				return fmt.Errorf("failed to ensure queueing order of pod %s: %w", p.Name, err)
 			}
 		}
+	}
+	return nil
+}
+
+func createCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingapi.CompositePodGroup) error {
+	cs := testCtx.ClientSet
+	cpgCopy := cpg.DeepCopy()
+	cpgCopy.Namespace = ns
+	if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create composite pod group %s: %w", cpgCopy.Name, err)
+	}
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for composite pod group %s to be discoverable by scheduler: %w", cpgCopy.Name, err)
+	}
+	return nil
+}
+
+func updateCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingapi.CompositePodGroup) error {
+	cs := testCtx.ClientSet
+	cpgCopy := cpg.DeepCopy()
+	cpgCopy.Namespace = ns
+
+	existing, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(testCtx.Ctx, cpgCopy.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get existing composite pod group %s for update: %w", cpgCopy.Name, err)
+	}
+	cpgCopy.ResourceVersion = existing.ResourceVersion
+
+	if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Update(testCtx.Ctx, cpgCopy, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("failed to update composite pod group %s: %w", cpgCopy.Name, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			listerCPG, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
+			if err != nil {
+				return false, err
+			}
+			if apiequality.Semantic.DeepEqual(listerCPG.Spec.SchedulingPolicy, cpgCopy.Spec.SchedulingPolicy) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for composite pod group %s update to be discoverable by scheduler: %w", cpgCopy.Name, err)
 	}
 	return nil
 }
@@ -603,6 +664,10 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = createPods(testCtx, ns, step.CreatePods, false)
 		case step.CreatePodsInOrder != nil:
 			err = createPods(testCtx, ns, step.CreatePodsInOrder, true)
+		case step.CreateCompositePodGroup != nil:
+			err = createCompositePodGroup(testCtx, ns, step.CreateCompositePodGroup)
+		case step.UpdateCompositePodGroup != nil:
+			err = updateCompositePodGroup(testCtx, ns, step.UpdateCompositePodGroup)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
 		case step.UpdatePodGroup != nil:

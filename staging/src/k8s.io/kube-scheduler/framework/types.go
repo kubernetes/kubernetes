@@ -172,6 +172,7 @@ const (
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
 	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
+	CompositePodGroup     EventResource = "scheduling.k8s.io/CompositePodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -654,8 +655,16 @@ type PodGroupInfo interface {
 	GetName() string
 	// GetNamespace returns the namespace the pod group belongs to.
 	GetNamespace() string
-	// GetPodGroup returns the PodGroup API object.
+	// GetType returns the type of the pod group.
+	GetType() string
+	// GetKey returns the key identifying the pod group.
+	GetKey() string
+	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
 	GetPodGroup() *schedulingv1alpha3.PodGroup
+	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
+	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup
+	// GetChildren returns the children of this pod group. Only composite pod groups have children.
+	GetChildren() []PodGroupInfo
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.

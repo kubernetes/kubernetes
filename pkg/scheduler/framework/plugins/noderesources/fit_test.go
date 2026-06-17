@@ -2574,6 +2574,7 @@ func TestScorePlacement_Resources(t *testing.T) {
 				}
 			}
 			podGroupInfo := &framework.PodGroupInfo{
+				Type:            framework.PodGroupKeyType,
 				UnscheduledPods: tc.podGroupPods,
 			}
 			podGroupAssignments := &fwk.PodGroupAssignments{

@@ -148,7 +148,7 @@ func TestScorePlacement(t *testing.T) {
 
 			// Setup cache, snapshot and framework
 			snapshot := internalcache.NewEmptySnapshot()
-			cache := internalcache.New(ctx, nil, true)
+			cache := internalcache.New(ctx, nil, true, true)
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 
 			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
@@ -194,6 +194,7 @@ func TestScorePlacement(t *testing.T) {
 			pgInfo := &framework.PodGroupInfo{
 				Namespace: tt.pod.Namespace,
 				Name:      *tt.pod.Spec.SchedulingGroup.PodGroupName,
+				Type:      framework.PodGroupKeyType,
 			}
 
 			// Run ScorePlacement
@@ -278,7 +279,7 @@ func TestNormalizePlacementScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pl := &PodGroupPodsCount{}
-			pgInfo := &framework.PodGroupInfo{Name: "pg1"}
+			pgInfo := &framework.PodGroupInfo{Name: "pg1", Type: framework.PodGroupKeyType}
 			status := pl.NormalizePlacementScore(context.Background(), nil, pgInfo, tt.scores)
 			if tt.expectedError != "" {
 				if status.IsSuccess() {
