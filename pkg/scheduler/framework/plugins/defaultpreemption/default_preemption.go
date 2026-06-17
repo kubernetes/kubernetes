@@ -113,10 +113,8 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	pl.Executor = preemption.NewExecutor(fh, fts)
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.Executor)
 
-	if pl.fts.EnableWorkloadAwarePreemption || pl.fts.EnableTopologyAwareWorkloadScheduling {
+	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister()
-	}
-	if pl.fts.EnableWorkloadAwarePreemption {
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor)
 	}
 
@@ -138,19 +136,8 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 		metrics.PreemptionAttempts.Inc()
 	}()
 
-	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableTopologyAwareWorkloadScheduling {
-		pg, err := pl.pgLister.PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
-		if err != nil {
-			return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: pod group for pod not found")
-		}
-		if pg.Spec.SchedulingConstraints != nil {
-			// When TAS is enabled, the default preemption logic needs to be disabled to avoid performing preemption multiple times for each topology option.
-			// The TAS-compatible preemption logic will be implemented in Delayed Preemption KEP 4671 or Workload-aware preemption KEP 5710 features.
-			return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to placement-based pod group scheduling limitation")
-		}
-	}
-	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableWorkloadAwarePreemption {
-		// When WAP is enabled, the default preemption logic needs to be disabled for pod group scheduling to avoid performing preemption in pod by pod cycle
+	if pod.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
+		// When GenericWorkload is enabled, the default preemption logic needs to be disabled for pod group scheduling to avoid performing preemption in pod by pod cycle
 		// of pod group scheduling. Instead the WAP will be called to perform preemption for the entire pod group.
 		return nil, fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled")
 	}
@@ -167,7 +154,7 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
-	if p.Spec.SchedulingGroup != nil && pl.fts.EnableWorkloadAwarePreemption {
+	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
 		pg, err := pl.pgLister.PodGroups(p.Namespace).Get(*p.Spec.SchedulingGroup.PodGroupName)
 		// If the pg is not found do not block the pod. It's not a default preemption responsibility
 		// to block pods from pod group without pg from entering the queue.

@@ -865,9 +865,7 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.featureGate {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:         true,
-					features.GangScheduling:          true,
-					features.WorkloadAwarePreemption: true,
+					features.GenericWorkload: true,
 				})
 			}
 

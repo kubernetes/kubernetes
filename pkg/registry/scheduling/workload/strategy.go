@@ -62,9 +62,6 @@ func (workloadStrategy) DeclarativeValidationConfig(ctx context.Context, obj, ol
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
 		opts = append(opts, string(features.DRAWorkloadResourceClaims))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
-		opts = append(opts, string(features.WorkloadAwarePreemption))
-	}
 	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
@@ -127,9 +124,6 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		template := &templates[i]
 		dropDisabledSchedulingConstraintsFields(template, oldTemplate)
 		dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate)
-		dropDisabledDisruptionModeField(template, oldTemplate)
-		dropDisabledPriorityClassNameField(template, oldTemplate)
-		dropDisabledPriorityField(template, oldTemplate)
 	}
 }
 
@@ -151,52 +145,10 @@ func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduli
 	template.ResourceClaims = nil
 }
 
-// dropDisabledDisruptionModeField removes the DisruptionMode field from a template
-// unless it is already used in the old template.
-func dropDisabledDisruptionModeField(template, oldTemplate *scheduling.PodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || disruptionModeInUse(oldTemplate) {
-		// No need to drop anything.
-		return
-	}
-	template.DisruptionMode = nil
-}
-
-// dropDisabledPriorityClassNameField removes the PriorityClassName field from a template
-// unless it is already used in the old template.
-func dropDisabledPriorityClassNameField(template, oldTemplate *scheduling.PodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityClassNameInUse(oldTemplate) {
-		// No need to drop anything.
-		return
-	}
-	template.PriorityClassName = ""
-}
-
-// dropDisabledPriorityField removes the Priority field from a template unless it is
-// already used in the old template.
-func dropDisabledPriorityField(template, oldTemplate *scheduling.PodGroupTemplate) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || priorityInUse(oldTemplate) {
-		// No need to drop anything.
-		return
-	}
-	template.Priority = nil
-}
-
 func schedulingConstraintsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.SchedulingConstraints != nil
 }
 
 func draWorkloadResourceClaimsInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && len(pgt.ResourceClaims) > 0
-}
-
-func disruptionModeInUse(pgt *scheduling.PodGroupTemplate) bool {
-	return pgt != nil && pgt.DisruptionMode != nil
-}
-
-func priorityClassNameInUse(pgt *scheduling.PodGroupTemplate) bool {
-	return pgt != nil && pgt.PriorityClassName != ""
-}
-
-func priorityInUse(pgt *scheduling.PodGroupTemplate) bool {
-	return pgt != nil && pgt.Priority != nil
 }

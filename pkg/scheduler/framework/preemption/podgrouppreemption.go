@@ -320,7 +320,7 @@ func (ev *PodGroupEvaluator) getPodPriority(p *v1.Pod) int32 {
 //
 //  1. Priority: Higher priority units are always more important.
 //
-//  2. Workload Type (if WorkloadAwarePreemption is enabled):
+//  2. Workload Type:
 //     Atomic workloads (PodGroups) are considered more important than individual Pods
 //     of the same priority.
 //

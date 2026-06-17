@@ -44,23 +44,17 @@ type PodGroupTemplateApplyConfiguration struct {
 	ResourceClaims []PodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	DisruptionMode *DisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// PriorityClassName indicates the priority that should be considered when scheduling
 	// a pod group created from this template. If no priority class is specified, admission
 	// control can set this to the global default priority class if it exists. Otherwise,
 	// pod groups created from this template will have the priority set to zero.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 	// Priority is the value of priority of pod groups created from this template. Various
 	// system components use this field to find the priority of the pod group. When
 	// Priority Admission Controller is enabled, it prevents users from setting this field.
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	Priority *int32 `json:"priority,omitempty"`
 }
 

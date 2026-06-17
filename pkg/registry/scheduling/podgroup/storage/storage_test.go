@@ -71,6 +71,9 @@ func validNewPodGroup() *scheduling.PodGroup {
 					MinCount: 5,
 				},
 			},
+			DisruptionMode: &scheduling.DisruptionMode{
+				Single: &scheduling.SingleDisruptionMode{},
+			},
 		},
 	}
 }

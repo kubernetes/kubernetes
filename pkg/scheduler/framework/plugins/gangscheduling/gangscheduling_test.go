@@ -305,7 +305,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 			cache.AddPodGroupMember(tt.pod)
 
-			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
+			p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true})
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
@@ -612,7 +612,7 @@ func TestPlacementFeasible(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 
-			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
+			p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true})
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}

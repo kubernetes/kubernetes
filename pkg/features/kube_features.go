@@ -376,11 +376,6 @@ const (
 
 	// owner: @erictune @wojtek-t
 	//
-	// Enables support for gang scheduling in kube-scheduler.
-	GangScheduling featuregate.Feature = "GangScheduling"
-
-	// owner: @erictune @wojtek-t
-	//
 	// Enables support for generic Workload API.
 	GenericWorkload featuregate.Feature = "GenericWorkload"
 
@@ -1169,13 +1164,6 @@ const (
 	// Enables support for joining Windows containers to a hosts' network namespace.
 	WindowsHostNetwork featuregate.Feature = "WindowsHostNetwork"
 
-	// owner: @wojtek-t
-	// kep: https://kep.k8s.io/5710
-	//
-	// Enables support for workload-aware preemption in pod group scheduling cycle
-	// and related PodGroup and Workload API fields.
-	WorkloadAwarePreemption featuregate.Feature = "WorkloadAwarePreemption"
-
 	// owner: @helayoty @mm4tt @wojtek-t
 	// kep: https://kep.k8s.io/5547
 	//
@@ -1420,10 +1408,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	GangScheduling: {
-		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	GenericWorkload: {
@@ -2046,10 +2030,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
-	WorkloadAwarePreemption: {
-		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	WorkloadWithJob: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2358,8 +2338,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ExternalServiceAccountTokenSigner: {},
 
-	GangScheduling: {GenericWorkload},
-
 	GenericWorkload: {},
 
 	GitRepoVolumeDriver: {},
@@ -2605,8 +2583,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	WindowsGracefulNodeShutdown: {GracefulNodeShutdown},
 
 	WindowsHostNetwork: {},
-
-	WorkloadAwarePreemption: {GangScheduling},
 
 	WorkloadWithJob: {GenericWorkload},
 

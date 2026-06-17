@@ -466,13 +466,12 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	var lock sync.Mutex
 
 	sched := &Scheduler{
-		Profiles:                       profile.Map{"test-scheduler": schedFwk},
-		SchedulingQueue:                internalqueue.NewTestQueue(ctx, nil),
-		Cache:                          cache,
-		client:                         client,
-		podGroupLister:                 podGroupLister,
-		nodeInfoSnapshot:               internalcache.NewEmptySnapshot(),
-		workloadAwarePreemptionEnabled: false,
+		Profiles:         profile.Map{"test-scheduler": schedFwk},
+		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
+		Cache:            cache,
+		client:           client,
+		podGroupLister:   podGroupLister,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
 		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			lock.Lock()
 			defer lock.Unlock()
@@ -525,25 +524,25 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 	tests := []struct {
 		name                             string
-		wapFeatureGateEnabled            bool
+		genericWorkloadEnabled           bool
 		postFilterPlugin                 string
 		expectedPodGroupPostFilterCalled bool
 	}{
 		{
-			name:                             "runs pod group post filter when WAP is enabled and DefaultPreemption is registered",
-			wapFeatureGateEnabled:            true,
+			name:                             "runs pod group post filter when GenericWorkload is enabled and DefaultPreemption is registered",
+			genericWorkloadEnabled:           true,
 			postFilterPlugin:                 "DefaultPreemption",
 			expectedPodGroupPostFilterCalled: true,
 		},
 		{
-			name:                             "disables pod group post filter when WAP feature gate is disabled",
-			wapFeatureGateEnabled:            false,
+			name:                             "disables pod group post filter when GenericWorkload feature gate is disabled",
+			genericWorkloadEnabled:           false,
 			postFilterPlugin:                 "DefaultPreemption",
 			expectedPodGroupPostFilterCalled: false,
 		},
 		{
 			name:                             "disables pod group post filter when DefaultPreemption is not registered",
-			wapFeatureGateEnabled:            true,
+			genericWorkloadEnabled:           true,
 			postFilterPlugin:                 "FakePodGroupPlugin",
 			expectedPodGroupPostFilterCalled: false,
 		},
@@ -551,11 +550,8 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Enable feature gates
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:         true,
-				features.WorkloadAwarePreemption: tt.wapFeatureGateEnabled,
-				features.GangScheduling:          true,
+				features.GenericWorkload: tt.genericWorkloadEnabled,
 			})
 
 			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
@@ -645,13 +641,13 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			cache.AddNode(logger, testNode)
 
 			sched := &Scheduler{
-				Profiles:                       profile.Map{"test-scheduler": schedFwk},
-				SchedulingQueue:                internalqueue.NewTestQueue(ctx, nil),
-				Cache:                          cache,
-				client:                         client,
-				podGroupLister:                 podGroupLister,
-				nodeInfoSnapshot:               internalcache.NewEmptySnapshot(),
-				workloadAwarePreemptionEnabled: tt.wapFeatureGateEnabled,
+				Profiles:               profile.Map{"test-scheduler": schedFwk},
+				SchedulingQueue:        internalqueue.NewTestQueue(ctx, nil),
+				Cache:                  cache,
+				client:                 client,
+				podGroupLister:         podGroupLister,
+				nodeInfoSnapshot:       internalcache.NewEmptySnapshot(),
+				genericWorkloadEnabled: tt.genericWorkloadEnabled,
 				FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 				},
 			}
@@ -2674,7 +2670,6 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.TopologyAwareWorkloadScheduling: true,
 		features.GenericWorkload:                 true,
-		features.GangScheduling:                  true,
 	})
 
 	// A single scenario exercises both isolation and continuity:
@@ -2884,11 +2879,8 @@ func TestRunWorkloadAwarePreemption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Enable feature gate before framework initialization
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:         true,
-				features.WorkloadAwarePreemption: tt.pluginsRegistered,
-				features.GangScheduling:          true,
+				features.GenericWorkload: true,
 			})
 
 			logger, ctx := ktesting.NewTestContext(t)
@@ -2980,11 +2972,7 @@ func TestRunWorkloadAwarePreemption(t *testing.T) {
 }
 
 func TestPodGroupCycle_NominatedNodes(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.WorkloadAwarePreemption: true,
-		features.GangScheduling:          true,
-	})
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 
 	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
@@ -3056,13 +3044,12 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 
 	cache := internalcache.New(ctx, nil, true)
 	sched := &Scheduler{
-		Profiles:                       profile.Map{"test-scheduler": schedFwk},
-		Cache:                          cache,
-		nodeInfoSnapshot:               internalcache.NewEmptySnapshot(),
-		podGroupLister:                 podGroupLister,
-		workloadAwarePreemptionEnabled: true,
-		client:                         client,
-		SchedulingQueue:                internalqueue.NewTestQueue(ctx, nil),
+		Profiles:         profile.Map{"test-scheduler": schedFwk},
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+		podGroupLister:   podGroupLister,
+		client:           client,
+		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
 	}
 
 	// Mock SchedulePod to return Unschedulable initially, and success on subsequent calls

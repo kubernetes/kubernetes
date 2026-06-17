@@ -50,8 +50,6 @@ type PodGroupSpecApplyConfiguration struct {
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
 	// One of Single, All. Defaults to Single if unset.
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	DisruptionMode *DisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
@@ -59,8 +57,6 @@ type PodGroupSpecApplyConfiguration struct {
 	// (i.e. if no priority class is specified, admission control can set this to the global default
 	// priority class if it exists. Otherwise, the pod group's priority will be zero).
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 	// Priority is the value of priority of this pod group. Various system components
 	// use this field to find the priority of the pod group. When Priority Admission
@@ -68,8 +64,6 @@ type PodGroupSpecApplyConfiguration struct {
 	// controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
-	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
 	Priority *int32 `json:"priority,omitempty"`
 }
 
