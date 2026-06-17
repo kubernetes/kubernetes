@@ -2282,6 +2282,32 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: watch_decode_duration_seconds
+  namespace: apiserver
+  help: Watch event decode and transform latency in seconds, broken down by group
+    and resource.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: watch_filtered_events_total
   namespace: apiserver
   help: Counter of events filtered out by shard selector during watch dispatch, broken

@@ -152,6 +152,16 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+	watchDecodeDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      "apiserver",
+			Name:           "watch_decode_duration_seconds",
+			Help:           "Watch event decode and transform latency in seconds, broken down by group and resource.",
+			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -173,6 +183,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(watchDecodeDuration)
 	})
 }
 
@@ -225,6 +236,11 @@ func RecordEtcdEvent(groupResource schema.GroupResource) {
 func RecordEtcdBookmark(groupResource schema.GroupResource) {
 	etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 	etcdBookmarkTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// RecordWatchDecodeDuration observes the time spent decoding and transforming a watch event.
+func RecordWatchDecodeDuration(groupResource schema.GroupResource, startTime time.Time) {
+	watchDecodeDuration.WithLabelValues(groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 // RecordDecodeError sets the storage_decode_errors metrics.
