@@ -249,17 +249,7 @@ func Convert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *batchv1.CronJob
 
 func autoConvert_v1_CronJobList_To_batch_CronJobList(in *batchv1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_v1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batch.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -270,17 +260,7 @@ func Convert_v1_CronJobList_To_batch_CronJobList(in *batchv1.CronJobList, out *b
 
 func autoConvert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *batchv1.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batchv1.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_batch_CronJob_To_v1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batchv1.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -415,17 +395,7 @@ func Convert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *
 
 func autoConvert_v1_JobList_To_batch_JobList(in *batchv1.JobList, out *batch.JobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.Job, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Job_To_batch_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batch.Job)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -436,17 +406,7 @@ func Convert_v1_JobList_To_batch_JobList(in *batchv1.JobList, out *batch.JobList
 
 func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *batchv1.JobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batchv1.Job, len(*in))
-		for i := range *in {
-			if err := Convert_batch_Job_To_v1_Job(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batchv1.Job)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -480,9 +440,9 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.Job
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.PodFailurePolicy = (*batchv1.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
 	out.SuccessPolicy = (*batchv1.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
 	out.BackoffLimitPerIndex = (*int32)(unsafe.Pointer(in.BackoffLimitPerIndex))
 	out.MaxFailedIndexes = (*int32)(unsafe.Pointer(in.MaxFailedIndexes))
@@ -524,13 +484,13 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *batch
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
-	out.Terminating = (*int32)(unsafe.Pointer(in.Terminating))
-	out.Ready = (*int32)(unsafe.Pointer(in.Ready))
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
+	out.Terminating = (*int32)(unsafe.Pointer(in.Terminating))
 	out.CompletedIndexes = in.CompletedIndexes
 	out.FailedIndexes = (*string)(unsafe.Pointer(in.FailedIndexes))
 	out.UncountedTerminatedPods = (*batchv1.UncountedTerminatedPods)(unsafe.Pointer(in.UncountedTerminatedPods))
+	out.Ready = (*int32)(unsafe.Pointer(in.Ready))
 	return nil
 }
 

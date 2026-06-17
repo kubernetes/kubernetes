@@ -128,17 +128,7 @@ func Convert_batch_CronJob_To_v1beta1_CronJob(in *batch.CronJob, out *batchv1bet
 
 func autoConvert_v1beta1_CronJobList_To_batch_CronJobList(in *batchv1beta1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batch.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -149,17 +139,7 @@ func Convert_v1beta1_CronJobList_To_batch_CronJobList(in *batchv1beta1.CronJobLi
 
 func autoConvert_batch_CronJobList_To_v1beta1_CronJobList(in *batch.CronJobList, out *batchv1beta1.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batchv1beta1.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_batch_CronJob_To_v1beta1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batchv1beta1.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
