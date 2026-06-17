@@ -7215,17 +7215,7 @@ func Convert_core_PodTemplate_To_v1_PodTemplate(in *core.PodTemplate, out *corev
 
 func autoConvert_v1_PodTemplateList_To_core_PodTemplateList(in *corev1.PodTemplateList, out *core.PodTemplateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]core.PodTemplate, len(*in))
-		for i := range *in {
-			if err := Convert_v1_PodTemplate_To_core_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]core.PodTemplate)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -7236,17 +7226,7 @@ func Convert_v1_PodTemplateList_To_core_PodTemplateList(in *corev1.PodTemplateLi
 
 func autoConvert_core_PodTemplateList_To_v1_PodTemplateList(in *core.PodTemplateList, out *corev1.PodTemplateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]corev1.PodTemplate, len(*in))
-		for i := range *in {
-			if err := Convert_core_PodTemplate_To_v1_PodTemplate(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]corev1.PodTemplate)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -7707,15 +7687,7 @@ func autoConvert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(
 	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
-	if in.Template != nil {
-		in, out := &in.Template, &out.Template
-		*out = new(core.PodTemplateSpec)
-		if err := Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
+	out.Template = (*core.PodTemplateSpec)(unsafe.Pointer(in.Template))
 	return nil
 }
 
@@ -7723,15 +7695,7 @@ func autoConvert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(
 	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
-	if in.Template != nil {
-		in, out := &in.Template, &out.Template
-		*out = new(corev1.PodTemplateSpec)
-		if err := Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Template = nil
-	}
+	out.Template = (*corev1.PodTemplateSpec)(unsafe.Pointer(in.Template))
 	return nil
 }
 
