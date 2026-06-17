@@ -46,6 +46,7 @@ type ResourceSliceSpec struct {
 	Devices                []Device         `json:",omitempty"`
 	PerDeviceNodeSelection *bool            `json:",omitempty"`
 	SharedCounters         []CounterSet     `json:",omitempty"`
+	SkipNodeOperations     *bool            `json:",omitempty"`
 }
 
 type CounterSet struct {

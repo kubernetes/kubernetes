@@ -195,6 +195,13 @@ type ResourceSliceSpec struct {
 	// +zeroOrOneOf=ResourceSliceType
 	// +k8s:alpha(since: "1.36")=+k8s:maxItems=8
 	SharedCounters []CounterSet `json:"sharedCounters,omitempty" protobuf:"bytes,8,name=sharedCounters"`
+
+	// SkipNodeOperations indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// are not required for the devices in this slice. Defaults to nil (false).
+	// +optional
+	// +featureGate=DRAOptionalNodeOperations
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	SkipNodeOperations *bool `json:"skipNodeOperations,omitempty" protobuf:"varint,9,opt,name=skipNodeOperations"`
 }
 
 // CounterSet defines a named set of counters
@@ -2020,6 +2027,12 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
+
+	// SkipNodeOperations indicates that node-local operations are not required for this allocated device.
+	// +optional
+	// +featureGate=DRAOptionalNodeOperations
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	SkipNodeOperations *bool `json:"skipNodeOperations,omitempty" protobuf:"varint,11,opt,name=skipNodeOperations"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

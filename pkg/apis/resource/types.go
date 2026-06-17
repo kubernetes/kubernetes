@@ -186,6 +186,11 @@ type ResourceSliceSpec struct {
 	// +featureGate=DRAPartitionableDevices
 	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
+
+	// SkipNodeOperations indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// are not required for the devices in this slice. Defaults to nil (false).
+	// +optional
+	SkipNodeOperations *bool
 }
 
 // CounterSet defines a named set of counters
@@ -1725,6 +1730,10 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity
+
+	// SkipNodeOperations indicates that node-local operations are not required for this allocated device.
+	// +optional
+	SkipNodeOperations *bool
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
