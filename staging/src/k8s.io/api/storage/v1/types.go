@@ -130,6 +130,7 @@ const (
 // to/from the specified node.
 //
 // VolumeAttachment objects are non-namespaced.
+// +k8s:hubType
 type VolumeAttachment struct {
 	metav1.TypeMeta `json:""`
 
@@ -155,6 +156,7 @@ type VolumeAttachment struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.13
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
+// +k8s:hubType
 type VolumeAttachmentList struct {
 	metav1.TypeMeta `json:""`
 
@@ -262,6 +264,7 @@ type VolumeError struct {
 // Kubernetes attach detach controller uses this object to determine whether attach is required.
 // Kubelet uses this object to determine whether pod information needs to be passed on mount.
 // CSIDriver objects are non-namespaced.
+// +k8s:hubType
 type CSIDriver struct {
 	metav1.TypeMeta `json:""`
 
@@ -283,6 +286,7 @@ type CSIDriver struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.18
 
 // CSIDriverList is a collection of CSIDriver objects.
+// +k8s:hubType
 type CSIDriverList struct {
 	metav1.TypeMeta `json:""`
 

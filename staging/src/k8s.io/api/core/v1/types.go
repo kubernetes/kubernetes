@@ -361,6 +361,7 @@ const (
 // It is analogous to a node.
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 // +k8s:supportsSubresource="/status"
+// +k8s:hubType
 type PersistentVolume struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -495,6 +496,7 @@ type PersistentVolumeStatus struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // PersistentVolumeList is a list of PersistentVolume items.
+// +k8s:hubType
 type PersistentVolumeList struct {
 	metav1.TypeMeta `json:""`
 	// Standard list metadata.
@@ -6288,6 +6290,7 @@ type ServicePort struct {
 // will answer requests sent through the proxy.
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/proxy"
+// +k8s:hubType
 type Service struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -6318,6 +6321,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // ServiceList holds a list of services.
+// +k8s:hubType
 type ServiceList struct {
 	metav1.TypeMeta `json:""`
 	// Standard list metadata.
