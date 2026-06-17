@@ -32,6 +32,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -65,6 +66,9 @@ func remove[T any](obj *T) [2]*T {
 func update[T any](oldObj, newObj *T) [2]*T {
 	return [2]*T{oldObj, newObj}
 }
+
+// removeRule(<name>) removes a DeviceTaintRule by name.
+type removeRule string
 
 func runInputEvents(tCtx *testContext, events []any, permutation []int) {
 	for _, i := range permutation {
@@ -109,7 +113,7 @@ func applyEventPair(tCtx *testContext, event any) {
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			tCtx.resourceSliceDelete(tCtx.Context)(pair[0])
+			tCtx.resourceSliceDelete(tCtx.Context)(resourceinformers.DeletedResourceSlice{OptionalObj: pair[0]})
 		default:
 			err := store.Add(pair[1])
 			require.NoError(tCtx, err)
@@ -125,12 +129,24 @@ func applyEventPair(tCtx *testContext, event any) {
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			tCtx.deviceTaintDelete(tCtx.Context)(pair[0])
+			tCtx.deviceTaintDelete(tCtx.Context)(resourceinformers.DeletedDeviceTaintRule{OptionalObj: pair[0]})
 		default:
 			err := store.Add(pair[1])
 			require.NoError(tCtx, err)
 			tCtx.deviceTaintAdd(tCtx.Context)(pair[1])
 		}
+	case removeRule:
+		name := string(pair)
+		store := tCtx.deviceTaints.GetStore()
+		obj, exists, err := store.GetByKey(name)
+		require.NoError(tCtx, err)
+		if !exists {
+			tCtx.Fatalf("cannot delete %s, not found", name)
+		}
+		err = store.Delete(obj)
+		require.NoError(tCtx, err)
+		// Let's pretend we don't have it...
+		tCtx.deviceTaintDelete(tCtx.Context)(resourceinformers.DeletedDeviceTaintRule{FinalStateUnknown: &cache.DeletedFinalStateUnknown{Key: name}})
 	}
 }
 
@@ -402,6 +418,40 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			expectedHandlerEvents: []handlerEvent{
 				{event: handlerEventAdd, newObj: slice1},
 				{event: handlerEventAdd, newObj: slice2Tainted},
+			},
+		},
+		"remove-patch-known-deleted-rule": {
+			events: []any{[]any{
+				add(taintPool2DevicesRule),
+				add(slice1),
+				add(slice2),
+				remove(taintPool2DevicesRule),
+			}},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				slice1,
+				slice2,
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2Tainted},
+				{event: handlerEventUpdate, oldObj: slice2Tainted, newObj: slice2},
+			},
+		},
+		"remove-patch-unknown-deleted-rule": {
+			events: []any{[]any{
+				add(taintPool2DevicesRule),
+				add(slice1),
+				add(slice2),
+				removeRule(taintPool2DevicesRule.Name),
+			}},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				slice1,
+				slice2,
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2Tainted},
+				{event: handlerEventUpdate, oldObj: slice2Tainted, newObj: slice2},
 			},
 		},
 		"merge-taints": {
