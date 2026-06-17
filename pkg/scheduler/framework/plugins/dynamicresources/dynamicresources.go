@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -777,6 +778,13 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			continue
 		}
 
+		// The claim is allocated, check whether it requires DRAOptionalNodeOperations feature on the node.
+		if allocationResultRequiresDRAOptionalNodeOperations(claim.Status.Allocation) && !slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
+			logger.V(5).Info("allocation's device requires DRAOptionalNodeOperations feature, but node lacks it", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+			unavailableClaims = append(unavailableClaims, index)
+			continue
+		}
+
 		// The claim is allocated, check whether it is ready for binding.
 		if pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus {
 			ready, err := pl.isClaimReadyForBinding(claim)
@@ -830,8 +838,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			if claim == extendedResourceClaim && nodeExtendedResourceClaim != nil {
 				claim = nodeExtendedResourceClaim
 			}
-			if state.informationsForClaim[index].allocation != nil {
-				pendingResult = append(pendingResult, *state.informationsForClaim[index].allocation)
+			if pendingAlloc := state.informationsForClaim[index].allocation; pendingAlloc != nil {
+				if allocationResultRequiresDRAOptionalNodeOperations(pendingAlloc) && !slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
+					logger.V(5).Info("allocation's device requires DRAOptionalNodeOperations feature, but node lacks it", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+					return statusUnschedulable(logger, fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(claim)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+				}
+				pendingResult = append(pendingResult, *pendingAlloc)
 				continue
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
@@ -1648,6 +1660,20 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 	}
 
 	return claim, prebindSuccessCleanup, nil
+}
+
+// allocationResultRequiresDRAOptionalNodeOperations checks whether an allocation result
+// has any allocated device that specifies SkipNodeOperations.
+func allocationResultRequiresDRAOptionalNodeOperations(alloc *resourceapi.AllocationResult) bool {
+	if alloc == nil {
+		return false
+	}
+	for _, result := range alloc.Devices.Results {
+		if result.SkipNodeOperations != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // isClaimReadyForBinding checks whether a given resource claim is

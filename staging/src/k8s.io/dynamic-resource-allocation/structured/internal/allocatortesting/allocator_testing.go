@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
@@ -139,6 +140,14 @@ func node(name, region string) *v1.Node {
 			},
 		},
 	}
+}
+
+// nodeWithDRAOptionalNodeOperations returns a node declaring DRAOptionalNodeOperations feature support
+// required by devices that define SkipNodeOperations.
+func nodeWithDRAOptionalNodeOperations(name, region string) *v1.Node {
+	n := node(name, region)
+	n.Status.DeclaredFeatures = append(n.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+	return n
 }
 
 // generate a DeviceClass object with the given name and a driver CEL selector.
@@ -658,6 +667,12 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 	return r
 }
 
+func deviceAllocationResultWithSkipNodeOperations(request, driver, pool, device string, skip resourceapi.SkipNodeOperations) resourceapi.DeviceRequestAllocationResult {
+	r := deviceAllocationResult(request, driver, pool, device, false)
+	r.SkipNodeOperations = &skip
+	return r
+}
+
 // deviceRequestAllocationResult can replace deviceAllocationResult
 func deviceRequestAllocationResult(request, driver, pool, device string) wrapDeviceRequestAllocationResult {
 	return wrapDeviceRequestAllocationResult{
@@ -986,6 +1001,33 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
+		},
+		"optional-node-operations": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				s := unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA))
+				s[0].Spec.SkipNodeOperations = ptr.To(resourceapi.SkipNodeOperationsAll)
+				return s
+			}(),
+			node: nodeWithDRAOptionalNodeOperations(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResultWithSkipNodeOperations(req0, driverA, pool1, device1, resourceapi.SkipNodeOperationsAll),
+			)},
+		},
+		"optional-node-operations-missing-feature": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				s := unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA))
+				s[0].Spec.SkipNodeOperations = ptr.To(resourceapi.SkipNodeOperationsAll)
+				return s
+			}(),
+			node: node(node1, region1),
+
+			expectResults: []any{},
 		},
 		"other-node": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
