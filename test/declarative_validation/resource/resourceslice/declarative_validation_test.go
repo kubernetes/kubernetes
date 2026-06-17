@@ -507,6 +507,26 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("overhead", "perPod"), "-100m", "must be non-negative").MarkFromImperative(),
 					},
 				},
+				// spec.skipNodeOperations
+				"valid: spec.skipNodeOperations All": {
+					input: mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationAll)),
+				},
+				"valid: spec.skipNodeOperations NodeUnprepareResources": {
+					input: mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationNodeUnprepareResources)),
+				},
+				"invalid: spec.skipNodeOperations invalid option": {
+					input: mkResourceSliceWithDevices(tweakSkipNodeOperations("InvalidOption")),
+					expectedErrs: field.ErrorList{
+						field.NotSupported(field.NewPath("spec", "skipNodeOperations").Index(0), resource.SkipNodeOperation("InvalidOption"), []string{"*", "NodePrepareResources", "NodeUnprepareResources"}),
+					},
+				},
+				"invalid: spec.skipNodeOperations duplicate": {
+					input: mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationAll, resource.SkipNodeOperationAll)),
+					expectedErrs: field.ErrorList{
+						field.Duplicate(field.NewPath("spec", "skipNodeOperations").Index(1), resource.SkipNodeOperationAll),
+					},
+				},
+				// TODO: Add more test cases
 			}
 
 			for k, tc := range testCases {
@@ -756,6 +776,33 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
 				},
+				// spec.skipNodeOperations
+				"valid update: spec.skipNodeOperations All": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationAll)),
+				},
+				"valid update: spec.skipNodeOperations NodeUnprepareResources": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationNodeUnprepareResources)),
+				},
+				"valid update: spec.skipNodeOperations, old value is invalid and new value is the same": {
+					old:    mkResourceSliceWithDevices(tweakSkipNodeOperations("InvalidOption")),
+					update: mkResourceSliceWithDevices(tweakSkipNodeOperations("InvalidOption")),
+				},
+				"invalid update: spec.skipNodeOperations invalid option": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakSkipNodeOperations("InvalidOption")),
+					expectedErrs: field.ErrorList{
+						field.NotSupported(field.NewPath("spec", "skipNodeOperations").Index(0), resource.SkipNodeOperation("InvalidOption"), []string{"*", "NodePrepareResources", "NodeUnprepareResources"}),
+					},
+				},
+				"invalid update: spec.skipNodeOperations duplicate": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakSkipNodeOperations(resource.SkipNodeOperationAll, resource.SkipNodeOperationAll)),
+					expectedErrs: field.ErrorList{
+						field.Duplicate(field.NewPath("spec", "skipNodeOperations").Index(1), resource.SkipNodeOperationAll),
+					},
+				},
 			}
 			for k, tc := range testCases {
 
@@ -977,5 +1024,11 @@ func tweakDeviceCapacity(name resource.QualifiedName, capacity resource.DeviceCa
 			rs.Spec.Devices[0].Capacity = make(map[resource.QualifiedName]resource.DeviceCapacity)
 		}
 		rs.Spec.Devices[0].Capacity[name] = capacity
+	}
+}
+
+func tweakSkipNodeOperations(skipNodeOperations ...resource.SkipNodeOperation) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.SkipNodeOperations = skipNodeOperations
 	}
 }

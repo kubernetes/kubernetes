@@ -224,6 +224,12 @@ var sliceWithPartitionTypeAttribute = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithSkipNodeOperations = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	obj.Spec.SkipNodeOperations = []resource.SkipNodeOperation{resource.SkipNodeOperationAll}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -430,6 +436,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-optional-node-operations": {
+			obj:              sliceWithSkipNodeOperations,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-optional-node-operations": {
+			obj:              sliceWithSkipNodeOperations,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSkipNodeOperations.DeepCopy()
 				obj.Generation = 1
 				return obj
 			}(),
@@ -932,6 +956,50 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-optional-node-operations": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSkipNodeOperations.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-optional-node-operations": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSkipNodeOperations.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSkipNodeOperations.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-optional-node-operations-without-featuregate-enabled": {
+			oldObj: sliceWithSkipNodeOperations,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSkipNodeOperations.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSkipNodeOperations.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),

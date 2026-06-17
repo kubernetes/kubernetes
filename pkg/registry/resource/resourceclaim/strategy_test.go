@@ -334,6 +334,41 @@ var objWithDeviceBindingConditions = &resource.ResourceClaim{
 	},
 }
 
+var objWithSkipNodeOperationsStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request:            "req-0",
+						Driver:             "dra.example.com",
+						Pool:               "pool-0",
+						Device:             "device-0",
+						SkipNodeOperations: []resource.SkipNodeOperation{resource.SkipNodeOperationAll},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithCapacityRequests = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -1450,6 +1485,39 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+		},
+		"keep-fields-optional-node-operations": {
+			oldObj:    obj,
+			newObj:    objWithSkipNodeOperationsStatus,
+			expectObj: objWithSkipNodeOperationsStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: true},
+		},
+		"keep-existing-fields-disable-optional-node-operations-feature-gate": {
+			oldObj:    objWithSkipNodeOperationsStatus,
+			newObj:    objWithSkipNodeOperationsStatus,
+			expectObj: objWithSkipNodeOperationsStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+		},
+		"drop-fields-optional-node-operations": {
+			oldObj:    obj,
+			newObj:    objWithSkipNodeOperationsStatus,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
 		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {

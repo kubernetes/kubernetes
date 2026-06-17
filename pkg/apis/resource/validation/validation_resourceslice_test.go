@@ -2004,6 +2004,30 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
+		"valid: skipNodeOperations All and Prepare": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll, resourceapi.SkipNodeOperationNodePrepareResources}
+				return slice
+			}(),
+		},
+		"valid: skipNodeOperations Prepare and Unprepare": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources, resourceapi.SkipNodeOperationNodeUnprepareResources}
+				return slice
+			}(),
+		},
+		"invalid: skipNodeOperations Prepare only": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources}
+				return slice
+			}(),
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "skipNodeOperations"), []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources}, "NodePrepareResources cannot be skipped unless NodeUnprepareResources is also skipped"),
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
