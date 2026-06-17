@@ -23,6 +23,7 @@ import (
 	"hash/fnv"
 	"reflect"
 	"sort"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -164,8 +165,19 @@ func NewPortMapKey(endpointPorts []discovery.EndpointPort, addrType discovery.Ad
 		endpointPorts = []discovery.EndpointPort{}
 	}
 	sort.Sort(portsInOrder(endpointPorts))
-	pmk := fmt.Sprintf("%s-%s", addrType, PortMapKey(deepHashObjectToString(endpointPorts)))
+	pmk := fmt.Sprintf("%s-%s", addrType, deepHashObjectToString(endpointPorts))
 	return PortMapKey(pmk)
+}
+
+// AddressType returns the discovery.AddressType associated with this PortMapKey.
+func (pk PortMapKey) AddressType() discovery.AddressType {
+	if strings.HasPrefix(string(pk), string(discovery.AddressTypeIPv6)) {
+		return discovery.AddressTypeIPv6
+	}
+	if strings.HasPrefix(string(pk), string(discovery.AddressTypeFQDN)) {
+		return discovery.AddressTypeFQDN
+	}
+	return discovery.AddressTypeIPv4
 }
 
 // deepHashObjectToString creates a unique hash string from a go object.

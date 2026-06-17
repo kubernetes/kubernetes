@@ -49,22 +49,22 @@ func (t *totalsByAction) add(totals totalsByAction) {
 // newDesiredCalc initializes and returns a new desiredCalc.
 func newDesiredCalc() *desiredCalc {
 	return &desiredCalc{
-		portsByKey:          map[addrTypePortMapKey][]discovery.EndpointPort{},
-		endpointsByKey:      map[addrTypePortMapKey]endpointsliceutil.EndpointSet{},
+		portsByKey:          map[endpointsliceutil.PortMapKey][]discovery.EndpointPort{},
+		endpointsByKey:      map[endpointsliceutil.PortMapKey]endpointsliceutil.EndpointSet{},
 		numDesiredEndpoints: 0,
 	}
 }
 
 // desiredCalc helps calculate desired endpoints and ports.
 type desiredCalc struct {
-	portsByKey          map[addrTypePortMapKey][]discovery.EndpointPort
-	endpointsByKey      map[addrTypePortMapKey]endpointsliceutil.EndpointSet
+	portsByKey          map[endpointsliceutil.PortMapKey][]discovery.EndpointPort
+	endpointsByKey      map[endpointsliceutil.PortMapKey]endpointsliceutil.EndpointSet
 	numDesiredEndpoints int
 }
 
 // multiAddrTypePortMapKey stores addrTypePortMapKey for different address
 // types.
-type multiAddrTypePortMapKey map[discovery.AddressType]addrTypePortMapKey
+type multiAddrTypePortMapKey map[discovery.AddressType]endpointsliceutil.PortMapKey
 
 // initPorts initializes ports for a subset and address type and returns the
 // corresponding addrTypePortMapKey.
@@ -74,7 +74,7 @@ func (d *desiredCalc) initPorts(subsetPorts []v1.EndpointPort) multiAddrTypePort
 	multiKey := multiAddrTypePortMapKey{}
 
 	for _, addrType := range addrTypes {
-		multiKey[addrType] = addrTypePortMapKey(endpointsliceutil.NewPortMapKey(endpointPorts, addrType))
+		multiKey[addrType] = endpointsliceutil.NewPortMapKey(endpointPorts, addrType)
 		if _, ok := d.endpointsByKey[multiKey[addrType]]; !ok {
 			d.endpointsByKey[multiKey[addrType]] = endpointsliceutil.EndpointSet{}
 		}

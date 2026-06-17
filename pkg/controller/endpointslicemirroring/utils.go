@@ -18,7 +18,6 @@ package endpointslicemirroring
 
 import (
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -30,17 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	netutils "k8s.io/utils/net"
 )
-
-// addrTypePortMapKey is used to uniquely identify groups of endpoint ports and
-// address types.
-type addrTypePortMapKey string
-
-func (pk addrTypePortMapKey) addressType() discovery.AddressType {
-	if strings.HasPrefix(string(pk), string(discovery.AddressTypeIPv6)) {
-		return discovery.AddressTypeIPv6
-	}
-	return discovery.AddressTypeIPv4
-}
 
 // newEndpointSlice returns an EndpointSlice generated from an Endpoints
 // resource, ports, and address type.
