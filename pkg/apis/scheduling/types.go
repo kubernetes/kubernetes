@@ -141,7 +141,8 @@ type WorkloadSpec struct {
 	ControllerRef *TypedLocalObjectReference
 
 	// PodGroupTemplates is the list of templates that make up the Workload.
-	// The maximum number of templates is 8. This field is immutable.
+	// The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
+	// Existing templates may still be updated where their individual fields allow it.
 	//
 	// +required
 	// +listType=map
@@ -189,6 +190,7 @@ type PodGroupTemplate struct {
 
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
 	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	// This field is immutable.
 	//
 	// +optional
 	// +featureGate=TopologyAwareWorkloadScheduling
@@ -215,6 +217,7 @@ type PodGroupTemplate struct {
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
+	// This field is immutable.
 	//
 	// +optional
 	DisruptionMode *DisruptionMode
@@ -223,6 +226,7 @@ type PodGroupTemplate struct {
 	// a pod group created from this template. If no priority class is specified, admission
 	// control can set this to the global default priority class if it exists. Otherwise,
 	// pod groups created from this template will have the priority set to zero.
+	// This field is immutable.
 	//
 	// +optional
 	PriorityClassName string
@@ -232,23 +236,30 @@ type PodGroupTemplate struct {
 	// Priority Admission Controller is enabled, it prevents users from setting this field.
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
+	// This field is immutable.
 	//
 	// +optional
 	Priority *int32
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
-// Exactly one policy must be set.
+// Exactly one policy must be set. The policy is chosen at creation time by setting either the
+// Basic or Gang field. The PodGroup may not change policy after creation.
+// Fields within chosen policy may be updated after creation when their individual fields allow it.
+//
 // +union
 type PodGroupSchedulingPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
-	// standard Kubernetes scheduling behavior.
+	// standard Kubernetes scheduling behavior. Setting this field at group creation time
+	// opts this group to basic scheduling; this field cannot be changed afterward.
 	//
 	// +optional
 	Basic *BasicSchedulingPolicy
 
 	// Gang specifies that the pods in this group should be scheduled using
-	// all-or-nothing semantics.
+	// all-or-nothing semantics. Setting this field at group creation time
+	// opts this group to gang scheduling; this field cannot be set or unset afterward.
+	// The minCount field within Gang scheduling policy remains mutable after group creation.
 	//
 	// +optional
 	Gang *GangSchedulingPolicy
@@ -267,7 +278,15 @@ type BasicSchedulingPolicy struct {
 type GangSchedulingPolicy struct {
 	// MinCount is the minimum number of pods that must be schedulable or scheduled
 	// at the same time for the scheduler to admit the entire group.
-	// It must be a positive integer.
+	// It must be a positive integer. This field is mutable to support workload scaling.
+	//
+	// Note that the scheduler operates on an eventually consistent model. Updates
+	// to minCount may not be immediately reflected in scheduling decisions due to
+	// propagation delays. If minCount is updated while a scheduling cycle is in
+	// progress for that group, the new value may not take effect until the next
+	// cycle. Moreover, minCount is only enforced during scheduling, meaning that
+	// modifications to this field do not affect already-scheduled pods, applying
+	// only to those evaluated in future cycles.
 	//
 	// +required
 	MinCount int32
@@ -393,7 +412,6 @@ type PodGroupSpec struct {
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// This field is immutable.
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy
