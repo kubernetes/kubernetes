@@ -22,6 +22,7 @@ import (
 	ingressadmission "k8s.io/kubernetes/openshift-kube-apiserver/admission/route"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/route/hostassignment"
 	projectnodeenv "k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeselectoradjuster"
 	schedulerpodnodeconstraints "k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/podnodeconstraints"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/storage/csiinlinevolumesecurity"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/storage/performantsecuritypolicy"
@@ -46,6 +47,9 @@ func RegisterOpenshiftKubeAdmissionPlugins(plugins *admission.Plugins) {
 	restrictedendpoints.RegisterRestrictedEndpoints(plugins)
 	csiinlinevolumesecurity.Register(plugins)
 	performantsecuritypolicy.Register(plugins)
+	if nodeselectoradjuster.IsStandalone() {
+		nodeselectoradjuster.Register(plugins)
+	}
 }
 
 var (
@@ -62,25 +66,31 @@ var (
 	)
 
 	// openshiftAdmissionPluginsForKubeBeforeMutating are the admission plugins to add after kube admission, before mutating webhooks
-	openshiftAdmissionPluginsForKubeBeforeMutating = []string{
-		"autoscaling.openshift.io/ClusterResourceOverride",
-		managementcpusoverride.PluginName, // "autoscaling.openshift.io/ManagementCPUsOverride"
-		"authorization.openshift.io/RestrictSubjectBindings",
-		"autoscaling.openshift.io/RunOnceDuration",
-		"scheduling.openshift.io/PodNodeConstraints",
-		"scheduling.openshift.io/OriginPodNodeEnvironment",
-		"network.openshift.io/ExternalIPRanger",
-		"network.openshift.io/RestrictedEndpointsAdmission",
-		imagepolicyapiv1.PluginName, // "image.openshift.io/ImagePolicy"
-		"security.openshift.io/SecurityContextConstraint",
-		"security.openshift.io/SCCExecRestrictions",
-		"route.openshift.io/IngressAdmission",
-		hostassignment.PluginName,           // "route.openshift.io/RouteHostAssignment"
-		csiinlinevolumesecurity.PluginName,  // "storage.openshift.io/CSIInlineVolumeSecurity"
-		managednode.PluginName,              // "autoscaling.openshift.io/ManagedNode"
-		mixedcpus.PluginName,                // "autoscaling.openshift.io/MixedCPUs"
-		performantsecuritypolicy.PluginName, // "storage.openshift.io/PerformantSecurityPolicy"
-	}
+	openshiftAdmissionPluginsForKubeBeforeMutating = func() []string {
+		plugins := []string{
+			"autoscaling.openshift.io/ClusterResourceOverride",
+			managementcpusoverride.PluginName, // "autoscaling.openshift.io/ManagementCPUsOverride"
+			"authorization.openshift.io/RestrictSubjectBindings",
+			"autoscaling.openshift.io/RunOnceDuration",
+			"scheduling.openshift.io/PodNodeConstraints",
+			"scheduling.openshift.io/OriginPodNodeEnvironment",
+			"network.openshift.io/ExternalIPRanger",
+			"network.openshift.io/RestrictedEndpointsAdmission",
+			imagepolicyapiv1.PluginName, // "image.openshift.io/ImagePolicy"
+			"security.openshift.io/SecurityContextConstraint",
+			"security.openshift.io/SCCExecRestrictions",
+			"route.openshift.io/IngressAdmission",
+			hostassignment.PluginName,           // "route.openshift.io/RouteHostAssignment"
+			csiinlinevolumesecurity.PluginName,  // "storage.openshift.io/CSIInlineVolumeSecurity"
+			managednode.PluginName,              // "autoscaling.openshift.io/ManagedNode"
+			mixedcpus.PluginName,                // "autoscaling.openshift.io/MixedCPUs"
+			performantsecuritypolicy.PluginName, // "storage.openshift.io/PerformantSecurityPolicy"
+		}
+		if nodeselectoradjuster.IsStandalone() {
+			plugins = append(plugins, nodeselectoradjuster.PluginName) // "scheduling.openshift.io/NodeSelectorAdjuster"
+		}
+		return plugins
+	}()
 
 	// openshiftAdmissionPluginsForKubeAfterResourceQuota are the plugins to add after ResourceQuota plugin
 	openshiftAdmissionPluginsForKubeAfterResourceQuota = []string{
