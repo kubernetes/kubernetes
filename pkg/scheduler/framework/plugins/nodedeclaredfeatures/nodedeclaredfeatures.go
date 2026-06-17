@@ -22,10 +22,13 @@ import (
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -58,6 +61,7 @@ type NodeDeclaredFeatures struct {
 	ndfFramework *ndf.Framework
 	version      *versionutil.Version
 	enabled      bool
+	claimLister  resourcelisters.ResourceClaimLister
 }
 
 var _ fwk.PreFilterPlugin = &NodeDeclaredFeatures{}
@@ -81,7 +85,31 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
 	}
-	return &NodeDeclaredFeatures{ndfFramework: ndfFramework, version: ver, enabled: true}, nil
+	var claimLister resourcelisters.ResourceClaimLister
+	if fh != nil {
+		claimLister = fh.SharedInformerFactory().Resource().V1().ResourceClaims().Lister()
+	}
+	return &NodeDeclaredFeatures{ndfFramework: ndfFramework, version: ver, enabled: true, claimLister: claimLister}, nil
+}
+
+func (pl *NodeDeclaredFeatures) constructPodInfo(pod *v1.Pod) *ndf.PodInfo {
+	if pod == nil {
+		return nil
+	}
+	var claims []*resourceapi.ResourceClaim
+	if pl.claimLister != nil {
+		for i := range pod.Spec.ResourceClaims {
+			claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+			if err != nil || claimName == nil {
+				continue
+			}
+			claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+			if err == nil && claim != nil {
+				claims = append(claims, claim)
+			}
+		}
+	}
+	return &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status, ResourceClaims: claims}
 }
 
 // PreFilter checks if the pod has any feature requirements.
@@ -89,8 +117,7 @@ func (pl *NodeDeclaredFeatures) PreFilter(ctx context.Context, cycleState fwk.Cy
 	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
-	// Pod status is not updated yet, we just pass the spec to node declared features library
-	podInfo := &ndf.PodInfo{Spec: &pod.Spec}
+	podInfo := pl.constructPodInfo(pod)
 	reqs, err := pl.ndfFramework.InferForPodScheduling(podInfo, pl.version)
 	if err != nil {
 		return nil, fwk.AsStatus(err)
@@ -128,7 +155,7 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 }
 
 func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	podInfo := &ndf.PodInfo{Spec: &pod.Spec}
+	podInfo := pl.constructPodInfo(pod)
 	fs, err := pl.ndfFramework.InferForPodScheduling(podInfo, pl.version)
 	if err != nil {
 		return nil, fwk.AsStatus(err)
@@ -152,6 +179,10 @@ func (pl *NodeDeclaredFeatures) EventsToRegister(_ context.Context) ([]fwk.Clust
 			Event:          fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
 			QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate,
 		},
+		{
+			Event:          fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update},
+			QueueingHintFn: pl.isSchedulableAfterClaimChange,
+		},
 	}, nil
 }
 
@@ -173,8 +204,8 @@ func (pl *NodeDeclaredFeatures) isSchedulableAfterTargetPodUpdate(logger klog.Lo
 		return fwk.Queue, err
 	}
 
-	oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec}
-	newPodInfo := &ndf.PodInfo{Spec: &newPod.Spec}
+	oldPodInfo := pl.constructPodInfo(oldPod)
+	newPodInfo := pl.constructPodInfo(newPod)
 	oldReqs, err := pl.ndfFramework.InferForPodScheduling(oldPodInfo, pl.version)
 	if err != nil {
 		logger.Error(err, "failed to infer old pod feature requirements", "pod", klog.KObj(pod))
@@ -203,5 +234,15 @@ func (pl *NodeDeclaredFeatures) isSchedulableAfterNodeChange(logger klog.Logger,
 		return fwk.QueueSkip, nil
 	}
 	logger.V(4).Info("Node declared features updated, queueing", "pod", klog.KObj(pod), "node", klog.KObj(newNode))
+	return fwk.Queue, nil
+}
+
+func (pl *NodeDeclaredFeatures) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	oldClaim, newClaim, err := util.As[*resourceapi.ResourceClaim](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	_ = oldClaim
+	logger.V(4).Info("ResourceClaim updated, queueing", "pod", klog.KObj(pod), "claim", klog.KObj(newClaim))
 	return fwk.Queue, nil
 }

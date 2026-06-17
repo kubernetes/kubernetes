@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
@@ -33,4 +34,5 @@ var AllFeatures = []types.Feature{
 	extendwebsocketstokubelet.Feature,
 	inplacepodresize.NonSidecarInitContainerResizeFeature,
 	usernamespaceshostnetwork.Feature,
+	draoptionalnodeoperations.Feature,
 }

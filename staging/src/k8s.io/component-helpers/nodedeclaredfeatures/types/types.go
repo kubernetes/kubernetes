@@ -18,6 +18,7 @@ package types
 
 import (
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
@@ -31,8 +32,8 @@ type PodInfo struct {
 	// when this struct represents a pod not yet created.
 	// (e.g., during scheduling).
 	Status *v1.PodStatus
-	// Add other ancillary resources here in the future as needed.
-	// Example: ResourceClaims []*v1.ResourceClaim
+	// ResourceClaims holds the resolved ResourceClaim objects referenced by the Pod.
+	ResourceClaims []*resourceapi.ResourceClaim
 }
 
 // Feature encapsulates all logic for a given declared feature.
