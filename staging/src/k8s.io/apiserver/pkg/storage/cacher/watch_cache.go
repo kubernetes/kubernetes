@@ -252,14 +252,13 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
-		if err := w.storage.UpdateStoreLocked(event.Type, elem); err != nil {
-			return err
-		}
 		if w.history.isCacheFullLocked() {
 			oldestRV := w.history.OldestResourceVersionLocked()
 			w.storage.CompactSnapshotsLocked(oldestRV)
 		}
-		w.storage.AddSnapshotLocked(w.resourceVersion)
+		if err := w.storage.UpdateStoreLocked(event.Type, elem, resourceVersion); err != nil {
+			return err
+		}
 		return nil
 	}(); err != nil {
 		return err
