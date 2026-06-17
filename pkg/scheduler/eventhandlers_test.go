@@ -523,7 +523,18 @@ func TestAddAllEventHandlers(t *testing.T) {
 			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
 			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
 
-			if diff := cmp.Diff(tt.expectStaticInformers, staticInformers); diff != "" {
+			expectedStaticInformers := make(map[reflect.Type]bool)
+			for k, v := range tt.expectStaticInformers {
+				expectedStaticInformers[k] = v
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+				expectedStaticInformers[reflect.TypeOf(&schedulingapi.PodGroup{})] = true
+				if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+					expectedStaticInformers[reflect.TypeOf(&schedulingapi.CompositePodGroup{})] = true
+				}
+			}
+
+			if diff := cmp.Diff(expectedStaticInformers, staticInformers); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.expectDynamicInformers, dynamicInformers); diff != "" {
@@ -755,7 +766,7 @@ func TestAddPod(t *testing.T) {
 				return
 			}
 
-			pgs, err := sched.Cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
+			pgs, err := sched.Cache.PodGroupStates().Get("podgroup", tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
 
 			if !tt.genericWorkloadEnabled {
 				if err == nil {
@@ -1001,7 +1012,7 @@ func TestUpdatePod(t *testing.T) {
 				// Pod has no pod group, so there is no pod group state to check, the test can complete.
 				return
 			}
-			pgs, err := sched.Cache.PodGroupStates().Get(tt.oldPod.Namespace, *tt.oldPod.Spec.SchedulingGroup.PodGroupName)
+			pgs, err := sched.Cache.PodGroupStates().Get("podgroup", tt.oldPod.Namespace, *tt.oldPod.Spec.SchedulingGroup.PodGroupName)
 
 			if !tt.genericWorkloadEnabled {
 				if err == nil {
@@ -1155,7 +1166,7 @@ func TestDeletePod(t *testing.T) {
 				// Pod has no pod group, so there is no pod group state to check, the test can complete.
 				return
 			}
-			_, err = sched.Cache.PodGroupStates().Get(tt.initialPod.Namespace, *tt.initialPod.Spec.SchedulingGroup.PodGroupName)
+			_, err = sched.Cache.PodGroupStates().Get("podgroup", tt.initialPod.Namespace, *tt.initialPod.Spec.SchedulingGroup.PodGroupName)
 			if err == nil {
 				t.Errorf("Unexpected pod group state in cache after pod removal")
 			}

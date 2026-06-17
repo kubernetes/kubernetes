@@ -185,31 +185,45 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		return
 	}
 
-	result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runAllPostFilters)
-
-	// Ensure podResults has an entry for each pod in the pod group with a status.
-	result = completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupCycleState, runAllPostFilters, result)
-	metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
-
-	// Run workload aware preemption if required. If the preemption is successful,
-	// we need to put the pods from pod group back into the scheduling queue.
-	if result.status.Code() == fwk.Unschedulable {
-		pgPostFilterResult, status := sched.runWorkloadAwarePreemption(ctx, schedFwk, podGroupCycleState, podGroupInfo)
-		if status.IsSuccess() {
-			result.waitingOnPreemption = true
-			for i := range result.podResults {
-				if nodeNameInfo, ok := pgPostFilterResult.NominatedNodeNames[result.podResults[i].pod]; ok {
-					result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
-				}
-			}
-		} else if status.IsError() {
-			result.status = status
-		} else {
-			result.status.AppendReason(status.String())
-		}
+	var pgResults []podGroupAlgorithmResult
+	var revertFn func()
+	var recursiveStatus *fwk.Status
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		pgResults, revertFn, recursiveStatus = sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runAllPostFilters)
+	} else {
+		result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runAllPostFilters))
+		recursiveStatus = result.status
+		revertFn = result.revertFn
+		pgResults = append(pgResults, result)
 	}
 
-	sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo, result, start)
+	for _, pgResult := range pgResults {
+		resultPGInfo := pgResult.podGroupInfo
+		// Ensure podResults has an entry for each pod in the pod group with a status.
+		result = completePodGroupAlgorithmResult(ctx, resultPGInfo, podGroupCycleState, runAllPostFilters, pgResult)
+		metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
+
+		// Run workload aware preemption if required. If the preemption is successful,
+		// we need to put the pods from pod group back into the scheduling queue.
+		// We don't yet support workload aware preemption for composite pod groups.
+		// We're doing this only for standalone pod groups.
+		if result.status.Code() == fwk.Unschedulable && podGroupInfo.PodGroup != nil {
+			pgPostFilterResult, status := sched.runWorkloadAwarePreemption(ctx, schedFwk, podGroupCycleState, resultPGInfo)
+			if status.IsSuccess() {
+				result.waitingOnPreemption = true
+				for i := range result.podResults {
+					if nodeNameInfo, ok := pgPostFilterResult.NominatedNodeNames[result.podResults[i].pod]; ok {
+						result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
+					}
+				}
+			} else if status.IsError() {
+				result.status = status
+			} else {
+				result.status.AppendReason(status.String())
+			}
+		}
+		sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, resultPGInfo, result, start)
+	}
 }
 
 // runWorkloadAwarePreemption runs workload-aware preemption for the given pod group.
@@ -289,6 +303,8 @@ func (ar *algorithmResult) GetNodeName() string {
 // podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
 // and any information needed to act on these results.
 type podGroupAlgorithmResult struct {
+	// podGroupInfo is the leaf pod group this result applies to.
+	podGroupInfo *framework.QueuedPodGroupInfo
 	// podResults is the list of scheduling results for each pod in the group.
 	// Only in the case of a pod group-wide Unschedulable or Error status can it contain fewer pods.
 	podResults []algorithmResult
@@ -310,6 +326,8 @@ type podGroupAlgorithmResult struct {
 	waitingOnPreemption bool
 	// placementCycleState is the state with which this placement was processed.
 	placementCycleState fwk.PlacementCycleState
+	// revertFn is a function to revert all assumptions made during the algorithm.
+	revertFn func()
 }
 
 // podGroupSchedulingDefaultAlgorithm runs the default algorithm for scheduling a pod group.
@@ -318,6 +336,7 @@ type podGroupAlgorithmResult struct {
 // treat that pod as already scheduled on that node with victims being already removed in memory.
 func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, postFilterMode podGroupPostFilterMode) podGroupAlgorithmResult {
 	result := podGroupAlgorithmResult{
+		podGroupInfo:        podGroupInfo,
 		podResults:          make([]algorithmResult, 0, len(podGroupInfo.QueuedPodInfos)),
 		status:              fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable),
 		waitingOnPreemption: false,
@@ -329,13 +348,20 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 	requiresPreemption := false
 	anyScheduled := false
+	var revertFns []func()
+	defer func() {
+		if !result.status.IsSuccess() {
+			for _, fn := range revertFns {
+				fn()
+			}
+		}
+	}()
+
 	for _, podInfo := range podGroupInfo.QueuedPodInfos {
 		podResult, revertFn := sched.podGroupPodSchedulingAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, podInfo, postFilterMode)
 		result.podResults = append(result.podResults, podResult)
 		if revertFn != nil {
-			// We unreserve the pod at the end of the whole algorithm (via defer) because it should be ultimately returned to the queue,
-			// without binding it yet. We only assumed the pod to check feasibility of subsequent pods in the group.
-			defer revertFn()
+			revertFns = append(revertFns, revertFn)
 		}
 
 		if !podResult.status.IsSuccess() && !podResult.status.IsRejected() {
@@ -379,6 +405,15 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 		} else if !anyScheduled {
 			// The framework requires at least 1 pod to be scheduled in order to return a success status.
 			result.status = fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable)
+		}
+	}
+
+	// Handle revert functions
+	if result.status.IsSuccess() && len(revertFns) > 0 {
+		result.revertFn = func() {
+			for _, fn := range revertFns {
+				fn()
+			}
 		}
 	}
 
@@ -639,7 +674,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
 		return podGroupAlgorithmResult{
-			status: fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
+			podGroupInfo: podGroupInfo,
+			status:       fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
 		}
 	}
 
@@ -648,7 +684,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, allNodes)
 	if !status.IsSuccess() {
 		return podGroupAlgorithmResult{
-			status: status,
+			podGroupInfo: podGroupInfo,
+			status:       status,
 		}
 	}
 
@@ -660,7 +697,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
 		if err != nil {
 			return podGroupAlgorithmResult{
-				status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
+				podGroupInfo: podGroupInfo,
+				status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
 			}
 		}
 		placementCycleState := framework.NewCycleState()
@@ -696,7 +734,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	bestPlacement, status := sched.findBestPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
 	if !status.IsSuccess() {
 		return podGroupAlgorithmResult{
-			status: status,
+			podGroupInfo: podGroupInfo,
+			status:       status,
 		}
 	}
 
@@ -767,7 +806,7 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 	podGroupCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) && podGroupInfo.CompositePodGroup != nil {
 		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode)
 	}
 	// The non-TAS default algorithm does not evaluate placement candidates, but it
@@ -776,4 +815,51 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 	placementCycleState := framework.NewCycleState()
 	placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
 	return sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, schedFwk, placementCycleState, podGroupInfo, postFilterMode)
+}
+
+func (sched *Scheduler) podGroupSchedulingRecursiveAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, postFilterMode podGroupPostFilterMode) ([]podGroupAlgorithmResult, func(), *fwk.Status) {
+	var allPGResults []podGroupAlgorithmResult
+	revertFns := []func(){}
+	var success bool
+
+	// Automatically revert if placement feasible is false.
+	defer func() {
+		if !success {
+			for _, fn := range revertFns {
+				fn()
+			}
+		}
+	}()
+
+	combinedRevertFn := func() {
+		for _, fn := range revertFns {
+			fn()
+		}
+	}
+
+	if podGroupInfo.PodGroup != nil {
+		pgResult := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode)
+		allPGResults = append(allPGResults, pgResult)
+		if pgResult.status.IsSuccess() && pgResult.revertFn != nil {
+			revertFns = append(revertFns, pgResult.revertFn)
+			success = true
+		}
+		return allPGResults, combinedRevertFn, pgResult.status
+	}
+
+	for child := range podGroupInfo.Children {
+		childResults, revertFn, status := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, podGroupCycleState, child, postFilterMode)
+		allPGResults = append(allPGResults, childResults...)
+		if status.IsSuccess() && revertFn != nil {
+			revertFns = append(revertFns, revertFn)
+		}
+	}
+
+	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, podGroupCycleState, podGroupInfo)
+	if placementFeasibleStatus.IsSuccess() {
+		success = true
+		return allPGResults, combinedRevertFn, placementFeasibleStatus
+	}
+
+	return nil, nil, placementFeasibleStatus
 }

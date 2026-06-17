@@ -266,12 +266,15 @@ type mockPodGroupState struct {
 
 func (m *mockPodGroupState) ScheduledPodsCount() int { return m.scheduledPodsCount }
 
+func (m *mockPodGroupState) GetParent() (string, bool) { return "", false }
+func (m *mockPodGroupState) GetChildren() []string { return nil }
+
 type mockPodGroupStateLister struct {
 	state *mockPodGroupState
 	err   error
 }
 
-func (m *mockPodGroupStateLister) Get(namespace, podGroupName string) (fwk.PodGroupState, error) {
+func (m *mockPodGroupStateLister) Get(groupType, namespace, podGroupName string) (fwk.PodGroupState, error) {
 	return m.state, m.err
 }
 

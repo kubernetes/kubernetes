@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -175,10 +176,22 @@ func TestPriorityQueue_Add(t *testing.T) {
 			}
 
 			objs := []runtime.Object{medPod, unschedPod, highPod}
+			var pgMed, pgUnsched, pgHigh *schedulingapi.PodGroup
+			if tt.usePodGroups {
+				pgMed = st.MakePodGroup().Name("pg-med").Namespace("ns2").Obj()
+				pgUnsched = st.MakePodGroup().Name("pg-unsched").Namespace("ns1").Obj()
+				pgHigh = st.MakePodGroup().Name("pg-high").Namespace("ns1").Obj()
+				objs = append(objs, pgMed, pgUnsched, pgHigh)
+			}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 			q.Add(ctx, medPod)
 			q.Add(ctx, unschedPod)
 			q.Add(ctx, highPod)
+			if tt.usePodGroups {
+				q.AddPodGroup(pgMed, "", false, nil, nil)
+				q.AddPodGroup(pgUnsched, "", false, nil, nil)
+				q.AddPodGroup(pgHigh, "", false, nil, nil)
+			}
 			expectedNominatedPods := &nominator{
 				nominatedPodToNode: map[types.UID]string{
 					medPod.UID:     "node1",
@@ -286,6 +299,7 @@ func Test_InFlightPods(t *testing.T) {
 	pgName := "pg-test"
 	pgPod1 := st.MakePod().Name("pgpod1").UID("pgpod1").PodGroupName(pgName).Obj()
 	pgPod2 := st.MakePod().Name("pgpod2").UID("pgpod2").PodGroupName(pgName).Obj()
+	pgTest := st.MakePodGroup().Name(pgName).Namespace(pgPod1.Namespace).Obj()
 
 	var poppedPod, poppedPod2 *framework.QueuedPodInfo
 
@@ -299,7 +313,9 @@ func Test_InFlightPods(t *testing.T) {
 		podEnqueued *framework.QueuedPodInfo
 		// podGroupAttempted is the PodGroup that was attempted to schedule.
 		podGroupAttempted *framework.QueuedPodGroupInfo
-		callback          func(t *testing.T, q *PriorityQueue)
+		// podGroupAdded is the PodGroup that is added/updated in the queue.
+		podGroupAdded *schedulingapi.PodGroup
+		callback      func(t *testing.T, q *PriorityQueue)
 	}
 
 	tests := []struct {
@@ -842,6 +858,7 @@ func Test_InFlightPods(t *testing.T) {
 				// Simulate a bug: add pgPod1 and pgPod2 back to activeQ while pod group is in-flight.
 				{podCreated: pgPod1},
 				{podCreated: pgPod2},
+				{podGroupAdded: pgTest},
 				// At this point, in the activeQ, we have pod group (with pgPod1 and pgPod2) and pod3 in this order.
 				{podCreated: pod3},
 				// pod3 is poped, not pgPod1.
@@ -860,6 +877,7 @@ func Test_InFlightPods(t *testing.T) {
 				{eventHappens: &csiNodeUpdate},
 				// This pod will be requeued to activeQ because it's a pod group member and the queued pod group itself is missing.
 				{podEnqueued: newQueuedPodInfoForLookup(pgPod2)},
+				{podGroupAdded: pgTest},
 				// This pod will be requeued to backoffQ immediately because no plugin is registered as unschedulable plugin,
 				// which means the pod encountered an unexpected error (e.g., a network error).
 				{podEnqueued: newQueuedPodInfoForLookup(pod3)},
@@ -911,6 +929,7 @@ func Test_InFlightPods(t *testing.T) {
 				{podCreated: pgPod1},
 				// Add a new, pgPod2 to activeQ.
 				{podCreated: pgPod2},
+				{podGroupAdded: pgTest},
 				// At this point, in the activeQ, we have pod group (with pgPod1 and pgPod2) and pod3 in this order.
 				{podCreated: pod3},
 				// pgPod2 is popped, while pgPod1 is discarded.
@@ -929,6 +948,7 @@ func Test_InFlightPods(t *testing.T) {
 				{eventHappens: &csiNodeUpdate},
 				// This pod will be requeued to activeQ because it's a pod group member and the queued pod group itself is missing.
 				{podEnqueued: newQueuedPodInfoForLookup(pgPod2)},
+				{podGroupAdded: pgTest},
 				// This pod will be requeued to backoffQ immediately because no plugin is registered as unschedulable plugin,
 				// which means the pod encountered an unexpected error (e.g., a network error).
 				{podEnqueued: newQueuedPodInfoForLookup(pod3)},
@@ -1026,8 +1046,21 @@ func Test_InFlightPods(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				obj := make([]runtime.Object, 0, len(test.initialPods))
+				var podGroupsToAdd []*schedulingapi.PodGroup
+				pgNamesSeen := sets.New[string]()
 				for _, p := range test.initialPods {
 					obj = append(obj, p)
+					if p.Spec.SchedulingGroup != nil && p.Spec.SchedulingGroup.PodGroupName != nil {
+						pgName := *p.Spec.SchedulingGroup.PodGroupName
+						if !pgNamesSeen.Has(pgName) {
+							pgNamesSeen.Insert(pgName)
+							pg := st.MakePodGroup().Name(pgName).Namespace(p.Namespace).Obj()
+							podGroupsToAdd = append(podGroupsToAdd, pg)
+						}
+					}
+				}
+				for _, pg := range podGroupsToAdd {
+					obj = append(obj, pg)
 				}
 				fakeClock := testingclock.NewFakeClock(time.Now())
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), obj, WithQueueingHintMapPerProfile(test.queueingHintMap), WithClock(fakeClock))
@@ -1044,6 +1077,9 @@ func Test_InFlightPods(t *testing.T) {
 				for _, p := range test.initialPods {
 					q.Add(ctx, p)
 					fakeClock.Step(time.Second)
+				}
+				for _, pg := range podGroupsToAdd {
+					q.AddPodGroup(pg, "", false, nil, nil)
 				}
 
 				for _, action := range test.actions {
@@ -1064,6 +1100,8 @@ func Test_InFlightPods(t *testing.T) {
 						if err != nil {
 							t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 						}
+					case action.podGroupAdded != nil:
+						q.AddPodGroup(action.podGroupAdded, "", false, nil, nil)
 					case action.callback != nil:
 						action.callback(t, q)
 					}
@@ -1411,12 +1449,12 @@ func TestPriorityQueue_Pop(t *testing.T) {
 
 			var medEntity, backoffEntity, errorBackoffEntity, unschedEntity framework.QueuedEntityInfo
 			if tt.usePodGroups {
-				medEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, medPod))
-				backoffPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, backoffPod, "plugin"))
+				medEntity = q.newQueuedPodGroupInfoFromPodInfo(q.newQueuedPodInfo(ctx, medPod))
+				backoffPodGroup := q.newQueuedPodGroupInfoFromPodInfo(q.newQueuedPodInfo(ctx, backoffPod, "plugin"))
 				backoffPodGroup.UnschedulablePlugins = sets.New("plugin")
 				backoffEntity = backoffPodGroup
-				errorBackoffEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, errorBackoffPod))
-				unschedPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, unschedPod, "plugin"))
+				errorBackoffEntity = q.newQueuedPodGroupInfoFromPodInfo(q.newQueuedPodInfo(ctx, errorBackoffPod))
+				unschedPodGroup := q.newQueuedPodGroupInfoFromPodInfo(q.newQueuedPodInfo(ctx, unschedPod, "plugin"))
 				unschedPodGroup.UnschedulablePlugins = sets.New("plugin")
 				unschedEntity = unschedPodGroup
 			} else {
@@ -3962,7 +4000,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			}
 			q := NewTestQueue(tCtx, newDefaultQueueSort(), opts...)
 
-			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1))
+			pgInfo := q.newQueuedPodGroupInfoFromPodInfo(q.newQueuedPodInfo(tCtx, pod1))
 
 			test.setup(tCtx, q, pgInfo)
 
@@ -6070,12 +6108,22 @@ const (
 	stateGated
 )
 
+func registerPodGroupForPod(q *PriorityQueue, pod *v1.Pod) {
+	if pod != nil && q.isPodGroupMember(pod) {
+		pgName := *pod.Spec.SchedulingGroup.PodGroupName
+		pg := st.MakePodGroup().Name(pgName).Namespace(pod.Namespace).Obj()
+		q.AddPodGroup(pg, "", false, nil, nil)
+	}
+}
+
 func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQueue, initialPods []*v1.Pod, initialState initialQueueState) {
 	t.Helper()
 	if len(initialPods) == 0 {
 		return
 	}
 	logger := klog.FromContext(ctx)
+
+	registerPodGroupForPod(q, initialPods[0])
 
 	for _, pod := range initialPods {
 		q.Add(ctx, pod)
@@ -6246,6 +6294,8 @@ func TestAddPodGroupMember(t *testing.T) {
 			if tt.initialPod != nil {
 				initialPods = []*v1.Pod{tt.initialPod}
 			}
+			registerPodGroupForPod(q, tt.incomingPod)
+			registerPodGroupForPod(q, tt.initialPod)
 			setupInitialPodGroupState(t, ctx, q, initialPods, tt.initialState)
 
 			// Add incoming pod
@@ -6624,6 +6674,8 @@ func TestUpdatePodGroupMember(t *testing.T) {
 			}
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
 
+			registerPodGroupForPod(q, tt.newPod)
+			registerPodGroupForPod(q, tt.oldPod)
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 			// Add pending pods
 			for _, pod := range tt.pendingPods {
@@ -7369,6 +7421,9 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
 
+			for _, pInfo := range tt.podsToAdd {
+				registerPodGroupForPod(q, pInfo.Pod)
+			}
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 
 			if tt.clearLastPopped {

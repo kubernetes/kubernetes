@@ -18,6 +18,7 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -122,6 +123,17 @@ type Cache interface {
 
 	// RemovePodGroupMember removes a pod from its pod group state.
 	RemovePodGroupMember(pod *v1.Pod)
+
+	// AddPodGroup adds a pod group to the cache.
+	AddPodGroup(pg *schedulingapi.PodGroup)
+	// RemovePodGroup removes a pod group from the cache.
+	RemovePodGroup(pg *schedulingapi.PodGroup)
+	// AddCompositePodGroup adds a composite pod group to the cache.
+	AddCompositePodGroup(cpg *schedulingapi.CompositePodGroup)
+	// RemoveCompositePodGroup removes a composite pod group from the cache.
+	RemoveCompositePodGroup(cpg *schedulingapi.CompositePodGroup)
+	// ExtractHierarchy resolves the root of a PodGroup or CompositePodGroup hierarchy and returns all its members.
+	ExtractHierarchy(namespace string, name string, isCPG bool) (rootName string, rootIsCPG bool, pgs []*schedulingapi.PodGroup, cpgs []*schedulingapi.CompositePodGroup)
 }
 
 // Dump is a dump of the cache state.

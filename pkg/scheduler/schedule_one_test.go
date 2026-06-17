@@ -1032,6 +1032,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 		var podGroupLister schedulinglisters.PodGroupLister
 		var clientObjs []runtime.Object
+		var testPG *schedulingv1alpha3.PodGroup
 		if scheduleAsPodGroup {
 			group := &v1.PodSchedulingGroup{
 				PodGroupName: new("pg"),
@@ -1046,7 +1047,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				item.expectPodInUnschedulable = nil
 			}
 
-			testPG := &schedulingv1alpha3.PodGroup{
+			testPG = &schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
 			}
 			clientObjs = []runtime.Object{item.sendPod, testPG}
@@ -1153,6 +1154,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			APIDispatcher:                          apiDispatcher,
 			podGroupLister:                         podGroupLister,
 			nominatedNodeNameForExpectationEnabled: features.nominatedNodeNameForExpectationEnabled,
+		}
+		if scheduleAsPodGroup {
+			if pq, ok := queue.(*internalqueue.PriorityQueue); ok {
+				pq.AddPodGroup(testPG, "", false, nil, nil)
+			}
 		}
 		queue.Add(ctx, item.sendPod)
 

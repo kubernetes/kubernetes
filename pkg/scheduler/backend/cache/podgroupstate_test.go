@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -65,6 +66,10 @@ func TestPodGroupState_Clone(t *testing.T) {
 	pgs.addPod(pod2)
 	pgs.assumePod(pod2)
 
+	parentKey := newPodGroupKey(compositePodGroupType, "ns1", "parent-pg")
+	pgs.parent = &parentKey
+	pgs.children = sets.New(newPodGroupKey(podGroupType, "ns1", "child1"), newPodGroupKey(podGroupType, "ns1", "child2"))
+
 	snap := pgs.snapshot()
 
 	// Clone has the same generation.
@@ -85,6 +90,24 @@ func TestPodGroupState_Clone(t *testing.T) {
 	// Clone preserves pod2 as assumed.
 	if !snap.AssumedPods().Has(pod2.UID) {
 		t.Error("expected pod2 in clone's AssumedPods")
+	}
+
+	// Clone preserves parent and children.
+	if snap.parent == nil || *snap.parent != parentKey {
+		t.Errorf("expected parent %v, got %v", parentKey, snap.parent)
+	}
+	if !snap.children.Equal(pgs.children) {
+		t.Errorf("expected children %v, got %v", pgs.children, snap.children)
+	}
+
+	// Mutating the clone's children/parent does not affect the original.
+	snap.parent = nil
+	snap.children.Insert(newPodGroupKey(podGroupType, "ns1", "child3"))
+	if pgs.parent == nil {
+		t.Error("mutation to clone's parent should not affect original's parent")
+	}
+	if pgs.children.Has(newPodGroupKey(podGroupType, "ns1", "child3")) {
+		t.Error("mutation to clone's children should not affect original's children")
 	}
 
 	// Mutating the clone does not affect the original.
