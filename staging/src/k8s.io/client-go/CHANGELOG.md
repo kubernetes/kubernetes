@@ -4,6 +4,35 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### Type-safe informers
+
+All code using the result of the generated client-go Informer() methods (a
+cache.SharedIndexInformer) constantly has to do type casts from "any" to the
+actual type of the objects managed by the informer.
+
+This is:
+- annoying at best
+- often done inconsistently (should failed type assertions be logged and if so, how?)
+- a source of bugs (not handling DeletedFinalStateUnknown, type in event handler not matching the type in the informer)
+
+In contrast, the Lister() result is typed. Now the new TypedInformer() methods
+return a variant of the traditional interfaces where event handlers are called
+with objects already cast to the correct type.
+
+Adding this method to each generated informer interface is a breaking
+change. Someone who mocks those interfaces may have to add the TypedInformer
+method to their mock.
+
+
+```
+...
+- ./informers/apps/v1.Interface.ControllerRevisions: changed from func() ControllerRevisionInformer to func() TypedControllerRevisionInformer
+- ./informers/apps/v1.Interface.DaemonSets: changed from func() DaemonSetInformer to func() TypedDaemonSetInformer
+- ./informers/apps/v1.Interface.Deployments: changed from func() DeploymentInformer to func() TypedDeploymentInformer
+- ./informers/apps/v1.ReplicaSetInformer: changed from ReplicaSetInformer to ReplicaSetInformer
+...
+```
+
 ### mutation cache: support informer events
 
 Calling OnAddOrUpdate and OnDelete from event handlers is optional. Calling

@@ -34,11 +34,39 @@ import (
 )
 
 // CompositePodGroupInformer provides access to a shared informer and lister for
-// CompositePodGroups.
+// CompositePodGroups. Prefer using the type-safe variant (see [TypedCompositePodGroupInformer]).
 type CompositePodGroupInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() schedulingv1alpha3.CompositePodGroupLister
 }
+
+// TypedCompositePodGroupInformer provides access to a shared informer and lister for
+// CompositePodGroups, including the type-safe TypedInformer variant.
+// It is a superset of CompositePodGroupInformer.
+type TypedCompositePodGroupInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CompositePodGroupIndexInformer
+	Lister() schedulingv1alpha3.CompositePodGroupLister
+}
+
+// CompositePodGroupIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CompositePodGroupIndexInformer cache.TypedSharedIndexInformer[*apischedulingv1alpha3.CompositePodGroup]
+
+// CompositePodGroupHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CompositePodGroup.
+type CompositePodGroupHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apischedulingv1alpha3.CompositePodGroup]
+
+// CompositePodGroupDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CompositePodGroup.
+type CompositePodGroupDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apischedulingv1alpha3.CompositePodGroup]
+
+// CompositePodGroupFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CompositePodGroup.
+type CompositePodGroupFilteringHandler = cache.TypedFilteringResourceEventHandler[*apischedulingv1alpha3.CompositePodGroup]
+
+// CompositePodGroupIndexers is a specialization of [cache.TypedIndexers] for CompositePodGroup.
+type CompositePodGroupIndexers = cache.TypedIndexers[*apischedulingv1alpha3.CompositePodGroup]
+
+// DeletedCompositePodGroup is a specialization of [cache.DeletedObject] for CompositePodGroup.
+type DeletedCompositePodGroup = cache.DeletedObject[*apischedulingv1alpha3.CompositePodGroup]
 
 type compositePodGroupInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type compositePodGroupInformer struct {
 // NewCompositePodGroupInformer constructs a new informer for CompositePodGroup type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCompositePodGroupInformer]).
 func NewCompositePodGroupInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewCompositePodGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCompositePodGroupInformer constructs a new informer for CompositePodGroup type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCompositePodGroupInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers CompositePodGroupIndexers) CompositePodGroupIndexInformer {
+	return NewTypedCompositePodGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCompositePodGroupInformer constructs a new informer for CompositePodGroup type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCompositePodGroupInformer]).
 func NewFilteredCompositePodGroupInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewCompositePodGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedCompositePodGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCompositePodGroupInformer constructs a new informer for CompositePodGroup type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCompositePodGroupInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers CompositePodGroupIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CompositePodGroupIndexInformer {
+	return NewTypedCompositePodGroupInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewCompositePodGroupInformerWithOptions constructs a new informer for CompositePodGroup type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCompositePodGroupInformerWithOptions]).
 func NewCompositePodGroupInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCompositePodGroupInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedCompositePodGroupInformerWithOptions constructs a new informer for CompositePodGroup type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCompositePodGroupInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) CompositePodGroupIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1alpha3", Resource: "compositepodgroups"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1alpha3.CompositePodGroup](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewCompositePodGroupInformerWithOptions(client kubernetes.Interface, namesp
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *compositePodGroupInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCompositePodGroupInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedCompositePodGroupInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *compositePodGroupInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apischedulingv1alpha3.CompositePodGroup{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *compositePodGroupInformer) TypedInformer() CompositePodGroupIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1alpha3.CompositePodGroup](f.factory.InformerFor(&apischedulingv1alpha3.CompositePodGroup{}, f.defaultInformer))
 }
 
 func (f *compositePodGroupInformer) Lister() schedulingv1alpha3.CompositePodGroupLister {
 	return schedulingv1alpha3.NewCompositePodGroupLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCompositePodGroupInformer converts an untyped informer into a TypedCompositePodGroupInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CompositePodGroup. If that is not the case, calling type-safe methods of the returned
+// TypedCompositePodGroupInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCompositePodGroupInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCompositePodGroupInformer(informer CompositePodGroupInformer) TypedCompositePodGroupInformer {
+	if informer, ok := informer.(TypedCompositePodGroupInformer); ok {
+		return informer
+	}
+	return &compositePodGroupTypedInformerAdapter{informer}
+}
+
+type compositePodGroupTypedInformerAdapter struct {
+	CompositePodGroupInformer
+}
+
+func (a *compositePodGroupTypedInformerAdapter) TypedInformer() CompositePodGroupIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1alpha3.CompositePodGroup](a.Informer())
+}
+
+// ToCompositePodGroupIndexInformer converts an untyped informer into a CompositePodGroupIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CompositePodGroup. If that is not the case, calling type-safe methods of the returned
+// CompositePodGroupIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CompositePodGroupIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCompositePodGroupIndexInformer(informer cache.SharedIndexInformer) CompositePodGroupIndexInformer {
+	if informer, ok := informer.(CompositePodGroupIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apischedulingv1alpha3.CompositePodGroup](informer)
 }
