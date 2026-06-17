@@ -353,6 +353,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
 		},
+		"valid update with minCount changed": {
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment"), setPodGroupMinCount(0, 10)),
+		},
 		"set controllerRef": {
 			oldObj:       mkValidWorkload(setResourceVersion("1")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "different-deployment")),
@@ -373,14 +377,15 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidWorkload(setResourceVersion("1"), setEmptyPodGroupTemplates()),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "podGroupTemplates"), "must have at least one item"),
-				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates"), "").WithOrigin("update"),
 			},
 		},
 		"change podGroupTemplate name": {
 			oldObj:    mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker2")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(1), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates"), "").WithOrigin("update"),
 			},
 		},
 		"invalid update too many podGroupTemplates": {
@@ -388,42 +393,62 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidWorkload(setResourceVersion("1"), setManyPodGroupTemplates(scheduling.WorkloadMaxPodGroupTemplates+1)),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("spec", "podGroupTemplates"), scheduling.WorkloadMaxPodGroupTemplates+1, scheduling.WorkloadMaxPodGroupTemplates).WithOrigin("maxItems"),
-				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(1), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(2), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(3), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(4), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(5), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(6), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(7), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(8), "").WithOrigin("update"),
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates"), "").WithOrigin("update"),
 			},
 		},
 		"add podGroupTemplate": {
-			oldObj:       mkValidWorkload(setResourceVersion("1")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker1")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker1")),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(1), "").WithOrigin("update"),
+			},
 		},
 		"remove podGroupTemplate": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker1")),
-			updateObj:    mkValidWorkload(setResourceVersion("1")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1"), addPodGroupTemplate("worker1")),
+			updateObj: mkValidWorkload(setResourceVersion("1")),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates"), "").WithOrigin("update"),
+			},
 		},
 		"invalid update with neither basic nor gang": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), clearPodGroupPolicy(0)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
 			},
 		},
 		"invalid update with both basic and gang": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setBothPolicies(0)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update of gang minCount": {
-			oldObj:       mkValidWorkload(setResourceVersion("1")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), setPodGroupMinCount(0, 10)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setPodGroupMinCount(0, -1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum"),
+			},
 		},
-		"valid update from gang to basic policy": {
-			oldObj:       mkValidWorkload(setResourceVersion("1")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+		"invalid update from gang to basic policy": {
+			oldObj:    mkValidWorkload(setResourceVersion("1")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
 		},
 		"valid update with unchanged scheduling constraints": {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
@@ -434,45 +459,62 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
 			updateObj:                     mkValidWorkload(setResourceVersion("1"), setSchedulingConstraints(0)),
 			enableTopologyAwareScheduling: true,
-			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"invalid update to topology constraints": {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
 			updateObj:                     mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo"), addTopologyConstraint(0, "bar")),
 			enableTopologyAwareScheduling: true,
-			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"invalid update to topology key": {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
 			updateObj:                     mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "bar")),
 			enableTopologyAwareScheduling: true,
-			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"valid update with unchanged scheduling constraints with TAS disabled": {
 			oldObj:    mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
 		},
 		"invalid update to scheduling constraints with TAS disabled": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), setSchedulingConstraints(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setSchedulingConstraints(0)),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), ""),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"invalid update to topology constraints with TAS disabled": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo"), addTopologyConstraint(0, "bar")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo"), addTopologyConstraint(0, "bar")),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), ""),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"invalid update to topology key with TAS disabled": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "bar")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "field is immutable").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "foo")),
+			updateObj: mkValidWorkload(setResourceVersion("1"), addTopologyConstraint(0, "bar")),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), ""),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"invalid add of resource claims, DRA workload resource claims disabled": {
 			oldObj: mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), addResourceClaims(
 				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimTemplateName: new("my-template")},
 			)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid add of resource claims, DRA workload resource claims enabled": {
 			oldObj: mkValidWorkload(setResourceVersion("1")),
@@ -480,7 +522,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimTemplateName: new("my-template")},
 			)),
 			enableDRAWorkloadResourceClaims: true,
-			expectedErrs:                    field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid update of resource claims, DRA workload resource claims disabled": {
 			oldObj: mkValidWorkload(setResourceVersion("1"), addResourceClaims(
@@ -489,7 +533,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidWorkload(setResourceVersion("1"), addResourceClaims(
 				scheduling.PodGroupResourceClaim{Name: "my-other-claim", ResourceClaimTemplateName: new("my-template")},
 			)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid update of resource claims, DRA workload resource claims enabled": {
 			oldObj: mkValidWorkload(setResourceVersion("1"), addResourceClaims(
@@ -499,14 +545,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				scheduling.PodGroupResourceClaim{Name: "my-other-claim", ResourceClaimTemplateName: new("my-template")},
 			)),
 			enableDRAWorkloadResourceClaims: true,
-			expectedErrs:                    field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid remove of resource claims, DRA workload resource claims disabled": {
 			oldObj: mkValidWorkload(setResourceVersion("1"), addResourceClaims(
 				scheduling.PodGroupResourceClaim{Name: "my-claim", ResourceClaimTemplateName: new("my-template")},
 			)),
-			updateObj:    mkValidWorkload(setResourceVersion("1")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			updateObj: mkValidWorkload(setResourceVersion("1")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid remove of resource claims, DRA workload resource claims enabled": {
 			oldObj: mkValidWorkload(setResourceVersion("1"), addResourceClaims(
@@ -514,22 +564,28 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			)),
 			updateObj:                       mkValidWorkload(setResourceVersion("1")),
 			enableDRAWorkloadResourceClaims: true,
-			expectedErrs:                    field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid update of disruption mode": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), setDisruptionModeSingle(0)),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), setDisruptionModeAll(0)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setDisruptionModeSingle(0)),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setDisruptionModeAll(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("disruptionMode"), nil, "").WithOrigin("immutable"),
+			},
 		},
 		"invalid update of priority class name": {
 			oldObj:       mkValidWorkload(setResourceVersion("1"), setPriorityClassName(0, "low-priority")),
 			updateObj:    mkValidWorkload(setResourceVersion("1"), setPriorityClassName(0, "high-priority")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priorityClassName"), nil, "").WithOrigin("immutable")},
 		},
 		"invalid update of priority": {
-			oldObj:       mkValidWorkload(setResourceVersion("1"), setPriority(0, 1000)),
-			updateObj:    mkValidWorkload(setResourceVersion("1"), setPriority(0, 2000)),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable")},
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setPriority(0, 1000)),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setPriority(0, 2000)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("immutable"),
+			},
 		},
 	}
 	for k, tc := range testCases {

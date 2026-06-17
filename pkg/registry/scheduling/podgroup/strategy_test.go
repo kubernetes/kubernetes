@@ -96,6 +96,7 @@ var (
 	maximumError           = "must be less than or equal to 1000000000"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	forbiddenError         = "Forbidden"
+	notAllowedToUnsetError = "field cannot be cleared once set"
 )
 
 func TestStrategy(t *testing.T) {
@@ -288,7 +289,7 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                        *scheduling.PodGroup
 		newObj                        *scheduling.PodGroup
 		enableTopologyAwareScheduling bool
-		expectValidationError         string
+		expectValidationErrors        []string
 	}{
 		"no changes": {
 			oldObj: podGroup,
@@ -301,7 +302,7 @@ func TestStrategyUpdate(t *testing.T) {
 				newPodGroup.Name += "bar"
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"updating pod group template ref not allowed": {
 			oldObj: podGroup,
@@ -315,16 +316,15 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing min count in gang scheduling policy not allowed": {
+		"changing min count in gang scheduling is allowed": {
 			oldObj: podGroup,
 			newObj: func() *scheduling.PodGroup {
 				newPodGroup := podGroup.DeepCopy()
 				newPodGroup.Spec.SchedulingPolicy.Gang.MinCount = 4
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
 		},
 		"changing scheduling policy not allowed": {
 			oldObj: podGroup,
@@ -335,45 +335,45 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newPodGroup
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError, notAllowedToUnsetError},
 		},
 		"changing scheduling constraints not allowed": {
 			oldObj:                        podGroupWithSchedulingConstraints("foo"),
 			newObj:                        podGroupWithSchedulingConstraints(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"changing topology constraints not allowed": {
 			oldObj:                        podGroupWithSchedulingConstraints("foo"),
 			newObj:                        podGroupWithSchedulingConstraints(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"changing topology key not allowed": {
 			oldObj:                        podGroupWithSchedulingConstraints("foo"),
 			newObj:                        podGroupWithSchedulingConstraints("foobar"),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"changing scheduling constraints not allowed with TAS disabled": {
-			oldObj:                podGroupWithSchedulingConstraints("foo"),
-			newObj:                podGroupWithSchedulingConstraints(),
-			expectValidationError: forbiddenError,
+			oldObj:                 podGroupWithSchedulingConstraints("foo"),
+			newObj:                 podGroupWithSchedulingConstraints(),
+			expectValidationErrors: []string{forbiddenError},
 		},
 		"changing topology constraints not allowed with TAS disabled": {
-			oldObj:                podGroupWithSchedulingConstraints("foo"),
-			newObj:                podGroupWithSchedulingConstraints(),
-			expectValidationError: forbiddenError,
+			oldObj:                 podGroupWithSchedulingConstraints("foo"),
+			newObj:                 podGroupWithSchedulingConstraints(),
+			expectValidationErrors: []string{forbiddenError},
 		},
 		"changing topology key not allowed with TAS disabled": {
-			oldObj:                podGroupWithSchedulingConstraints("foo"),
-			newObj:                podGroupWithSchedulingConstraints("foobar"),
-			expectValidationError: forbiddenError,
+			oldObj:                 podGroupWithSchedulingConstraints("foo"),
+			newObj:                 podGroupWithSchedulingConstraints("foobar"),
+			expectValidationErrors: []string{forbiddenError},
 		},
 		"changing disruption mode not allowed": {
-			oldObj:                podGroup,
-			newObj:                podGroupWithDisruptionModeAll(),
-			expectValidationError: fieldImmutableError,
+			oldObj:                 podGroup,
+			newObj:                 podGroupWithDisruptionModeAll(),
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing priority class name not allowed": {
 			oldObj: podGroup,
@@ -382,7 +382,7 @@ func TestStrategyUpdate(t *testing.T) {
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing priority not allowed": {
 			oldObj: podGroup,
@@ -391,7 +391,7 @@ func TestStrategyUpdate(t *testing.T) {
 				pg.Spec.Priority = new(int32(2000))
 				return pg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 	}
 
@@ -410,18 +410,20 @@ func TestStrategyUpdate(t *testing.T) {
 			errs := strategy.ValidateUpdate(ctx, newPodGroup, podGroup)
 			errs = strategy.ValidateDeclaratively(ctx, newPodGroup, podGroup, errs, operation.Update, strategy.DeclarativeValidationConfig(ctx, newPodGroup, podGroup))
 			if len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				if len(errs) != 1 {
-					t.Fatalf("exactly one error expected")
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("expected %d errors, got %d", len(tc.expectValidationErrors), len(errs))
 				}
-				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
-					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				for i, err := range errs {
+					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
+						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+					}
 				}
 				return
 			}
-			if tc.expectValidationError != "" {
+			if len(tc.expectValidationErrors) != 0 {
 				t.Fatal("expected validation error(s), got none")
 			}
 		})

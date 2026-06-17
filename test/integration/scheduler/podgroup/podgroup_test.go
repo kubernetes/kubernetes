@@ -49,6 +49,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t2").BasicPolicy().Obj()).
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t-mid").MinCount(2).Obj()).
+		PodGroupTemplate(st.MakePodGroupTemplate().Name("t-mutable").MinCount(5).Obj()).
 		Obj()
 	otherWorkload := st.MakeWorkload().Name("other-workload").
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(3).Obj()).
@@ -61,6 +62,13 @@ func TestPodGroupScheduling(t *testing.T) {
 		Priority(100).MinCount(3).Obj()
 
 	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").Priority(100).BasicPolicy().Obj()
+	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").TemplateRef("t-mutable", "workload").Priority(100).MinCount(5).Obj()
+
+	mutP1 := st.MakePod().Name("mut-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(105).Obj()
+	mutP2 := st.MakePod().Name("mut-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(104).Obj()
+	mutP3 := st.MakePod().Name("mut-p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(103).Obj()
+	mutP4 := st.MakePod().Name("mut-p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(102).Obj()
+	mutP5 := st.MakePod().Name("mut-p5").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(101).Obj()
 
 	p1 := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("pg1").Priority(100).Obj()
@@ -514,6 +522,97 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:                     "Verify the entire gang becomes unschedulable",
 					WaitForPodsUnschedulable: []string{"mid-p1", "mid-p2"},
+				},
+			},
+		},
+		{
+			name: "gang pods are unschedulable due to lack of quorum, then scheduled when minCount is decreased",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with minCount=5",
+					CreatePodGroup: podGroupWithMinCount5,
+				},
+				{
+					Name:       "Create 4 pods belonging to the gang (quorum is 5)",
+					CreatePods: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
+				},
+				{
+					Name:                               "Verify gang pods are gated at PreEnqueue",
+					WaitForPodsInUnschedulableEntities: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+				{
+					Name:           "Update the PodGroup with decreased minCount=4",
+					UpdatePodGroup: (&st.PodGroupWrapper{PodGroup: *podGroupWithMinCount5.DeepCopy()}).MinCount(4).Obj(),
+				},
+				{
+					Name:                 "Verify all gang pods are immediately re-queued and scheduled successfully",
+					WaitForPodsScheduled: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+			},
+		},
+		{
+			name: "gang pods are unschedulable due to lack of space, then scheduled when minCount is decreased",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with minCount=5",
+					CreatePodGroup: podGroupWithMinCount5,
+				},
+				{
+					Name:       "Create 5 pods belonging to the gang",
+					CreatePods: []*v1.Pod{mutP1, mutP2, mutP3, mutP4, mutP5},
+				},
+				{
+					Name:                     "Verify gang pods are unschedulable",
+					WaitForPodsUnschedulable: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4", "mut-p5"},
+				},
+				{
+					Name:           "Update the PodGroup with decreased minCount=4",
+					UpdatePodGroup: (&st.PodGroupWrapper{PodGroup: *podGroupWithMinCount5.DeepCopy()}).MinCount(4).Obj(),
+				},
+				{
+					Name:                 "Verify 4 gang pods are immediately re-queued and scheduled successfully",
+					WaitForPodsScheduled: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+				{
+					Name:                     "Verify the last gang pod is unschedulable",
+					WaitForPodsUnschedulable: []string{"mut-p5"},
+				},
+			},
+		},
+		{
+			name: "gang pods are unschedulable due to lack of quorum, and remain unschedulable without triggering reschedule when minCount is increased",
+			steps: []stepsframework.Step{
+				{
+					Name:           "Create the PodGroup object with minCount=5",
+					CreatePodGroup: podGroupWithMinCount5,
+				},
+				{
+					Name:       "Create 4 pods belonging to the gang (quorum is 5)",
+					CreatePods: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
+				},
+				{
+					Name:                               "Verify gang pods are gated at PreEnqueue",
+					WaitForPodsInUnschedulableEntities: []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+				},
+				{
+					Name: "Verify scheduling attempts of all gang pods is 0",
+					VerifyPodSchedulingAttempts: &stepsframework.VerifyPodsSchedulingAttempts{
+						PodNames:     []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+						PodGroupName: "pg-mutable",
+						Attempts:     0,
+					},
+				},
+				{
+					Name:           "Update the PodGroup with increased minCount=6",
+					UpdatePodGroup: (&st.PodGroupWrapper{PodGroup: *podGroupWithMinCount5.DeepCopy()}).MinCount(6).Obj(),
+				},
+				{
+					Name: "Verify scheduling attempts of all gang pods is still 0 (did not trigger reschedule/requeue)",
+					VerifyPodSchedulingAttempts: &stepsframework.VerifyPodsSchedulingAttempts{
+						PodNames:     []string{"mut-p1", "mut-p2", "mut-p3", "mut-p4"},
+						PodGroupName: "pg-mutable",
+						Attempts:     0,
+					},
 				},
 			},
 		},

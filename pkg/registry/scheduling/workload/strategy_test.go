@@ -55,11 +55,14 @@ var (
 		},
 	}
 
-	fieldImmutableError = "field is immutable"
-	minCountError       = "must be greater than or equal to 1"
-	tooManyItemsError   = "must have at most 1 item"
-	requiredError       = "Required value"
-	subdomainNameError  = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	fieldImmutableError     = "field is immutable"
+	minCountError           = "must be greater than or equal to 1"
+	tooManyItemsError       = "must have at most 1 item"
+	requiredError           = "Required value"
+	subdomainNameError      = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	itemCannotBeAddedError  = "item may not be added"
+	forbiddenError          = "Forbidden"
+	fieldCannotBeUnsetError = "field cannot be cleared once set"
 )
 
 func TestWorkloadStrategy(t *testing.T) {
@@ -251,7 +254,7 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                        *scheduling.Workload
 		newObj                        *scheduling.Workload
 		enableTopologyAwareScheduling bool
-		expectValidationError         string
+		expectValidationErrors        []string
 		expectWorkload                *scheduling.Workload
 	}{
 		"no changes": {
@@ -266,7 +269,7 @@ func TestStrategyUpdate(t *testing.T) {
 				w.Name += "bar"
 				return w
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"invalid spec update - controllerRef": {
 			oldObj: workload,
@@ -278,16 +281,18 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return w
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"invalid spec update - podGroupTemplates": {
 			oldObj: workload,
 			newObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = 4
+				w.Spec.PodGroupTemplates[0].SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
+					Basic: &scheduling.BasicSchedulingPolicy{},
+				}
 				return w
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError, fieldCannotBeUnsetError},
 		},
 		"valid update with scheduling constraints unchanged and TAS disabled": {
 			oldObj: func() *scheduling.Workload {
@@ -357,7 +362,7 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return workload
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
 		},
 		"changing topology key not allowed with TAS enabled": {
 			oldObj: func() *scheduling.Workload {
@@ -375,7 +380,7 @@ func TestStrategyUpdate(t *testing.T) {
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
 		"topology constraint addition is dropped with TAS disabled": {
 			oldObj: workload,
@@ -406,10 +411,11 @@ func TestStrategyUpdate(t *testing.T) {
 				workload.Spec.PodGroupTemplates[1].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
 					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
 				}
+				workload.Spec.PodGroupTemplates[1].Name = "bar1"
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{itemCannotBeAddedError},
 		},
 		"adding scheduling constraints not allowed with TAS disabled": {
 			oldObj: func() *scheduling.Workload {
@@ -428,9 +434,10 @@ func TestStrategyUpdate(t *testing.T) {
 				workload.Spec.PodGroupTemplates[1].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
 					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
 				}
+				workload.Spec.PodGroupTemplates[1].Name = "bar1"
 				return workload
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{itemCannotBeAddedError},
 		},
 		"adding scheduling constraints not allowed with TAS enabled": {
 			oldObj: func() *scheduling.Workload {
@@ -449,10 +456,11 @@ func TestStrategyUpdate(t *testing.T) {
 				workload.Spec.PodGroupTemplates[1].SchedulingConstraints = &scheduling.PodGroupSchedulingConstraints{
 					Topology: []scheduling.TopologyConstraint{{Key: "foo"}},
 				}
+				workload.Spec.PodGroupTemplates[1].Name = "bar1"
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         fieldImmutableError,
+			expectValidationErrors:        []string{itemCannotBeAddedError},
 		},
 		"changing disruption mode": {
 			oldObj: workload,
@@ -461,7 +469,7 @@ func TestStrategyUpdate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing priorityClassName": {
 			oldObj: func() *scheduling.Workload {
@@ -474,7 +482,7 @@ func TestStrategyUpdate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "low-priority"
 				return w
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 	}
 
@@ -492,18 +500,23 @@ func TestStrategyUpdate(t *testing.T) {
 			errs := Strategy.ValidateUpdate(ctx, newWorkload, oldWorkload)
 			errs = Strategy.ValidateDeclaratively(ctx, newWorkload, oldWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, newWorkload, oldWorkload))
 			if len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				if len(errs) != 1 {
-					t.Fatalf("exactly one error expected")
+				for _, e := range errs {
+					t.Logf("error: %v", e)
 				}
-				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
-					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("%d errors expected", len(tc.expectValidationErrors))
+				}
+				for i, err := range errs {
+					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
+						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+					}
 				}
 				return
 			}
-			if tc.expectValidationError != "" {
+			if len(tc.expectValidationErrors) != 0 {
 				t.Fatal("expected validation error(s), got none")
 			}
 			if warnings := Strategy.WarningsOnUpdate(ctx, newWorkload, oldWorkload); len(warnings) != 0 {
