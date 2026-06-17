@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-gang-{{.Index}}
+spec:
+  schedulingGroup:
+    podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app: blue
+            label1: value1
+            label2: value2
+            label3: value3
+            label4: value4
+        topologyKey: kubernetes.io/hostname
+        namespaceSelector: {}
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      limits:
+        cpu: 3970m
+        memory: 500Mi
+      requests:
+        cpu: 3970m
+        memory: 500Mi

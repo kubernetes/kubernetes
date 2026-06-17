@@ -1,0 +1,71 @@
+- name: GangPreemptionBasic
+  featureGates:
+    GenericWorkload: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_podgroup_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [waiting_on_preemption, scheduled, unschedulable]
+      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createAny
+    countParam: $initPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: waitForPodGroups
+    namespace: gang-preempt-0
+    countParam: $initPodGroups
+  - opcode: startCollectingMetrics
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+  - opcode: stopCollectingMetrics
+
+  workloads:
+  - name: 2Nodes_10InitPods_1Gang_2Pods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      initPodGroups: 1
+      podsPerGroup: 2
+      gangCpuRequest: 3970m
+  # This test pases locally in ~1min
+  - name: 100Nodes_1000InitPods_1Gang_100Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 1
+      podsPerGroup: 100
+      gangCpuRequest: 3970m
+  # This test pases locally in ~1.5min
+  - name: 100Nodes_1000InitPods_10Gangs_10Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 10
+      podsPerGroup: 10
+      gangCpuRequest: 3970m
+

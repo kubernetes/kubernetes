@@ -1,0 +1,81 @@
+- name: GangPreemptionAffinity
+  featureGates:
+    GenericWorkload: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_podgroup_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [waiting_on_preemption, scheduled, unschedulable]
+      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 3
+  # create high priority pods that podgroup will anchor on
+  - opcode: createPods
+    countParam: $anchorPods
+    podTemplatePath: templates/pod-anchor.yaml
+    namespace: gang-preempt-2
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $anchorPods
+  # create low priority pods that will be preempted
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createAny
+    countParam: $initPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: waitForPodGroups
+    namespace: gang-preempt-0
+    countParam: $initPodGroups
+  - opcode: startCollectingMetrics
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/pod-gang-affinity.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: stopCollectingMetrics
+
+  workloads:
+  - name: 2Nodes_10InitPods_1Gang_2Pods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      anchorPods: 2
+      initPods: 10
+      initPodGroups: 1
+      podsPerGroup: 2
+  # This test pases locally in ~1min
+  - name: 100Nodes_1000InitPods_1Gang_100Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 1
+      podsPerGroup: 100
+      anchorPods: 100
+  # This test pases locally in ~1.5min
+  - name: 100Nodes_1000InitPods_10Gangs_10Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 10
+      podsPerGroup: 10
+      anchorPods: 100
+      
+
+
