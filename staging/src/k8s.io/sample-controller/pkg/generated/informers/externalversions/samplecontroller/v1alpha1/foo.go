@@ -34,11 +34,23 @@ import (
 )
 
 // FooInformer provides access to a shared informer and lister for
-// Foos.
+// Foos. Prefer using the type-safe variant (see [TypedFooInformer]).
 type FooInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() samplecontrollerv1alpha1.FooLister
 }
+
+// TypedFooInformer provides access to a shared informer and lister for
+// Foos, including the type-safe TypedInformer variant.
+type TypedFooInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() FooIndexInformer
+	Lister() samplecontrollerv1alpha1.FooLister
+}
+
+// apissamplecontrollerv1alpha1.FooIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type FooIndexInformer cache.TypedSharedIndexInformer[*apissamplecontrollerv1alpha1.Foo]
 
 type fooInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type fooInformer struct {
 // NewFooInformer constructs a new informer for Foo type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFooInformer]).
 func NewFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFooInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedFooInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedFooInformer constructs a new informer for Foo type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) FooIndexInformer {
+	return NewTypedFooInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredFooInformer constructs a new informer for Foo type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredFooInformer]).
 func NewFilteredFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFooInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredFooInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredFooInformer constructs a new informer for Foo type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) FooIndexInformer {
+	return NewTypedFooInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewFooInformerWithOptions constructs a new informer for Foo type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFooInformerWithOptions]).
 func NewFooInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedFooInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedFooInformerWithOptions constructs a new informer for Foo type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFooInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) FooIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "samplecontroller.k8s.io", Version: "v1alpha1", Resource: "foos"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apissamplecontrollerv1alpha1.Foo](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewFooInformerWithOptions(client versioned.Interface, namespace string, opt
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *fooInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFooInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedFooInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *fooInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apissamplecontrollerv1alpha1.Foo{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *fooInformer) TypedInformer() FooIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apissamplecontrollerv1alpha1.Foo](f.factory.InformerFor(&apissamplecontrollerv1alpha1.Foo{}, f.defaultInformer))
 }
 
 func (f *fooInformer) Lister() samplecontrollerv1alpha1.FooLister {

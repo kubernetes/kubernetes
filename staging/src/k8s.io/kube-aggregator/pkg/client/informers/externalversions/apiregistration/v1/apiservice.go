@@ -34,11 +34,23 @@ import (
 )
 
 // APIServiceInformer provides access to a shared informer and lister for
-// APIServices.
+// APIServices. Prefer using the type-safe variant (see [TypedAPIServiceInformer]).
 type APIServiceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() apiregistrationv1.APIServiceLister
 }
+
+// TypedAPIServiceInformer provides access to a shared informer and lister for
+// APIServices, including the type-safe TypedInformer variant.
+type TypedAPIServiceInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() APIServiceIndexInformer
+	Lister() apiregistrationv1.APIServiceLister
+}
+
+// apisapiregistrationv1.APIServiceIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type APIServiceIndexInformer cache.TypedSharedIndexInformer[*apisapiregistrationv1.APIService]
 
 type aPIServiceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type aPIServiceInformer struct {
 // NewAPIServiceInformer constructs a new informer for APIService type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedAPIServiceInformer]).
 func NewAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewAPIServiceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedAPIServiceInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedAPIServiceInformer constructs a new informer for APIService type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) APIServiceIndexInformer {
+	return NewTypedAPIServiceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredAPIServiceInformer constructs a new informer for APIService type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredAPIServiceInformer]).
 func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewAPIServiceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredAPIServiceInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredAPIServiceInformer constructs a new informer for APIService type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) APIServiceIndexInformer {
+	return NewTypedAPIServiceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewAPIServiceInformerWithOptions constructs a new informer for APIService type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedAPIServiceInformerWithOptions]).
 func NewAPIServiceInformerWithOptions(client clientset.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedAPIServiceInformerWithOptions(client, options)
+}
+
+// NewTypedAPIServiceInformerWithOptions constructs a new informer for APIService type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedAPIServiceInformerWithOptions(client clientset.Interface, options internalinterfaces.InformerOptions) APIServiceIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "apiregistration.k8s.io", Version: "v1", Resource: "apiservices"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apisapiregistrationv1.APIService](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewAPIServiceInformerWithOptions(client clientset.Interface, options intern
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *aPIServiceInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewAPIServiceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedAPIServiceInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *aPIServiceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisapiregistrationv1.APIService{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *aPIServiceInformer) TypedInformer() APIServiceIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apisapiregistrationv1.APIService](f.factory.InformerFor(&apisapiregistrationv1.APIService{}, f.defaultInformer))
 }
 
 func (f *aPIServiceInformer) Lister() apiregistrationv1.APIServiceLister {

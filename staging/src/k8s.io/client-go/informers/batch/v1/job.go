@@ -34,11 +34,23 @@ import (
 )
 
 // JobInformer provides access to a shared informer and lister for
-// Jobs.
+// Jobs. Prefer using the type-safe variant (see [TypedJobInformer]).
 type JobInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() batchv1.JobLister
 }
+
+// TypedJobInformer provides access to a shared informer and lister for
+// Jobs, including the type-safe TypedInformer variant.
+type TypedJobInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() JobIndexInformer
+	Lister() batchv1.JobLister
+}
+
+// apibatchv1.JobIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type JobIndexInformer cache.TypedSharedIndexInformer[*apibatchv1.Job]
 
 type jobInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type jobInformer struct {
 // NewJobInformer constructs a new informer for Job type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedJobInformer]).
 func NewJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedJobInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedJobInformer constructs a new informer for Job type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) JobIndexInformer {
+	return NewTypedJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredJobInformer constructs a new informer for Job type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredJobInformer]).
 func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredJobInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredJobInformer constructs a new informer for Job type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredJobInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) JobIndexInformer {
+	return NewTypedJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewJobInformerWithOptions constructs a new informer for Job type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedJobInformerWithOptions]).
 func NewJobInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedJobInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedJobInformerWithOptions constructs a new informer for Job type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedJobInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) JobIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apibatchv1.Job](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewJobInformerWithOptions(client kubernetes.Interface, namespace string, op
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *jobInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *jobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apibatchv1.Job{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *jobInformer) TypedInformer() JobIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apibatchv1.Job](f.factory.InformerFor(&apibatchv1.Job{}, f.defaultInformer))
 }
 
 func (f *jobInformer) Lister() batchv1.JobLister {

@@ -25,9 +25,9 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// DeviceTaintRules returns a DeviceTaintRuleInformer.
-	DeviceTaintRules() DeviceTaintRuleInformer
+	DeviceTaintRules() TypedDeviceTaintRuleInformer
 	// ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
-	ResourcePoolStatusRequests() ResourcePoolStatusRequestInformer
+	ResourcePoolStatusRequests() TypedResourcePoolStatusRequestInformer
 }
 
 type version struct {
@@ -42,11 +42,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // DeviceTaintRules returns a DeviceTaintRuleInformer.
-func (v *version) DeviceTaintRules() DeviceTaintRuleInformer {
+func (v *version) DeviceTaintRules() TypedDeviceTaintRuleInformer {
 	return &deviceTaintRuleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
-func (v *version) ResourcePoolStatusRequests() ResourcePoolStatusRequestInformer {
+func (v *version) ResourcePoolStatusRequests() TypedResourcePoolStatusRequestInformer {
 	return &resourcePoolStatusRequestInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

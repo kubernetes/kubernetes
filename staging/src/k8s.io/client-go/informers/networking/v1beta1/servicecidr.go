@@ -34,11 +34,23 @@ import (
 )
 
 // ServiceCIDRInformer provides access to a shared informer and lister for
-// ServiceCIDRs.
+// ServiceCIDRs. Prefer using the type-safe variant (see [TypedServiceCIDRInformer]).
 type ServiceCIDRInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() networkingv1beta1.ServiceCIDRLister
 }
+
+// TypedServiceCIDRInformer provides access to a shared informer and lister for
+// ServiceCIDRs, including the type-safe TypedInformer variant.
+type TypedServiceCIDRInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ServiceCIDRIndexInformer
+	Lister() networkingv1beta1.ServiceCIDRLister
+}
+
+// apinetworkingv1beta1.ServiceCIDRIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ServiceCIDRIndexInformer cache.TypedSharedIndexInformer[*apinetworkingv1beta1.ServiceCIDR]
 
 type serviceCIDRInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type serviceCIDRInformer struct {
 // NewServiceCIDRInformer constructs a new informer for ServiceCIDR type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedServiceCIDRInformer]).
 func NewServiceCIDRInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewServiceCIDRInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedServiceCIDRInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedServiceCIDRInformer constructs a new informer for ServiceCIDR type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedServiceCIDRInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) ServiceCIDRIndexInformer {
+	return NewTypedServiceCIDRInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredServiceCIDRInformer constructs a new informer for ServiceCIDR type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredServiceCIDRInformer]).
 func NewFilteredServiceCIDRInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewServiceCIDRInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredServiceCIDRInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredServiceCIDRInformer constructs a new informer for ServiceCIDR type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredServiceCIDRInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ServiceCIDRIndexInformer {
+	return NewTypedServiceCIDRInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewServiceCIDRInformerWithOptions constructs a new informer for ServiceCIDR type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedServiceCIDRInformerWithOptions]).
 func NewServiceCIDRInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedServiceCIDRInformerWithOptions(client, options)
+}
+
+// NewTypedServiceCIDRInformerWithOptions constructs a new informer for ServiceCIDR type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedServiceCIDRInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ServiceCIDRIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "servicecidrs"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apinetworkingv1beta1.ServiceCIDR](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewServiceCIDRInformerWithOptions(client kubernetes.Interface, options inte
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *serviceCIDRInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewServiceCIDRInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedServiceCIDRInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *serviceCIDRInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apinetworkingv1beta1.ServiceCIDR{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *serviceCIDRInformer) TypedInformer() ServiceCIDRIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apinetworkingv1beta1.ServiceCIDR](f.factory.InformerFor(&apinetworkingv1beta1.ServiceCIDR{}, f.defaultInformer))
 }
 
 func (f *serviceCIDRInformer) Lister() networkingv1beta1.ServiceCIDRLister {

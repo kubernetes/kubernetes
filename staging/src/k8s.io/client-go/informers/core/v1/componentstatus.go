@@ -34,11 +34,23 @@ import (
 )
 
 // ComponentStatusInformer provides access to a shared informer and lister for
-// ComponentStatuses.
+// ComponentStatuses. Prefer using the type-safe variant (see [TypedComponentStatusInformer]).
 type ComponentStatusInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.ComponentStatusLister
 }
+
+// TypedComponentStatusInformer provides access to a shared informer and lister for
+// ComponentStatuses, including the type-safe TypedInformer variant.
+type TypedComponentStatusInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ComponentStatusIndexInformer
+	Lister() corev1.ComponentStatusLister
+}
+
+// apicorev1.ComponentStatusIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ComponentStatusIndexInformer cache.TypedSharedIndexInformer[*apicorev1.ComponentStatus]
 
 type componentStatusInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type componentStatusInformer struct {
 // NewComponentStatusInformer constructs a new informer for ComponentStatus type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedComponentStatusInformer]).
 func NewComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewComponentStatusInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedComponentStatusInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedComponentStatusInformer constructs a new informer for ComponentStatus type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) ComponentStatusIndexInformer {
+	return NewTypedComponentStatusInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredComponentStatusInformer constructs a new informer for ComponentStatus type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredComponentStatusInformer]).
 func NewFilteredComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewComponentStatusInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredComponentStatusInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredComponentStatusInformer constructs a new informer for ComponentStatus type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredComponentStatusInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ComponentStatusIndexInformer {
+	return NewTypedComponentStatusInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewComponentStatusInformerWithOptions constructs a new informer for ComponentStatus type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedComponentStatusInformerWithOptions]).
 func NewComponentStatusInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedComponentStatusInformerWithOptions(client, options)
+}
+
+// NewTypedComponentStatusInformerWithOptions constructs a new informer for ComponentStatus type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedComponentStatusInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ComponentStatusIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ComponentStatus](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewComponentStatusInformerWithOptions(client kubernetes.Interface, options 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *componentStatusInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewComponentStatusInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedComponentStatusInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *componentStatusInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.ComponentStatus{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *componentStatusInformer) TypedInformer() ComponentStatusIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ComponentStatus](f.factory.InformerFor(&apicorev1.ComponentStatus{}, f.defaultInformer))
 }
 
 func (f *componentStatusInformer) Lister() corev1.ComponentStatusLister {

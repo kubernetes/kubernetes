@@ -34,11 +34,23 @@ import (
 )
 
 // ReplicationControllerInformer provides access to a shared informer and lister for
-// ReplicationControllers.
+// ReplicationControllers. Prefer using the type-safe variant (see [TypedReplicationControllerInformer]).
 type ReplicationControllerInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.ReplicationControllerLister
 }
+
+// TypedReplicationControllerInformer provides access to a shared informer and lister for
+// ReplicationControllers, including the type-safe TypedInformer variant.
+type TypedReplicationControllerInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ReplicationControllerIndexInformer
+	Lister() corev1.ReplicationControllerLister
+}
+
+// apicorev1.ReplicationControllerIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ReplicationControllerIndexInformer cache.TypedSharedIndexInformer[*apicorev1.ReplicationController]
 
 type replicationControllerInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type replicationControllerInformer struct {
 // NewReplicationControllerInformer constructs a new informer for ReplicationController type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedReplicationControllerInformer]).
 func NewReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewReplicationControllerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedReplicationControllerInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedReplicationControllerInformer constructs a new informer for ReplicationController type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) ReplicationControllerIndexInformer {
+	return NewTypedReplicationControllerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredReplicationControllerInformer constructs a new informer for ReplicationController type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredReplicationControllerInformer]).
 func NewFilteredReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewReplicationControllerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredReplicationControllerInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredReplicationControllerInformer constructs a new informer for ReplicationController type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ReplicationControllerIndexInformer {
+	return NewTypedReplicationControllerInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewReplicationControllerInformerWithOptions constructs a new informer for ReplicationController type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedReplicationControllerInformerWithOptions]).
 func NewReplicationControllerInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedReplicationControllerInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedReplicationControllerInformerWithOptions constructs a new informer for ReplicationController type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedReplicationControllerInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ReplicationControllerIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "replicationcontrollers"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ReplicationController](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewReplicationControllerInformerWithOptions(client kubernetes.Interface, na
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *replicationControllerInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewReplicationControllerInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedReplicationControllerInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.ReplicationController{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *replicationControllerInformer) TypedInformer() ReplicationControllerIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ReplicationController](f.factory.InformerFor(&apicorev1.ReplicationController{}, f.defaultInformer))
 }
 
 func (f *replicationControllerInformer) Lister() corev1.ReplicationControllerLister {

@@ -25,15 +25,15 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// ControllerRevisions returns a ControllerRevisionInformer.
-	ControllerRevisions() ControllerRevisionInformer
+	ControllerRevisions() TypedControllerRevisionInformer
 	// DaemonSets returns a DaemonSetInformer.
-	DaemonSets() DaemonSetInformer
+	DaemonSets() TypedDaemonSetInformer
 	// Deployments returns a DeploymentInformer.
-	Deployments() DeploymentInformer
+	Deployments() TypedDeploymentInformer
 	// ReplicaSets returns a ReplicaSetInformer.
-	ReplicaSets() ReplicaSetInformer
+	ReplicaSets() TypedReplicaSetInformer
 	// StatefulSets returns a StatefulSetInformer.
-	StatefulSets() StatefulSetInformer
+	StatefulSets() TypedStatefulSetInformer
 }
 
 type version struct {
@@ -48,26 +48,26 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // ControllerRevisions returns a ControllerRevisionInformer.
-func (v *version) ControllerRevisions() ControllerRevisionInformer {
+func (v *version) ControllerRevisions() TypedControllerRevisionInformer {
 	return &controllerRevisionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DaemonSets returns a DaemonSetInformer.
-func (v *version) DaemonSets() DaemonSetInformer {
+func (v *version) DaemonSets() TypedDaemonSetInformer {
 	return &daemonSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Deployments returns a DeploymentInformer.
-func (v *version) Deployments() DeploymentInformer {
+func (v *version) Deployments() TypedDeploymentInformer {
 	return &deploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ReplicaSets returns a ReplicaSetInformer.
-func (v *version) ReplicaSets() ReplicaSetInformer {
+func (v *version) ReplicaSets() TypedReplicaSetInformer {
 	return &replicaSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // StatefulSets returns a StatefulSetInformer.
-func (v *version) StatefulSets() StatefulSetInformer {
+func (v *version) StatefulSets() TypedStatefulSetInformer {
 	return &statefulSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

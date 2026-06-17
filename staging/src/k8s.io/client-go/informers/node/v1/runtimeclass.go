@@ -34,11 +34,23 @@ import (
 )
 
 // RuntimeClassInformer provides access to a shared informer and lister for
-// RuntimeClasses.
+// RuntimeClasses. Prefer using the type-safe variant (see [TypedRuntimeClassInformer]).
 type RuntimeClassInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() nodev1.RuntimeClassLister
 }
+
+// TypedRuntimeClassInformer provides access to a shared informer and lister for
+// RuntimeClasses, including the type-safe TypedInformer variant.
+type TypedRuntimeClassInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() RuntimeClassIndexInformer
+	Lister() nodev1.RuntimeClassLister
+}
+
+// apinodev1.RuntimeClassIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type RuntimeClassIndexInformer cache.TypedSharedIndexInformer[*apinodev1.RuntimeClass]
 
 type runtimeClassInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +60,49 @@ type runtimeClassInformer struct {
 // NewRuntimeClassInformer constructs a new informer for RuntimeClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedRuntimeClassInformer]).
 func NewRuntimeClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewRuntimeClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedRuntimeClassInformer(client, resyncPeriod, indexers)
+}
+
+// NewTypedRuntimeClassInformer constructs a new informer for RuntimeClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedRuntimeClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) RuntimeClassIndexInformer {
+	return NewTypedRuntimeClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredRuntimeClassInformer constructs a new informer for RuntimeClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredRuntimeClassInformer]).
 func NewFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewRuntimeClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredRuntimeClassInformer(client, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredRuntimeClassInformer constructs a new informer for RuntimeClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) RuntimeClassIndexInformer {
+	return NewTypedRuntimeClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewRuntimeClassInformerWithOptions constructs a new informer for RuntimeClass type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedRuntimeClassInformerWithOptions]).
 func NewRuntimeClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedRuntimeClassInformerWithOptions(client, options)
+}
+
+// NewTypedRuntimeClassInformerWithOptions constructs a new informer for RuntimeClass type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedRuntimeClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) RuntimeClassIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "node.k8s.io", Version: "v1", Resource: "runtimeclasss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apinodev1.RuntimeClass](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,15 +135,19 @@ func NewRuntimeClassInformerWithOptions(client kubernetes.Interface, options int
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *runtimeClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewRuntimeClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedRuntimeClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *runtimeClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apinodev1.RuntimeClass{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *runtimeClassInformer) TypedInformer() RuntimeClassIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apinodev1.RuntimeClass](f.factory.InformerFor(&apinodev1.RuntimeClass{}, f.defaultInformer))
 }
 
 func (f *runtimeClassInformer) Lister() nodev1.RuntimeClassLister {

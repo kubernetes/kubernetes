@@ -34,11 +34,23 @@ import (
 )
 
 // LimitRangeInformer provides access to a shared informer and lister for
-// LimitRanges.
+// LimitRanges. Prefer using the type-safe variant (see [TypedLimitRangeInformer]).
 type LimitRangeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.LimitRangeLister
 }
+
+// TypedLimitRangeInformer provides access to a shared informer and lister for
+// LimitRanges, including the type-safe TypedInformer variant.
+type TypedLimitRangeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() LimitRangeIndexInformer
+	Lister() corev1.LimitRangeLister
+}
+
+// apicorev1.LimitRangeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type LimitRangeIndexInformer cache.TypedSharedIndexInformer[*apicorev1.LimitRange]
 
 type limitRangeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type limitRangeInformer struct {
 // NewLimitRangeInformer constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedLimitRangeInformer]).
 func NewLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewLimitRangeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedLimitRangeInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedLimitRangeInformer constructs a new informer for LimitRange type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) LimitRangeIndexInformer {
+	return NewTypedLimitRangeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredLimitRangeInformer constructs a new informer for LimitRange type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredLimitRangeInformer]).
 func NewFilteredLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewLimitRangeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredLimitRangeInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredLimitRangeInformer constructs a new informer for LimitRange type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) LimitRangeIndexInformer {
+	return NewTypedLimitRangeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewLimitRangeInformerWithOptions constructs a new informer for LimitRange type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedLimitRangeInformerWithOptions]).
 func NewLimitRangeInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedLimitRangeInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedLimitRangeInformerWithOptions constructs a new informer for LimitRange type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedLimitRangeInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) LimitRangeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "limitranges"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.LimitRange](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewLimitRangeInformerWithOptions(client kubernetes.Interface, namespace str
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *limitRangeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewLimitRangeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedLimitRangeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.LimitRange{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *limitRangeInformer) TypedInformer() LimitRangeIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.LimitRange](f.factory.InformerFor(&apicorev1.LimitRange{}, f.defaultInformer))
 }
 
 func (f *limitRangeInformer) Lister() corev1.LimitRangeLister {

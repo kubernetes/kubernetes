@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
-	HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer
+	HorizontalPodAutoscalers() TypedHorizontalPodAutoscalerInformer
 }
 
 type version struct {
@@ -40,6 +40,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 }
 
 // HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
-func (v *version) HorizontalPodAutoscalers() HorizontalPodAutoscalerInformer {
+func (v *version) HorizontalPodAutoscalers() TypedHorizontalPodAutoscalerInformer {
 	return &horizontalPodAutoscalerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

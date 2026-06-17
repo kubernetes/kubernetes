@@ -287,6 +287,114 @@ type SharedIndexInformer interface {
 	GetIndexer() Indexer
 }
 
+// TypedSharedIndexInformer adds type-safe variants for non-type-safe methods
+// in SharedIndexInformer. No type casts are needed when using those variants.
+type TypedSharedIndexInformer[T any] interface {
+	SharedIndexInformer
+
+	// TODO (?): GetTypedStore() TypedStore[T]
+
+	TypedAddEventHandler(handler TypedResourceEventHandler[T], options HandlerOptions) (ResourceEventHandlerRegistration, error)
+	TypedAddIndexers(indexers TypedIndexers[T]) error
+	TypedGetIndexer() TypedIndexer[T]
+
+	internal()
+}
+
+func TypedNewSharedIndexInformer[T any](informer SharedIndexInformer) TypedSharedIndexInformer[T] {
+	return &typedSharedIndexInformer[T]{SharedIndexInformer: informer}
+}
+
+type typedSharedIndexInformer[T any] struct {
+	SharedIndexInformer
+}
+
+func (s typedSharedIndexInformer[T]) TypedAddEventHandler(handler TypedResourceEventHandler[T], options HandlerOptions) (ResourceEventHandlerRegistration, error) {
+	return s.AddEventHandlerWithOptions(&typedResourceEventHandler[T]{handler}, options)
+}
+
+func (s typedSharedIndexInformer[T]) TypedAddIndexers(indexers TypedIndexers[T]) error {
+	untyped := make(Indexers, len(indexers))
+	for i, indexer := range indexers {
+		untyped[i] = func(obj any) ([]string, error) {
+			return indexer(obj.(T))
+		}
+	}
+	return s.AddIndexers(untyped)
+}
+
+func (s typedSharedIndexInformer[T]) TypedGetIndexer() TypedIndexer[T] {
+	return &typedIndexer[T]{s.GetIndexer()}
+}
+
+//nolint:unused // This implements the TypedSharedIndexInformer interface.
+func (s typedSharedIndexInformer[T]) internal() {}
+
+// typedResourceEventHandler implements the untyped ResourceEventHandler interface
+// by invoking the methods of a TypedResourceEventHandler instance.
+type typedResourceEventHandler[T any] struct {
+	handler TypedResourceEventHandler[T]
+}
+
+var _ ResourceEventHandler = &typedResourceEventHandler[int]{}
+
+func (h *typedResourceEventHandler[T]) OnAdd(obj any, isInitialList bool) {
+	h.handler.OnAdd(obj.(T), isInitialList)
+}
+
+func (h *typedResourceEventHandler[T]) OnUpdate(oldObj, newObj any) {
+	h.handler.OnUpdate(oldObj.(T), newObj.(T))
+}
+
+func (h *typedResourceEventHandler[T]) OnDelete(obj any) {
+	if tomb, ok := obj.(DeletedFinalStateUnknown); ok {
+		h.handler.OnDelete(tomb.Obj.(T), &tomb)
+		return
+	}
+	h.handler.OnDelete(obj.(T), nil)
+}
+
+type typedIndexer[T any] struct {
+	Indexer
+}
+
+func (i typedIndexer[T]) TypedIndex(indexName string, obj T) ([]T, error) {
+	untyped, err := i.Index(indexName, obj)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) TypedByIndex(indexName, indexedValue string) ([]T, error) {
+	untyped, err := i.ByIndex(indexName, indexedValue)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) TypedAddIndexers(newIndexers TypedIndexers[T]) error {
+	untyped := make(Indexers, len(newIndexers))
+	for i, indexer := range newIndexers {
+		untyped[i] = func(obj any) ([]string, error) {
+			return indexer(obj.(T))
+		}
+	}
+	return i.AddIndexers(untyped)
+}
+
+//nolint:unused // This implements the TypedIndexer interface.
+func (i typedIndexer[T]) internal() {}
+
 // NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
 func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
 	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})

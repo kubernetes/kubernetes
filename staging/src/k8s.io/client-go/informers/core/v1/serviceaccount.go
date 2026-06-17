@@ -34,11 +34,23 @@ import (
 )
 
 // ServiceAccountInformer provides access to a shared informer and lister for
-// ServiceAccounts.
+// ServiceAccounts. Prefer using the type-safe variant (see [TypedServiceAccountInformer]).
 type ServiceAccountInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.ServiceAccountLister
 }
+
+// TypedServiceAccountInformer provides access to a shared informer and lister for
+// ServiceAccounts, including the type-safe TypedInformer variant.
+type TypedServiceAccountInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ServiceAccountIndexInformer
+	Lister() corev1.ServiceAccountLister
+}
+
+// apicorev1.ServiceAccountIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ServiceAccountIndexInformer cache.TypedSharedIndexInformer[*apicorev1.ServiceAccount]
 
 type serviceAccountInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +61,49 @@ type serviceAccountInformer struct {
 // NewServiceAccountInformer constructs a new informer for ServiceAccount type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedServiceAccountInformer]).
 func NewServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewServiceAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+	return NewTypedServiceAccountInformer(client, namespace, resyncPeriod, indexers)
+}
+
+// NewTypedServiceAccountInformer constructs a new informer for ServiceAccount type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) ServiceAccountIndexInformer {
+	return NewTypedServiceAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredServiceAccountInformer constructs a new informer for ServiceAccount type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredServiceAccountInformer]).
 func NewFilteredServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewServiceAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFilteredServiceAccountInformer(client, namespace, resyncPeriod, indexers, tweakListOptions)
+}
+
+// NewTypedFilteredServiceAccountInformer constructs a new informer for ServiceAccount type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredServiceAccountInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ServiceAccountIndexInformer {
+	return NewTypedServiceAccountInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
 }
 
 // NewServiceAccountInformerWithOptions constructs a new informer for ServiceAccount type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedServiceAccountInformerWithOptions]).
 func NewServiceAccountInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedServiceAccountInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedServiceAccountInformerWithOptions constructs a new informer for ServiceAccount type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedServiceAccountInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ServiceAccountIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "serviceaccounts"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ServiceAccount](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,15 +136,19 @@ func NewServiceAccountInformerWithOptions(client kubernetes.Interface, namespace
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *serviceAccountInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewServiceAccountInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedServiceAccountInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.ServiceAccount{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *serviceAccountInformer) TypedInformer() ServiceAccountIndexInformer {
+	return cache.TypedNewSharedIndexInformer[*apicorev1.ServiceAccount](f.factory.InformerFor(&apicorev1.ServiceAccount{}, f.defaultInformer))
 }
 
 func (f *serviceAccountInformer) Lister() corev1.ServiceAccountLister {
