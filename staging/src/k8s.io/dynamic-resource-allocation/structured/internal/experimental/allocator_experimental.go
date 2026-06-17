@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -83,6 +84,7 @@ var SupportedFeatures = internal.Features{
 	ConsumableCapacity:      true,
 	FractionalCapacityRange: true,
 	ListTypeAttributes:      true,
+	OptionalNodeOperations:  true,
 }
 
 type Allocator struct {
@@ -389,6 +391,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				Tolerations:      internal.lookupRequest(claim).tolerations(),
 				ShareID:          internal.shareID,
 				ConsumedCapacity: consumedCapacity,
+				// If OptionalNodeOperations feature is off, allocateDevice ensures
+				// selected devices have SkipNodeOperations == nil.
+				SkipNodeOperations: internal.slice.Spec.SkipNodeOperations,
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
@@ -1481,6 +1486,17 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if !request.adminAccess() && alloc.deviceInUse(device.id) {
 		alloc.logger.V(7).Info("Device in use", "device", device.id)
 		return false, nil, nil
+	}
+
+	if len(device.slice.Spec.SkipNodeOperations) > 0 {
+		if !alloc.features.OptionalNodeOperations {
+			alloc.logger.V(7).Info("Device requires optional node operations, but the optional node operations feature is not enabled", "device", device.id)
+			return false, nil, nil
+		}
+		if !slices.Contains(alloc.node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
+			alloc.logger.V(7).Info("Device requires DRAOptionalNodeOperations but node lacks it", "device", device.id)
+			return false, nil, nil
+		}
 	}
 
 	// Devices that consume counters can not be allocated if the PartitionableDevices feature

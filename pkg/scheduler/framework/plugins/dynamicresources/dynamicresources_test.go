@@ -55,6 +55,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -303,7 +304,12 @@ var (
 
 	workerNodeWithExtendedResource                = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).Node
 	workerNodeWithExtendedResourceZeroAllocatable = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "0"}).Node
-	brokenSelector                                = resourceapi.DeviceSelector{
+	workerNodeWithOptionalNodeOperations          = func() *v1.Node {
+		node := workerNode.DeepCopy()
+		node.Status.DeclaredFeatures = []string{draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate}
+		return node
+	}()
+	brokenSelector = resourceapi.DeviceSelector{
 		CEL: &resourceapi.CELDeviceSelector{
 			// Not set for workerNode.
 			Expression: fmt.Sprintf(`device.attributes["%s"].%s`, driver, attrName),
@@ -657,6 +663,11 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	allocationResultWithSkipNodeOperations = func() *resourceapi.AllocationResult {
+		res := allocationResult.DeepCopy()
+		res.Devices.Results[0].SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}
+		return res
+	}()
 	inUseClaim = st.FromResourceClaim(pendingClaim).
 			Allocation(allocationResult).
 			ReservedForPod(podName, types.UID(podUID)).
@@ -725,6 +736,9 @@ var (
 						Obj()
 	allocatedClaimWithConsumedCapacity2 = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithConsumedCapacity2).
+						Obj()
+	allocatedClaimWithSkipNodeOperations = st.FromResourceClaim(pendingClaim).
+						Allocation(allocationResultWithSkipNodeOperations).
 						Obj()
 	otherClaim = st.MakeResourceClaim().
 			Name("not-my-claim").
@@ -1333,6 +1347,63 @@ func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
 	if pluginState.informationsForClaim[0].availableOnNodes != nil {
 		t.Errorf("availableOnNodes should be nil, got %v", pluginState.informationsForClaim[0].availableOnNodes)
 	}
+}
+
+func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAWorkloadResourceClaims: true,
+		features.GenericWorkload:           true,
+	})
+
+	feats := feature.Features{
+		EnableDynamicResourceAllocation: true,
+		EnableDRAWorkloadResourceClaims: true,
+	}
+	testCtx := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{workerNode, workerNodeWithOptionalNodeOperations}, []*resourceapi.ResourceClaim{pendingPodGroupClaim}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{workerNodeSlice}, feats, false, nil)
+
+	pendingClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, claimName)
+	if err != nil {
+		t.Fatalf("Get claim: %v", err)
+	}
+	allocatedClaim := pendingClaim.DeepCopy()
+	allocatedClaim.Status.Allocation = allocationResultWithSkipNodeOperations.DeepCopy()
+	allocatedClaim.Status.Allocation.NodeSelector = nil
+	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(allocatedClaim.UID, allocatedClaim))
+
+	podGroupCycleState := framework.NewCycleState()
+	podGroupCycleState.Write(stateKey, &podGroupStateData{
+		pendingAllocations: map[types.UID]sets.Set[types.UID]{
+			allocatedClaim.UID: sets.New(groupedPodWithClaimName.UID),
+		},
+	})
+	cycleState := framework.NewCycleState()
+	cycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	testCtx.state = cycleState
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(workerNode)
+	nodeInfoWithFeature := framework.NewNodeInfo()
+	nodeInfoWithFeature.SetNode(workerNodeWithOptionalNodeOperations)
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("PreFilter panicked: %v", r)
+			}
+		}()
+		_, status := testCtx.p.PreFilter(tCtx, testCtx.state, groupedPodWithClaimName, []fwk.NodeInfo{nodeInfo, nodeInfoWithFeature})
+		if !status.IsSuccess() {
+			t.Errorf("PreFilter status: %v", status)
+		}
+	}()
+
+	status := testCtx.p.Filter(context.Background(), testCtx.state, groupedPodWithClaimName, nodeInfo)
+	assert.Equal(t, fwk.UnschedulableAndUnresolvable, status.Code())
+	assert.Equal(t, fmt.Sprintf("resource claim %s allocation requires DRAOptionalNodeOperations feature on the node", klog.KObj(allocatedClaim)), status.Message())
+
+	statusWithFeature := testCtx.p.Filter(context.Background(), testCtx.state, groupedPodWithClaimName, nodeInfoWithFeature)
+	assert.True(t, statusWithFeature.IsSuccess(), "expected success when node has DRAOptionalNodeOperations feature")
 }
 
 func testPlugin(tCtx ktesting.TContext) {
@@ -2043,6 +2114,44 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaimWithGoodTopology, podWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return addAllocationTimestamp(st.FromResourceClaim(in).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj())
+						},
+					},
+				},
+			},
+		},
+		"allocated-skip-node-operations-missing-feature": {
+			pod:    podWithClaimName,
+			claims: []*resourceapi.ResourceClaim{allocatedClaimWithSkipNodeOperations},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return st.FromResourceClaim(in).
+								Allocation(nil).
+								Obj()
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
+				},
+			},
+		},
+		"allocated-skip-node-operations-with-feature": {
+			nodes:  []*v1.Node{workerNodeWithOptionalNodeOperations},
+			pod:    podWithClaimName,
+			claims: []*resourceapi.ResourceClaim{allocatedClaimWithSkipNodeOperations},
+			want: want{
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaimWithSkipNodeOperations, podWithClaimName)),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return addAllocationTimestamp(st.FromResourceClaim(in).
@@ -5070,6 +5179,10 @@ func TestAllocatorSelection(t *testing.T) {
 			features:             "AllAlpha=false,AllBeta=false,DRAListTypeAttributes=true",
 			expectImplementation: "experimental",
 		},
+		"OptionalNodeOperations": {
+			features:             "AllAlpha=false,AllBeta=false,DRAOptionalNodeOperations=true",
+			expectImplementation: "experimental",
+		},
 		"PartitionableDevices": {
 			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true",
 			expectImplementation: "stable",
@@ -5112,6 +5225,102 @@ func TestAllocatorSelection(t *testing.T) {
 	notCovered := allFeatures.Difference(coveredFeatures)
 	if len(notCovered) > 0 {
 		t.Errorf("Some feature fields in %T were never set by any of the dedicated sub-tests: %s\nA test case for a new feature is missing and/or AllocatorFeatures was not updated to set the field.", structured.Features{}, strings.Join(sets.List(notCovered), ", "))
+	}
+}
+
+func Test_allocationResultRequiresDRAOptionalNodeOperations(t *testing.T) {
+	testcases := map[string]struct {
+		alloc *resourceapi.AllocationResult
+		want  bool
+	}{
+		"nil": {
+			alloc: nil,
+			want:  false,
+		},
+		"empty-results": {
+			alloc: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: nil,
+				},
+			},
+			want: false,
+		},
+		"no-skip-node-operations": {
+			alloc: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Driver:  driver,
+							Pool:    nodeName,
+							Device:  "instance-1",
+							Request: "req-1",
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		"with-skip-node-operations": {
+			alloc: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Driver:             driver,
+							Pool:               nodeName,
+							Device:             "instance-1",
+							Request:            "req-1",
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		"empty-skip-node-operations": {
+			alloc: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Driver:             driver,
+							Pool:               nodeName,
+							Device:             "instance-1",
+							Request:            "req-1",
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		"mixed-skip-node-operations": {
+			alloc: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Driver:  driver,
+							Pool:    nodeName,
+							Device:  "instance-1",
+							Request: "req-1",
+						},
+						{
+							Driver:             driver,
+							Pool:               nodeName,
+							Device:             "instance-2",
+							Request:            "req-2",
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			got := allocationResultRequiresDRAOptionalNodeOperations(tc.alloc)
+			assert.Equal(t, tc.want, got)
+		})
 	}
 }
 
