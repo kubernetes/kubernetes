@@ -186,7 +186,27 @@ type ResourceSliceSpec struct {
 	// +featureGate=DRAPartitionableDevices
 	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
+
+	// SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// should be skipped for the devices in this slice. When nil, neither operation is skipped.
+	//
+	// +optional
+	// +featureGate=DRAOptionalNodeOperations
+	SkipNodeOperations *SkipNodeOperations
 }
+
+// +enum
+type SkipNodeOperations string
+
+const (
+	// SkipNodeOperationsAll indicates that node-local resource operations (NodePrepareResources
+	// and NodeUnprepareResources gRPC calls) are not required.
+	SkipNodeOperationsAll SkipNodeOperations = "All"
+
+	// SkipNodeOperationsUnprepare indicates that only NodeUnprepareResources
+	// gRPC calls are not required. NodePrepareResources gRPC calls are required.
+	SkipNodeOperationsUnprepare SkipNodeOperations = "UnprepareOnly"
+)
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
@@ -1725,6 +1745,11 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity
+
+	// SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// should be skipped for this allocated device. When nil, neither operation is skipped.
+	// +optional
+	SkipNodeOperations *SkipNodeOperations
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
