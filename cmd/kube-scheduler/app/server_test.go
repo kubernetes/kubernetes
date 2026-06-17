@@ -224,7 +224,7 @@ leaderElection:
 		wantFeaturesGates    map[string]bool
 	}{
 		{
-			name: "default config with an alpha feature enabled",
+			name: "default config with beta feature explicitly enabled",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
 				"--feature-gates=StorageCapacityScoring=true",
@@ -233,7 +233,20 @@ leaderElection:
 				"default-scheduler": defaults.ExpandedPluginsV1,
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
-				features.StorageCapacityScoring: false,
+				features.StorageCapacityScoring: true,
+			},
+		},
+		{
+			name: "default config with beta feature explicitly disabled",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--feature-gates=StorageCapacityScoring=false",
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": defaults.ExpandedPluginsV1,
+			},
+			restoreFeatures: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
 			},
 		},
 		{
@@ -446,8 +459,8 @@ leaderElection:
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
 			componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
-			// set binary version to v1.33+ since StorageCapacityScoring (Alpha in v1.33) panics on registration otherwise
-			verKube := basecompatibility.NewEffectiveVersionFromString("1.33", "1.31", "1.31")
+			// set binary version to v1.37+ since StorageCapacityScoring (Beta in v1.37) is enabled by default
+			verKube := basecompatibility.NewEffectiveVersionFromString("1.37", "1.31", "1.31")
 			fg := feature.DefaultFeatureGate.DeepCopy()
 			utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 				"kubeA": {
