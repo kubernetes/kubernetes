@@ -537,7 +537,7 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			name: "zero is a valid config",
+			name: "[StorageCapacityScoring=off] zero is a valid config",
 			features: map[featuregate.Feature]bool{
 				features.StorageCapacityScoring: false,
 			},
@@ -546,7 +546,20 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "positive value is valid config",
+			name: "[StorageCapacityScoring=on] zero is a valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 0,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
+			},
+		},
+		{
+			name: "[StorageCapacityScoring=off] positive value is valid config",
 			features: map[featuregate.Feature]bool{
 				features.StorageCapacityScoring: false,
 			},
@@ -555,12 +568,44 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "negative value is invalid config ",
+			name: "[StorageCapacityScoring=on] positive value is valid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
+			},
+		},
+		{
+			name: "[StorageCapacityScoring=off] negative value is invalid config",
 			features: map[featuregate.Feature]bool{
 				features.StorageCapacityScoring: false,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: -10,
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "bindTimeoutSeconds",
+				BadValue: int64(-10),
+				Detail:   "invalid BindTimeoutSeconds, should not be a negative value",
+			}}),
+		},
+		{
+			name: "[StorageCapacityScoring=on] negative value is invalid config",
+			features: map[featuregate.Feature]bool{
+				features.StorageCapacityScoring: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: -10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 100, Score: 10},
+				},
 			},
 			wantErr: errors.NewAggregate([]error{&field.Error{
 				Type:     field.ErrorTypeInvalid,
