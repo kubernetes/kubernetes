@@ -96,7 +96,7 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 					},
 					UpdateStatus: func(obj *schedulingv1alpha3.PodGroup) *schedulingv1alpha3.PodGroup {
 						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
-							Type:               scheduling.PodGroupScheduled,
+							Type:               scheduling.PodGroupInitiallyScheduled,
 							Status:             metav1.ConditionFalse,
 							Reason:             scheduling.PodGroupReasonUnschedulable,
 							Message:            "Test status condition message",

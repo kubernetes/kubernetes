@@ -546,7 +546,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 		},
 		"valid status update": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), addCondition(scheduling.PodGroupScheduled)),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), addCondition(scheduling.PodGroupInitiallyScheduled)),
 		},
 		"valid resource claim status update": {
 			oldObj: mkValidPodGroup(
@@ -773,7 +773,7 @@ func addCondition(conditionType string) func(obj *scheduling.PodGroup) {
 		obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
 			Type:               conditionType,
 			Status:             metav1.ConditionFalse,
-			Reason:             scheduling.PodGroupScheduled,
+			Reason:             scheduling.PodGroupInitiallyScheduled,
 			Message:            "Test status condition message",
 			LastTransitionTime: metav1.Now(),
 		})

@@ -8348,7 +8348,7 @@ func TestPrintPodGroupList(t *testing.T) {
 				Status: scheduling.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   scheduling.PodGroupScheduled,
+							Type:   scheduling.PodGroupInitiallyScheduled,
 							Status: metav1.ConditionTrue,
 						},
 					},
@@ -8368,7 +8368,7 @@ func TestPrintPodGroupList(t *testing.T) {
 				Status: scheduling.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   scheduling.PodGroupScheduled,
+							Type:   scheduling.PodGroupInitiallyScheduled,
 							Status: metav1.ConditionFalse,
 							Reason: scheduling.PodGroupReasonUnschedulable,
 						},
@@ -8389,7 +8389,7 @@ func TestPrintPodGroupList(t *testing.T) {
 				Status: scheduling.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   scheduling.PodGroupScheduled,
+							Type:   scheduling.PodGroupInitiallyScheduled,
 							Status: metav1.ConditionTrue,
 						},
 						{

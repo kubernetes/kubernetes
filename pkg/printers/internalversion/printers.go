@@ -3500,7 +3500,7 @@ func printPodGroup(obj *scheduling.PodGroup, options printers.GenerateOptions) (
 		cond := obj.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
 	}
-	if cond, ok := conditionMap[scheduling.PodGroupScheduled]; ok {
+	if cond, ok := conditionMap[scheduling.PodGroupInitiallyScheduled]; ok {
 		status = "Unschedulable"
 		if cond.Status == metav1.ConditionTrue {
 			status = "Scheduled"

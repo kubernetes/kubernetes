@@ -160,7 +160,7 @@ func TestStrategyCreate(t *testing.T) {
 				newPodGroup := podGroup.DeepCopy()
 				newPodGroup.Status.Conditions = []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             scheduling.PodGroupReasonUnschedulable,
 						Message:            "Test status condition message",
@@ -454,7 +454,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			newObj: func() *scheduling.PodGroup {
 				podGroup := podGroup.DeepCopy()
 				podGroup.Status.Conditions = append(podGroup.Status.Conditions, metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",
@@ -465,7 +465,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			expectObj: func() *scheduling.PodGroup {
 				podGroup := podGroup.DeepCopy()
 				podGroup.Status.Conditions = append(podGroup.Status.Conditions, metav1.Condition{
-					Type:               scheduling.PodGroupScheduled,
+					Type:               scheduling.PodGroupInitiallyScheduled,
 					Status:             metav1.ConditionFalse,
 					Reason:             scheduling.PodGroupReasonUnschedulable,
 					Message:            "Test status condition message",

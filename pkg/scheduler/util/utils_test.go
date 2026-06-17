@@ -388,7 +388,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -408,7 +408,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 				Status: schedulingv1alpha3.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:               schedulingapi.PodGroupScheduled,
+							Type:               schedulingapi.PodGroupInitiallyScheduled,
 							Status:             metav1.ConditionFalse,
 							Reason:             schedulingapi.PodGroupReasonUnschedulable,
 							Message:            "not enough capacity",
@@ -420,7 +420,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity",
@@ -468,7 +468,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -503,7 +503,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -543,7 +543,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",
@@ -564,7 +564,7 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			statusToUpdate: &schedulingv1alpha3.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               schedulingapi.PodGroupScheduled,
+						Type:               schedulingapi.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             schedulingapi.PodGroupReasonUnschedulable,
 						Message:            "not enough capacity for the gang",

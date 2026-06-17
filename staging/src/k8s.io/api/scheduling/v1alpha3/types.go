@@ -480,11 +480,13 @@ type PodGroupStatus struct {
 	// Conditions represent the latest observations of the PodGroup's state.
 	//
 	// Known condition types:
-	// - "PodGroupScheduled": Indicates whether the scheduling requirement has been satisfied.
+	// - "PodGroupInitiallyScheduled": Indicates whether the scheduling requirement has been satisfied.
+	// Once this condition transitions to True, it serves as a terminal state and will never revert to False,
+	// even if pods are subsequently evicted and group constraints are no longer met.
 	// - "DisruptionTarget": Indicates whether the PodGroup is about to be terminated
 	//   due to disruption such as preemption.
 	//
-	// Known reasons for the PodGroupScheduled condition:
+	// Known reasons for the PodGroupInitiallyScheduled condition:
 	// - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
 	//   affinity/anti-affinity rules, or insufficient capacity for the gang.
 	// - "SchedulerError": The PodGroup cannot be scheduled due to some internal error
@@ -520,8 +522,8 @@ type PodGroupStatus struct {
 
 // Well-known condition types for PodGroups.
 const (
-	// PodGroupScheduled represents status of the scheduling process for this PodGroup.
-	PodGroupScheduled string = "PodGroupScheduled"
+	// PodGroupInitiallyScheduled represents status of the scheduling process for this PodGroup till first success.
+	PodGroupInitiallyScheduled string = "PodGroupInitiallyScheduled"
 	// DisruptionTarget indicates the PodGroup is about to be terminated due to disruption
 	// such as preemption.
 	DisruptionTarget string = "DisruptionTarget"
@@ -529,10 +531,10 @@ const (
 
 // Well-known condition reasons for PodGroups.
 const (
-	// Unschedulable reason in the PodGroupScheduled condition indicates that the PodGroup cannot be scheduled
+	// Unschedulable reason in the PodGroupInitiallyScheduled condition indicates that the PodGroup cannot be scheduled
 	// due to resource constraints, affinity/anti-affinity rules, or insufficient capacity for the PodGroup.
 	PodGroupReasonUnschedulable string = "Unschedulable"
-	// SchedulerError reason in the PodGroupScheduled condition means that some internal error happens
+	// SchedulerError reason in the PodGroupInitiallyScheduled condition means that some internal error happens
 	// during scheduling, for example due to nodeAffinity parsing errors.
 	PodGroupReasonSchedulerError string = "SchedulerError"
 	// PreemptionByScheduler reason in the DisruptionTarget condition indicates the PodGroup was preempted
