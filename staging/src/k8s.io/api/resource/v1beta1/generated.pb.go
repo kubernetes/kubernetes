@@ -1584,6 +1584,13 @@ func (m *DeviceRequestAllocationResult) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
+	if m.SkipNodeOperations != nil {
+		i -= len(*m.SkipNodeOperations)
+		copy(dAtA[i:], *m.SkipNodeOperations)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.SkipNodeOperations)))
+		i--
+		dAtA[i] = 0x5a
+	}
 	if len(m.ConsumedCapacity) > 0 {
 		keysForConsumedCapacity := make([]string, 0, len(m.ConsumedCapacity))
 		for k := range m.ConsumedCapacity {
@@ -2537,6 +2544,13 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.SkipNodeOperations != nil {
+		i -= len(*m.SkipNodeOperations)
+		copy(dAtA[i:], *m.SkipNodeOperations)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.SkipNodeOperations)))
+		i--
+		dAtA[i] = 0x4a
+	}
 	if len(m.SharedCounters) > 0 {
 		for iNdEx := len(m.SharedCounters) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -3230,6 +3244,10 @@ func (m *DeviceRequestAllocationResult) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if m.SkipNodeOperations != nil {
+		l = len(*m.SkipNodeOperations)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -3568,6 +3586,10 @@ func (m *ResourceSliceSpec) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
+	}
+	if m.SkipNodeOperations != nil {
+		l = len(*m.SkipNodeOperations)
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -4037,6 +4059,7 @@ func (this *DeviceRequestAllocationResult) String() string {
 		`BindingFailureConditions:` + fmt.Sprintf("%v", this.BindingFailureConditions) + `,`,
 		`ShareID:` + valueToStringGenerated(this.ShareID) + `,`,
 		`ConsumedCapacity:` + mapStringForConsumedCapacity + `,`,
+		`SkipNodeOperations:` + valueToStringGenerated(this.SkipNodeOperations) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4298,6 +4321,7 @@ func (this *ResourceSliceSpec) String() string {
 		`Devices:` + repeatedStringForDevices + `,`,
 		`PerDeviceNodeSelection:` + valueToStringGenerated(this.PerDeviceNodeSelection) + `,`,
 		`SharedCounters:` + repeatedStringForSharedCounters + `,`,
+		`SkipNodeOperations:` + valueToStringGenerated(this.SkipNodeOperations) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -9130,6 +9154,39 @@ func (m *DeviceRequestAllocationResult) Unmarshal(dAtA []byte) error {
 			}
 			m.ConsumedCapacity[QualifiedName(mapkey)] = *mapvalue
 			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SkipNodeOperations", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := SkipNodeOperations(dAtA[iNdEx:postIndex])
+			m.SkipNodeOperations = &s
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -11919,6 +11976,39 @@ func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 			if err := m.SharedCounters[len(m.SharedCounters)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SkipNodeOperations", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := SkipNodeOperations(dAtA[iNdEx:postIndex])
+			m.SkipNodeOperations = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

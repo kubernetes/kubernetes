@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
@@ -82,6 +83,9 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// The maximum number of counter sets is 8.
 	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
+	// SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// should be skipped for the devices in this slice. When nil, neither operation is skipped.
+	SkipNodeOperations *resourcev1beta2.SkipNodeOperations `json:"skipNodeOperations,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -161,5 +165,13 @@ func (b *ResourceSliceSpecApplyConfiguration) WithSharedCounters(values ...*Coun
 		}
 		b.SharedCounters = append(b.SharedCounters, *values[i])
 	}
+	return b
+}
+
+// WithSkipNodeOperations sets the SkipNodeOperations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SkipNodeOperations field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithSkipNodeOperations(value resourcev1beta2.SkipNodeOperations) *ResourceSliceSpecApplyConfiguration {
+	b.SkipNodeOperations = &value
 	return b
 }

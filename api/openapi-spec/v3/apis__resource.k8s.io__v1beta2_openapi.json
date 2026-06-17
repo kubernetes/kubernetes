@@ -810,6 +810,10 @@
             "description": "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
             "type": "string"
           },
+          "skipNodeOperations": {
+            "description": "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for this allocated device. When nil, neither operation is skipped.",
+            "type": "string"
+          },
           "tolerations": {
             "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
@@ -1661,6 +1665,10 @@
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
+          },
+          "skipNodeOperations": {
+            "description": "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for the devices in this slice. When nil, neither operation is skipped.",
+            "type": "string"
           }
         },
         "required": [

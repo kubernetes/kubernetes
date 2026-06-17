@@ -47503,6 +47503,14 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							},
 						},
 					},
+					"skipNodeOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for this allocated device. When nil, neither operation is skipped.\n\n\nPossible enum values:\n - `\"All\"` indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) are not required.\n - `\"UnprepareOnly\"` indicates that only NodeUnprepareResources gRPC calls are not required. NodePrepareResources gRPC calls are required.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"All", "UnprepareOnly"},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
@@ -48483,6 +48491,14 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 									},
 								},
 							},
+						},
+					},
+					"skipNodeOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for the devices in this slice. When nil, neither operation is skipped.\n\n\nPossible enum values:\n - `\"All\"` indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) are not required.\n - `\"UnprepareOnly\"` indicates that only NodeUnprepareResources gRPC calls are not required. NodePrepareResources gRPC calls are required.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"All", "UnprepareOnly"},
 						},
 					},
 				},
@@ -50439,6 +50455,14 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"skipNodeOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for this allocated device. When nil, neither operation is skipped.\n\n\nPossible enum values:\n - `\"All\"` indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) are not required.\n - `\"UnprepareOnly\"` indicates that only NodeUnprepareResources gRPC calls are not required. NodePrepareResources gRPC calls are required.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"All", "UnprepareOnly"},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
@@ -51331,6 +51355,14 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 									},
 								},
 							},
+						},
+					},
+					"skipNodeOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for the devices in this slice. When nil, neither operation is skipped.\n\n\nPossible enum values:\n - `\"All\"` indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) are not required.\n - `\"UnprepareOnly\"` indicates that only NodeUnprepareResources gRPC calls are not required. NodePrepareResources gRPC calls are required.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"All", "UnprepareOnly"},
 						},
 					},
 				},
@@ -52623,6 +52655,14 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"skipNodeOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for this allocated device. When nil, neither operation is skipped.\n\n\nPossible enum values:\n - `\"All\"` indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) are not required.\n - `\"UnprepareOnly\"` indicates that only NodeUnprepareResources gRPC calls are not required. NodePrepareResources gRPC calls are required.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"All", "UnprepareOnly"},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
@@ -53805,6 +53845,14 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 									},
 								},
 							},
+						},
+					},
+					"skipNodeOperations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SkipNodeOperations indicates whether node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) should be skipped for the devices in this slice. When nil, neither operation is skipped.\n\n\nPossible enum values:\n - `\"All\"` indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls) are not required.\n - `\"UnprepareOnly\"` indicates that only NodeUnprepareResources gRPC calls are not required. NodePrepareResources gRPC calls are required.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"All", "UnprepareOnly"},
 						},
 					},
 				},
