@@ -634,7 +634,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			}
 
 			getComponentConfigs := true
-			cfg, err := getInitConfigurationFromCluster(tmpdir, client, rt.getNodeRegistration, rt.getAPIEndpoint, getComponentConfigs)
+			cfg, err := getInitConfigurationFromCluster(tmpdir, client, rt.getNodeRegistration, rt.getAPIEndpoint, getComponentConfigs, true)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getInitConfigurationFromCluster: %v", err)
 				return
