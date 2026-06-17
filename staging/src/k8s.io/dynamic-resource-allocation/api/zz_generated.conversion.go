@@ -324,6 +324,7 @@ func autoConvert_api_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *ResourceSlice
 	} else {
 		out.SharedCounters = nil
 	}
+	out.SharingAffinity = *(*[]v1.SharingAffinityExtractor)(unsafe.Pointer(&in.SharingAffinity))
 	return nil
 }
 
@@ -367,6 +368,7 @@ func autoConvert_v1_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1.ResourceSl
 	} else {
 		out.SharedCounters = nil
 	}
+	out.SharingAffinity = *(*[]v1.SharingAffinityExtractor)(unsafe.Pointer(&in.SharingAffinity))
 	return nil
 }
 

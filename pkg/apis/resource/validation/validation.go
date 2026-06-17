@@ -715,8 +715,20 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			"exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"))
 	}
 
-	if spec.SharedCounters != nil && spec.Devices != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "only one of `sharedCounters` or `devices` is allowed"))
+	resourceSliceTypeFields := make([]string, 0, 3)
+	if spec.Devices != nil {
+		resourceSliceTypeFields = append(resourceSliceTypeFields, "`devices`")
+	}
+	if spec.SharedCounters != nil {
+		resourceSliceTypeFields = append(resourceSliceTypeFields, "`sharedCounters`")
+	}
+	if spec.SharingAffinity != nil {
+		resourceSliceTypeFields = append(resourceSliceTypeFields, "`sharingAffinity`")
+	}
+	if len(resourceSliceTypeFields) > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath,
+			fmt.Sprintf("{%s}", strings.Join(resourceSliceTypeFields, ", ")),
+			"only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"))
 	}
 
 	maxDevices := resource.ResourceSliceMaxDevices
@@ -737,6 +749,55 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		func(counterSet resource.CounterSet) string {
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+
+	var oldSharingAffinity []resource.SharingAffinityExtractor
+	if oldSpec != nil {
+		oldSharingAffinity = oldSpec.SharingAffinity
+	}
+	allErrs = append(allErrs, validateSharingAffinity(spec.SharingAffinity, oldSharingAffinity, fldPath.Child("sharingAffinity"))...)
+
+	return allErrs
+}
+
+// validateSharingAffinity mirrors the declarative maxItems and per-extractor
+// rules for ResourceSliceSpec.SharingAffinity. Errors are marked as covered by
+// declarative validation so the imperative/declarative shadow comparison stays
+// at parity.
+func validateSharingAffinity(extractors, oldExtractors []resource.SharingAffinityExtractor, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Ratcheting: leave an already-persisted value untouched so updates that
+	// don't modify SharingAffinity are not rejected by tightened limits.
+	if oldExtractors != nil && apiequality.Semantic.DeepEqual(extractors, oldExtractors) {
+		return allErrs
+	}
+
+	if len(extractors) > resource.SharingAffinityMaxEntries {
+		allErrs = append(allErrs, field.TooMany(fldPath, len(extractors), resource.SharingAffinityMaxEntries).WithOrigin("maxItems").MarkCoveredByDeclarative())
+		return allErrs
+	}
+
+	for i := range extractors {
+		allErrs = append(allErrs, validateSharingAffinityExtractor(extractors[i], fldPath.Index(i))...)
+	}
+
+	return allErrs
+}
+
+// validateSharingAffinityExtractor mirrors the declarative required and
+// maxProperties rules for a single SharingAffinityExtractor's CEL map. CEL
+// parse/compile checks are intentionally out of scope here.
+func validateSharingAffinityExtractor(extractor resource.SharingAffinityExtractor, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	celPath := fldPath.Child("cel")
+	if len(extractor.CEL) == 0 {
+		allErrs = append(allErrs, field.Required(celPath, "").MarkCoveredByDeclarative())
+		return allErrs
+	}
+	if len(extractor.CEL) > resource.SharingAffinityCELMaxKeys {
+		allErrs = append(allErrs, field.TooMany(celPath, len(extractor.CEL), resource.SharingAffinityCELMaxKeys).WithOrigin("maxProperties").MarkCoveredByDeclarative())
+	}
 
 	return allErrs
 }

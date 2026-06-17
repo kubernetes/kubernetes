@@ -200,6 +200,23 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
+	dropDisabledDRASharingAffinityFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRASharingAffinityFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRASharingAffinity) || draSharingAffinityFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.SharingAffinity = nil
+}
+
+func draSharingAffinityFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	return len(slice.Spec.SharingAffinity) > 0
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {

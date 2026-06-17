@@ -210,6 +210,17 @@ var sliceWithListTypeAttributes = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithSharingAffinity = func() *resource.ResourceSlice {
+	obj := slice.DeepCopy()
+	obj.Spec.Devices = nil
+	obj.Spec.SharingAffinity = []resource.SharingAffinityExtractor{{
+		CEL: map[string]string{
+			"subnet": `'subnet-a'`,
+		},
+	}}
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -230,6 +241,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		consumableCapacity          bool
 		draNodeAllocatableResources bool
 		listTypeAttributes          bool
+		sharingAffinity             bool
 		expectedValidationError     bool
 		expectObj                   *resource.ResourceSlice
 	}{
@@ -408,6 +420,26 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			listTypeAttributes:      false,
 			expectedValidationError: true,
 		},
+		"drop-fields-sharing-affinity-disabled-feature": {
+			obj:             sliceWithSharingAffinity,
+			sharingAffinity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-sharing-affinity": {
+			obj:                sliceWithSharingAffinity,
+			sharingAffinity:    true,
+			consumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -420,6 +452,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
 				features.DRANodeAllocatableResources:  tc.draNodeAllocatableResources,
 				features.DRAListTypeAttributes:        tc.listTypeAttributes,
+				features.DRASharingAffinity:           tc.sharingAffinity,
 			})
 
 			obj := tc.obj.DeepCopy()
@@ -452,6 +485,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 		bindingConditions     bool
 		consumableCapacity    bool
 		listTypeAttributes    bool
+		sharingAffinity       bool
 		expectValidationError bool
 		expectObj             *resource.ResourceSlice
 	}{
@@ -848,6 +882,60 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-sharing-affinity": {
+			oldObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				return obj
+			}(),
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			consumableCapacity: true,
+			sharingAffinity:    true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-sharing-affinity-disabled-feature": {
+			oldObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				return obj
+			}(),
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			sharingAffinity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.Spec.SharingAffinity = nil
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-sharing-affinity-disabled-feature": {
+			oldObj: sliceWithSharingAffinity,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			sharingAffinity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharingAffinity.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
@@ -858,6 +946,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
+				features.DRASharingAffinity:           tc.sharingAffinity,
 			})
 
 			oldObj := tc.oldObj.DeepCopy()
