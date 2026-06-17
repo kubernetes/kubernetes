@@ -631,5 +631,20 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
+	if !matchesSingle && w.storage.snapshots != nil && w.storage.snapshottingEnabled.Load() {
+		// Latest() is safe here because this method is called under the
+		// watchCache read lock. Both processEvent and Replace set
+		// w.resourceVersion and add a snapshot at that same RV atomically
+		// under the write lock. Under RLock we see a consistent view:
+		// Latest() returns the snapshot at exactly resourceVersion.
+		// The snapshot is immutable, so lazySnapshotCacheIntervalSource can
+		// iterate it lazily outside the lock in the processInterval goroutine.
+		if snap, ok := w.storage.snapshots.Latest(); ok {
+			return &watchCacheInterval{
+				resourceVersion: w.resourceVersion,
+				source:          &lazySnapshotCacheIntervalSource{snapshot: snap, key: key, resourceVersion: w.resourceVersion},
+			}, nil
+		}
+	}
 	return newCacheIntervalFromStore(w.resourceVersion, w.storage.StoreLocked(), key, matchesSingle)
 }

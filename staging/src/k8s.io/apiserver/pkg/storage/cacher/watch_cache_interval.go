@@ -228,6 +228,53 @@ func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	return event, nil
 }
 
+// lazySnapshotCacheIntervalSource serves events by lazily loading items from an
+// immutable store.Snapshot. The snapshot's OrderedListPrefix is called on the
+// first Next() call, which typically runs in a goroutine outside the watchCache
+// lock. This avoids holding the lock while iterating over the entire store.
+type lazySnapshotCacheIntervalSource struct {
+	// snapshot is an immutable point-in-time copy of the store.
+	snapshot store.Snapshot
+
+	// key is the prefix passed to OrderedListPrefix when loading items.
+	key string
+
+	// resourceVersion is assigned to every watchCacheEvent produced by this source.
+	resourceVersion uint64
+
+	// items holds the result of OrderedListPrefix, populated on the first Next() call.
+	items []interface{}
+
+	// currentIndex tracks the current position within items.
+	currentIndex int
+
+	// loaded indicates whether items have been populated from the snapshot.
+	loaded bool
+}
+
+func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+	if !s.loaded {
+		var err error
+		// TODO (p0lyn0mial): instead of materializing the entire slice
+		// we could yield one element per Next() call which should reduce memory
+		// from O(N) to O(1).
+		s.items, err = s.snapshot.OrderedListPrefix(s.key, "")
+		if err != nil {
+			return nil, err
+		}
+		s.loaded = true
+	}
+	if s.currentIndex >= len(s.items) {
+		return nil, nil
+	}
+	elem, ok := s.items[s.currentIndex].(*store.Element)
+	if !ok {
+		return nil, fmt.Errorf("not a storeElement: %v", s.items[s.currentIndex])
+	}
+	s.currentIndex++
+	return storeElementToWatchCacheEvent(elem, s.resourceVersion), nil
+}
+
 const bufferSize = 100
 
 // watchCacheIntervalBuffer is used to reduce acquiring
