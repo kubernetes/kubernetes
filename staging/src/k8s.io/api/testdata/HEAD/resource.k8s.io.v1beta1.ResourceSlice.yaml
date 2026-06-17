@@ -120,3 +120,4 @@ spec:
       countersKey:
         value: "0"
     name: nameValue
+  skipNodeOperations: true

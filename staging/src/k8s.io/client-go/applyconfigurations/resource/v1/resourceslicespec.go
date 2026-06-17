@@ -82,6 +82,9 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// The maximum number of counter sets is 8.
 	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
+	// SkipNodeOperations indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+	// are not required for the devices in this slice. Defaults to nil (false).
+	SkipNodeOperations *bool `json:"skipNodeOperations,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -161,5 +164,13 @@ func (b *ResourceSliceSpecApplyConfiguration) WithSharedCounters(values ...*Coun
 		}
 		b.SharedCounters = append(b.SharedCounters, *values[i])
 	}
+	return b
+}
+
+// WithSkipNodeOperations sets the SkipNodeOperations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SkipNodeOperations field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithSkipNodeOperations(value bool) *ResourceSliceSpecApplyConfiguration {
+	b.SkipNodeOperations = &value
 	return b
 }

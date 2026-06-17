@@ -1074,6 +1074,12 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAConsumableCapacity
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacity = 10;
+
+  // SkipNodeOperations indicates that node-local operations are not required for this allocated device.
+  // +optional
+  // +featureGate=DRAOptionalNodeOperations
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  optional bool skipNodeOperations = 11;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -1975,5 +1981,12 @@ message ResourceSliceSpec {
   // +zeroOrOneOf=ResourceSliceType
   // +k8s:alpha(since: "1.36")=+k8s:maxItems=8
   repeated CounterSet sharedCounters = 8;
+
+  // SkipNodeOperations indicates that node-local resource operations (NodePrepareResources and NodeUnprepareResources gRPC calls)
+  // are not required for the devices in this slice. Defaults to nil (false).
+  // +optional
+  // +featureGate=DRAOptionalNodeOperations
+  // +k8s:alpha(since: "1.36")=+k8s:optional
+  optional bool skipNodeOperations = 9;
 }
 

@@ -1072,6 +1072,7 @@ func autoConvert_v1_DeviceRequestAllocationResult_To_resource_DeviceRequestAlloc
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.ShareID = (*types.UID)(unsafe.Pointer(in.ShareID))
 	out.ConsumedCapacity = *(*map[resource.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.ConsumedCapacity))
+	out.SkipNodeOperations = (*bool)(unsafe.Pointer(in.SkipNodeOperations))
 	return nil
 }
 
@@ -1091,6 +1092,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1_DeviceRequestAlloc
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.ShareID = (*types.UID)(unsafe.Pointer(in.ShareID))
 	out.ConsumedCapacity = *(*map[resourcev1.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.ConsumedCapacity))
+	out.SkipNodeOperations = (*bool)(unsafe.Pointer(in.SkipNodeOperations))
 	return nil
 }
 
@@ -1590,6 +1592,7 @@ func autoConvert_v1_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *resource
 	out.Devices = *(*[]resource.Device)(unsafe.Pointer(&in.Devices))
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]resource.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	out.SkipNodeOperations = (*bool)(unsafe.Pointer(in.SkipNodeOperations))
 	return nil
 }
 
@@ -1609,6 +1612,7 @@ func autoConvert_resource_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *resource
 	out.Devices = *(*[]resourcev1.Device)(unsafe.Pointer(&in.Devices))
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]resourcev1.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	out.SkipNodeOperations = (*bool)(unsafe.Pointer(in.SkipNodeOperations))
 	return nil
 }
 

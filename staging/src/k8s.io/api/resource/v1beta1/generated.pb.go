@@ -1584,6 +1584,16 @@ func (m *DeviceRequestAllocationResult) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
+	if m.SkipNodeOperations != nil {
+		i--
+		if *m.SkipNodeOperations {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x58
+	}
 	if len(m.ConsumedCapacity) > 0 {
 		keysForConsumedCapacity := make([]string, 0, len(m.ConsumedCapacity))
 		for k := range m.ConsumedCapacity {
@@ -2537,6 +2547,16 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.SkipNodeOperations != nil {
+		i--
+		if *m.SkipNodeOperations {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x48
+	}
 	if len(m.SharedCounters) > 0 {
 		for iNdEx := len(m.SharedCounters) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -3230,6 +3250,9 @@ func (m *DeviceRequestAllocationResult) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if m.SkipNodeOperations != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -3568,6 +3591,9 @@ func (m *ResourceSliceSpec) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
+	}
+	if m.SkipNodeOperations != nil {
+		n += 2
 	}
 	return n
 }
@@ -4037,6 +4063,7 @@ func (this *DeviceRequestAllocationResult) String() string {
 		`BindingFailureConditions:` + fmt.Sprintf("%v", this.BindingFailureConditions) + `,`,
 		`ShareID:` + valueToStringGenerated(this.ShareID) + `,`,
 		`ConsumedCapacity:` + mapStringForConsumedCapacity + `,`,
+		`SkipNodeOperations:` + valueToStringGenerated(this.SkipNodeOperations) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4298,6 +4325,7 @@ func (this *ResourceSliceSpec) String() string {
 		`Devices:` + repeatedStringForDevices + `,`,
 		`PerDeviceNodeSelection:` + valueToStringGenerated(this.PerDeviceNodeSelection) + `,`,
 		`SharedCounters:` + repeatedStringForSharedCounters + `,`,
+		`SkipNodeOperations:` + valueToStringGenerated(this.SkipNodeOperations) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -9130,6 +9158,27 @@ func (m *DeviceRequestAllocationResult) Unmarshal(dAtA []byte) error {
 			}
 			m.ConsumedCapacity[QualifiedName(mapkey)] = *mapvalue
 			iNdEx = postIndex
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SkipNodeOperations", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.SkipNodeOperations = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -11920,6 +11969,27 @@ func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SkipNodeOperations", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.SkipNodeOperations = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

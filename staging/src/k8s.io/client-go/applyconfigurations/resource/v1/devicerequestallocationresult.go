@@ -94,6 +94,8 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// This field is populated only for devices that allow multiple allocations.
 	// All capacity entries are included, even if the consumed amount is zero.
 	ConsumedCapacity map[resourcev1.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
+	// SkipNodeOperations indicates that node-local operations are not required for this allocated device.
+	SkipNodeOperations *bool `json:"skipNodeOperations,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -194,5 +196,13 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(e
 	for k, v := range entries {
 		b.ConsumedCapacity[k] = v
 	}
+	return b
+}
+
+// WithSkipNodeOperations sets the SkipNodeOperations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SkipNodeOperations field is set to the value of the last call.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithSkipNodeOperations(value bool) *DeviceRequestAllocationResultApplyConfiguration {
+	b.SkipNodeOperations = &value
 	return b
 }
