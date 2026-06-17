@@ -53,6 +53,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.MaxExpirationSeconds == nil {
 				obj.MaxExpirationSeconds = ptr.To[int32](86400)
 			}
+
+			// Clear PKIXPublicKey and ProofOfPossession since they are dropped
+			// in the v1 version of PodCertificateRequest, causing roundtrip failures.
+			obj.PKIXPublicKey = nil
+			obj.ProofOfPossession = nil
 		},
 	}
 }
