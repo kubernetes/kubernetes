@@ -120,6 +120,11 @@ func (in *Slice) DeepCopyInto(out *Slice) {
 		*out = new(resourcev1.FullyQualifiedName)
 		**out = **in
 	}
+	if in.SkipNodeOperations != nil {
+		in, out := &in.SkipNodeOperations, &out.SkipNodeOperations
+		*out = make([]resourcev1.SkipNodeOperation, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

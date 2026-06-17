@@ -165,7 +165,10 @@
             "shareID": "shareIDValue",
             "consumedCapacity": {
               "consumedCapacityKey": "0"
-            }
+            },
+            "skipNodeOperations": [
+              "skipNodeOperationsValue"
+            ]
           }
         ],
         "config": [

@@ -117,6 +117,8 @@ status:
         pool: poolValue
         request: requestValue
         shareID: shareIDValue
+        skipNodeOperations:
+        - skipNodeOperationsValue
         tolerations:
         - effect: effectValue
           key: keyValue
