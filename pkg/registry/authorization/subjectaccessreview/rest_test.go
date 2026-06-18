@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
 )
 
 type fakeAuthorizer struct {
@@ -242,7 +243,18 @@ func TestCreate(t *testing.T) {
 		}
 		storage := NewREST(auth, legacyscheme.Scheme)
 
-		result, err := storage.Create(genericapirequest.NewContext(), &authorizationapi.SubjectAccessReview{Spec: tc.spec}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		ctx := genericapirequest.WithRequestInfo(
+			genericapirequest.NewContext(),
+			&genericapirequest.RequestInfo{
+				APIGroup:          "authorization.k8s.io",
+				APIVersion:        "v1",
+				Resource:          "subjectaccessreviews",
+				IsResourceRequest: true,
+				Verb:              "create",
+			},
+		)
+
+		result, err := storage.Create(ctx, &authorizationapi.SubjectAccessReview{Spec: tc.spec}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
 			if tc.expectedErr != "" {
 				if !strings.Contains(err.Error(), tc.expectedErr) {
