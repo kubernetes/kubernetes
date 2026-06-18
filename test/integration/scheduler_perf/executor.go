@@ -51,7 +51,6 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -646,17 +645,8 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 	// Start watching pods in the namespace. Any pod which is seen as being scheduled
 	// gets deleted.
 	scheduledPods := make(chan *v1.Pod, cpo.Count)
-	scheduledPodsClosed := false
-	var mutex sync.Mutex
-	defer func() {
-		mutex.Lock()
-		defer mutex.Unlock()
-		close(scheduledPods)
-		scheduledPodsClosed = true
-	}()
+	defer close(scheduledPods)
 
-	existingPods := 0
-	runningPods := 0
 	onPodChange := func(oldObj, newObj any) {
 		oldPod, newPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
 		if err != nil {
@@ -664,24 +654,14 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 			return
 		}
 
-		mutex.Lock()
-		defer mutex.Unlock()
-		if oldPod == nil {
-			existingPods++
-		}
 		if (oldPod == nil || oldPod.Spec.NodeName == "") && newPod.Spec.NodeName != "" {
-			// Got scheduled.
-			runningPods++
-
 			// Only ask for deletion in our namespace.
 			if newPod.Namespace != namespace {
 				return
 			}
-			if !scheduledPodsClosed {
-				select {
-				case <-tCtx.Done():
-				case scheduledPods <- newPod:
-				}
+			select {
+			case <-tCtx.Done():
+			case scheduledPods <- newPod:
 			}
 		}
 	}
@@ -692,29 +672,22 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		UpdateFunc: func(oldObj, newObj any) {
 			onPodChange(oldObj, newObj)
 		},
-		DeleteFunc: func(obj any) {
-			pod, _, err := schedutil.As[*v1.Pod](obj, nil)
-			if err != nil {
-				tCtx.Errorf("unexpected pod events: %v", err)
-				return
-			}
-
-			mutex.Lock()
-			defer mutex.Unlock()
-			existingPods--
-			if pod.Spec.NodeName != "" {
-				runningPods--
-			}
-		},
 	})
 	if err != nil {
 		return fmt.Errorf("register event handler: %w", err)
 	}
 	defer func() {
-		tCtx.ExpectNoError(podInformer.Informer().RemoveEventHandler(handle), "remove event handler")
+		tCtx.ExpectNoError(cache.ShutDownEventHandler(podInformer.Informer(), handle), "remove event handler")
 	}()
 
 	// Seed the namespace with the initial number of pods.
+	// This is the backlog for the scheduler. Because we
+	// delete each scheduled pod as soon as we see it and
+	// create a new one, a) the scheduler's queue should never
+	// be empty and b) the number of pods running concurrently
+	// should be smaller than this number, i.e. the cluster
+	// will typically be more or less in its starting condition
+	// for each pod scheduling attempt.
 	if err := strategy(tCtx, tCtx.Client(), namespace, cpo.Count); err != nil {
 		return fmt.Errorf("create initial %d pods: %w", cpo.Count, err)
 	}
@@ -747,49 +720,44 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 				return errors.New("no pod at all got scheduled, either because of a problem or because the test interval was too small")
 			}
 			return nil
-		case <-scheduledPods:
+		case pod := <-scheduledPods:
 			countScheduledPods++
-			if countScheduledPods%cpo.Count == 0 {
-				// All scheduled. Start over with a new batch.
-				err := tCtx.Client().CoreV1().Pods(namespace).DeleteCollection(tCtx, metav1.DeleteOptions{
-					GracePeriodSeconds: ptr.To(int64(0)),
-					PropagationPolicy:  ptr.To(metav1.DeletePropagationBackground), // Foreground will block.
-				}, metav1.ListOptions{})
-				// Ignore errors when the time is up. errors.Is(context.Canceled) would
-				// be more precise, but doesn't work because client-go doesn't reliably
-				// propagate it.
-				if tCtx.Err() != nil {
+			// Delete the scheduled pod.
+			err := tCtx.Client().CoreV1().Pods(pod.Namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{
+				GracePeriodSeconds: new(int64(0)),
+				PropagationPolicy:  new(metav1.DeletePropagationBackground), // Foreground will block.
+			})
+			// Ignore errors when the time is up. errors.Is(context.Canceled) would
+			// be more precise, but doesn't work because client-go doesn't reliably
+			// propagate it.
+			if tCtx.Err() != nil {
+				continue
+			}
+			if err != nil {
+				// Worse, sometimes rate limiting gives up *before* the context deadline is reached.
+				// Then we get here with this error:
+				//   client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
+				//
+				// This also can be ignored. We'll retry if the test is not done yet.
+				if strings.Contains(err.Error(), "would exceed context deadline") {
 					continue
 				}
-				if err != nil {
-					// Worse, sometimes rate limiting gives up *before* the context deadline is reached.
-					// Then we get here with this error:
-					//   client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
-					//
-					// This also can be ignored. We'll retry if the test is not done yet.
-					if strings.Contains(err.Error(), "would exceed context deadline") {
-						continue
-					}
-					return fmt.Errorf("delete scheduled pods: %w", err)
-				}
-				err = strategy(tCtx, tCtx.Client(), namespace, cpo.Count)
-				if tCtx.Err() != nil {
-					continue
-				}
-				if err != nil {
-					return fmt.Errorf("create next batch of pods: %w", err)
-				}
+				return fmt.Errorf("delete scheduled pod: %w", err)
+			}
+			// Immediately create a new one to keep the scheduler busy.
+			err = strategy(tCtx, tCtx.Client(), namespace, 1)
+			if tCtx.Err() != nil {
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("create next batch of pods: %w", err)
 			}
 		case <-ticker.C:
 			delta := countScheduledPods - lastCountScheduledPods
 			lastCountScheduledPods = countScheduledPods
 			func() {
-				mutex.Lock()
-				defer mutex.Unlock()
-
-				tCtx.Logf("%d pods got scheduled in total in namespace %q, overall %d out of %d pods scheduled: %f pods/s in last interval",
+				tCtx.Logf("%d pods got scheduled in total in namespace %q: %f pods/s in last interval",
 					countScheduledPods, namespace,
-					runningPods, existingPods,
 					float64(delta)/logPeriod.Seconds(),
 				)
 			}()

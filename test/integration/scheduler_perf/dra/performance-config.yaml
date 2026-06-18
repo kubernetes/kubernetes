@@ -124,9 +124,9 @@
       measurePods: 2500
       maxClaimsPerNode: 10
 
-# SteadyStateResourceClaimTemplate uses a ResourceClaimTemplate and
+# SteadyStateClusterResourceClaimTemplate uses a ResourceClaimTemplate and
 # dynamically creates ResourceClaim instances for each pod. It creates ten
-# pods, waits for them to be scheduled, deletes them, and starts again,
+# pods, then deletes each scheduled pod and creates a new one immediately,
 # so the cluster remains at the same level of utilization.
 #
 # The number of already allocated claims can be varied, thus simulating
