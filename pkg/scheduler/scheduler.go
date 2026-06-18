@@ -112,6 +112,10 @@ type Scheduler struct {
 
 	percentageOfPlacementsToScore int32
 
+	// shufflePlacements randomizes candidate placement order so the placement limit picks a fair
+	// subset. Set via New; nil disables shuffling to keep tests deterministic.
+	shufflePlacements func(placements []*fwk.Placement)
+
 	nextStartNodeIndex int
 
 	// logger *must* be initialized when creating a Scheduler,
@@ -474,6 +478,7 @@ func New(ctx context.Context,
 		nodeInfoSnapshot:                       snapshot,
 		percentageOfNodesToScore:               options.percentageOfNodesToScore,
 		percentageOfPlacementsToScore:          options.percentageOfPlacementsToScore,
+		shufflePlacements:                      randShufflePlacements,
 		Extenders:                              extenders,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,

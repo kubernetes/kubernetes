@@ -22,6 +22,7 @@ import (
 	"iter"
 	"maps"
 	"math/rand"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -1008,6 +1009,13 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
 	}
 
+	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
+	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
+	if sched.shufflePlacements != nil && int(numPlacementsToFind) < len(placements) {
+		placements = slices.Clone(placements)
+		sched.shufflePlacements(placements)
+	}
+
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -1121,6 +1129,13 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
 	}
 
+	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
+	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
+	if sched.shufflePlacements != nil && int(numPlacementsToFind) < len(placements) {
+		placements = slices.Clone(placements)
+		sched.shufflePlacements(placements)
+	}
+
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -1197,6 +1212,13 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	maps.Copy(results, bestResult)
 
 	return bestResult[pgKey(podGroupInfo)], revertFns
+}
+
+// randShufflePlacements is the default placement shuffler, randomizing placement order in place.
+func randShufflePlacements(placements []*fwk.Placement) {
+	rand.Shuffle(len(placements), func(i, j int) {
+		placements[i], placements[j] = placements[j], placements[i]
+	})
 }
 
 // numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
