@@ -496,6 +496,8 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 			} else {
 				return nil, fmt.Errorf("GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface")
 			}
+		} else {
+			logger.Error(nil, "GenericWorkload is enabled, but GangScheduling plugin is not set. Gang scheduling using PodGroups may not work as expected.")
 		}
 	}
 
