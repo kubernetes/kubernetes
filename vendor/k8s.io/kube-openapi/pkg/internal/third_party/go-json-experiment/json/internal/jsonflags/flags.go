@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !goexperiment.jsonv2 || !go1.25
-
 // jsonflags implements all the optional boolean flags.
 // These flags are shared across both "json", "jsontext", and "jsonopts".
 package jsonflags

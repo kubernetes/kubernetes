@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !goexperiment.jsonv2 || !go1.25
-
 // Package jsontext implements syntactic processing of JSON
 // as specified in RFC 4627, RFC 7159, RFC 7493, RFC 8259, and RFC 8785.
 // JSON is a simple data interchange format that can represent
