@@ -5477,7 +5477,8 @@ type PodStatus struct {
 	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
 	// +featureGate=DRANodeAllocatableResources
 	// +optional
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
 }
 
@@ -8522,7 +8523,47 @@ type NodeAllocatableResourceClaimStatus struct {
 	// +optional
 	// +listType=set
 	Containers []string `json:"containers,omitempty" protobuf:"bytes,2,rep,name=containers"`
-	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+	// Direct contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.direct`.
+	// This is used by kubelet for node cgroup enforcement.
+	// Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +oneOf=MappingType
+	Direct []NodeAllocatableDirectResources `json:"direct,omitempty" protobuf:"bytes,3,rep,name=direct"`
+	// Overhead contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.overhead`.
+	// This is used by kubelet for node cgroup enforcement.
+	// Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +oneOf=MappingType
+	Overhead []NodeAllocatableOverheadResources `json:"overhead,omitempty" protobuf:"bytes,4,rep,name=overhead"`
+}
+
+// NodeAllocatableDirectResources describes direct node allocatable resource allocations.
+type NodeAllocatableDirectResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
 	// +required
-	Resources map[ResourceName]resource.Quantity `json:"resources" protobuf:"bytes,3,rep,name=resources"`
+	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
+	// Quantity is the total node allocatable resource capacity allocated for the claim.
+	// This claim's allocated devices is shared by all the containers referencing the claim.
+	// +required
+	Quantity resource.Quantity `json:"quantity" protobuf:"bytes,2,opt,name=quantity"`
+}
+
+// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
+type NodeAllocatableOverheadResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
+	// +required
+	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
+	// PerPod is the flat overhead quantity allocated per pod.
+	// +optional
+	PerPod *resource.Quantity `json:"perPod,omitempty" protobuf:"bytes,2,opt,name=perPod"`
+	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
+	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+	// The total overhead quantity allocated for the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// +optional
+	PerContainer *resource.Quantity `json:"perContainer,omitempty" protobuf:"bytes,3,opt,name=perContainer"`
 }

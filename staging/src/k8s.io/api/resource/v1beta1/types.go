@@ -482,7 +482,28 @@ type BasicDevice struct {
 
 // NodeAllocatableResourceMapping defines the translation between the DRA device/capacity
 // units requested to the corresponding quantity of the node allocatable resource.
+// Exactly one of Direct or Overhead must be specified. Specifying both simultaneously is an invalid configuration.
 type NodeAllocatableResourceMapping struct {
+	// Direct is used when the device directly models a node allocatable resource like standard CPU or memory
+	// (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance
+	// on the node. To prevent node cgroup isolation friction, the scheduler explicitly
+	// blocks sharing direct-mapped device claims across multiple pods.
+	// +optional
+	// +oneOf=MappingType
+	Direct *NodeAllocatableDirectMapping `json:"direct,omitempty" protobuf:"bytes,1,opt,name=direct"`
+
+	// Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources
+	// when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs).
+	// Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted
+	// for individually for each pod referencing the claim.
+	// +optional
+	// +oneOf=MappingType
+	Overhead *NodeAllocatableOverhead `json:"overhead,omitempty" protobuf:"bytes,2,opt,name=overhead"`
+}
+
+// NodeAllocatableDirectMapping defines how a DRA allocation directly translates into a node allocatable resource quantity.
+// The mapping can be derived from the count of allocated devices, the specific capacity consumed, or a combination of both.
+type NodeAllocatableDirectMapping struct {
 	// CapacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with
 	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
@@ -516,6 +537,23 @@ type NodeAllocatableResourceMapping struct {
 	//     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	// +optional
 	AllocationMultiplier *resource.Quantity `json:"allocationMultiplier,omitempty" protobuf:"bytes,2,opt,name=allocationMultiplier"`
+}
+
+// NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device.
+// Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.
+type NodeAllocatableOverhead struct {
+	// PerPod is overhead applied once per pod referencing the claim on this node.
+	// This is a flat overhead incurred for every pod referencing the claim.
+	// +optional
+	PerPod *resource.Quantity `json:"perPodReference,omitempty" protobuf:"bytes,1,opt,name=perPodReference"`
+
+	// PerContainer is applied per container reference to the claim.
+	// This models overhead scaling linearly with the number of containers actively using the device.
+	// When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing
+	// the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// +optional
+	PerContainer *resource.Quantity `json:"perContainerReference,omitempty" protobuf:"bytes,2,opt,name=perContainerReference"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
