@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -44,6 +45,9 @@ var errNotImplemented = errors.New("not implemented")
 type fakeEtcdClient struct {
 	members   []*pb.Member
 	endpoints []string
+
+	memberListFunc    func(context.Context, ...clientv3.OpOption) (*clientv3.MemberListResponse, error)
+	memberPromoteFunc func(context.Context, uint64) (*clientv3.MemberPromoteResponse, error)
 }
 
 // Close shuts down the client's etcd connections.
@@ -58,7 +62,10 @@ func (f *fakeEtcdClient) Endpoints() []string {
 }
 
 // MemberList lists the current cluster membership.
-func (f *fakeEtcdClient) MemberList(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+func (f *fakeEtcdClient) MemberList(ctx context.Context, opts ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+	if f.memberListFunc != nil {
+		return f.memberListFunc(ctx, opts...)
+	}
 	return &clientv3.MemberListResponse{
 		Members: f.members,
 	}, nil
@@ -80,7 +87,10 @@ func (f *fakeEtcdClient) MemberRemove(_ context.Context, id uint64) (*clientv3.M
 }
 
 // MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
-func (f *fakeEtcdClient) MemberPromote(_ context.Context, id uint64) (*clientv3.MemberPromoteResponse, error) {
+func (f *fakeEtcdClient) MemberPromote(ctx context.Context, id uint64) (*clientv3.MemberPromoteResponse, error) {
+	if f.memberPromoteFunc != nil {
+		return f.memberPromoteFunc(ctx, id)
+	}
 	return nil, errNotImplemented
 }
 
@@ -961,6 +971,201 @@ func TestEvaluateClusterStatus(t *testing.T) {
 
 			if tc.wantMemberErrors != (err != nil) {
 				t.Errorf("gotMemberErrors = %v, wantMemberErrors = %t", err, tc.wantMemberErrors)
+			}
+		})
+	}
+}
+
+func TestMemberPromote(t *testing.T) {
+	learnerID := uint64(12345)
+
+	const (
+		initialEndpoint  = "https://192.168.10.100:2379"
+		promotedEndpoint = "https://192.168.10.200:2379"
+	)
+
+	member := func(isLearner bool) *pb.Member {
+		return &pb.Member{
+			ID:         learnerID,
+			Name:       "cp-1",
+			PeerURLs:   []string{"https://192.168.10.200:2380"},
+			ClientURLs: []string{promotedEndpoint},
+			IsLearner:  isLearner,
+		}
+	}
+
+	type memberListResult struct {
+		members []*pb.Member
+		err     error
+	}
+
+	type memberPromoteResult struct {
+		resp *clientv3.MemberPromoteResponse
+		err  error
+	}
+
+	tests := []struct {
+		name                 string
+		memberListResults    []memberListResult
+		memberPromoteResults []memberPromoteResult
+		wantErr              bool
+		wantEndpoint         string
+		wantPromoteCalls     int
+		minMemberListCalls   int
+	}{
+		{
+			name: "successful promotion adds endpoint",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(true)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					resp: &clientv3.MemberPromoteResponse{
+						Members: []*pb.Member{member(false)},
+					},
+				},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   1,
+			minMemberListCalls: 2,
+		},
+		{
+			name: "already promoted after transient promote failure adds endpoint",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(false)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					err: context.DeadlineExceeded,
+				},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   1,
+			minMemberListCalls: 3,
+		},
+		{
+			name: "already promoted before promote attempt adds endpoint",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(false)}},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   0,
+			minMemberListCalls: 2,
+		},
+		{
+			name: "member list error before promote is retried",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{err: errNotImplemented},
+				{members: []*pb.Member{member(true)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					resp: &clientv3.MemberPromoteResponse{
+						Members: []*pb.Member{member(false)},
+					},
+				},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   1,
+			minMemberListCalls: 3,
+		},
+		{
+			name: "promotion keeps failing",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(true)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					err: context.DeadlineExceeded,
+				},
+			},
+			wantErr:            true,
+			wantPromoteCalls:   -1,
+			minMemberListCalls: 1,
+		},
+	}
+
+	oldActiveTimeout := kubeadmapi.GetActiveTimeouts()
+	newActiveTimeout := oldActiveTimeout.DeepCopy()
+	newActiveTimeout.EtcdAPICall = &metav1.Duration{
+		Duration: 3 * constants.EtcdAPICallRetryInterval,
+	}
+	kubeadmapi.SetActiveTimeouts(newActiveTimeout)
+	defer kubeadmapi.SetActiveTimeouts(oldActiveTimeout)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			memberListCalls := 0
+			memberPromoteCalls := 0
+
+			fakeClient := &fakeEtcdClient{}
+
+			fakeClient.memberListFunc = func(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+				if len(tt.memberListResults) == 0 {
+					t.Fatal("MemberList called without configured results")
+				}
+
+				resultIndex := memberListCalls
+				if resultIndex >= len(tt.memberListResults) {
+					resultIndex = len(tt.memberListResults) - 1
+				}
+				result := tt.memberListResults[resultIndex]
+				memberListCalls++
+
+				if result.err != nil {
+					return nil, result.err
+				}
+				return &clientv3.MemberListResponse{
+					Members: result.members,
+				}, nil
+			}
+
+			fakeClient.memberPromoteFunc = func(_ context.Context, _ uint64) (*clientv3.MemberPromoteResponse, error) {
+				if len(tt.memberPromoteResults) == 0 {
+					t.Fatalf("unexpected MemberPromote call")
+				}
+
+				resultIndex := memberPromoteCalls
+				if resultIndex >= len(tt.memberPromoteResults) {
+					resultIndex = len(tt.memberPromoteResults) - 1
+				}
+				result := tt.memberPromoteResults[resultIndex]
+				memberPromoteCalls++
+
+				return result.resp, result.err
+			}
+
+			c := &Client{
+				Endpoints: []string{initialEndpoint},
+			}
+			c.newEtcdClient = func(_ []string) (etcdClient, error) {
+				return fakeClient, nil
+			}
+			c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
+				return fakeClient.MemberList(context.Background())
+			}
+
+			err := c.MemberPromote(learnerID)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("MemberPromote() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantPromoteCalls >= 0 && memberPromoteCalls != tt.wantPromoteCalls {
+				t.Fatalf("MemberPromote calls = %d, want %d", memberPromoteCalls, tt.wantPromoteCalls)
+			}
+
+			if memberListCalls < tt.minMemberListCalls {
+				t.Fatalf("MemberList calls = %d, want at least %d", memberListCalls, tt.minMemberListCalls)
+			}
+
+			if tt.wantEndpoint != "" && !slices.Contains(c.Endpoints, tt.wantEndpoint) {
+				t.Fatalf("expected endpoint %q to be added, got %v", tt.wantEndpoint, c.Endpoints)
 			}
 		})
 	}
