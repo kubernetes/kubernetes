@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !goexperiment.jsonv2 || !go1.25
-
 // Package json implements semantic processing of JSON as specified in RFC 8259.
 // JSON is a simple data interchange format that can represent
 // primitive data types such as booleans, strings, and numbers,
