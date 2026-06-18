@@ -126,6 +126,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dims/libcadvisor v0.0.0-20260618134556-20142fb8a1be
 ## explicit; go 1.24.0
 github.com/dims/libcadvisor/cache/memory
+github.com/dims/libcadvisor/cadvisorflags
 github.com/dims/libcadvisor/container
 github.com/dims/libcadvisor/container/common
 github.com/dims/libcadvisor/container/containerd
