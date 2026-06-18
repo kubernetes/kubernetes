@@ -111,13 +111,17 @@ type PrometheusCollector struct {
 // exported metrics. If left to nil, the DefaultContainerLabels function
 // will be used instead.
 //
-// NOTE (fork divergence): this kubelet-only fork registers metric blocks only
-// for the container.MetricKinds the kubelet ever enables — CpuUsage, CpuLoad,
-// MemoryUsage, DiskUsage, DiskIO, NetworkUsage, Process, App, OOM, and Pressure.
-// The upstream blocks for the never-enabled kinds (ProcessScheduler, Hugetlb,
+// NOTE (fork divergence): this kubelet-only fork keeps container-metric blocks
+// only for the container.MetricKinds the kubelet enables AND can still populate —
+// CpuUsage, MemoryUsage, DiskUsage, DiskIO, NetworkUsage, Process, OOM, and
+// Pressure. Removed: the never-enabled upstream blocks (ProcessScheduler, Hugetlb,
 // CPUSet, MemoryNuma, NetworkTcp/AdvancedTcp/Udp, PerCpu, Perf, ReferencedMemory,
-// Resctrl) were removed (C3). The MetricKind constants still exist in
-// container/factory.go; passing one of the removed kinds is a harmless no-op.
+// Resctrl) in C3, and CpuLoad once its data source — the netlink cpu-load reader —
+// was removed in C2 (the kubelet's deprecated --enable-load-reader is now a no-op,
+// so the load / task-state series could only ever read zero). AppMetrics likewise
+// has no block here (the application-metrics collector was removed earlier). The
+// MetricKind constants still exist in container/factory.go; passing a blockless
+// kind is a harmless no-op.
 func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetrics container.MetricSet, now clock.Clock, opts info.RequestOptions) *PrometheusCollector {
 	if f == nil {
 		f = DefaultContainerLabels
@@ -264,59 +268,6 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 							value:     float64(s.Cpu.CFS.BurstTime) / float64(time.Second),
 							timestamp: s.Timestamp,
 						}}
-				},
-			},
-		}...)
-	}
-	if includedMetrics.Has(container.CpuLoadMetrics) {
-		c.containerMetrics = append(c.containerMetrics, []containerMetric{
-			{
-				name:      "container_cpu_load_average_10s",
-				help:      "Value of container cpu load average over the last 10 seconds.",
-				valueType: prometheus.GaugeValue,
-				getValues: func(s *info.ContainerStats) metricValues {
-					return metricValues{{value: float64(s.Cpu.LoadAverage), timestamp: s.Timestamp}}
-				},
-			}, {
-				name:      "container_cpu_load_d_average_10s",
-				help:      "Value of container cpu load.d average over the last 10 seconds.",
-				valueType: prometheus.GaugeValue,
-				getValues: func(s *info.ContainerStats) metricValues {
-					return metricValues{{value: float64(s.Cpu.LoadDAverage), timestamp: s.Timestamp}}
-				},
-			}, {
-				name:        "container_tasks_state",
-				help:        "Number of tasks in given state",
-				extraLabels: []string{"state"},
-				valueType:   prometheus.GaugeValue,
-				getValues: func(s *info.ContainerStats) metricValues {
-					return metricValues{
-						{
-							value:     float64(s.TaskStats.NrSleeping),
-							labels:    []string{"sleeping"},
-							timestamp: s.Timestamp,
-						},
-						{
-							value:     float64(s.TaskStats.NrRunning),
-							labels:    []string{"running"},
-							timestamp: s.Timestamp,
-						},
-						{
-							value:     float64(s.TaskStats.NrStopped),
-							labels:    []string{"stopped"},
-							timestamp: s.Timestamp,
-						},
-						{
-							value:     float64(s.TaskStats.NrUninterruptible),
-							labels:    []string{"uninterruptible"},
-							timestamp: s.Timestamp,
-						},
-						{
-							value:     float64(s.TaskStats.NrIoWait),
-							labels:    []string{"iowaiting"},
-							timestamp: s.Timestamp,
-						},
-					}
 				},
 			},
 		}...)

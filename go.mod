@@ -22,7 +22,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.6
 	github.com/cyphar/filepath-securejoin v0.6.1
-	github.com/dims/libcadvisor v0.0.0-20260618134556-20142fb8a1be
+	github.com/dims/libcadvisor v0.0.0-20260618134556-27e8f6e41e5a
 	github.com/distribution/reference v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.13.0

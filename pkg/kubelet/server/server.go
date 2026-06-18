@@ -504,7 +504,6 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
-		cadvisormetrics.CpuLoadMetrics:      struct{}{},
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
 		cadvisormetrics.DiskUsageMetrics:    struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},

@@ -123,7 +123,7 @@ github.com/cyphar/filepath-securejoin/pathrs-lite/procfs
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dims/libcadvisor v0.0.0-20260618134556-20142fb8a1be
+# github.com/dims/libcadvisor v0.0.0-20260618134556-27e8f6e41e5a
 ## explicit; go 1.24.0
 github.com/dims/libcadvisor/cache/memory
 github.com/dims/libcadvisor/cadvisorflags
