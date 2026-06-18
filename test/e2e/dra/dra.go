@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	testdriverapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -2647,6 +2648,204 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	optionalNodeOperationsTests := func() {
+		ginkgo.Context("with control-plane only driver (no node plugin)", func() {
+			ginkgo.It("bypasses node preparation when SkipNodeOperations is All", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				nodes := drautils.NewNodesNow(tCtx, 1, 1)
+				driver := drautils.NewDriverInstance(tCtx)
+				driver.WithKubelet = false
+				b := drautils.NewBuilderNow(tCtx, driver)
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal(claim.Name)
+
+				driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesWithSkipNodeOperationsNow(nodes, 1, resourceapi.SkipNodeOperationAll))
+
+				b.Create(tCtx, claim, pod)
+				// TestPod returns early when !driver.WithKubelet, so explicitly wait for the pod to be running.
+				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+				framework.ExpectNoError(err, "start pod")
+
+				// driver.Nodes contains in-memory test driver handles. With WithKubelet = false,
+				// the driver uses a null socket listener, so kubelet cannot discover or register it.
+				scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get scheduled pod")
+				plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+				if !ok {
+					framework.Failf("pod got scheduled to node %s without a plugin handle in test driver", scheduledPod.Spec.NodeName)
+				}
+				calls := plugin.GetGRPCCalls()
+				gomega.Expect(calls).NotTo(testdrivergomega.BeRegistered, "plugin should not be registered with kubelet")
+
+				evList, err := f.ClientSet.CoreV1().Events(pod.Namespace).List(ctx, metav1.ListOptions{
+					FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod", pod.Name),
+				})
+				framework.ExpectNoError(err, "list events")
+				for _, event := range evList.Items {
+					gomega.Expect(event.Reason).NotTo(gomega.Equal(events.FailedPrepareDynamicResources), "unexpected FailedPrepareDynamicResources event")
+				}
+			})
+
+			ginkgo.It("fails node preparation when SkipNodeOperations is not set", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				nodes := drautils.NewNodesNow(tCtx, 1, 1)
+				driver := drautils.NewDriverInstance(tCtx)
+				driver.WithKubelet = false
+				b := drautils.NewBuilderNow(tCtx, driver)
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal(claim.Name)
+
+				driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+
+				b.Create(tCtx, claim, pod)
+				err := e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+				framework.ExpectNoError(err, "schedule pod")
+
+				// driver.Nodes contains in-memory test driver handles. With WithKubelet = false,
+				// the driver uses a null socket listener, so kubelet cannot discover or register it.
+				scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get scheduled pod")
+				plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+				if !ok {
+					framework.Failf("pod got scheduled to node %s without a plugin handle in test driver", scheduledPod.Spec.NodeName)
+				}
+				calls := plugin.GetGRPCCalls()
+				gomega.Expect(calls).NotTo(testdrivergomega.BeRegistered, "plugin should not be registered with kubelet")
+
+				gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+					evList, err := f.ClientSet.CoreV1().Events(pod.Namespace).List(ctx, metav1.ListOptions{
+						FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod", pod.Name),
+					})
+					if err != nil {
+						return false, err
+					}
+					for _, event := range evList.Items {
+						if event.Reason == events.FailedPrepareDynamicResources {
+							return true, nil
+						}
+					}
+					return false, nil
+				}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("pod should fail preparation due to missing node-local driver"))
+			})
+
+			ginkgo.It("fails node preparation when SkipNodeOperations is UnprepareOnly", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				nodes := drautils.NewNodesNow(tCtx, 1, 1)
+				driver := drautils.NewDriverInstance(tCtx)
+				driver.WithKubelet = false
+				b := drautils.NewBuilderNow(tCtx, driver)
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal(claim.Name)
+
+				driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesWithSkipNodeOperationsNow(nodes, 1, resourceapi.SkipNodeOperationNodeUnprepareResources))
+
+				b.Create(tCtx, claim, pod)
+				err := e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name)
+				framework.ExpectNoError(err, "schedule pod")
+
+				// driver.Nodes contains in-memory test driver handles. With WithKubelet = false,
+				// the driver uses a null socket listener, so kubelet cannot discover or register it.
+				scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get scheduled pod")
+				plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+				if !ok {
+					framework.Failf("pod got scheduled to node %s without a plugin handle in test driver", scheduledPod.Spec.NodeName)
+				}
+				calls := plugin.GetGRPCCalls()
+				gomega.Expect(calls).NotTo(testdrivergomega.BeRegistered, "plugin should not be registered with kubelet")
+
+				gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+					evList, err := f.ClientSet.CoreV1().Events(pod.Namespace).List(ctx, metav1.ListOptions{
+						FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod", pod.Name),
+					})
+					if err != nil {
+						return false, err
+					}
+					for _, event := range evList.Items {
+						if event.Reason == events.FailedPrepareDynamicResources {
+							return true, nil
+						}
+					}
+					return false, nil
+				}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("pod should fail preparation due to missing node-local driver"))
+			})
+		})
+
+		ginkgo.Context("with standard driver (node plugin running)", func() {
+			ginkgo.It("bypasses node preparation and unprepare when SkipNodeOperations is All", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				nodes := drautils.NewNodesNow(tCtx, 1, 1)
+				driver := drautils.NewDriverInstance(tCtx)
+				b := drautils.NewBuilderNow(tCtx, driver)
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal(claim.Name)
+
+				driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesWithSkipNodeOperationsNow(nodes, 1, resourceapi.SkipNodeOperationAll))
+
+				b.Create(tCtx, claim, pod)
+				// Explicitly wait for pod running instead of calling TestPod, because TestPod asserts that
+				// driver-injected environment variables are present, which are omitted when NodePrepareResources is skipped.
+				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+				framework.ExpectNoError(err, "start pod")
+
+				scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get scheduled pod")
+				plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+				if !ok {
+					framework.Failf("pod got scheduled to node %s without a plugin handle in test driver", scheduledPod.Spec.NodeName)
+				}
+				calls := plugin.GetGRPCCalls()
+				gomega.Expect(calls).NotTo(testdrivergomega.NodePrepareResourcesSucceeded, "NodePrepareResources should not be called")
+				gomega.Expect(calls).NotTo(testdrivergomega.NodePrepareResourcesFailed, "NodePrepareResources should not be called")
+
+				b.DeletePodAndWaitForNotFound(tCtx, pod)
+				calls = plugin.GetGRPCCalls()
+				gomega.Expect(calls).NotTo(testdrivergomega.NodeUnprepareResourcesSucceeded, "NodeUnprepareResources should not be called")
+				gomega.Expect(calls).NotTo(testdrivergomega.NodeUnprepareResourcesFailed, "NodeUnprepareResources should not be called")
+			})
+
+			ginkgo.It("bypasses node unprepare when SkipNodeOperations is UnprepareOnly", func(ctx context.Context) {
+				tCtx := f.TContext(ctx)
+				nodes := drautils.NewNodesNow(tCtx, 1, 1)
+				driver := drautils.NewDriverInstance(tCtx)
+				b := drautils.NewBuilderNow(tCtx, driver)
+
+				claim := b.ExternalClaim()
+				pod := b.PodExternal(claim.Name)
+
+				driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesWithSkipNodeOperationsNow(nodes, 1, resourceapi.SkipNodeOperationNodeUnprepareResources))
+
+				b.Create(tCtx, claim, pod)
+				b.TestPod(tCtx, pod)
+
+				scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get scheduled pod")
+				plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+				if !ok {
+					framework.Failf("pod got scheduled to node %s without a plugin handle in test driver", scheduledPod.Spec.NodeName)
+				}
+				calls := plugin.GetGRPCCalls()
+				gomega.Expect(calls).To(testdrivergomega.NodePrepareResourcesSucceeded, "NodePrepareResources should be called and succeed")
+
+				b.DeletePodAndWaitForNotFound(tCtx, pod)
+				calls = plugin.GetGRPCCalls()
+				gomega.Expect(calls).NotTo(testdrivergomega.NodeUnprepareResourcesSucceeded, "NodeUnprepareResources should not be called")
+				gomega.Expect(calls).NotTo(testdrivergomega.NodeUnprepareResourcesFailed, "NodeUnprepareResources should not be called")
+
+				// Fetch the claim from the API server to get the server-assigned UID; otherwise,
+				// plugin unprepare fails to locate the prepared claim in its internal map.
+				claim, err = b.ClientV1(tCtx).ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get claim from API server")
+				err = plugin.UnprepareClaim(ctx, claim)
+				framework.ExpectNoError(err, "manually unprepare claim on plugin")
+			})
+		})
+	}
+
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
@@ -2667,6 +2866,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithKubeletMinVersion("1.36"), podGroupResourceClaimTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), optionalNodeOperationsTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
