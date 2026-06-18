@@ -171,10 +171,14 @@ message SelfSubjectAccessReview {
 message SelfSubjectAccessReviewSpec {
   // resourceAttributes describes information for a resource access request
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:unionMember
   optional ResourceAttributes resourceAttributes = 1;
 
   // nonResourceAttributes describes information for a non-resource access request
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:unionMember
   optional NonResourceAttributes nonResourceAttributes = 2;
 }
 
@@ -226,10 +230,14 @@ message SubjectAccessReview {
 message SubjectAccessReviewSpec {
   // resourceAttributes describes information for a resource access request
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:unionMember
   optional ResourceAttributes resourceAttributes = 1;
 
   // nonResourceAttributes describes information for a non-resource access request
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:unionMember
   optional NonResourceAttributes nonResourceAttributes = 2;
 
   // user is the user you're testing for.
