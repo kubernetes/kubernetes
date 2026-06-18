@@ -57,17 +57,17 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 
 	// subjectaccessreviews
 	if resource := "subjectaccessreviews"; apiResourceConfigSource.ResourceEnabled(authorizationv1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = subjectaccessreview.NewREST(p.Authorizer)
+		storage[resource] = subjectaccessreview.NewREST(p.Authorizer, legacyscheme.Scheme)
 	}
 
 	// selfsubjectaccessreviews
 	if resource := "selfsubjectaccessreviews"; apiResourceConfigSource.ResourceEnabled(authorizationv1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = selfsubjectaccessreview.NewREST(p.Authorizer)
+		storage[resource] = selfsubjectaccessreview.NewREST(p.Authorizer, legacyscheme.Scheme)
 	}
 
 	// localsubjectaccessreviews
 	if resource := "localsubjectaccessreviews"; apiResourceConfigSource.ResourceEnabled(authorizationv1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = localsubjectaccessreview.NewREST(p.Authorizer)
+		storage[resource] = localsubjectaccessreview.NewREST(p.Authorizer, legacyscheme.Scheme)
 	}
 
 	// selfsubjectrulesreviews

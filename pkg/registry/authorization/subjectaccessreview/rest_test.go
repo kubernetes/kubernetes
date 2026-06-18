@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -239,7 +240,7 @@ func TestCreate(t *testing.T) {
 			reason:   tc.reason,
 			err:      tc.err,
 		}
-		storage := NewREST(auth)
+		storage := NewREST(auth, legacyscheme.Scheme)
 
 		result, err := storage.Create(genericapirequest.NewContext(), &authorizationapi.SubjectAccessReview{Spec: tc.spec}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
