@@ -1328,16 +1328,13 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	t.Log("Test cache on rev 100")
 	elem1 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
-	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem1))
-	s.AddSnapshotLocked(100)
+	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem1, 100))
 
 	elem2 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "200"}}
-	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem2))
-	s.AddSnapshotLocked(200)
+	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem2, 200))
 
 	elem3 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "300"}}
-	require.NoError(t, s.UpdateStoreLocked(watch.Deleted, elem3))
-	s.AddSnapshotLocked(300)
+	require.NoError(t, s.UpdateStoreLocked(watch.Deleted, elem3, 300))
 
 	t.Log("Test cache on rev 100")
 	_, err = s.GetExactSnapshotLocked(99)
@@ -1372,8 +1369,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	t.Log("Test cache on rev 400")
 	elem4 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "400"}}
-	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem4))
-	s.AddSnapshotLocked(400)
+	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem4, 400))
 
 	snap400, err := s.GetExactSnapshotLocked(400)
 	require.NoError(t, err)
@@ -1389,8 +1385,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	t.Log("Test cache on rev 500")
 	elem5 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "500"}}
-	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem5))
-	s.AddSnapshotLocked(500)
+	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem5, 500))
 
 	snap500, err := s.GetExactSnapshotLocked(500)
 	require.NoError(t, err)
@@ -1401,8 +1396,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	t.Log("Test cache on rev 600")
 	elem6 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}}
-	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem6))
-	s.AddSnapshotLocked(600)
+	require.NoError(t, s.UpdateStoreLocked(watch.Modified, elem6, 600))
 
 	snap600, err := s.GetExactSnapshotLocked(600)
 	require.NoError(t, err)
