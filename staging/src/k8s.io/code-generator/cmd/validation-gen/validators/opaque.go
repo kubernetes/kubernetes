@@ -45,11 +45,11 @@ func (opaqueTypeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validat
 	return Validations{OpaqueType: true}, nil
 }
 
-func (opaqueTypeTagValidator) Docs() TagDoc {
+func (v opaqueTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            opaqueTypeTagName,
-		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         []Scope{ScopeField},
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(v.ValidScopes()),
 		Description: "Indicates that any validations declared on the referenced type will be ignored. " +
 			"If a referenced type's package is not included in the generator's current " +
 			"flags, this tag must be set, or code generation will fail (preventing silent " +
