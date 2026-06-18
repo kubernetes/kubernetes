@@ -158,6 +158,13 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 	return string(b), nil
 }
 
+// frozenVersionedSet is a frozen fieldpath.VersionedSet that retains the
+// FieldsV1 it was decoded from.
+type frozenVersionedSet struct {
+	fieldpath.VersionedSet
+	encoded *metav1.FieldsV1
+}
+
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet fieldpath.VersionedSet, err error) {
 	fields := EmptyFields
 	if encodedVersionedSet.FieldsV1 != nil {
@@ -167,7 +174,11 @@ func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (version
 	if err != nil {
 		return nil, fmt.Errorf("error decoding set: %v", err)
 	}
-	return fieldpath.NewVersionedSet(&set, fieldpath.APIVersion(encodedVersionedSet.APIVersion), encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply), nil
+	set.Freeze() // Guard against accidental in-place mutations to the set. Copy-on-write operations are allowed.
+	return &frozenVersionedSet{
+		VersionedSet: fieldpath.NewVersionedSet(&set, fieldpath.APIVersion(encodedVersionedSet.APIVersion), encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply),
+		encoded:      encodedVersionedSet.FieldsV1,
+	}, nil
 }
 
 // encodeManagedFields converts ManagedFields from the format used by
@@ -238,11 +249,16 @@ func encodeManagerVersionedSet(manager string, versionedSet fieldpath.VersionedS
 		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
 	}
 	encodedVersionedSet.FieldsType = "FieldsV1"
-	fields, err := SetToFields(*versionedSet.Set())
-	if err != nil {
-		return nil, fmt.Errorf("error encoding set: %v", err)
+	if frozenSet, ok := versionedSet.(*frozenVersionedSet); ok && frozenSet.encoded != nil {
+		// Go back the frozenVersionedSet that was originally decoded, just reuse it.
+		encodedVersionedSet.FieldsV1 = frozenSet.encoded
+	} else {
+		fields, err := SetToFields(*versionedSet.Set())
+		if err != nil {
+			return nil, fmt.Errorf("error encoding set: %v", err)
+		}
+		encodedVersionedSet.FieldsV1 = &fields
 	}
-	encodedVersionedSet.FieldsV1 = &fields
 
 	return encodedVersionedSet, nil
 }
