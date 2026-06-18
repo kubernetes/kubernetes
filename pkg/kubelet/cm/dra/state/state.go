@@ -47,7 +47,8 @@ type ClaimInfoState struct {
 // DriverState is used to store per-device claim info state in a checkpoint
 // +k8s:deepcopy-gen=true
 type DriverState struct {
-	Devices []Device
+	Devices            []Device
+	SkipNodeOperations bool `json:"skipNodeOperations,omitempty"`
 }
 
 // Device is how a DRA driver described an allocated device in a claim

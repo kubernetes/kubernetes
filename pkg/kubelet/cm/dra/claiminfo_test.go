@@ -17,6 +17,7 @@ limitations under the License.
 package dra
 
 import (
+	"encoding/json"
 	"errors"
 	"path"
 	"reflect"
@@ -29,9 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 // ClaimInfo test cases
@@ -897,4 +902,57 @@ func TestSyncToCheckpoint(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestNewClaimInfoSkipNodeOperations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "ns", UID: "uid"},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{Driver: "driver-a", Device: "dev1", SkipNodeOperations: ptr.To(true)},
+						{Driver: "driver-a", Device: "dev2", SkipNodeOperations: ptr.To(true)},
+						{Driver: "driver-b", Device: "dev3", SkipNodeOperations: ptr.To(false)},
+					},
+				},
+			},
+		},
+	}
+
+	info, err := newClaimInfoFromClaim(claim)
+	require.NoError(t, err)
+	assert.True(t, info.DriverState["driver-a"].SkipNodeOperations)
+	assert.False(t, info.DriverState["driver-b"].SkipNodeOperations)
+}
+
+func TestCheckpointVersionCompatibility(t *testing.T) {
+	checkpointVersionN := `[{"claimUID":"uid-1","claimName":"claim-1","namespace":"default","driverState":{"gpu.com":{"skipNodeOperations":true}}}]`
+	var stateVersionN []state.ClaimInfoState
+	err := json.Unmarshal([]byte(checkpointVersionN), &stateVersionN)
+	require.NoError(t, err)
+	require.Len(t, stateVersionN, 1)
+	assert.True(t, stateVersionN[0].DriverState["gpu.com"].SkipNodeOperations)
+
+	checkpointVersionNMinus1 := `[{"claimUID":"uid-2","claimName":"claim-2","namespace":"default","driverState":{"gpu.com":{"devices":[]}}}]`
+	var stateFromOlder []state.ClaimInfoState
+	err = json.Unmarshal([]byte(checkpointVersionNMinus1), &stateFromOlder)
+	require.NoError(t, err)
+	require.Len(t, stateFromOlder, 1)
+	assert.False(t, stateFromOlder[0].DriverState["gpu.com"].SkipNodeOperations)
+
+	type olderDriverState struct {
+		Devices []state.Device
+	}
+	type olderClaimInfoState struct {
+		ClaimUID    types.UID
+		ClaimName   string
+		Namespace   string
+		DriverState map[string]olderDriverState
+	}
+	var olderState []olderClaimInfoState
+	err = json.Unmarshal([]byte(checkpointVersionN), &olderState)
+	require.NoError(t, err)
+	require.Len(t, olderState, 1)
 }

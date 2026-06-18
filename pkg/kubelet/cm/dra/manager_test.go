@@ -2904,3 +2904,21 @@ func TestBuildDeviceHealth(t *testing.T) {
 		})
 	}
 }
+
+func genTestClaimWithSkip(name, driver, device, podUID string, skip bool) *resourceapi.ResourceClaim {
+	c := genTestClaim(name, driver, device, podUID)
+	c.Status.Allocation.Devices.Results[0].SkipNodeOperations = &skip
+	return c
+}
+
+func TestPrepareResourcesSkipNodeOperations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+	claim := genTestClaimWithSkip("c", driverName, deviceName, "pod-uid", true)
+	_, err := newClaimInfoFromClaim(claim)
+	require.ErrorContains(t, err, "DRAOptionalNodeOperations feature gate is disabled")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+	info, err := newClaimInfoFromClaim(claim)
+	require.NoError(t, err)
+	assert.True(t, info.DriverState[driverName].SkipNodeOperations)
+}

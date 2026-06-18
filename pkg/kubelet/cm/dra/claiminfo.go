@@ -28,8 +28,10 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -63,8 +65,22 @@ func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) (*ClaimInfo, error)
 	if claim.Status.Allocation == nil {
 		return nil, errors.New("not allocated")
 	}
+	driverTotal := make(map[string]int)
+	driverSkip := make(map[string]int)
 	for _, result := range claim.Status.Allocation.Devices.Results {
-		claimInfoState.DriverState[result.Driver] = state.DriverState{}
+		driverTotal[result.Driver]++
+		if result.SkipNodeOperations != nil && *result.SkipNodeOperations {
+			driverSkip[result.Driver]++
+		}
+	}
+	for driver, total := range driverTotal {
+		skip := total > 0 && driverSkip[driver] == total
+		if skip && !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+			return nil, errors.New("DRAOptionalNodeOperations feature gate is disabled on kubelet")
+		}
+		claimInfoState.DriverState[driver] = state.DriverState{
+			SkipNodeOperations: skip,
+		}
 	}
 	info := &ClaimInfo{
 		ClaimInfoState: claimInfoState,
