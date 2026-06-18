@@ -327,6 +327,23 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 
+// VerifyValidationEquivalenceFunc is a variant of VerifyValidationEquivalence
+// for callers that produce handwritten and declarative validation errors directly, rather
+// than through a RESTCreateStrategy. The validate closure should return the combined
+// ErrorList for (ctx, obj).
+func VerifyValidationEquivalenceFunc(t *testing.T, ctx context.Context, obj runtime.Object, validate func(ctx context.Context, obj runtime.Object) field.ErrorList, expectedErrs field.ErrorList, testConfigs ...ValidationTestConfig) {
+	t.Helper()
+	opts := &validationOption{}
+	for _, testcfg := range testConfigs {
+		testcfg(opts)
+	}
+
+	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
+		return validate(c, obj)
+	}, ctx, opts, obj)
+	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
+}
+
 // VerifyUpdateValidationEquivalenceFunc is a variant of VerifyUpdateValidationEquivalence
 // for callers that produce handwritten and declarative validation errors directly, rather
 // than through a RESTUpdateStrategy. The validate closure should return the combined
