@@ -197,12 +197,14 @@ message Condition {
   // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
   // +kubebuilder:validation:MaxLength=316
   // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
   // +required
   // +kubebuilder:validation:Required
   // +kubebuilder:validation:Enum=True;False;Unknown
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string status = 2;
 
   // observedGeneration represents the .metadata.generation that the condition was set based upon.
@@ -210,6 +212,8 @@ message Condition {
   // with respect to the current state of the instance.
   // +optional
   // +kubebuilder:validation:Minimum=0
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:minimum=0
   optional int64 observedGeneration = 3;
 
   // lastTransitionTime is the last time the condition transitioned from one status to another.
@@ -230,6 +234,8 @@ message Condition {
   // +kubebuilder:validation:MaxLength=1024
   // +kubebuilder:validation:MinLength=1
   // +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:maxLength=1024
   optional string reason = 5;
 
   // message is a human readable message indicating details about the transition.
@@ -237,6 +243,8 @@ message Condition {
   // +required
   // +kubebuilder:validation:Required
   // +kubebuilder:validation:MaxLength=32768
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:maxLength=32768
   optional string message = 6;
 }
 

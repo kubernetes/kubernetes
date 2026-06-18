@@ -319,16 +319,18 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	if len(condition.Type) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "is required").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type"))...)
+		allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type")).MarkCoveredByDeclarative()...)
 	}
 
 	// status is set and is an accepted value
-	if !validConditionStatuses.Has(string(condition.Status)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()))
+	if len(string(condition.Status)) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("status"), "").MarkCoveredByDeclarative())
+	} else if !validConditionStatuses.Has(string(condition.Status)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()).MarkCoveredByDeclarative())
 	}
 
 	if condition.ObservedGeneration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero").WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 
 	if condition.LastTransitionTime.IsZero() {
@@ -336,18 +338,18 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	}
 
 	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, currErr := range isValidConditionReason(condition.Reason) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))
 		}
 		if len(condition.Reason) > maxReasonLen {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen).WithOrigin("maxLength").MarkCoveredByDeclarative())
 		}
 	}
 
 	if len(condition.Message) > maxMessageLen {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen).WithOrigin("maxLength").MarkCoveredByDeclarative())
 	}
 
 	return allErrs
