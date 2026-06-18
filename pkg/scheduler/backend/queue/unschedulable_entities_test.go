@@ -35,16 +35,16 @@ type mockMetricRecorder struct {
 	val atomic.Int64
 }
 
-func (m *mockMetricRecorder) Add(val int) {
-	m.val.Add(int64(val))
+func (m *mockMetricRecorder) Add(entity metrics.Entity) {
+	m.val.Add(int64(entity.Size()))
 }
 
-func (m *mockMetricRecorder) Inc() {
-	m.val.Add(1)
+func (m *mockMetricRecorder) Remove(entity metrics.Entity) {
+	m.val.Add(-int64(entity.Size()))
 }
 
-func (m *mockMetricRecorder) Dec() {
-	m.val.Add(-1)
+func (m *mockMetricRecorder) Update(oldEntity, newEntity metrics.Entity) {
+	m.val.Add(int64(newEntity.Size() - oldEntity.Size()))
 }
 
 func (m *mockMetricRecorder) Clear() {

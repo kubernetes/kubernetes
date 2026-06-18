@@ -44,19 +44,19 @@ func newUnschedulableEntities(unschedulableRecorder, gatedRecorder metrics.Metri
 
 // updateMetricsOnStateChange handles the metric accounting when an entity changes
 // between Gated and Unschedulable states.
-func (u *unschedulableEntities) updateMetricsOnStateChange(gatedBefore, isGated bool, size int) {
+func (u *unschedulableEntities) updateMetricsOnStateChange(gatedBefore, isGated bool, entity framework.QueuedEntityInfo) {
 	if gatedBefore == isGated {
 		return
 	}
 
 	if gatedBefore {
 		// Transition: Gated -> Ungated
-		u.gatedRecorder.Add(-size)
-		u.unschedulableRecorder.Add(size)
+		u.gatedRecorder.Remove(entity)
+		u.unschedulableRecorder.Add(entity)
 	} else {
 		// Transition: Ungated -> Gated
-		u.gatedRecorder.Add(size)
-		u.unschedulableRecorder.Add(-size)
+		u.unschedulableRecorder.Remove(entity)
+		u.gatedRecorder.Add(entity)
 	}
 }
 
@@ -65,16 +65,14 @@ func (u *unschedulableEntities) updateMetricsOnStateChange(gatedBefore, isGated 
 func (u *unschedulableEntities) addOrUpdate(entity framework.QueuedEntityInfo, gatedBefore bool, event string) {
 	entityKey := u.keyFunc(entity)
 	if _, exists := u.entityInfoMap[entityKey]; exists {
-		u.updateMetricsOnStateChange(gatedBefore, entity.Gated(), entity.Size())
+		u.updateMetricsOnStateChange(gatedBefore, entity.Gated(), entity)
 	} else {
 		if entity.Gated() {
-			u.gatedRecorder.Add(entity.Size())
+			u.gatedRecorder.Add(entity)
 		} else {
-			u.unschedulableRecorder.Add(entity.Size())
+			u.unschedulableRecorder.Add(entity)
 		}
-		if metrics.SchedulerQueueIncomingPods != nil {
-			metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Add(float64(entity.Size()))
-		}
+		recordIncomingEntitiesMetrics("unschedulable", entity, event)
 	}
 	u.entityInfoMap[entityKey] = entity
 }
@@ -85,9 +83,9 @@ func (u *unschedulableEntities) delete(entity framework.QueuedEntityInfo, gated 
 	entityKey := u.keyFunc(entity)
 	if _, exists := u.entityInfoMap[entityKey]; exists {
 		if gated {
-			u.gatedRecorder.Add(-entity.Size())
+			u.gatedRecorder.Remove(entity)
 		} else {
-			u.unschedulableRecorder.Add(-entity.Size())
+			u.unschedulableRecorder.Remove(entity)
 		}
 	}
 	delete(u.entityInfoMap, entityKey)

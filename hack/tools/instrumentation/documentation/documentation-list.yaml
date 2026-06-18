@@ -6432,6 +6432,22 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: pending_entities
+  subsystem: scheduler
+  help: Number of pending scheduling entities ('pod' or 'podgroup') by the queue type.
+    'active' means number of entities in activeQ; 'backoff' means number of entities
+    in backoffQ; 'unschedulable' means number of entities in unschedulableEntities
+    that the scheduler attempted to schedule and failed; 'gated' is the number of
+    unschedulable entities that the scheduler never attempted to schedule because
+    they are gated.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - entity
+  - queue
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: plugin_execution_duration_seconds
   subsystem: scheduler
   help: Duration for running a plugin at a specific extension point.
@@ -6577,6 +6593,19 @@
   stabilityLevel: ALPHA
   labels:
   - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: queue_incoming_entities_total
+  subsystem: scheduler
+  help: Number of scheduling entities added to scheduling queues by event, queue type,
+    and entity type. Entity types are either 'pod' or 'podgroup'.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - entity
+  - event
+  - queue
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics

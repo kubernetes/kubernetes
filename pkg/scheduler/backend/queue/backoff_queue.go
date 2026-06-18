@@ -119,8 +119,8 @@ func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Dura
 	if popFromBackoffQEnabled {
 		entityBackoffQLessFn = bq.lessBackoffCompletedWithPriority
 	}
-	bq.entityBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, entityBackoffQLessFn, metrics.NewBackoffPodsRecorder())
-	bq.entityErrorBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, bq.lessBackoffCompleted, metrics.NewBackoffPodsRecorder())
+	bq.entityBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, entityBackoffQLessFn, metrics.NewBackoffEntitiesRecorder())
+	bq.entityErrorBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, bq.lessBackoffCompleted, metrics.NewBackoffEntitiesRecorder())
 
 	return bq
 }
@@ -308,7 +308,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 			logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 			return
 		}
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Add(float64(entity.Size()))
+		recordIncomingEntitiesMetrics("backoff", entity, event)
 		logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 		return
 	}
@@ -318,7 +318,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 		logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityErrorBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 		return
 	}
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Add(float64(entity.Size()))
+	recordIncomingEntitiesMetrics("backoff", entity, event)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 }
 

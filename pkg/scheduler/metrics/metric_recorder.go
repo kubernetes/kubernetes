@@ -22,68 +22,87 @@ import (
 	"k8s.io/component-base/metrics"
 )
 
-// MetricRecorder represents a metric recorder which takes action when the
-// metric Inc(), Dec() and Clear()
+// Entity is either a pod or a podgroup that gets recorded in the metrics.
+type Entity interface {
+	Size() int
+	Type() string
+}
+
+// MetricRecorder represents a metric recorder which maintains a metric through Add(), Remove(), Update(), and Clear().
 type MetricRecorder interface {
-	Add(int)
-	Inc()
-	Dec()
+	Add(entity Entity)
+	Remove(entity Entity)
+	Update(oldEntity, newEntity Entity)
 	Clear()
 }
 
-var _ MetricRecorder = &PendingPodsRecorder{}
+var _ MetricRecorder = &PendingEntitiesRecorder{}
 
-// PendingPodsRecorder is an implementation of MetricRecorder
-type PendingPodsRecorder struct {
-	recorder metrics.GaugeMetric
+// PendingEntitiesRecorder is an implementation of MetricRecorder.
+type PendingEntitiesRecorder struct {
+	pods     metrics.GaugeMetric
+	entities func(entityType string) metrics.GaugeMetric
 }
 
-// NewActivePodsRecorder returns ActivePods in a Prometheus metric fashion
-func NewActivePodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: ActivePods(),
+// NewActiveEntitiesRecorder returns ActivePods and ActiveEntities in a Prometheus metric fashion.
+func NewActiveEntitiesRecorder() *PendingEntitiesRecorder {
+	return &PendingEntitiesRecorder{
+		pods:     ActivePods(),
+		entities: ActiveEntities,
 	}
 }
 
-// NewUnschedulablePodsRecorder returns UnschedulablePods in a Prometheus metric fashion
-func NewUnschedulablePodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: UnschedulablePods(),
+// NewUnschedulableEntitiesRecorder returns UnschedulablePods and UnschedulableEntities in a Prometheus metric fashion.
+func NewUnschedulableEntitiesRecorder() *PendingEntitiesRecorder {
+	return &PendingEntitiesRecorder{
+		pods:     UnschedulablePods(),
+		entities: UnschedulableEntities,
 	}
 }
 
-// NewBackoffPodsRecorder returns BackoffPods in a Prometheus metric fashion
-func NewBackoffPodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: BackoffPods(),
+// NewBackoffEntitiesRecorder returns BackoffPods and BackoffEntities in a Prometheus metric fashion.
+func NewBackoffEntitiesRecorder() *PendingEntitiesRecorder {
+	return &PendingEntitiesRecorder{
+		pods:     BackoffPods(),
+		entities: BackoffEntities,
 	}
 }
 
-// NewGatedPodsRecorder returns GatedPods in a Prometheus metric fashion
-func NewGatedPodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: GatedPods(),
+// NewGatedEntitiesRecorder returns GatedPods and GatedEntities in a Prometheus metric fashion.
+func NewGatedEntitiesRecorder() *PendingEntitiesRecorder {
+	return &PendingEntitiesRecorder{
+		pods:     GatedPods(),
+		entities: GatedEntities,
 	}
 }
 
-// Add adds a value to the metric, in an atomic way
-func (r *PendingPodsRecorder) Add(val int) {
-	r.recorder.Add(float64(val))
+// Add records the addition of an entity.
+// It increments pending pods and entities metric counters atomically.
+func (r *PendingEntitiesRecorder) Add(entity Entity) {
+	r.pods.Add(float64(entity.Size()))
+	r.entities(entity.Type()).Inc()
 }
 
-// Inc increases a metric counter by 1, in an atomic way
-func (r *PendingPodsRecorder) Inc() {
-	r.recorder.Inc()
+// Remove records the removal of an entity.
+// It decrements pending pods and entities metric counters atomically.
+func (r *PendingEntitiesRecorder) Remove(entity Entity) {
+	r.pods.Add(-float64(entity.Size()))
+	r.entities(entity.Type()).Dec()
 }
 
-// Dec decreases a metric counter by 1, in an atomic way
-func (r *PendingPodsRecorder) Dec() {
-	r.recorder.Dec()
+// Update records the update of an entity.
+// It updates pending pods metric counter atomically.
+// It shouldn't update pending entities metric, because the entity type cannot be changed, and an entity will always be a single object.
+func (r *PendingEntitiesRecorder) Update(oldEntity, newEntity Entity) {
+	diff := newEntity.Size() - oldEntity.Size()
+	r.pods.Add(float64(diff))
 }
 
-// Clear set a metric counter to 0, in an atomic way
-func (r *PendingPodsRecorder) Clear() {
-	r.recorder.Set(float64(0))
+// Clear resets pending pods and entities metric counters to 0 atomically.
+func (r *PendingEntitiesRecorder) Clear() {
+	r.pods.Set(float64(0))
+	r.entities("pod").Set(float64(0))
+	r.entities("podgroup").Set(float64(0))
 }
 
 // histogramVecMetric is the data structure passed in the buffer channel between the main framework thread

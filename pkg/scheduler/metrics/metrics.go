@@ -138,6 +138,7 @@ var (
 	PreemptionVictims            *metrics.Histogram
 	PreemptionAttempts           *metrics.Counter
 	pendingPods                  *metrics.GaugeVec
+	PendingEntities              *metrics.GaugeVec
 	InFlightEvents               *metrics.GaugeVec
 	Goroutines                   *metrics.GaugeVec
 	BatchAttemptStats            *metrics.CounterVec
@@ -156,8 +157,9 @@ var (
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec
 
-	queueingHintExecutionDuration *metrics.HistogramVec
-	SchedulerQueueIncomingPods    *metrics.CounterVec
+	queueingHintExecutionDuration  *metrics.HistogramVec
+	SchedulerQueueIncomingPods     *metrics.CounterVec
+	SchedulerQueueIncomingEntities *metrics.CounterVec
 
 	// The below two are only available when the async-preemption feature gate is enabled.
 	PreemptionGoroutinesDuration       *metrics.HistogramVec
@@ -281,6 +283,13 @@ func InitMetrics() {
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
+	PendingEntities = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pending_entities",
+			Help:           "Number of pending scheduling entities ('pod' or 'podgroup') by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"queue", "entity"})
 	InFlightEvents = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -380,6 +389,14 @@ func InitMetrics() {
 			Help:           "Number of pods added to scheduling queues by event and queue type.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue", "event"})
+
+	SchedulerQueueIncomingEntities = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "queue_incoming_entities_total",
+			Help:           "Number of scheduling entities added to scheduling queues by event, queue type, and entity type. Entity types are either 'pod' or 'podgroup'.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"queue", "event", "entity"})
 
 	PermitWaitDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -539,12 +556,14 @@ func InitMetrics() {
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
+		PendingEntities,
 		PodSchedulingSLIDuration,
 		PodSchedulingAttempts,
 		PodScheduledAfterFlush,
 		FrameworkExtensionPointDuration,
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
+		SchedulerQueueIncomingEntities,
 		Goroutines,
 		PermitWaitDuration,
 		CacheSize,
@@ -590,6 +609,26 @@ func UnschedulablePods() metrics.GaugeMetric {
 // GatedPods returns the pending pods metrics with the label gated
 func GatedPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "gated"})
+}
+
+// ActiveEntities returns the pending entities metric with the label active and entityType (either "pod" or "podgroup").
+func ActiveEntities(entityType string) metrics.GaugeMetric {
+	return PendingEntities.With(metrics.Labels{"queue": "active", "entity": entityType})
+}
+
+// BackoffEntities returns the pending entities metric with the label backoff and entityType (either "pod" or "podgroup").
+func BackoffEntities(entityType string) metrics.GaugeMetric {
+	return PendingEntities.With(metrics.Labels{"queue": "backoff", "entity": entityType})
+}
+
+// UnschedulableEntities returns the pending entities metric with the label unschedulable and entityType (either "pod" or "podgroup").
+func UnschedulableEntities(entityType string) metrics.GaugeMetric {
+	return PendingEntities.With(metrics.Labels{"queue": "unschedulable", "entity": entityType})
+}
+
+// GatedEntities returns the pending entities metric with the label gated and entityType (either "pod" or "podgroup").
+func GatedEntities(entityType string) metrics.GaugeMetric {
+	return PendingEntities.With(metrics.Labels{"queue": "gated", "entity": entityType})
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

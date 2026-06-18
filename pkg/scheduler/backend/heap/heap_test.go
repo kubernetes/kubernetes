@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 func testHeapObjectKeyFunc(obj testHeapObject) string {
@@ -39,23 +40,27 @@ func (obj testHeapObject) Size() int {
 	return obj.size
 }
 
+func (obj testHeapObject) Type() string {
+	return "test"
+}
+
 type testMetricRecorder int
 
-func (tmr *testMetricRecorder) Add(val int) {
+func (tmr *testMetricRecorder) Add(entity metrics.Entity) {
 	if tmr != nil {
-		*tmr += testMetricRecorder(val)
+		*tmr += testMetricRecorder(entity.Size())
 	}
 }
 
-func (tmr *testMetricRecorder) Inc() {
+func (tmr *testMetricRecorder) Remove(entity metrics.Entity) {
 	if tmr != nil {
-		*tmr++
+		*tmr -= testMetricRecorder(entity.Size())
 	}
 }
 
-func (tmr *testMetricRecorder) Dec() {
+func (tmr *testMetricRecorder) Update(oldEntity, newEntity metrics.Entity) {
 	if tmr != nil {
-		*tmr--
+		*tmr += testMetricRecorder(newEntity.Size() - oldEntity.Size())
 	}
 }
 
