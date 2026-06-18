@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -39,6 +40,12 @@ type Decoder interface {
 	// the stream that it is no longer being watched. Close() must cause any
 	// outstanding call to Decode() to return with an error of some sort.
 	Close()
+}
+
+// NetworkTimingReporter is an optional interface that a Decoder can implement
+// to report accumulated time spent on network reads.
+type NetworkTimingReporter interface {
+	NetworkTiming() time.Duration
 }
 
 // Reporter hides the details of how an error is turned into a runtime.Object for
@@ -110,9 +117,26 @@ func (sw *StreamWatcher) receive() {
 	defer utilruntime.HandleCrashWithLogger(sw.logger)
 	defer close(sw.result)
 	defer sw.Stop()
+	var totalDecodeTime, totalSendTime time.Duration
+	var eventCount int
+	start := time.Now()
 	for {
+		decodeStart := time.Now()
 		action, obj, err := sw.source.Decode()
+		totalDecodeTime += time.Since(decodeStart)
 		if err != nil {
+			// For watchlist, this trace covers exactly one init sync cycle because the
+			// watchlist binary cancels the informer context after sync, stopping the watch.
+			if elapsed := time.Since(start); elapsed > 10*time.Second {
+				if tr, ok := sw.source.(NetworkTimingReporter); ok {
+					networkTime := tr.NetworkTiming()
+					unmarshalTime := totalDecodeTime - networkTime
+					otherTime := elapsed - totalDecodeTime - totalSendTime
+					klog.V(2).Infof("TRACE-STREAMWATCHER: events=%d total=%v network=%v (read) unmarshal=%v (decode) other=%v (overhead) send=%v (to result chan)", eventCount, elapsed, networkTime, unmarshalTime, otherTime, totalSendTime)
+				} else {
+					klog.V(2).Infof("TRACE-STREAMWATCHER: events=%d total=%v decode=%v (network+unmarshal) send=%v (to result chan)", eventCount, elapsed, totalDecodeTime, totalSendTime)
+				}
+			}
 			switch err {
 			case io.EOF:
 				// watch closed normally
@@ -133,6 +157,8 @@ func (sw *StreamWatcher) receive() {
 			}
 			return
 		}
+		eventCount++
+		sendStart := time.Now()
 		select {
 		case <-sw.done:
 			return
@@ -141,5 +167,6 @@ func (sw *StreamWatcher) receive() {
 			Object: obj,
 		}:
 		}
+		totalSendTime += time.Since(sendStart)
 	}
 }

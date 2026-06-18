@@ -18,12 +18,27 @@ package watch
 
 import (
 	"fmt"
+	"io"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+// TimingReadCloser wraps an io.ReadCloser and accumulates time spent in Read().
+type TimingReadCloser struct {
+	io.ReadCloser
+	TotalReadTime time.Duration
+}
+
+func (t *TimingReadCloser) Read(p []byte) (int, error) {
+	start := time.Now()
+	n, err := t.ReadCloser.Read(p)
+	t.TotalReadTime += time.Since(start)
+	return n, err
+}
 
 // Decoder implements the watch.Decoder interface for io.ReadClosers that
 // have contents which consist of a series of watchEvent objects encoded
@@ -32,6 +47,7 @@ import (
 type Decoder struct {
 	decoder         streaming.Decoder
 	embeddedDecoder runtime.Decoder
+	networkReader   *TimingReadCloser
 }
 
 // NewDecoder creates an Decoder for the given writer and codec.
@@ -39,6 +55,15 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 	return &Decoder{
 		decoder:         decoder,
 		embeddedDecoder: embeddedDecoder,
+	}
+}
+
+// NewDecoderWithNetworkTiming creates a Decoder that tracks network read time separately.
+func NewDecoderWithNetworkTiming(decoder streaming.Decoder, embeddedDecoder runtime.Decoder, networkReader *TimingReadCloser) *Decoder {
+	return &Decoder{
+		decoder:         decoder,
+		embeddedDecoder: embeddedDecoder,
+		networkReader:   networkReader,
 	}
 }
 
@@ -64,6 +89,14 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 		return "", nil, fmt.Errorf("unable to decode watch event: %v", err)
 	}
 	return watch.EventType(got.Type), obj, nil
+}
+
+// NetworkTiming implements watch.DecoderNetworkTimingReporter.
+func (d *Decoder) NetworkTiming() time.Duration {
+	if d.networkReader == nil {
+		return 0
+	}
+	return d.networkReader.TotalReadTime
 }
 
 // Close closes the underlying r.

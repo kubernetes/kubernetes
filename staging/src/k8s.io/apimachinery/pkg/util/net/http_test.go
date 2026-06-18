@@ -939,6 +939,23 @@ func TestPingTimeoutSeconds(t *testing.T) {
 	}
 }
 
+func TestMaxReadFrameSize(t *testing.T) {
+	t.Setenv("HTTP2_MAX_READ_FRAME_SIZE", "16777215")
+	if e, a := uint32(16777215), maxReadFrameSize(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+
+	t.Setenv("HTTP2_MAX_READ_FRAME_SIZE", "illegal value")
+	if e, a := uint32(0), maxReadFrameSize(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+
+	t.Setenv("HTTP2_MAX_READ_FRAME_SIZE", "")
+	if e, a := uint32(0), maxReadFrameSize(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+}
+
 func Benchmark_ParseQuotedString(b *testing.B) {
 	str := `"The quick brown" fox jumps over the lazy dog`
 	b.ReportAllocs()
