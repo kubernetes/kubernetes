@@ -18,9 +18,12 @@
 # before/after comparisons with benchstat.
 
 # Partitionable is a variant of SchedulingWithResourceClaimTemplate.
-# It creates ResourceSlices with partitionable devices and uses a claim template referenced
-# by the test pods. It includes allocated claims that consumes counters and it sets up the devices
-# such that the allocator will have to backtrack once in order to find a working solution.
+# For each node, it creates two ResourceSlices: one providing a shared counter
+# set (counter1..4, capacity 1 each), and another providing partitionable
+# devices (two 2-counter devices) that consume from those shared counters. Each
+# allocation requests two devices. Since each node has only one device slice,
+# the allocator matches both devices (device-1 and device-2) without
+# counter conflicts or backtracking. This means one pod or claim fits onto one node.
 - name: Partitionable
   featureGates:
     DynamicResourceAllocation: true
@@ -33,14 +36,14 @@
     countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/resourceslice-partitionable-countersets.yaml
-    countParam: $resourceSlices
+    countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/resourceslice-partitionable-devices.yaml
-    countParam: $resourceSlices
+    countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
   - opcode: createAny
-    templatePath: ../templates/resourceclaim-with-selector.yaml
+    templatePath: ../templates/resourceclaim-partitionable.yaml
     namespace: init
     countParam: $initClaims
   - opcode: allocResourceClaims
@@ -63,25 +66,89 @@
       # taking too long overall.
       nodesWithDRA: 1
       nodesWithoutDRA: 1
-      resourceSlices: 10
-      initClaims: 10
-      measurePods: 10
+      initClaims: 0
+      measurePods: 1
       steadyState: false
       duration: 0s # unused
-  - name: 2000pods_100nodes
+  - name: empty_100nodes
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
-      resourceSlices: 2000
-      initClaims: 2000
-      measurePods: 2000
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 50 # 50 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 250 # 250 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 490 # 500 nodes * 1 claim/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 500 # 500 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 990 # 1000 nodes * 1 claim/node - 10 pods
+      measurePods: 10
       steadyState: true
       duration: 10s
 
-# PartitionableBacktracking is a variant of
-# SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice and a
-# ResourceClaim that forces the allocator to backtrack multiple times in order
-# to find a solution.
+# PartitionableBacktracking is a variant of SchedulingWithResourceClaimTemplate.
+# For each slice, it creates shared counter sets for CPU (cpu1..8, capacity 1
+# each) and memory (mem, capacity 70Gi), and eight devices. Device 1 consumes
+# 20Gi memory; devices 2..8 consume 10Gi each. Each allocation requests 7
+# devices. Including device 1 requires 20Gi + (6 * 10Gi) = 80Gi, exceeding
+# memory capacity. The only working combination is devices 2..8 (70Gi).
+# Attempting combinations with device 1 forces the allocator into repeated
+# backtracking. This means one pod or claim fits onto one node.
 - name: PartitionableBacktracking
   featureGates:
     DynamicResourceAllocation: true
@@ -94,18 +161,26 @@
     countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/resourceslice-partitionable-backtracking-countersets.yaml
-    countParam: $resourceSlices
+    countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/resourceslice-partitionable-backtracking-devices.yaml
-    countParam: $resourceSlices
+    countParam: $nodesWithDRA
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaim-partitionable-backtracking.yaml
+    namespace: init
+    countParam: $initClaims
+  - opcode: allocResourceClaims
+    namespace: init
   - opcode: createAny
     templatePath: ../templates/resourceclaimtemplate-backtracking.yaml
     namespace: test
   - opcode: createPods
     namespace: test
     countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
     podTemplatePath: ../templates/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
@@ -116,5 +191,77 @@
       # taking too long overall.
       nodesWithDRA: 1
       nodesWithoutDRA: 1
-      resourceSlices: 1
+      initClaims: 0
       measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+  - name: empty_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 50 # 50 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 250 # 250 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_500nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 490 # 500 nodes * 1 claim/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: empty_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: half_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 500 # 500 nodes * 1 claim/node
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+  - name: full_1000nodes
+    labels: [performance]
+    params:
+      nodesWithDRA: 1000
+      nodesWithoutDRA: 0
+      initClaims: 990 # 1000 nodes * 1 claim/node - 10 pods
+      measurePods: 10
+      steadyState: true
+      duration: 10s
