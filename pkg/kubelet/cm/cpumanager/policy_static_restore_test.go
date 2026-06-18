@@ -146,7 +146,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 
 			// Allocate resources (Pod Scope)
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(logger, pod)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -154,7 +154,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				// Allocate resources (Container Scope / Legacy)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(pod, container)
+					err = mgr.Allocate(tCtx, pod, container)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}

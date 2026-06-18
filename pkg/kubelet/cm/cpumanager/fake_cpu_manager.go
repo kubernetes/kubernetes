@@ -48,8 +48,8 @@ func (m *fakeManager) Policy() Policy {
 	return pol
 }
 
-func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	logger := klog.TODO()
+func (m *fakeManager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
+	logger := klog.FromContext(ctx)
 	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
@@ -63,20 +63,17 @@ func (m *fakeManager) RemoveContainer(logger logr.Logger, containerID string) er
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
+func (m *fakeManager) GetTopologyHints(logger logr.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	logger.Info("Get container topology hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
+func (m *fakeManager) GetPodTopologyHints(logger logr.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	logger.Info("Get pod topology hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) AllocatePod(pod *v1.Pod) error {
-	logger := klog.TODO()
+func (m *fakeManager) AllocatePod(logger logr.Logger, pod *v1.Pod) error {
 	logger.Info("AllocatePod", "pod", klog.KObj(pod))
 	return nil
 }

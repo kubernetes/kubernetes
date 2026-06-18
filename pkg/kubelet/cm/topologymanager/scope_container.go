@@ -69,7 +69,7 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAd
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(pod, &container)
+		err := s.allocateAlignedResources(ctx, pod, &container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			return admission.GetPodAdmitResult(err)
@@ -88,7 +88,7 @@ func (s *containerScope) accumulateProvidersHints(logger klog.Logger, pod *v1.Po
 
 	for _, provider := range s.hintProviders {
 		// Get the TopologyHints for a Container from a provider.
-		hints := provider.GetTopologyHints(pod, container)
+		hints := provider.GetTopologyHints(logger, pod, container)
 		providersHints = append(providersHints, hints)
 		logger.Info("TopologyHints", "hints", hints, "pod", klog.KObj(pod), "containerName", container.Name)
 	}

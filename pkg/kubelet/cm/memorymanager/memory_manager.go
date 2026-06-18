@@ -65,7 +65,7 @@ type Manager interface {
 
 	// Allocate is called to pre-allocate memory resources during Pod admission.
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, any memory allocated to the container is freed.
@@ -77,15 +77,15 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetPodTopologyHints(*v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// AllocatePod is called to trigger the allocation of memory to a pod.
-	AllocatePod(pod *v1.Pod) error
+	AllocatePod(logger klog.Logger, pod *v1.Pod) error
 
 	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
 	GetMemoryNUMANodes(logger klog.Logger, pod *v1.Pod, container *v1.Container) sets.Set[int]
@@ -264,24 +264,22 @@ func (m *manager) GetMemoryNUMANodes(logger klog.Logger, pod *v1.Pod, container 
 }
 
 // Allocate is called to pre-allocate memory resources during Pod admission.
-func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	logger := klog.TODO()
+func (m *manager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
+	logger := klog.FromContext(ctx)
 	m.removeStaleState(logger)
 
 	m.Lock()
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container memory if required.
-	if err := m.policy.Allocate(logger, m.state, pod, container); err != nil {
+	if err := m.policy.Allocate(ctx, m.state, pod, container); err != nil {
 		logger.Error(err, "Allocate error", "pod", klog.KObj(pod), "containerName", container.Name)
 		return err
 	}
 	return nil
 }
 
-func (m *manager) AllocatePod(pod *v1.Pod) error {
-	logger := klog.TODO() // until we move topology manager to contextual logging
-
+func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod) error {
 	m.removeStaleState(logger)
 
 	m.Lock()
@@ -320,22 +318,19 @@ func (m *manager) State() state.Reader {
 }
 
 // GetPodTopologyHints returns the topology hints for the topology manager
-func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
+func (m *manager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState(klog.FromContext(ctx))
+	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(klog.TODO(), m.state, pod)
+	return m.policy.GetPodTopologyHints(logger, m.state, pod)
 }
 
 // GetTopologyHints returns the topology hints for the topology manager
-func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState(klog.TODO())
+	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(klog.TODO(), m.state, pod, container)
+	return m.policy.GetTopologyHints(logger, m.state, pod, container)
 }
 
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers

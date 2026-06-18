@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	"github.com/go-logr/logr"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
@@ -60,15 +62,15 @@ func (p *bestEffortPolicy) Start(logger logr.Logger, s state.State) error {
 	return p.static.Start(logger, s)
 }
 
-func (p *bestEffortPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
-	return p.static.Allocate(logger, s, pod, container)
+func (p *bestEffortPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+	return p.static.Allocate(ctx, s, pod, container)
 }
 
 func (p *bestEffortPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID string, containerName string) {
 	p.static.RemoveContainer(logger, s, podUID, containerName)
 }
 
-func (p *bestEffortPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *bestEffortPolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Pod-level resources are not supported on Windows.
 	return nil
 }
@@ -81,7 +83,7 @@ func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {
 	return p.static.GetAllocatableMemory(s)
 }
 
-func (p *bestEffortPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod) error {
+func (p *bestEffortPolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) error {
 	// Pod-level resources are not supported on Windows.
 	return nil
 }

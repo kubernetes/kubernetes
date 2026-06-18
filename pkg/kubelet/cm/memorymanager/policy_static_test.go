@@ -1220,7 +1220,7 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAllocate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing for non-guaranteed pods",
@@ -2117,7 +2117,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[0])
 			if (err == nil) != (testCase.expectedError == nil) || (err != nil && testCase.expectedError != nil && err.Error() != testCase.expectedError.Error()) {
 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 			}
@@ -2140,7 +2140,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should re-use init containers memory, init containers requests 1Gi and 2Gi, apps containers 3Gi and 4Gi",
@@ -2842,14 +2842,14 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -2869,7 +2869,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should do nothing once containers already exist under the state file",
@@ -3176,7 +3176,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -3187,7 +3187,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i])
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}

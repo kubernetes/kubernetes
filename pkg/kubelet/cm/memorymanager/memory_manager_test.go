@@ -99,7 +99,7 @@ func (p *mockPolicy) Start(klog.Logger, state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(klog.Logger, state.State, *v1.Pod, *v1.Container) error {
+func (p *mockPolicy) Allocate(context.Context, state.State, *v1.Pod, *v1.Container) error {
 	return p.err
 }
 
@@ -114,7 +114,7 @@ func (p *mockPolicy) GetPodTopologyHints(klog.Logger, state.State, *v1.Pod) map[
 	return nil
 }
 
-func (p *mockPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod) error {
+func (p *mockPolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod) error {
 	return p.err
 }
 
@@ -936,7 +936,7 @@ func TestRemoveStaleState(t *testing.T) {
 }
 
 func TestAddContainer(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
 	reserved := systemReservedMemory{
 		0: map[v1.ResourceName]uint64{
@@ -1418,7 +1418,7 @@ func TestAddContainer(t *testing.T) {
 			}
 			pod := testCase.podAllocate
 			container := &pod.Spec.Containers[0]
-			err := mgr.Allocate(pod, container)
+			err := mgr.Allocate(ctx, pod, container)
 			if !reflect.DeepEqual(err, testCase.expectedAllocateError) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
@@ -2177,7 +2177,7 @@ func TestGetTopologyHints(t *testing.T) {
 
 			pod := getPod("fakePod1", "fakeContainer1", requirementsGuaranteed)
 			container := &pod.Spec.Containers[0]
-			hints := mgr.GetTopologyHints(pod, container)
+			hints := mgr.GetTopologyHints(logger, pod, container)
 			if !reflect.DeepEqual(hints, testCase.expectedHints) {
 				t.Errorf("Hints were not generated correctly. Hints generated: %+v, hints expected: %+v",
 					hints, testCase.expectedHints)
@@ -2187,7 +2187,7 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testMemoryManager{
 		{
 			description: "should remove init containers from the state file, once app container started",
@@ -2355,7 +2355,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Allocates memory for init containers
 			for i := range testCase.podAllocate.Spec.InitContainers {
-				err := mgr.Allocate(testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i])
+				err := mgr.Allocate(ctx, testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -2363,7 +2363,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Allocates memory for apps containers
 			for i := range testCase.podAllocate.Spec.Containers {
-				err := mgr.Allocate(testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i])
+				err := mgr.Allocate(ctx, testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}

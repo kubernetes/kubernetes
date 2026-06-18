@@ -1507,7 +1507,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 
 	const containerName = "c1"
 
@@ -1728,6 +1728,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, tc.ipprPLRFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
@@ -1811,7 +1812,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 
-	logger, tCtx := ktesting.NewTestContext(t)
+	logger, _ := ktesting.NewTestContext(t)
 
 	const containerName = "c1"
 
@@ -1991,6 +1992,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	for _, tc := range testCases {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.ipprFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
@@ -2478,7 +2480,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	}
 
 	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager, logger)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }
