@@ -326,7 +326,10 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		}
 		infos[i].claimInfo = claimInfo
 		infos[i].plugins = make(map[string]*draplugin.DRAPlugin, len(claimInfo.DriverState))
-		for driverName := range claimInfo.DriverState {
+		for driverName, driverState := range claimInfo.DriverState {
+			if driverState.Skips(resourceapi.SkipNodeOperationNodePrepareResources) {
+				continue
+			}
 			if plugin := infos[i].plugins[driverName]; plugin != nil {
 				continue
 			}
@@ -396,7 +399,11 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				Uid:       string(claimInfo.ClaimUID),
 				Name:      claimInfo.ClaimName,
 			}
-			for driverName := range claimInfo.DriverState {
+			for driverName, driverState := range claimInfo.DriverState {
+				if driverState.Skips(resourceapi.SkipNodeOperationNodePrepareResources) {
+					kubeletmetrics.DRANodePrepareSkipsTotal.WithLabelValues(driverName).Inc()
+					continue
+				}
 				plugin := infos[i].plugins[driverName]
 				batches[plugin] = append(batches[plugin], claim)
 			}
@@ -702,7 +709,11 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 				Uid:       string(claimInfo.ClaimUID),
 				Name:      claimInfo.ClaimName,
 			}
-			for driverName := range claimInfo.DriverState {
+			for driverName, driverState := range claimInfo.DriverState {
+				if driverState.Skips(resourceapi.SkipNodeOperationNodeUnprepareResources) {
+					kubeletmetrics.DRANodeUnprepareSkipsTotal.WithLabelValues(driverName).Inc()
+					continue
+				}
 				batches[driverName] = append(batches[driverName], claim)
 			}
 

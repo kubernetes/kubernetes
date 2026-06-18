@@ -28,8 +28,10 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -59,24 +61,82 @@ type claimInfoCache struct {
 // newClaimInfoFromClaim creates a new claim info from a resource claim.
 // It verifies that the kubelet can handle the claim.
 func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) (*ClaimInfo, error) {
-	claimInfoState := state.ClaimInfoState{
-		ClaimUID:    claim.UID,
-		ClaimName:   claim.Name,
-		Namespace:   claim.Namespace,
-		PodUIDs:     sets.New[string](),
-		DriverState: make(map[string]state.DriverState),
-	}
 	if claim.Status.Allocation == nil {
 		return nil, errors.New("not allocated")
 	}
-	for _, result := range claim.Status.Allocation.Devices.Results {
-		claimInfoState.DriverState[result.Driver] = state.DriverState{}
+
+	driverState, err := computeDriverStates(claim)
+	if err != nil {
+		return nil, err
 	}
+
 	info := &ClaimInfo{
-		ClaimInfoState: claimInfoState,
-		prepared:       false,
+		ClaimInfoState: state.ClaimInfoState{
+			ClaimUID:    claim.UID,
+			ClaimName:   claim.Name,
+			Namespace:   claim.Namespace,
+			PodUIDs:     sets.New[string](),
+			DriverState: driverState,
+		},
+		prepared: false,
 	}
 	return info, nil
+}
+
+func computeDriverStates(claim *resourceapi.ResourceClaim) (map[string]state.DriverState, error) {
+	devicesPerDriver := make(map[string]int)
+	opCountsPerDriver := make(map[string]map[resourceapi.SkipNodeOperation]int)
+
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		devicesPerDriver[result.Driver]++
+		if len(result.SkipNodeOperations) == 0 {
+			continue
+		}
+		if opCountsPerDriver[result.Driver] == nil {
+			opCountsPerDriver[result.Driver] = make(map[resourceapi.SkipNodeOperation]int)
+		}
+		// SkipNodeOperationAll already subsumes all individual operations for this result.
+		if slices.Contains(result.SkipNodeOperations, resourceapi.SkipNodeOperationAll) {
+			opCountsPerDriver[result.Driver][resourceapi.SkipNodeOperationAll]++
+			continue
+		}
+		// API validation (+listType=set) guarantees slice items are unique.
+		for _, op := range result.SkipNodeOperations {
+			opCountsPerDriver[result.Driver][op]++
+		}
+	}
+
+	driverStates := make(map[string]state.DriverState, len(devicesPerDriver))
+	for driver, total := range devicesPerDriver {
+		var skippedOps []resourceapi.SkipNodeOperation
+		driverOpCounts := opCountsPerDriver[driver]
+		if driverOpCounts != nil {
+			allCount := driverOpCounts[resourceapi.SkipNodeOperationAll]
+			if allCount == total {
+				skippedOps = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}
+			} else {
+				for op, count := range driverOpCounts {
+					if op == resourceapi.SkipNodeOperationAll {
+						continue
+					}
+					if count+allCount == total {
+						skippedOps = append(skippedOps, op)
+					}
+				}
+				slices.Sort(skippedOps)
+			}
+		}
+
+		if len(skippedOps) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) {
+			return nil, errors.New("DRAOptionalNodeOperations feature gate is disabled on kubelet")
+		}
+
+		driverStates[driver] = state.DriverState{
+			SkipNodeOperations: skippedOps,
+		}
+	}
+
+	return driverStates, nil
 }
 
 // newClaimInfoFromClaim creates a new claim info from a checkpointed claim info state object.
