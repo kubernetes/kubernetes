@@ -144,25 +144,26 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 // ValidateCreate performs common and strategy-specific validation for a create operation.
 func ValidateCreate(ctx context.Context, obj runtime.Object, strategy RESTCreateStrategy) field.ErrorList {
 	errs := strategy.Validate(ctx, obj)
+
+	if len(errs) == 0 {
+		objectMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return append(errs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get object metadata: %v", err)))
+		}
+
+		// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
+
+		// Custom validation (including name validation) passed
+		// Now run common validation on object meta
+		// Do this *after* custom validation so that specific error messages are shown whenever possible
+		errs = append(errs, genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata"))...)
+	}
+
 	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
 		errs = dv.ValidateDeclaratively(ctx, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(ctx, obj, nil))
 	}
 
-	if len(errs) > 0 {
-		return errs
-	}
-
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return append(errs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get object metadata: %w", err)))
-	}
-
-	// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
-
-	// Custom validation (including name validation) passed
-	// Now run common validation on object meta
-	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	return genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata"))
+	return errs
 }
 
 // CheckGeneratedNameError checks whether an error that occurred creating a resource is due
