@@ -45,7 +45,7 @@ func GetCAdvisorRootDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, fmt.Sprintf("%s/", "github.com/google/cadvisor")), nil
+	return filepath.Join(dir, fmt.Sprintf("%s/", "github.com/dims/libcadvisor")), nil
 }
 
 // RootDir gets the on-disk kubernetes source directory, returning an error is none is found

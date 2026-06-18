@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
 	"strconv"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	"k8s.io/kubernetes/test/e2e/perftype"
-	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 )
 
 const (
@@ -65,47 +63,6 @@ func logPerfData(p *perftype.PerfData, perfType string) {
 		return
 	}
 	dumpDataToFile(p, p.Labels, "performance-"+perfType)
-}
-
-// logDensityTimeSeries writes the time series data of operation and resource
-// usage to a standalone json file if the framework.TestContext.ReportDir is
-// non-empty, or to the general build log otherwise. If an error occurs,
-// no perf data will be logged.
-func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1.Time, testInfo map[string]string) {
-	timeSeries := &nodeperftype.NodeTimeSeries{
-		Labels:  testInfo,
-		Version: e2eperf.CurrentKubeletPerfMetricsVersion,
-	}
-	// Attach operation time series.
-	timeSeries.OperationData = map[string][]int64{
-		"create":  getCumulatedPodTimeSeries(create),
-		"running": getCumulatedPodTimeSeries(watch),
-	}
-	// Attach resource time series.
-	timeSeries.ResourceData = rc.GetResourceTimeSeries()
-
-	if framework.TestContext.ReportDir == "" {
-		framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
-		return
-	}
-	dumpDataToFile(timeSeries, timeSeries.Labels, "time_series")
-}
-
-type int64arr []int64
-
-func (a int64arr) Len() int           { return len(a) }
-func (a int64arr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a int64arr) Less(i, j int) bool { return a[i] < a[j] }
-
-// getCumulatedPodTimeSeries gets the cumulative pod number time series.
-func getCumulatedPodTimeSeries(timePerPod map[string]metav1.Time) []int64 {
-	timeSeries := make(int64arr, 0)
-	for _, ts := range timePerPod {
-		timeSeries = append(timeSeries, ts.Time.UnixNano())
-	}
-	// Sort all timestamps.
-	sort.Sort(timeSeries)
-	return timeSeries
 }
 
 // getLatencyPerfData returns perf data of pod startup latency.

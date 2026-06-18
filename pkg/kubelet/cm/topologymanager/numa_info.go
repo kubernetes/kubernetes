@@ -19,7 +19,7 @@ package topologymanager
 import (
 	"fmt"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/dims/libcadvisor/model"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 

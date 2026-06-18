@@ -25,12 +25,12 @@ import (
 	"github.com/spf13/pflag"
 
 	// ensure libs have a chance to globally register their flags
-	_ "github.com/google/cadvisor/container/common"
-	_ "github.com/google/cadvisor/container/containerd"
-	_ "github.com/google/cadvisor/container/raw"
-	_ "github.com/google/cadvisor/machine"
-	_ "github.com/google/cadvisor/manager"
-	_ "github.com/google/cadvisor/storage"
+	_ "github.com/dims/libcadvisor/container/common"
+	_ "github.com/dims/libcadvisor/container/containerd"
+	_ "github.com/dims/libcadvisor/container/raw"
+	_ "github.com/dims/libcadvisor/machine"
+	_ "github.com/dims/libcadvisor/manager"
+	_ "github.com/dims/libcadvisor/storage"
 )
 
 // addCadvisorFlags adds flags from cadvisor

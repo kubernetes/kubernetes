@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/dims/libcadvisor/model"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/klog/v2"
 

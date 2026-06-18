@@ -33,11 +33,10 @@ import (
 	"strings"
 	"time"
 
+	cadvisormetrics "github.com/dims/libcadvisor/container"
+	"github.com/dims/libcadvisor/metrics"
+	cadvisorapi "github.com/dims/libcadvisor/model"
 	"github.com/emicklei/go-restful/v3"
-	cadvisormetrics "github.com/google/cadvisor/container"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorv2 "github.com/google/cadvisor/info/v2"
-	"github.com/google/cadvisor/metrics"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
@@ -527,8 +526,8 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
 		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
-		cadvisorOpts := cadvisorv2.RequestOptions{
-			IdType:    cadvisorv2.TypeName,
+		cadvisorOpts := cadvisorapi.RequestOptions{
+			IdType:    cadvisorapi.TypeName,
 			Count:     1,
 			Recursive: true,
 		}
@@ -1313,7 +1312,7 @@ type prometheusHostAdapter struct {
 	host HostInterface
 }
 
-func (a prometheusHostAdapter) GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (a prometheusHostAdapter) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return a.host.GetRequestedContainersInfo(containerName, options)
 }
 func (a prometheusHostAdapter) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {

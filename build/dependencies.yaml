@@ -237,15 +237,6 @@ dependencies:
     - path: build/common.sh
       match: __default_setcap_version=
 
-  # cadvisor
-  - name: "gcr.io/cadvisor/cadvisor: dependents"
-    version: "v0.47.2"
-    refPaths:
-    - path: test/e2e_node/resource_collector.go
-      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
-    - path: test/e2e_node/image_list.go
-      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
-
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"
     version: v20260108-7f313c340e@sha256:4d778a001ae3f4247b2b61d8a870319e71d66c87556969a6399b90972e4d0491

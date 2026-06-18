@@ -19,8 +19,8 @@ package topology
 import (
 	"fmt"
 
+	cadvisorapi "github.com/dims/libcadvisor/model"
 	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/utils/cpuset"
 )
 

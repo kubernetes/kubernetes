@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	cadvisormemory "github.com/google/cadvisor/cache/memory"
+	cadvisormemory "github.com/dims/libcadvisor/cache/memory"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

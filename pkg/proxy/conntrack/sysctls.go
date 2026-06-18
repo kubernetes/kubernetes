@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/machine"
-	"github.com/google/cadvisor/utils/sysfs"
+	"github.com/dims/libcadvisor/machine"
+	"github.com/dims/libcadvisor/utils/sysfs"
 
 	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"

@@ -17,8 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	cadvisorapi "github.com/dims/libcadvisor/model"
 	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
 

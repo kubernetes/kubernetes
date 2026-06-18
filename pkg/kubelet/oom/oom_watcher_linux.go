@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
-	"github.com/google/cadvisor/utils/oomparser"
+	"github.com/dims/libcadvisor/utils/oomparser"
 )
 
 type streamer interface {

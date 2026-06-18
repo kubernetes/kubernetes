@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/google/cadvisor/container/crio"
-	cadvisorfs "github.com/google/cadvisor/fs"
+	"github.com/dims/libcadvisor/container/crio"
+	cadvisorfs "github.com/dims/libcadvisor/fs"
 	"github.com/opencontainers/cgroups"
 	"k8s.io/klog/v2"
 )

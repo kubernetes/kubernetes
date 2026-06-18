@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hnslib"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/dims/libcadvisor/model"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -83,10 +83,10 @@ func (p *criStatsProvider) listContainerNetworkStats(logger klog.Logger) (map[st
 }
 
 func (p *criStatsProvider) addCRIPodContainerStats(logger klog.Logger, criSandboxStat *runtimeapi.PodSandboxStats,
-	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
+	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapi.FilesystemInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
-	rootFsInfo *cadvisorapiv2.FsInfo,
+	rootFsInfo *cadvisorapi.FilesystemInfo,
 	updateCPUNanoCoreUsage bool) error {
 	for _, criContainerStat := range criSandboxStat.GetWindows().GetContainers() {
 		container, found := containerMap[criContainerStat.Attributes.Id]
@@ -109,8 +109,8 @@ func (p *criStatsProvider) makeWinContainerStats(
 	logger klog.Logger,
 	stats *runtimeapi.WindowsContainerStats,
 	container *runtimeapi.Container,
-	rootFsInfo *cadvisorapiv2.FsInfo,
-	fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
+	rootFsInfo *cadvisorapi.FilesystemInfo,
+	fsIDtoInfo map[string]*cadvisorapi.FilesystemInfo,
 	meta *runtimeapi.PodSandboxMetadata) (*statsapi.ContainerStats, error) {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
