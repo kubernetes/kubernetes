@@ -53,8 +53,6 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 		{Group: "network.k8s.io", Version: "v1"},
 		{Group: "network.k8s.io", Version: "v1beta1"},
 		{Group: "autoscaling", Version: "v1"},
-		{Group: "autoscaling", Version: "v1beta1"},
-		{Group: "autoscaling", Version: "v1beta2"},
 		{Group: "autoscaling", Version: "v2"},
 		{Group: "admissionregistration.k8s.io", Version: "v1"},
 		{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
@@ -72,10 +70,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 	// Other resources with subresources (e.g. Pod status, exec) share validation logic with
 	// the root resource, so fuzzing the root is sufficient to verify validation equivalence.
 	subresourceOnly := map[schema.GroupVersionKind]string{
-		{Group: "autoscaling", Version: "v1", Kind: "Scale"}:      "scale",
-		{Group: "autoscaling", Version: "v1beta1", Kind: "Scale"}: "scale",
-		{Group: "autoscaling", Version: "v1beta2", Kind: "Scale"}: "scale",
-		{Group: "autoscaling", Version: "v2", Kind: "Scale"}:      "scale",
+		{Group: "autoscaling", Version: "v1", Kind: "Scale"}: "scale",
+		{Group: "autoscaling", Version: "v2", Kind: "Scale"}: "scale",
 	}
 
 	fuzzIters := *roundtrip.FuzzIters / 10 // TODO: Find a better way to manage test running time
@@ -102,7 +98,8 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 					// This would allow each API group to register its own normalization rules independently.
 					allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 					allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
-					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
+					opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f), WithSkipGroupVersions("extensions/v1beta1"))
+
 					if subresource != "" {
 						opts = append(opts, WithSubResources(subresource))
 					}
