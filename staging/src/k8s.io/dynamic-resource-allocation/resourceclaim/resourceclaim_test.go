@@ -174,6 +174,12 @@ func TestResourceClaimIsFor(t *testing.T) {
 				claim:         claimNoOwner,
 				expectedError: `ResourceClaim kube-system/claimNoOwner was not created for Pod kube-system/podOwner (Pod is not owner)`,
 			},
+			"accept-podgroup-without-podgroup": {
+				pod:            podOwner,
+				claim:          claimNoOwner,
+				expectedError:  `ResourceClaim kube-system/claimNoOwner was not created for Pod kube-system/podOwner (Pod is not owner)`,
+				acceptPodGroup: true,
+			},
 			"different-namespace": {
 				pod:           podOwner,
 				claim:         userClaimWithOwner,
