@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 	"sigs.k8s.io/yaml"
 )
 
@@ -292,6 +293,113 @@ func TestRoundTripManagedFields(t *testing.T) {
 				t.Fatalf("expected:\n%v\nbut got:\n%v", test, string(marshaled))
 			}
 		})
+	}
+}
+
+// TestEncodeReusesRawFieldsOfUnchangedManagers verifies that encoding reuses
+// the decoded FieldsV1 raw bytes for managers whose VersionedSet was not
+// replaced, and re-encodes the set for managers whose VersionedSet was.
+func TestEncodeReusesRawFieldsOfUnchangedManagers(t *testing.T) {
+	var unmarshaled []metav1.ManagedFieldsEntry
+	if err := yaml.Unmarshal([]byte(`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:spec:
+      f:replicas: {}
+  manager: foo
+  operation: Update
+`), &unmarshaled); err != nil {
+		t.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	decoded, err := DecodeManagedFields(unmarshaled)
+	if err != nil {
+		t.Fatalf("did not expect decoding error but got: %v", err)
+	}
+
+	encoded, err := encodeManagedFields(decoded)
+	if err != nil {
+		t.Fatalf("did not expect encoding error but got: %v", err)
+	}
+	if encoded[0].FieldsV1 != unmarshaled[0].FieldsV1 {
+		t.Errorf("expected unchanged manager to reuse the decoded FieldsV1, got: %s", encoded[0].FieldsV1)
+	}
+
+	for manager, vs := range decoded.Fields() {
+		added := fieldpath.NewSet(fieldpath.MakePathOrDie("spec", "paused"))
+		decoded.Fields()[manager] = fieldpath.NewVersionedSet(vs.Set().Union(added), vs.APIVersion(), vs.Applied())
+	}
+	encoded, err = encodeManagedFields(decoded)
+	if err != nil {
+		t.Fatalf("did not expect encoding error but got: %v", err)
+	}
+	set, err := FieldsToSet(*encoded[0].FieldsV1)
+	if err != nil {
+		t.Fatalf("did not expect decoding error but got: %v", err)
+	}
+	want := fieldpath.NewSet(
+		fieldpath.MakePathOrDie("spec", "paused"),
+		fieldpath.MakePathOrDie("spec", "replicas"),
+	)
+	if !set.Equals(want) {
+		t.Errorf("expected re-encoded set:\n%v\nbut got:\n%v", want, &set)
+	}
+}
+
+func BenchmarkEncodeManagedFields(b *testing.B) {
+	var unmarshaled []metav1.ManagedFieldsEntry
+	if err := yaml.Unmarshal([]byte(`- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:metadata:
+      f:labels:
+        f:app: {}
+      f:name: {}
+    f:spec:
+      f:replicas: {}
+      f:selector:
+        f:matchLabels:
+          f:app: {}
+      f:template:
+        f:metadata:
+          f:labels:
+            f:app: {}
+        f:spec:
+          f:containers:
+            k:{"name":"nginx"}:
+              .: {}
+              f:image: {}
+              f:name: {}
+              f:ports:
+                i:0:
+                  f:containerPort: {}
+  manager: foo
+  operation: Apply
+- apiVersion: v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:status:
+      f:availableReplicas: {}
+      f:observedGeneration: {}
+      f:readyReplicas: {}
+      f:replicas: {}
+      f:updatedReplicas: {}
+  manager: bar
+  operation: Update
+  subresource: status
+  time: "2011-12-13T14:15:16Z"
+`), &unmarshaled); err != nil {
+		b.Fatalf("did not expect yaml unmarshalling error but got: %v", err)
+	}
+	decoded, err := DecodeManagedFields(unmarshaled)
+	if err != nil {
+		b.Fatalf("did not expect decoding error but got: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := encodeManagedFields(decoded); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
