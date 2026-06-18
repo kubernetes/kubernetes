@@ -8168,3 +8168,177 @@ func TestPodGroupSchedulingPlacementAlgorithm_PlacementLimit(t *testing.T) {
 		})
 	}
 }
+
+// fixedOrderPlacementPlugin returns placements in a deterministic order, so a test can verify
+// that the scheduler itself randomizes the evaluation order.
+type fixedOrderPlacementPlugin struct {
+	placementNames   []string
+	nodePerPlacement map[string]string
+}
+
+func (p *fixedOrderPlacementPlugin) Name() string { return "fixedOrderPlacementPlugin" }
+
+func (p *fixedOrderPlacementPlugin) GeneratePlacements(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
+	parentNodes := map[string]fwk.NodeInfo{}
+	for _, node := range parentPlacement.Nodes {
+		parentNodes[node.Node().Name] = node
+	}
+	placements := make([]*fwk.Placement, 0, len(p.placementNames))
+	for _, name := range p.placementNames {
+		placements = append(placements, &fwk.Placement{
+			Name:  name,
+			Nodes: []fwk.NodeInfo{parentNodes[p.nodePerPlacement[name]]},
+		})
+	}
+	return &fwk.GeneratePlacementsResult{Placements: placements}, nil
+}
+
+func TestPodGroupSchedulingPlacementAlgorithm_UsesShufflePlacements(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.TopologyAwareWorkloadScheduling: true,
+		features.GenericWorkload:                 true,
+	})
+
+	const numPlacements = 10
+	placementPlugin := &fixedOrderPlacementPlugin{nodePerPlacement: map[string]string{}}
+	nodes := make([]*v1.Node, numPlacements)
+	for i := range numPlacements {
+		nodeName := fmt.Sprintf("n%v", i)
+		placementName := fmt.Sprintf("p%v", i)
+		nodes[i] = st.MakeNode().Name(nodeName).UID(nodeName).Obj()
+		placementPlugin.placementNames = append(placementPlugin.placementNames, placementName)
+		placementPlugin.nodePerPlacement[placementName] = nodeName
+	}
+
+	logger, ctx := ktesting.NewTestContext(t)
+	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+	cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
+	for _, node := range nodes {
+		cache.AddNode(logger, node)
+	}
+	testPodGroup := &schedulingv1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
+	}
+	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
+	snapshot := internalcache.NewEmptySnapshot()
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("Failed to update snapshot: %v", err)
+	}
+
+	trackingFilter := &trackingFilterPlugin{scoredNodes: sets.New[string]()}
+	registry := []tf.RegisterPluginFunc{
+		tf.RegisterPlacementGeneratePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return placementPlugin, nil
+		}),
+		tf.RegisterFilterPlugin(trackingFilter.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return trackingFilter, nil
+		}),
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+
+	schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithPodNominator(queue),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create new framework: %v", err)
+	}
+
+	// Without a nomination, the first feasible placement must be the one moved to the front.
+	const wantPlacement = "p7"
+	sched := &Scheduler{
+		Cache:            cache,
+		nodeInfoSnapshot: snapshot,
+		SchedulingQueue:  queue,
+		Profiles:         profile.Map{"test-scheduler": schedFwk},
+		shufflePlacements: func(placements []*fwk.Placement) {
+			for i, p := range placements {
+				if p.Name == wantPlacement {
+					placements[0], placements[i] = placements[i], placements[0]
+					return
+				}
+			}
+		},
+	}
+	sched.initAlgorithm()
+	sched.SchedulePod = sched.algorithm.SchedulePod
+
+	for _, test := range []struct {
+		name              string
+		nominatedNodeName string
+		wantNode          string
+	}{
+		{
+			name:     "first shuffled placement",
+			wantNode: placementPlugin.nodePerPlacement[wantPlacement],
+		},
+		{
+			name:              "nominated placement precedes shuffled placements",
+			nominatedNodeName: "n0",
+			wantNode:          "n0",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			trackingFilter.scoredNodes = sets.New[string]()
+			podGroupPod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").NominatedNodeName(test.nominatedNodeName).Obj()
+			pgInfo := &framework.QueuedPodGroupInfo{
+				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
+					fwk.PodGroupKey("default", "pg"): {
+						{PodInfo: &framework.PodInfo{Pod: podGroupPod}},
+					},
+				},
+				PodGroupInfo: &framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
+					UnscheduledPods: []*v1.Pod{podGroupPod},
+				},
+			}
+
+			result, revertFns := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
+			revertFns.revert()
+			if !result.status.IsSuccess() {
+				t.Fatalf("Expected successful placement, got %v", result.status)
+			}
+
+			if got := trackingFilter.scoredNodes; got.Len() != 1 || !got.Has(test.wantNode) {
+				t.Errorf("Expected only %s to be checked, got %v", test.wantNode, sets.List(got))
+			}
+		})
+	}
+}
+
+func TestNewShufflePlacementsRandomizesOrder(t *testing.T) {
+	client := clientsetfake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sched, err := New(ctx, client, informerFactory, nil, profile.NewRecorderFactory(eventBroadcaster))
+	if err != nil {
+		t.Fatalf("Failed to create scheduler: %v", err)
+	}
+	if sched.shufflePlacements == nil {
+		t.Fatal("Expected New to set a non-nil shufflePlacements function")
+	}
+
+	const numPlacements = 10
+	const runs = 50
+	firstNames := sets.New[string]()
+	for range runs {
+		placements := make([]*fwk.Placement, numPlacements)
+		for i := range placements {
+			placements[i] = &fwk.Placement{Name: fmt.Sprintf("p%d", i)}
+		}
+		sched.shufflePlacements(placements)
+		firstNames.Insert(placements[0].Name)
+	}
+
+	if len(firstNames) <= 1 {
+		t.Errorf("Expected the default shuffler to randomize placement order, but saw only %d distinct first placement(s) over %d runs", len(firstNames), runs)
+	}
+}
