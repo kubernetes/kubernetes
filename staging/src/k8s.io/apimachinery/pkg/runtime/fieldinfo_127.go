@@ -28,6 +28,6 @@ func isInlinedFromTag(field reflect.StructField, tagName string, tagDirectives [
 		// optionally unwrap a single level
 		fieldType = fieldType.Elem()
 	}
-	// TODO: when switching to direct use of json/v2, error on non-struct inlining and use of inline with other directives
-	return fieldType.Kind() == reflect.Struct && tagName == "" && len(tagDirectives) == 1 && tagDirectives[0] == "inline"
+	// TODO: when switching to direct use of json/v2, error on non-struct embedding and use of embed with other directives
+	return fieldType.Kind() == reflect.Struct && tagName == "" && len(tagDirectives) == 1 && tagDirectives[0] == "embed"
 }
