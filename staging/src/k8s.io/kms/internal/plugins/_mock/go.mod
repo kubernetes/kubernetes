@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260618013952-2dbe2afc5ae7

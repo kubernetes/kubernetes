@@ -38,6 +38,9 @@ type Set struct {
 	// members of the set. Appearance in this list does not imply membership.
 	// Note: this is a tree, not an arbitrary graph.
 	Children SetNodeMap
+
+	// frozen marks this Set as read-only.
+	frozen bool
 }
 
 // NewSet makes a set from a list of paths.
@@ -51,6 +54,7 @@ func NewSet(paths ...Path) *Set {
 
 // Copy returns a copy of the Set.
 // This is not a full deep copy as any contained value.Value is not copied.
+// The returned Set is not frozen.
 func (s *Set) Copy() *Set {
 	return &Set{
 		Members:  s.Members.Copy(),
@@ -58,9 +62,30 @@ func (s *Set) Copy() *Set {
 	}
 }
 
+// Freeze marks the Set as read-only. Calling functions that mutate state
+// results in a panic. The Members and Children are also frozen.
+//
+// Freeze only guards the set's structure. It does not deep-copy the contained
+// PathElements and Values as these types are expected to be treated as
+// immutable across structured-merge-diff.
+//
+// Freeze is not airtight. It is designed to ensure well-behaved consumers of
+// this API do not accidentally mutate Sets that are intended to be read-only
+// but it does not prevent all possible forms of mutation.
+func (s *Set) Freeze() *Set {
+	s.frozen = true
+	s.Members.freeze()
+	s.Children.freeze()
+	return s
+}
+
 // Insert adds the field identified by `p` to the set. Important: parent fields
 // are NOT added to the set; if that is desired, they must be added separately.
+// Insert panics if the Set has been frozen.
 func (s *Set) Insert(p Path) {
+	if s.frozen {
+		panic("fieldpath: Insert called on a frozen Set")
+	}
 	if len(p) == 0 {
 		// Zero-length path identifies the entire object; we don't
 		// track top-level ownership.
@@ -465,6 +490,17 @@ type setNode struct {
 // SetNodeMap is a map of PathElement to subset.
 type SetNodeMap struct {
 	members sortedSetNode
+
+	// frozen marks the SetNodeMap as read-ohnly.
+	frozen bool
+}
+
+// freeze marks the map read-only and freezes every child Set.
+func (s *SetNodeMap) freeze() {
+	s.frozen = true
+	for i := range s.members {
+		s.members[i].set.Freeze()
+	}
 }
 
 type sortedSetNode []setNode
@@ -486,7 +522,11 @@ func (s *SetNodeMap) Copy() SetNodeMap {
 }
 
 // Descend adds pe to the set if necessary, returning the associated subset.
+// Descend panics if the set has been frozen.
 func (s *SetNodeMap) Descend(pe PathElement) *Set {
+	if s.frozen {
+		panic("fieldpath: Descend called on a frozen Set")
+	}
 	loc, found := slices.BinarySearchFunc(s.members, pe, func(a setNode, b PathElement) int {
 		return a.pathElement.Compare(b)
 	})

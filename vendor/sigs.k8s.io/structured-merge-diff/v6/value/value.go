@@ -118,6 +118,11 @@ func readJSONIter(iter *jsoniter.Iterator) (Value, error) {
 	if iter.Error != nil && iter.Error != io.EOF {
 		return nil, iter.Error
 	}
+	if iter.WhatIsNext(); iter.Error == nil {
+		// Piggy back on scanner aware error reporting here.
+		iter.ReportError("managedFields parsing", "unexpected trailing data after JSON object")
+		return nil, iter.Error
+	}
 	return NewValueInterface(v), nil
 }
 

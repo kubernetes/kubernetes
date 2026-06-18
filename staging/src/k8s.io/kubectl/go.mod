@@ -45,7 +45,7 @@ require (
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
 	sigs.k8s.io/kustomize/kyaml v0.21.1
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.4.0
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260618013952-2dbe2afc5ae7
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -113,4 +113,5 @@ replace (
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/metrics => ../metrics
 	k8s.io/streaming => ../streaming
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260618013952-2dbe2afc5ae7
 )

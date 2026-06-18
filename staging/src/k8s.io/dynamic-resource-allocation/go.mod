@@ -86,7 +86,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20260519202549-bbf5c5577288 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260618013952-2dbe2afc5ae7 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
@@ -100,4 +100,5 @@ replace (
 	k8s.io/kms => ../kms
 	k8s.io/kubelet => ../kubelet
 	k8s.io/streaming => ../streaming
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260618013952-2dbe2afc5ae7
 )

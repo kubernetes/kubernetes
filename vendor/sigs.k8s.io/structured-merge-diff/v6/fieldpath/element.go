@@ -227,6 +227,14 @@ func KeyByFields(nameValues ...interface{}) *value.FieldList {
 // TODO: serialize as a list.
 type PathElementSet struct {
 	members sortedPathElements
+
+	// frozen marks the PathElementSet as read-only.
+	frozen bool
+}
+
+// freeze marks the set read-only.
+func (s *PathElementSet) freeze() {
+	s.frozen = true
 }
 
 func MakePathElementSet(size int) PathElementSet {
@@ -254,7 +262,11 @@ func (s PathElementSet) Copy() PathElementSet {
 }
 
 // Insert adds pe to the set.
+// Insert panics if the set has been frozen.
 func (s *PathElementSet) Insert(pe PathElement) {
+	if s.frozen {
+		panic("fieldpath: Insert called on a frozen Set")
+	}
 	loc, found := slices.BinarySearchFunc(s.members, pe, func(a, b PathElement) int {
 		return a.Compare(b)
 	})
