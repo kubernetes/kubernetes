@@ -18,6 +18,7 @@ package queue
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-base/metrics"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -28,21 +29,25 @@ type podGroupMemberPods struct {
 	// podGroupToPodInfos stores QueuedPodInfos keyed by their pod group key (pg-type/namespace/pg-name),
 	// and then by pod key (namespace/pg-name).
 	podGroupToPodInfos map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo
+	podsRecorder       metrics.GaugeMetric
 }
 
-func newPodGroupMemberPods() *podGroupMemberPods {
+func newPodGroupMemberPods(podsRecorder metrics.GaugeMetric) *podGroupMemberPods {
 	return &podGroupMemberPods{
 		podGroupToPodInfos: make(map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo),
+		podsRecorder:       podsRecorder,
 	}
 }
 
 // add adds a pod info.
+// It also increments the metric counter.
 func (p *podGroupMemberPods) add(pInfo *framework.QueuedPodInfo) {
 	pgKey, pKey := podGroupKeyForPod(pInfo.Pod), podKey(pInfo.Pod)
 	if p.podGroupToPodInfos[pgKey] == nil {
 		p.podGroupToPodInfos[pgKey] = make(map[fwk.EntityKey]*framework.QueuedPodInfo)
 	}
 	p.podGroupToPodInfos[pgKey][pKey] = pInfo
+	p.podsRecorder.Inc()
 }
 
 // has checks if the pod is tracked.
@@ -77,6 +82,7 @@ func (p *podGroupMemberPods) update(newPod *v1.Pod) *framework.QueuedPodInfo {
 }
 
 // delete removes a specific pod and returns its pod info if found.
+// It also decrements the metric counter.
 func (p *podGroupMemberPods) delete(podLookup *v1.Pod) *framework.QueuedPodInfo {
 	pgKey, pKey := podGroupKeyForPod(podLookup), podKey(podLookup)
 	if pInfo, ok := p.podGroupToPodInfos[pgKey][pKey]; ok {
@@ -84,6 +90,7 @@ func (p *podGroupMemberPods) delete(podLookup *v1.Pod) *framework.QueuedPodInfo 
 		if len(p.podGroupToPodInfos[pgKey]) == 0 {
 			delete(p.podGroupToPodInfos, pgKey)
 		}
+		p.podsRecorder.Dec()
 		return pInfo
 	}
 	return nil
@@ -100,7 +107,8 @@ func (p *podGroupMemberPods) list() []*v1.Pod {
 	return pods
 }
 
-// clearGroup removes and returns all pod infos for a specific pod group namespace and name.
+// clear removes and returns all pod infos for a specific pod group namespace and name.
+// It also decrements the metric counter for all cleared pods.
 func (p *podGroupMemberPods) clear(namespace, name string) []*framework.QueuedPodInfo {
 	pgKey := fwk.PodGroupKey(namespace, name)
 	if pInfos, ok := p.podGroupToPodInfos[pgKey]; ok {
@@ -108,6 +116,7 @@ func (p *podGroupMemberPods) clear(namespace, name string) []*framework.QueuedPo
 		var pInfoList []*framework.QueuedPodInfo
 		for _, pInfo := range pInfos {
 			pInfoList = append(pInfoList, pInfo)
+			p.podsRecorder.Dec()
 		}
 		return pInfoList
 	}

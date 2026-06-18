@@ -1142,7 +1142,8 @@
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
     of pods in unschedulableEntities that the scheduler attempted to schedule and
     failed; 'gated' is the number of unschedulable pods that the scheduler never attempted
-    to schedule because they are gated.
+    to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods;
+    'pending' means number of pods in pendingPodGroupPods.
   type: Gauge
   stabilityLevel: STABLE
   labels:

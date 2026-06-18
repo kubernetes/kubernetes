@@ -48,7 +48,9 @@ type activeQueuer interface {
 	// The event should show which event triggered this addition and is used for the metric recording.
 	// Note: it does not signal the pop() method to wake up,
 	// so the caller is responsible for calling broadcast() after executing this method.
-	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string)
+	// 'strategy' is the previous queuing strategy, helps determine if the entity moved into a different
+	// queue or newly added to correctly maintain incoming entities metrics.
+	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy)
 	// get returns the entity matching entity inside the activeQ.
 	get(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, bool)
 
@@ -344,7 +346,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (framework.QueuedEntityIn
 		if err != nil {
 			return nil, err
 		}
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Add(float64(entity.Size()))
+		recordIncomingEntitiesMetrics("active", entity, framework.PopFromBackoffQ, nil)
 	}
 	err = aq.unlockedMoveEntityToInFlight(logger, entity)
 	if err != nil {
@@ -403,12 +405,12 @@ func (aq *activeQueue) has(entityLookup framework.QueuedEntityInfo) bool {
 // The event should show which event triggered this addition and is used for the metric recording.
 // Note: it does not signal the pop() method to wake up,
 // so the caller is responsible for calling broadcast() after executing this method.
-func (aq *activeQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo, event string) {
+func (aq *activeQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
 	aq.queue.AddOrUpdate(entity)
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Add(float64(entity.Size()))
+	recordIncomingEntitiesMetrics("active", entity, event, strategy)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", activeQ)
 }
 
