@@ -83,6 +83,32 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("status", "conditions").Child("[1]", "type"), certificates.PodCertificateRequestConditionTypeDenied, `There may be at most one condition with type "Issued", "Denied", or "Failed"`).MarkFromImperative(),
 					},
 				},
+				{
+					Name: "invalid negative observedGeneration",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakObservedGeneration(-1),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.Invalid(
+							field.NewPath("status", "conditions").Index(0).Child("observedGeneration"),
+							int64(-1),
+							"",
+						).WithOrigin("minimum").MarkAlpha(),
+					},
+				},
+				{
+					Name: "valid observedGeneration zero",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakObservedGeneration(0),
+						),
+					},
+					ExpectedErrs: nil,
+				},
 			}
 
 			for _, tc := range testCases {

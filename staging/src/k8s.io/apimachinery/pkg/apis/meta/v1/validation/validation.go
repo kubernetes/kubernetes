@@ -293,7 +293,7 @@ func ValidateConditions(conditions []metav1.Condition, fldPath *field.Path) fiel
 	conditionTypeToFirstIndex := map[string]int{}
 	for i, condition := range conditions {
 		if _, ok := conditionTypeToFirstIndex[condition.Type]; ok {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), condition.Type).MarkCoveredByDeclarative().MarkAlpha())
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), condition.Type).MarkCoveredByDeclarative())
 		} else {
 			conditionTypeToFirstIndex[condition.Type] = i
 		}
@@ -328,7 +328,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	}
 
 	if condition.ObservedGeneration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero").WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 
 	if condition.LastTransitionTime.IsZero() {
