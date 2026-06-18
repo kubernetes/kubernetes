@@ -2920,7 +2920,11 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 }
 
 func TestSchedulerSchedulePod(t *testing.T) {
-	fts := feature.Features{}
+	fts := feature.Features{
+		// Feature gate(s) that are beta (enabled by default) must be explicitly set
+		// to true here to match the default feature gate state.
+		EnableStorageCapacityScoring: true,
+	}
 	tests := []struct {
 		name               string
 		registerPlugins    []tf.RegisterPluginFunc
