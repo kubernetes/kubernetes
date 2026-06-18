@@ -93,6 +93,14 @@ func (b *ProbeApplyConfiguration) WithGRPC(value *GRPCActionApplyConfiguration) 
 	return b
 }
 
+// WithH2CGet sets the H2CGet field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the H2CGet field is set to the value of the last call.
+func (b *ProbeApplyConfiguration) WithH2CGet(value *H2CGetActionApplyConfiguration) *ProbeApplyConfiguration {
+	b.ProbeHandlerApplyConfiguration.H2CGet = value
+	return b
+}
+
 // WithInitialDelaySeconds sets the InitialDelaySeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the InitialDelaySeconds field is set to the value of the last call.

@@ -32,6 +32,9 @@ type ProbeHandlerApplyConfiguration struct {
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
 	// GRPC specifies a GRPC HealthCheckRequest.
 	GRPC *GRPCActionApplyConfiguration `json:"grpc,omitempty"`
+	// H2CGet specifies an HTTP GET request over HTTP/2 cleartext (h2c) to the pod's IP address
+	// and the given container port.
+	H2CGet *H2CGetActionApplyConfiguration `json:"h2cGet,omitempty"`
 }
 
 // ProbeHandlerApplyConfiguration constructs a declarative configuration of the ProbeHandler type for use with
@@ -69,5 +72,13 @@ func (b *ProbeHandlerApplyConfiguration) WithTCPSocket(value *TCPSocketActionApp
 // If called multiple times, the GRPC field is set to the value of the last call.
 func (b *ProbeHandlerApplyConfiguration) WithGRPC(value *GRPCActionApplyConfiguration) *ProbeHandlerApplyConfiguration {
 	b.GRPC = value
+	return b
+}
+
+// WithH2CGet sets the H2CGet field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the H2CGet field is set to the value of the last call.
+func (b *ProbeHandlerApplyConfiguration) WithH2CGet(value *H2CGetActionApplyConfiguration) *ProbeHandlerApplyConfiguration {
+	b.H2CGet = value
 	return b
 }

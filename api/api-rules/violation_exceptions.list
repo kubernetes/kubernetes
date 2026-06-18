@@ -40,6 +40,7 @@ API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/core/v1,PodSpec,DeprecatedServiceAccount
+API rule violation: names_match,k8s.io/api/core/v1,ProbeHandler,H2CGet
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,CephMonitors
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDImage
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDPool

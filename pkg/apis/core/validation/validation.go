@@ -3345,6 +3345,7 @@ type commonHandler struct {
 	HTTPGet   *core.HTTPGetAction
 	TCPSocket *core.TCPSocketAction
 	GRPC      *core.GRPCAction
+	H2CGet    *core.H2CGetAction
 	Sleep     *core.SleepAction
 }
 
@@ -3354,6 +3355,7 @@ func handlerFromProbe(ph *core.ProbeHandler) commonHandler {
 		HTTPGet:   ph.HTTPGet,
 		TCPSocket: ph.TCPSocket,
 		GRPC:      ph.GRPC,
+		H2CGet:    ph.H2CGet,
 	}
 }
 
@@ -3454,6 +3456,16 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
 
+func validateHTTPHeaders(headers []core.HTTPHeader, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	for _, header := range headers {
+		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	return allErrors
+}
+
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
@@ -3463,11 +3475,7 @@ func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.
 	if !supportedHTTPSchemes.Has(http.Scheme) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, sets.List(supportedHTTPSchemes)))
 	}
-	for _, header := range http.HTTPHeaders {
-		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
-		}
-	}
+	allErrors = append(allErrors, validateHTTPHeaders(http.HTTPHeaders, fldPath)...)
 	return allErrors
 }
 
@@ -3493,6 +3501,14 @@ func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) fie
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
 }
+
+func validateH2CGetAction(h2c *core.H2CGetAction, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidatePortNumOrName(intstr.FromInt32(h2c.Port), fldPath.Child("port"))...)
+	allErrs = append(allErrs, validateHTTPHeaders(h2c.HTTPHeaders, fldPath)...)
+	return allErrs
+}
+
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
@@ -3526,6 +3542,16 @@ func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.P
 		} else {
 			numHandlers++
 			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"))...)
+		}
+	}
+	if handler.H2CGet != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("h2cGet"), "only supported when the H2CContainerProbe feature gate is enabled"))
+		} else if numHandlers > 0 {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("h2cGet"), "may not specify more than 1 handler type"))
+		} else {
+			numHandlers++
+			allErrors = append(allErrors, validateH2CGetAction(handler.H2CGet, fldPath.Child("h2cGet"))...)
 		}
 	}
 	if handler.Sleep != nil {
