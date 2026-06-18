@@ -109,6 +109,24 @@ func valueToObject(val value.Value) (runtime.Object, error) {
 	}
 }
 
+// GroupVersionOfTypedValue returns the extracted GroupVersion from the TypeMeta
+// fields of a TypedValue, or return false if no TypeMeta fields are found.
+func GroupVersionOfTypedValue(object *typed.TypedValue) (schema.GroupVersion, bool) {
+	val := object.AsValue()
+	if val == nil || !val.IsMap() {
+		return schema.GroupVersion{}, false
+	}
+	apiVersion, ok := val.AsMap().Get("apiVersion")
+	if !ok || !apiVersion.IsString() {
+		return schema.GroupVersion{}, false
+	}
+	groupVersion, err := schema.ParseGroupVersion(apiVersion.AsString())
+	if err != nil {
+		return schema.GroupVersion{}, false
+	}
+	return groupVersion, true
+}
+
 func indexModels(
 	typeParser *typed.Parser,
 	openAPISchemas map[string]*spec.Schema,
