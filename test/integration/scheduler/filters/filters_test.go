@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
@@ -3282,5 +3284,66 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDRAOptionalNodeOperationsSchedulingFilter(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "dra-optional-node-ops")
+	cs := testCtx.ClientSet
+	ns := testCtx.NS.Name
+
+	nodeWithFeature := st.MakeNode().Name("node-with-dra-opt").Obj()
+	nodeWithFeature.Status.DeclaredFeatures = []string{draoptionalnodeoperations.DraOptionalNodeOperations}
+	if _, err := testutils.CreateNode(cs, nodeWithFeature); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+	nodeWithoutFeature := st.MakeNode().Name("node-without-dra-opt").Obj()
+	nodeWithoutFeature.Status.DeclaredFeatures = []string{}
+	if _, err := testutils.CreateNode(cs, nodeWithoutFeature); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+		t.Fatalf("Failed to wait for nodes in cache: %v", err)
+	}
+
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-claim", Namespace: ns},
+		Spec:       resourceapi.ResourceClaimSpec{Devices: resourceapi.DeviceClaim{Requests: []resourceapi.DeviceRequest{{Name: "req", Exactly: &resourceapi.ExactDeviceRequest{DeviceClassName: "class"}}}}},
+	}
+	createdClaim, err := cs.ResourceV1().ResourceClaims(ns).Create(testCtx.Ctx, claim, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create claim: %v", err)
+	}
+
+	createdClaim.Status = resourceapi.ResourceClaimStatus{
+		Allocation: &resourceapi.AllocationResult{
+			AllocationTimestamp: &metav1.Time{Time: time.Now()},
+			Devices: resourceapi.DeviceAllocationResult{
+				Results: []resourceapi.DeviceRequestAllocationResult{
+					{Request: "req", Driver: "driver.com", Pool: "p", Device: "d", SkipNodeOperations: ptr.To(true)},
+				},
+			},
+		},
+	}
+	_, err = cs.ResourceV1().ResourceClaims(ns).UpdateStatus(testCtx.Ctx, createdClaim, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update claim status: %v", err)
+	}
+
+	pod := st.MakePod().Name("pod-skip").Namespace(ns).
+		Containers([]v1.Container{{Name: "c", Image: imageutils.GetPauseImageName(), Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim-ref", Request: "req"}}}}}).
+		PodResourceClaims(v1.PodResourceClaim{Name: "claim-ref", ResourceClaimName: ptr.To("my-claim")}).Obj()
+
+	if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, ns, pod.Name, []string{"node-with-dra-opt"}))
+	if err != nil {
+		t.Errorf("Expected pod to be scheduled to node-with-dra-opt, got err: %v", err)
 	}
 }
