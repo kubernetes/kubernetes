@@ -418,7 +418,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
-		AllowPodLifecycleSleepActionZeroValue:               utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
@@ -475,7 +474,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 			}
 		}
 
-		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(oldPodSpec)
 		// If oldPod has resize policy set on the restartable init container, we must allow it
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
@@ -778,7 +776,6 @@ func dropDisabledFields(
 	}
 
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
-	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
@@ -875,101 +872,6 @@ func dropDisabledPodLevelResources(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && !podLevelResourcesInUse(oldPodSpec) {
 		podSpec.Resources = nil
 	}
-}
-
-func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) || podLifecycleSleepActionInUse(oldPodSpec) {
-		return
-	}
-
-	adjustLifecycle := func(lifecycle *api.Lifecycle) {
-		if lifecycle.PreStop != nil && lifecycle.PreStop.Sleep != nil {
-			lifecycle.PreStop.Sleep = nil
-			if lifecycle.PreStop.Exec == nil && lifecycle.PreStop.HTTPGet == nil && lifecycle.PreStop.TCPSocket == nil {
-				lifecycle.PreStop = nil
-			}
-		}
-		if lifecycle.PostStart != nil && lifecycle.PostStart.Sleep != nil {
-			lifecycle.PostStart.Sleep = nil
-			if lifecycle.PostStart.Exec == nil && lifecycle.PostStart.HTTPGet == nil && lifecycle.PostStart.TCPSocket == nil {
-				lifecycle.PostStart = nil
-			}
-		}
-	}
-
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].Lifecycle == nil {
-			continue
-		}
-		adjustLifecycle(podSpec.Containers[i].Lifecycle)
-		if podSpec.Containers[i].Lifecycle.PreStop == nil && podSpec.Containers[i].Lifecycle.PostStart == nil && podSpec.Containers[i].Lifecycle.StopSignal == nil {
-			podSpec.Containers[i].Lifecycle = nil
-		}
-	}
-
-	for i := range podSpec.InitContainers {
-		if podSpec.InitContainers[i].Lifecycle == nil {
-			continue
-		}
-		adjustLifecycle(podSpec.InitContainers[i].Lifecycle)
-		if podSpec.InitContainers[i].Lifecycle.PreStop == nil && podSpec.InitContainers[i].Lifecycle.PostStart == nil && podSpec.InitContainers[i].Lifecycle.StopSignal == nil {
-			podSpec.InitContainers[i].Lifecycle = nil
-		}
-	}
-
-	for i := range podSpec.EphemeralContainers {
-		if podSpec.EphemeralContainers[i].Lifecycle == nil {
-			continue
-		}
-		adjustLifecycle(podSpec.EphemeralContainers[i].Lifecycle)
-		if podSpec.EphemeralContainers[i].Lifecycle.PreStop == nil && podSpec.EphemeralContainers[i].Lifecycle.PostStart == nil && podSpec.EphemeralContainers[i].Lifecycle.StopSignal == nil {
-			podSpec.EphemeralContainers[i].Lifecycle = nil
-		}
-	}
-}
-
-func podLifecycleSleepActionInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.Lifecycle == nil {
-			return true
-		}
-		if c.Lifecycle.PreStop != nil && c.Lifecycle.PreStop.Sleep != nil {
-			inUse = true
-			return false
-		}
-		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
-}
-
-func podLifecycleSleepActionZeroValueInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.Lifecycle == nil {
-			return true
-		}
-		if c.Lifecycle.PreStop != nil && c.Lifecycle.PreStop.Sleep != nil && c.Lifecycle.PreStop.Sleep.Seconds == 0 {
-			inUse = true
-			return false
-		}
-		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil && c.Lifecycle.PostStart.Sleep.Seconds == 0 {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
 }
 
 // dropDisabledPodStatusFields removes disabled fields from the pod status

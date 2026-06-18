@@ -3294,7 +3294,7 @@ func validateProbe(probe *core.Probe, gracePeriod *int64, fldPath *field.Path, o
 	if probe == nil {
 		return allErrs
 	}
-	allErrs = append(allErrs, validateHandler(handlerFromProbe(&probe.ProbeHandler), gracePeriod, fldPath, opts)...)
+	allErrs = append(allErrs, validateHandler(handlerFromProbe(&probe.ProbeHandler), gracePeriod, fldPath)...)
 
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.InitialDelaySeconds), fldPath.Child("initialDelaySeconds"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.TimeoutSeconds), fldPath.Child("timeoutSeconds"))...)
@@ -3366,21 +3366,14 @@ func handlerFromLifecycle(lh *core.LifecycleHandler) commonHandler {
 	}
 }
 
-func validateSleepAction(sleep *core.SleepAction, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateSleepAction(sleep *core.SleepAction, gracePeriod *int64, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	// We allow gracePeriod to be nil here because the pod in which this SleepAction
 	// is defined might have an invalid grace period defined, and we don't want to
 	// flag another error here when the real problem will already be flagged.
-	if opts.AllowPodLifecycleSleepActionZeroValue {
-		if gracePeriod != nil && (sleep.Seconds < 0 || sleep.Seconds > *gracePeriod) {
-			invalidStr := fmt.Sprintf("must be non-negative and less than terminationGracePeriodSeconds (%d)", *gracePeriod)
-			allErrors = append(allErrors, field.Invalid(fldPath, sleep.Seconds, invalidStr))
-		}
-	} else {
-		if gracePeriod != nil && (sleep.Seconds <= 0 || sleep.Seconds > *gracePeriod) {
-			invalidStr := fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d). Enable AllowPodLifecycleSleepActionZeroValue feature gate for zero sleep.", *gracePeriod)
-			allErrors = append(allErrors, field.Invalid(fldPath, sleep.Seconds, invalidStr))
-		}
+	if gracePeriod != nil && (sleep.Seconds < 0 || sleep.Seconds > *gracePeriod) {
+		invalidStr := fmt.Sprintf("must be non-negative and less than terminationGracePeriodSeconds (%d)", *gracePeriod)
+		allErrors = append(allErrors, field.Invalid(fldPath, sleep.Seconds, invalidStr))
 	}
 	return allErrors
 }
@@ -3493,7 +3486,7 @@ func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) fie
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
 }
-func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
 	if handler.Exec != nil {
@@ -3533,7 +3526,7 @@ func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.P
 			allErrors = append(allErrors, field.Forbidden(fldPath.Child("sleep"), "may not specify more than 1 handler type"))
 		} else {
 			numHandlers++
-			allErrors = append(allErrors, validateSleepAction(handler.Sleep, gracePeriod, fldPath.Child("sleep"), opts)...)
+			allErrors = append(allErrors, validateSleepAction(handler.Sleep, gracePeriod, fldPath.Child("sleep"))...)
 		}
 	}
 	if numHandlers == 0 {
@@ -3583,13 +3576,13 @@ func validateStopSignal(stopSignal *core.Signal, fldPath *field.Path, os *core.P
 	return allErrors
 }
 
-func validateLifecycle(lifecycle *core.Lifecycle, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, os *core.PodOS) field.ErrorList {
+func validateLifecycle(lifecycle *core.Lifecycle, gracePeriod *int64, fldPath *field.Path, os *core.PodOS) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if lifecycle.PostStart != nil {
-		allErrs = append(allErrs, validateHandler(handlerFromLifecycle(lifecycle.PostStart), gracePeriod, fldPath.Child("postStart"), opts)...)
+		allErrs = append(allErrs, validateHandler(handlerFromLifecycle(lifecycle.PostStart), gracePeriod, fldPath.Child("postStart"))...)
 	}
 	if lifecycle.PreStop != nil {
-		allErrs = append(allErrs, validateHandler(handlerFromLifecycle(lifecycle.PreStop), gracePeriod, fldPath.Child("preStop"), opts)...)
+		allErrs = append(allErrs, validateHandler(handlerFromLifecycle(lifecycle.PreStop), gracePeriod, fldPath.Child("preStop"))...)
 	}
 	if lifecycle.StopSignal != nil {
 		allErrs = append(allErrs, validateStopSignal(lifecycle.StopSignal, fldPath.Child("stopSignal"), os)...)
@@ -3835,7 +3828,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		switch {
 		case restartAlways:
 			if ctr.Lifecycle != nil {
-				allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, idxPath.Child("lifecycle"), opts, os)...)
+				allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, idxPath.Child("lifecycle"), os)...)
 			}
 			allErrs = append(allErrs, validateLivenessProbe(ctr.LivenessProbe, gracePeriod, idxPath.Child("livenessProbe"), opts)...)
 			allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, gracePeriod, idxPath.Child("readinessProbe"), opts)...)
@@ -4052,7 +4045,7 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 		// Regular init container and ephemeral container validation will return
 		// field.Forbidden() for these paths.
 		if ctr.Lifecycle != nil {
-			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, path.Child("lifecycle"), opts, os)...)
+			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, path.Child("lifecycle"), os)...)
 		}
 		allErrs = append(allErrs, validateLivenessProbe(ctr.LivenessProbe, gracePeriod, path.Child("livenessProbe"), opts)...)
 		allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, gracePeriod, path.Child("readinessProbe"), opts)...)
@@ -4474,8 +4467,6 @@ type PodValidationOptions struct {
 	ResourceIsPod bool
 	// Allow relaxed validation of environment variable names
 	AllowRelaxedEnvironmentVariableValidation bool
-	// Allows zero value for Pod Lifecycle Sleep Action
-	AllowPodLifecycleSleepActionZeroValue bool
 	// Allow only Recursive value of SELinuxChangePolicy.
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
