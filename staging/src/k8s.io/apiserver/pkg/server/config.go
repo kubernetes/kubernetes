@@ -1116,6 +1116,11 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 }
 
 func installAPI(name string, s *GenericAPIServer, c *Config) {
+	// EXPERIMENT: force-disable block profiling regardless of --contention-profiling.
+	// The only effect of EnableContentionProfiling is goruntime.SetBlockProfileRate(1)
+	// below; neutralizing it here lets us A/B the LIST p99 tail without touching the
+	// test-infra job config that still passes --contention-profiling=true.
+	c.EnableContentionProfiling = false
 	if c.EnableIndex {
 		routes.Index{}.Install(s.listedPathProvider, s.Handler.NonGoRestfulMux)
 	}
