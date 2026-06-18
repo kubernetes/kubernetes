@@ -2480,6 +2480,84 @@ func TestAllocator(t *testing.T,
 				},
 			)},
 		},
+		"claim-config-scoped-to-subrequests-of-one-request": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 1),
+						subRequest(subReq1, classB, 1),
+					),
+					deviceRequest(req1, classA, 1),
+				).withConfigs(
+					objects(
+						deviceClaimConfig([]string{req0SubReq0, req0SubReq1}, deviceConfiguration(driverA, "scoped")),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrap(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, 2),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResultWithConfigs(
+				localNodeSelector(node1),
+				objects(
+					deviceAllocationResult(req0SubReq0, driverA, pool1, device0, false),
+					deviceAllocationResult(req1, driverA, pool1, device1, false),
+				),
+				[]resourceapi.DeviceAllocationConfiguration{
+					{
+						Source:              resourceapi.AllocationConfigSourceClaim,
+						Requests:            []string{req0SubReq0, req0SubReq1},
+						DeviceConfiguration: deviceConfiguration(driverA, "scoped"),
+					},
+				},
+			)},
+		},
+		"claim-config-covering-all-requests-is-cleared": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 1),
+						subRequest(subReq1, classB, 1),
+					),
+					deviceRequest(req1, classA, 1),
+				).withConfigs(
+					objects(
+						// Covers req0 (via its selected subrequest) and req1 (by name),
+						// i.e. every top-level request, so Requests must collapse to nil.
+						deviceClaimConfig([]string{req0SubReq0, req1}, deviceConfiguration(driverA, "all")),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrap(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, 2),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResultWithConfigs(
+				localNodeSelector(node1),
+				objects(
+					deviceAllocationResult(req0SubReq0, driverA, pool1, device0, false),
+					deviceAllocationResult(req1, driverA, pool1, device1, false),
+				),
+				[]resourceapi.DeviceAllocationConfiguration{
+					{
+						Source:              resourceapi.AllocationConfigSourceClaim,
+						Requests:            nil,
+						DeviceConfiguration: deviceConfiguration(driverA, "all"),
+					},
+				},
+			)},
+		},
 		"prioritized-list-subrequests-with-expressions": {
 			features: Features{
 				PrioritizedList: true,
