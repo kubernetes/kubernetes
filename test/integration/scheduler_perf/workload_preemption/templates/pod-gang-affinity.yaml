@@ -11,6 +11,7 @@ spec:
       - labelSelector:
           matchLabels:
             app: blue
+            # Adding more lables to increase scheduler load while calculating affinity
             label1: value1
             label2: value2
             label3: value3

@@ -16,6 +16,8 @@ spec:
     name: pause
     ports:
     - containerPort: 80
+      # hostPort is configured with a formula based on .Index and the number of pods per node
+      # to guarantee that anchor pods are evenly distributed/spread across all nodes in the cluster.
       hostPort: {{AddInt 7000 (Mod .Index (DivideInt .podsCount .nodesCount))}}
     resources:
       limits:

@@ -35,13 +35,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestSchedulerPerf(t *testing.T) {
-	perf.RunIntegrationPerfScheduling(t, "preemption-performance-basic.yaml")
-	perf.RunIntegrationPerfScheduling(t, "preemption-performance-podgroups.yaml")
-	perf.RunIntegrationPerfScheduling(t, "preemption-performance-affinity.yaml")
+	perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
 }
 
 func BenchmarkPerfScheduling(b *testing.B) {
-	perf.RunBenchmarkPerfScheduling(b, "preemption-performance-basic.yaml", "workloadpreemption", nil)
-	perf.RunBenchmarkPerfScheduling(b, "preemption-performance-podgroups.yaml", "workloadpreemption", nil)
-	perf.RunBenchmarkPerfScheduling(b, "preemption-performance-affinity.yaml", "workloadpreemption", nil)
+	perf.RunBenchmarkPerfScheduling(b, "performance-config.yaml", "workloadpreemption", nil)
 }

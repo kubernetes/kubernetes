@@ -12,6 +12,8 @@ spec:
     {{if .hostPortBase}}
     ports:
     - containerPort: 80
+      # hostPort guarantees that all pods from the same PodGroup have the exact same host port.
+      # Since two pods cannot share the same host port on a single node, this forces them to land on different nodes.
       hostPort: {{AddInt .hostPortBase (DivideInt .Index .podsPerGroup)}}
     {{end}}
     resources:

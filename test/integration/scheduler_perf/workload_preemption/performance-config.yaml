@@ -1,0 +1,254 @@
+# GangPreemptionBasic tests basic gang preemption scenario - podgrup is preempting pods.
+- name: GangPreemptionBasic
+  featureGates:
+    GenericWorkload: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_podgroup_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [waiting_on_preemption, scheduled, unschedulable]
+      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createAny
+    countParam: $initPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: waitForPodGroups
+    namespace: gang-preempt-0
+    countParam: $initPodGroups
+  - opcode: startCollectingMetrics
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+  - opcode: stopCollectingMetrics
+
+  workloads:
+  - name: 2Nodes_10InitPods_1Gang_2Pods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      initPodGroups: 1
+      podsPerGroup: 2
+      gangCpuRequest: 3970m
+  # This test pases locally in ~1min
+  - name: 100Nodes_1000InitPods_1Gang_100Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 1
+      podsPerGroup: 100
+      gangCpuRequest: 3970m
+  # This test pases locally in ~1.5min
+  - name: 100Nodes_1000InitPods_10Gangs_10Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 10
+      podsPerGroup: 10
+      gangCpuRequest: 3970m
+
+# GangPreemptionPodGroups tests preemption scenario where podgroup preempts other podgroups.
+- name: GangPreemptionPodGroups
+  featureGates:
+    GenericWorkload: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_podgroup_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [waiting_on_preemption, scheduled, unschedulable]
+      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createAny
+    countParam: $lowPriorityGroups
+    namespace: gang-preempt-1
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 1000
+  - opcode: waitForPodGroups
+    namespace: gang-preempt-1
+    countParam: $lowPriorityGroups
+  - opcode: createPods
+    countParam: $lowPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $lowPriorityCpuRequest
+      hostPortBase: 8000
+  - opcode: createAny
+    countParam: $highPriorityGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 9999999
+  - opcode: waitForPodGroups
+    namespace: gang-preempt-0
+    countParam: $highPriorityGroups
+  - opcode: startCollectingMetrics
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    countParam: $highPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $highPriorityCpuRequest
+      hostPortBase: 9000
+  - opcode: stopCollectingMetrics
+
+  workloads:
+  - name: 2Nodes_2LowPriorityGangs_1Gang_2Pods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      lowPriorityGroups: 2
+      highPriorityGroups: 1
+      podsPerGroup: 2
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  # Scenario where 100 nodes have 5 distinct low-priority PodGroups (each consuming 600m CPU per node).
+  # An incoming high-priority preemptor PodGroup (100 pods, 3500m CPU per node) requires 2500m more CPU per node.
+  # It evicts all low-priority PodGroups to fit successfully.
+  - name: 100Nodes_5LowPriorityGangs_1PreemptorGang_EvictAllGangs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityGroups: 5
+      highPriorityGroups: 1
+      podsPerGroup: 100
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  # Scenario where 100 nodes have 50 distinct low-priority PodGroups.
+  # We have 10 high priority preemptor PodGroups of 10 pods each.
+  # It evicts all low-priority PodGroups to fit successfully.
+  - name: 100Nodes_50LowPriorityGangs_10PreemptorGangs_10Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityGroups: 50
+      highPriorityGroups: 10
+      podsPerGroup: 10
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+
+# GangPreemptionAffinity benchmarks the performance of gang preemption (WorkloadAwarePreemption)
+# in the presence of pod affinity constraints.
+#
+# The scenario flow is:
+# 1. Create a set of high-priority "anchor pods" that are evenly distributed across all nodes
+#    using host port conflicts to ensure uniform spread.
+# 2. Fill the cluster with low-priority pods.
+# 3. Submit high-priority PodGroups (gangs) whose pods have required podAffinity targeting the
+#    labels of the anchor pods.
+# 4. This forces the gang pods to schedule on nodes containing anchor pods, triggering preemption
+#    of the low-priority pods on those specific nodes to accommodate the new gang pods.
+- name: GangPreemptionAffinity
+  featureGates:
+    GenericWorkload: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_podgroup_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [waiting_on_preemption, scheduled, unschedulable]
+      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 3
+  # create high priority pods that podgroup will anchor on
+  - opcode: createPods
+    countParam: $anchorPods
+    podTemplatePath: templates/pod-anchor.yaml
+    namespace: gang-preempt-2
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $anchorPods
+  # create low priority pods that will be preempted
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createAny
+    countParam: $initPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: waitForPodGroups
+    namespace: gang-preempt-0
+    countParam: $initPodGroups
+  - opcode: startCollectingMetrics
+    namespaces: [gang-preempt-0]
+  - opcode: createPods
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/pod-gang-affinity.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: stopCollectingMetrics
+
+  workloads:
+  - name: 2Nodes_10InitPods_1Gang_2Pods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      anchorPods: 2
+      initPods: 10
+      initPodGroups: 1
+      podsPerGroup: 2
+  # This test pases locally in ~1min
+  - name: 100Nodes_1000InitPods_1Gang_100Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 1
+      podsPerGroup: 100
+      anchorPods: 100
+  # This test pases locally in ~1.5min
+  - name: 100Nodes_1000InitPods_10Gangs_10Pods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initPodGroups: 10
+      podsPerGroup: 10
+      anchorPods: 100
