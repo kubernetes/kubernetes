@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -668,6 +669,14 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
 	}
 
+	// Only a subset of placements will be evaluated (the loop breaks once enough feasible ones are
+	// found), so shuffle to make that subset random rather than dictated by the PlacementGenerate
+	// plugin. Shuffle a copy to avoid mutating the slice the plugin returned.
+	if sched.shufflePlacements != nil && int(numPlacementsToFind) < len(placements) {
+		placements = slices.Clone(placements)
+		sched.shufflePlacements(placements)
+	}
+
 	for _, placement := range placements {
 		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
@@ -718,6 +727,13 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	}
 
 	return *successfulResults[bestPlacement]
+}
+
+// randShufflePlacements is the default placement shuffler, randomizing placement order in place.
+func randShufflePlacements(placements []*fwk.Placement) {
+	rand.Shuffle(len(placements), func(i, j int) {
+		placements[i], placements[j] = placements[j], placements[i]
+	})
 }
 
 // numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
