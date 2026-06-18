@@ -2226,6 +2226,31 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithKubeletMinVersion("1.36"), podGroupResourceClaimTests)
 
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), func() {
+		ginkgo.It("bypasses node preparation when SkipNodeOperations is true", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodes := drautils.NewNodesNow(tCtx, 1, 1)
+			driver := drautils.NewDriverInstance(tCtx)
+			b := drautils.NewBuilderNow(tCtx, driver)
+
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+
+			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
+
+			slices, err := f.ClientSet.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{LabelSelector: "resource.kubernetes.io/driver=" + driver.Name})
+			framework.ExpectNoError(err)
+			for _, slice := range slices.Items {
+				slice.Spec.SkipNodeOperations = ptr.To(true)
+				_, err := f.ClientSet.ResourceV1().ResourceSlices().Update(ctx, &slice, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+			}
+
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+		})
+	})
+
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false), drautils.TaintAllDevices(resourceapi.DeviceTaint{
