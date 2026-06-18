@@ -237,12 +237,12 @@ var (
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
 					PodGroupName(podGroupName).
 					Obj()
-	groupedPodWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
-					UID(podUID).
-					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-					PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
-					PodGroupName(podGroupName).
-					Obj()
+	groupedPodWithClaimNameScheduled = st.MakePod().Name(podName).Namespace(namespace).
+						UID(podUID).
+						Node(nodeName).
+						PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+						PodGroupName(podGroupName).
+						Obj()
 	groupedPodWithClaimTemplateInStatus = func() *v1.Pod {
 		pod := podWithClaimTemplateInStatus.DeepCopy()
 		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
@@ -2100,7 +2100,52 @@ func testPlugin(tCtx ktesting.TContext) {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
+			objs: []apiruntime.Object{
+				// Pods in the PodGroup
+
+				// This Pod has been scheduled, but it's the only one left in
+				// the PodGroup, so the claim can be unreserved.
+				groupedPodWithClaimNameScheduled,
+			},
+			claims: []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
+			want: want{
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							claim := st.FromResourceClaim(in).
+								ReservedFor(podGroupReservation).
+								Obj()
+							claim = addAllocationTimestamp(claim)
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
+				},
+			},
+		},
+		"bind-podgroup-failure-with-active-pods": {
+			enableDRAWorkloadResourceClaims: true,
+			pod:                             groupedPodWithClaimName,
+			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			objs: []apiruntime.Object{
+				// Pods in the PodGroup
+				groupedPodWithClaimNameScheduled,
+				st.MakePod().Name(podName + "-2").Namespace(namespace).
+					Node(nodeName). // Scheduled, this Pod still needs the PodGroup's claim
+					PodGroupName(podGroupName).
+					Obj(),
+			},
+			claims: []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
@@ -2120,7 +2165,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
-		"postfilter-unreserve-podgroup": {
+		"postfilter-deallocate-reserved-podgroup": {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
@@ -2140,15 +2185,16 @@ func testPlugin(tCtx ktesting.TContext) {
 					changes: change{
 						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							claim = claim.DeepCopy()
-							claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							claim.Status.ReservedFor = nil
+							claim.Status.Allocation = nil
 							return claim
 						},
 					},
-					status: fwk.NewStatus(fwk.Unschedulable, `ResourceClaim unreserved for PodGroup`),
+					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of PodGroup ResourceClaim completed`),
 				},
 			},
 		},
-		"postfilter-skip-unreserve-podgroup-feature-disabled": {
+		"postfilter-skip-deallocate-reserved-podgroup-feature-disabled": {
 			enableDRAWorkloadResourceClaims: false,
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
@@ -2169,7 +2215,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
-		"postfilter-deallocate-podgroup": {
+		"postfilter-deallocate-unreserved-podgroup": {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
@@ -2204,7 +2250,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 		},
-		"postfilter-skip-unreserve-podgroup-when-pods-active": {
+		"postfilter-skip-deallocate-reserved-podgroup-when-pods-active": {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
@@ -2226,44 +2272,6 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
-				},
-			},
-		},
-		"postfilter-skip-unreserve-podgroup-other-claim-deallocated": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithTwoClaimNames,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			objs: []apiruntime.Object{
-				// Pods in the PodGroup
-				groupedPodWithClaimName,
-			},
-			classes: []*resourceapi.DeviceClass{deviceClass},
-			claims: []*resourceapi.ResourceClaim{
-				allocatedPodGroupClaimWithWrongTopology,
-				func() *resourceapi.ResourceClaim {
-					claim := allocatedClaimWithWrongTopology.DeepCopy()
-					claim.Name = claimName2
-					return claim
-				}(),
-			},
-			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
-					},
-				},
-				postfilter: result{
-					changes: change{
-						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
-							if claim.Name == claimName2 {
-								return st.FromResourceClaim(claim).
-									Allocation(nil).
-									Obj()
-							}
-							return claim
-						},
-					},
-					status: fwk.NewStatus(fwk.Unschedulable, `deallocation and deletion of ResourceClaims completed`),
 				},
 			},
 		},
@@ -3772,6 +3780,9 @@ func testPlugin(tCtx ktesting.TContext) {
 						testCtx.verify(tCtx, tc.want.unreserve, initialObjects, tc.pod, nil, status)
 					})
 				} else {
+					// PodGroup cycle state is cleared before asynchronous binding.
+					testCtx.state.(*framework.CycleState).SetPodGroupSchedulingCycle(nil)
+
 					if tc.want.unreserveBeforePreBind != nil {
 						initialObjects = testCtx.listAll(tCtx)
 						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
