@@ -2679,6 +2679,28 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: node_prepare_skips_total
+  subsystem: dra
+  help: Cumulative number of times NodePrepareResources gRPC calls were skipped due
+    to SkipNodeOperations.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: node_unprepare_skips_total
+  subsystem: dra
+  help: Cumulative number of times NodeUnprepareResources gRPC calls were skipped
+    due to SkipNodeOperations.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: operations_duration_seconds
   subsystem: dra
   help: Latency histogram in seconds for the duration of handling all ResourceClaims

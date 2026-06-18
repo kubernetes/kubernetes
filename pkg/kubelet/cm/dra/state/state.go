@@ -19,6 +19,7 @@ package state
 import (
 	"time"
 
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -48,6 +49,10 @@ type ClaimInfoState struct {
 // +k8s:deepcopy-gen=true
 type DriverState struct {
 	Devices []Device
+	// SkipNodeOperations allows kubelet to bypass driver plugin initialization and node-local
+	// gRPC calls (NodePrepareResources and NodeUnprepareResources) when all allocated devices
+	// for this driver do not require node-local preparation or cleanup.
+	SkipNodeOperations resourceapi.SkipNodeOperations `json:"skipNodeOperations,omitempty"`
 }
 
 // Device is how a DRA driver described an allocated device in a claim
