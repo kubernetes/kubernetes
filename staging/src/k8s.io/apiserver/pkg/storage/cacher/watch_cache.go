@@ -631,5 +631,5 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
-	return newCacheIntervalFromStore(w.resourceVersion, w.storage.SnapshotLocked(), key, matchesSingle)
+	return newCacheIntervalFromStore(w.resourceVersion, w.storage.StoreLocked(), key, matchesSingle)
 }
