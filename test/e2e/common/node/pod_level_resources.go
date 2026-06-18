@@ -26,6 +26,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
@@ -286,17 +287,16 @@ func podLevelResourcesTests(f *framework.Framework) {
 			},
 		},
 		{
-			name:         "Burstable QoS pod, pod resources requests, container resources limits",
+			name:         "Guaranteed QoS pod, pod resources requests, container resources limits",
 			podResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			containers: []containerInfo{
 				{Name: "c1", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
 				{Name: "c2", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
 			},
 			expected: expectedPodConfig{
-				qos:               v1.PodQOSBurstable,
+				qos:               v1.PodQOSGuaranteed,
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
-			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 		},
 		{
 			name:         "Burstable QoS pod, pod resources requests, partial container resources limits",
@@ -314,22 +314,16 @@ func podLevelResourcesTests(f *framework.Framework) {
 			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 		},
 		{
-			name:         "Burstable QoS pod, pod resources requests, container resources requests and limits",
+			name:         "Guaranteed QoS pod, pod resources requests, container resources requests and limits",
 			podResources: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 			containers: []containerInfo{
 				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "30m", CPULim: "30m", MemReq: "30Mi", MemLim: "30Mi"}},
 				{Name: "c2", Resources: &cgroups.ContainerResources{CPUReq: "30m", CPULim: "30m", MemReq: "30Mi", MemLim: "30Mi"}},
 			},
 			expected: expectedPodConfig{
-				qos: v1.PodQOSBurstable,
-				// At first glance, this may seem invalid. However, the value of CPUReq is only used
-				// to calculate the ratio for cpu.weight (i.e., CPU shares), and the absolute value
-				// of CPUReq is not directly applied. Therefore, it’s not a problem even if CPUReq
-				// exceeds CPULim. Similarly, when the MemoryQoS feature is disabled, MemReq is not
-				// used for memory.min, so it’s also fine for MemReq to exceed MemLim.
-				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "60m", MemReq: "100Mi", MemLim: "60Mi"},
+				qos:               v1.PodQOSGuaranteed,
+				totalPodResources: &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
 			},
-			expectedPodLevelResourcesOverride: &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
 		},
 		{
 			name:         "Burstable QoS pod, no container resources",
@@ -471,3 +465,104 @@ func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, p
 	}
 	return utilerrors.NewAggregate(errs)
 }
+
+// podLevelResourcesFixUpdateDefaultingTests contains tests that require both
+// PodLevelResources and PodLevelResourcesFixUpdateDefaulting feature gates.
+func podLevelResourcesFixUpdateDefaultingTests(f *framework.Framework) {
+	// When pod-level requests are set and all containers define limits, pod-level
+	// limits are auto-defaulted to the aggregated container limits. Since req==lim
+	// after defaulting, the pod gets Guaranteed QoS.
+	ginkgo.It("Guaranteed QoS pod, pod resources requests, container resources limits auto-defaulted", func(ctx context.Context) {
+		containers := []containerInfo{
+			{Name: "c1", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
+			{Name: "c2", Resources: &cgroups.ContainerResources{CPULim: "50m", MemLim: "50Mi"}},
+		}
+		podResources := &cgroups.ContainerResources{CPUReq: "100m", MemReq: "100Mi"}
+		expectedResources := &cgroups.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"}
+
+		podMetadata := makeObjectMetadata("testpod", f.Namespace.Name)
+		testPod := makePod(&podMetadata, podResources, containers)
+
+		ginkgo.By("creating pod")
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, testPod)
+
+		ginkgo.By("verifying pod resources are as expected")
+		verifyPodResources(*pod, podResources, expectedResources)
+
+		ginkgo.By("verifying pod QoS as expected")
+		verifyQoS(*pod, v1.PodQOSGuaranteed)
+
+		ginkgo.By("verifying pod cgroup values")
+		err := cgroups.VerifyPodCgroups(ctx, f, pod, expectedResources)
+		framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
+
+		ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
+		err = verifyContainersCgroupLimits(ctx, f, pod)
+		framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
+
+		ginkgo.By("deleting pod")
+		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+	})
+
+	// When only a CPU request is set at pod level (no memory request), and containers
+	// define both CPU and memory limits, defaulting should set ONLY the CPU limit.
+	// Memory limit must NOT be defaulted — no pod-level memory request exists, so
+	// defaulting a memory limit would create an asymmetric limits-without-requests state.
+	// Furthermore, a subsequent update (e.g. adding an annotation) must not cause
+	// decode-time defaulting to inject a memory request (since pod-level limits now
+	// exist after the initial create), which would produce request-without-limit asymmetry.
+	ginkgo.It("partial pod-level request: only CPU limit defaulted, memory limit not set, stable across updates", func(ctx context.Context) {
+		containers := []containerInfo{
+			{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"}},
+		}
+		// Only CPU request set at pod level — no memory request.
+		podResources := &cgroups.ContainerResources{CPUReq: "50m"}
+		// Expected: CPU limit defaulted from container, memory limit must remain unset.
+		expectedResources := &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m"}
+
+		podMetadata := makeObjectMetadata("testpod-partial-req", f.Namespace.Name)
+		testPod := makePod(&podMetadata, podResources, containers)
+
+		ginkgo.By("creating pod")
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, testPod)
+
+		ginkgo.By("verifying pod resources after create: CPU limit defaulted, memory limit absent")
+		verifyPodResources(*pod, podResources, expectedResources)
+
+		ginkgo.By("patching an annotation to trigger a decode+update cycle")
+		patch := []byte(`{"metadata":{"annotations":{"test-annotation":"trigger-defaulting"}}}`)
+		updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(
+			ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch pod annotation")
+
+		ginkgo.By("verifying pod resources after annotation update: still no memory request or limit")
+		verifyPodResources(*updatedPod, podResources, expectedResources)
+
+		ginkgo.By("deleting pod")
+		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+	})
+}
+
+var _ = SIGDescribe("Pod Level Resources Fix Update Defaulting", framework.WithSerial(), feature.PodLevelResources, feature.PodLevelResourcesFixUpdateDefaulting, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixUpdateDefaulting), func() {
+	f := framework.NewDefaultFramework("pod-level-resources-fix-defaulting-tests")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+
+		if framework.NodeOSDistroIs("windows") {
+			e2eskipper.Skipf("not supported on windows -- skipping")
+		}
+
+		if !isCgroupv2Node(f, ctx) {
+			e2eskipper.Skipf("not supported on cgroupv1 -- skipping")
+		}
+	})
+
+	podLevelResourcesFixUpdateDefaultingTests(f)
+})
