@@ -1354,6 +1354,16 @@ func MakeResourceSliceWithPerDeviceNodeSelection(namePrefix, driverName string) 
 	return wrapper
 }
 
+func MakeResourceSliceWithAllNodes(namePrefix, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = namePrefix + "-" + driverName
+	wrapper.Spec.AllNodes = new(true)
+	wrapper.Spec.Pool.Name = namePrefix
+	wrapper.Spec.Pool.ResourceSliceCount = 1
+	wrapper.Spec.Driver = driverName
+	return wrapper
+}
+
 // FromResourceSlice creates a ResourceSlice wrapper from some existing object.
 func FromResourceSlice(other *resourceapi.ResourceSlice) *ResourceSliceWrapper {
 	return &ResourceSliceWrapper{*other.DeepCopy()}
@@ -1399,6 +1409,11 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 
 func (wrapper *ResourceSliceWrapper) ResourceSliceCount(count int) *ResourceSliceWrapper {
 	wrapper.Spec.Pool.ResourceSliceCount = int64(count)
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) SkipNodeOperations(skip ...resourceapi.SkipNodeOperation) *ResourceSliceWrapper {
+	wrapper.Spec.SkipNodeOperations = skip
 	return wrapper
 }
 
