@@ -39,11 +39,9 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 )
@@ -216,7 +214,6 @@ leaderElection:
 		name                 string
 		flags                []string
 		registryOptions      []Option
-		restoreFeatures      map[featuregate.Feature]bool
 		wantPlugins          map[string]*config.Plugins
 		wantLeaderElection   *componentbaseconfig.LeaderElectionConfiguration
 		wantClientConnection *componentbaseconfig.ClientConnectionConfiguration
@@ -232,9 +229,6 @@ leaderElection:
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": defaults.ExpandedPluginsV1,
 			},
-			restoreFeatures: map[featuregate.Feature]bool{
-				features.StorageCapacityScoring: true,
-			},
 		},
 		{
 			name: "default config with beta feature explicitly disabled",
@@ -244,9 +238,6 @@ leaderElection:
 			},
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": defaults.ExpandedPluginsV1,
-			},
-			restoreFeatures: map[featuregate.Feature]bool{
-				features.StorageCapacityScoring: true,
 			},
 		},
 		{
@@ -455,9 +446,6 @@ leaderElection:
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.restoreFeatures {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
 			componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 			// set binary version to v1.37+ since StorageCapacityScoring (Beta in v1.37) is enabled by default
 			verKube := basecompatibility.NewEffectiveVersionFromString("1.37", "1.31", "1.31")
