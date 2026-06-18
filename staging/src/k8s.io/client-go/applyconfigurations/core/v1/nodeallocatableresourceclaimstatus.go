@@ -18,11 +18,6 @@ limitations under the License.
 
 package v1
 
-import (
-	corev1 "k8s.io/api/core/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
-)
-
 // NodeAllocatableResourceClaimStatusApplyConfiguration represents a declarative configuration of the NodeAllocatableResourceClaimStatus type for use
 // with apply.
 //
@@ -32,8 +27,14 @@ type NodeAllocatableResourceClaimStatusApplyConfiguration struct {
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
 	// Containers lists the names of all containers in this pod that reference the claim.
 	Containers []string `json:"containers,omitempty"`
-	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
-	Resources map[corev1.ResourceName]resource.Quantity `json:"resources,omitempty"`
+	// Direct contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.direct`.
+	// This is used by kubelet for node cgroup enforcement.
+	// Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.
+	Direct []NodeAllocatableDirectResourcesApplyConfiguration `json:"direct,omitempty"`
+	// Overhead contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.overhead`.
+	// This is used by kubelet for node cgroup enforcement.
+	// Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.
+	Overhead []NodeAllocatableOverheadResourcesApplyConfiguration `json:"overhead,omitempty"`
 }
 
 // NodeAllocatableResourceClaimStatusApplyConfiguration constructs a declarative configuration of the NodeAllocatableResourceClaimStatus type for use with
@@ -60,16 +61,28 @@ func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithContainers(va
 	return b
 }
 
-// WithResources puts the entries into the Resources field in the declarative configuration
+// WithDirect adds the given value to the Direct field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Resources field,
-// overwriting an existing map entries in Resources field with the same key.
-func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithResources(entries map[corev1.ResourceName]resource.Quantity) *NodeAllocatableResourceClaimStatusApplyConfiguration {
-	if b.Resources == nil && len(entries) > 0 {
-		b.Resources = make(map[corev1.ResourceName]resource.Quantity, len(entries))
+// If called multiple times, values provided by each call will be appended to the Direct field.
+func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithDirect(values ...*NodeAllocatableDirectResourcesApplyConfiguration) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithDirect")
+		}
+		b.Direct = append(b.Direct, *values[i])
 	}
-	for k, v := range entries {
-		b.Resources[k] = v
+	return b
+}
+
+// WithOverhead adds the given value to the Overhead field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Overhead field.
+func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithOverhead(values ...*NodeAllocatableOverheadResourcesApplyConfiguration) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithOverhead")
+		}
+		b.Overhead = append(b.Overhead, *values[i])
 	}
 	return b
 }

@@ -75,8 +75,12 @@ spec:
             value: "0"
       nodeAllocatableResourceMappings:
         nodeAllocatableResourceMappingsKey:
-          allocationMultiplier: "0"
-          capacityKey: capacityKeyValue
+          direct:
+            allocationMultiplier: "0"
+            capacityKey: capacityKeyValue
+          overhead:
+            perContainerReference: "0"
+            perPodReference: "0"
       nodeName: nodeNameValue
       nodeSelector:
         nodeSelectorTerms:

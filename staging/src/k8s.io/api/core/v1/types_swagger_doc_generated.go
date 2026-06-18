@@ -1234,11 +1234,33 @@ func (NodeAffinity) SwaggerDoc() map[string]string {
 	return map_NodeAffinity
 }
 
+var map_NodeAllocatableDirectResources = map[string]string{
+	"":         "NodeAllocatableDirectResources describes direct node allocatable resource allocations.",
+	"name":     "Name is the name of the resource (e.g., cpu, memory).",
+	"quantity": "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim.",
+}
+
+func (NodeAllocatableDirectResources) SwaggerDoc() map[string]string {
+	return map_NodeAllocatableDirectResources
+}
+
+var map_NodeAllocatableOverheadResources = map[string]string{
+	"":             "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+	"name":         "Name is the name of the resource (e.g., cpu, memory).",
+	"perPod":       "PerPod is the flat overhead quantity allocated per pod.",
+	"perContainer": "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences)",
+}
+
+func (NodeAllocatableOverheadResources) SwaggerDoc() map[string]string {
+	return map_NodeAllocatableOverheadResources
+}
+
 var map_NodeAllocatableResourceClaimStatus = map[string]string{
 	"":                  "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
 	"resourceClaimName": "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
 	"containers":        "Containers lists the names of all containers in this pod that reference the claim.",
-	"resources":         "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
+	"direct":            "Direct contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.direct`. This is used by kubelet for node cgroup enforcement. Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.",
+	"overhead":          "Overhead contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.overhead`. This is used by kubelet for node cgroup enforcement. Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.",
 }
 
 func (NodeAllocatableResourceClaimStatus) SwaggerDoc() map[string]string {

@@ -108,6 +108,10 @@ func (m *ExactDeviceRequest) Reset() { *m = ExactDeviceRequest{} }
 
 func (m *NetworkDeviceData) Reset() { *m = NetworkDeviceData{} }
 
+func (m *NodeAllocatableDirectMapping) Reset() { *m = NodeAllocatableDirectMapping{} }
+
+func (m *NodeAllocatableOverhead) Reset() { *m = NodeAllocatableOverhead{} }
+
 func (m *NodeAllocatableResourceMapping) Reset() { *m = NodeAllocatableResourceMapping{} }
 
 func (m *OpaqueDeviceConfiguration) Reset() { *m = OpaqueDeviceConfiguration{} }
@@ -2177,7 +2181,7 @@ func (m *NetworkDeviceData) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *NodeAllocatableResourceMapping) Marshal() (dAtA []byte, err error) {
+func (m *NodeAllocatableDirectMapping) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2187,12 +2191,12 @@ func (m *NodeAllocatableResourceMapping) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *NodeAllocatableResourceMapping) MarshalTo(dAtA []byte) (int, error) {
+func (m *NodeAllocatableDirectMapping) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *NodeAllocatableResourceMapping) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *NodeAllocatableDirectMapping) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2213,6 +2217,100 @@ func (m *NodeAllocatableResourceMapping) MarshalToSizedBuffer(dAtA []byte) (int,
 		i -= len(*m.CapacityKey)
 		copy(dAtA[i:], *m.CapacityKey)
 		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.CapacityKey)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *NodeAllocatableOverhead) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeAllocatableOverhead) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodeAllocatableOverhead) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.PerContainer != nil {
+		{
+			size, err := m.PerContainer.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.PerPod != nil {
+		{
+			size, err := m.PerPod.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *NodeAllocatableResourceMapping) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeAllocatableResourceMapping) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodeAllocatableResourceMapping) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Overhead != nil {
+		{
+			size, err := m.Overhead.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.Direct != nil {
+		{
+			size, err := m.Direct.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
 		i--
 		dAtA[i] = 0xa
 	}
@@ -3659,7 +3757,7 @@ func (m *NetworkDeviceData) Size() (n int) {
 	return n
 }
 
-func (m *NodeAllocatableResourceMapping) Size() (n int) {
+func (m *NodeAllocatableDirectMapping) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3671,6 +3769,40 @@ func (m *NodeAllocatableResourceMapping) Size() (n int) {
 	}
 	if m.AllocationMultiplier != nil {
 		l = m.AllocationMultiplier.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *NodeAllocatableOverhead) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.PerPod != nil {
+		l = m.PerPod.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.PerContainer != nil {
+		l = m.PerContainer.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *NodeAllocatableResourceMapping) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Direct != nil {
+		l = m.Direct.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.Overhead != nil {
+		l = m.Overhead.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -4496,13 +4628,35 @@ func (this *NetworkDeviceData) String() string {
 	}, "")
 	return s
 }
+func (this *NodeAllocatableDirectMapping) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeAllocatableDirectMapping{`,
+		`CapacityKey:` + valueToStringGenerated(this.CapacityKey) + `,`,
+		`AllocationMultiplier:` + strings.Replace(fmt.Sprintf("%v", this.AllocationMultiplier), "Quantity", "resource.Quantity", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NodeAllocatableOverhead) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodeAllocatableOverhead{`,
+		`PerPod:` + strings.Replace(fmt.Sprintf("%v", this.PerPod), "Quantity", "resource.Quantity", 1) + `,`,
+		`PerContainer:` + strings.Replace(fmt.Sprintf("%v", this.PerContainer), "Quantity", "resource.Quantity", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *NodeAllocatableResourceMapping) String() string {
 	if this == nil {
 		return "nil"
 	}
 	s := strings.Join([]string{`&NodeAllocatableResourceMapping{`,
-		`CapacityKey:` + valueToStringGenerated(this.CapacityKey) + `,`,
-		`AllocationMultiplier:` + strings.Replace(fmt.Sprintf("%v", this.AllocationMultiplier), "Quantity", "resource.Quantity", 1) + `,`,
+		`Direct:` + strings.Replace(this.Direct.String(), "NodeAllocatableDirectMapping", "NodeAllocatableDirectMapping", 1) + `,`,
+		`Overhead:` + strings.Replace(this.Overhead.String(), "NodeAllocatableOverhead", "NodeAllocatableOverhead", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -11043,7 +11197,7 @@ func (m *NetworkDeviceData) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *NodeAllocatableResourceMapping) Unmarshal(dAtA []byte) error {
+func (m *NodeAllocatableDirectMapping) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -11066,10 +11220,10 @@ func (m *NodeAllocatableResourceMapping) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: NodeAllocatableResourceMapping: wiretype end group for non-group")
+			return fmt.Errorf("proto: NodeAllocatableDirectMapping: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: NodeAllocatableResourceMapping: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: NodeAllocatableDirectMapping: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -11138,6 +11292,250 @@ func (m *NodeAllocatableResourceMapping) Unmarshal(dAtA []byte) error {
 				m.AllocationMultiplier = &resource.Quantity{}
 			}
 			if err := m.AllocationMultiplier.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NodeAllocatableOverhead) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeAllocatableOverhead: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeAllocatableOverhead: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PerPod", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PerPod == nil {
+				m.PerPod = &resource.Quantity{}
+			}
+			if err := m.PerPod.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PerContainer", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PerContainer == nil {
+				m.PerContainer = &resource.Quantity{}
+			}
+			if err := m.PerContainer.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NodeAllocatableResourceMapping) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeAllocatableResourceMapping: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeAllocatableResourceMapping: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Direct", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Direct == nil {
+				m.Direct = &NodeAllocatableDirectMapping{}
+			}
+			if err := m.Direct.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Overhead", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Overhead == nil {
+				m.Overhead = &NodeAllocatableOverhead{}
+			}
+			if err := m.Overhead.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

@@ -572,6 +572,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.Node{}.OpenAPIModelName():                                                                                schema_k8sio_api_core_v1_Node(ref),
 		corev1.NodeAddress{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_NodeAddress(ref),
 		corev1.NodeAffinity{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_NodeAffinity(ref),
+		corev1.NodeAllocatableDirectResources{}.OpenAPIModelName():                                                      schema_k8sio_api_core_v1_NodeAllocatableDirectResources(ref),
+		corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName():                                                    schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref),
 		corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref),
 		corev1.NodeCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NodeCondition(ref),
 		corev1.NodeConfigSource{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigSource(ref),
@@ -1019,6 +1021,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceToleration{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_DeviceToleration(ref),
 		resourcev1.ExactDeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1_ExactDeviceRequest(ref),
 		resourcev1.NetworkDeviceData{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_NetworkDeviceData(ref),
+		resourcev1.NodeAllocatableDirectMapping{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1_NodeAllocatableDirectMapping(ref),
+		resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref),
 		resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref),
 		resourcev1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1_OpaqueDeviceConfiguration(ref),
 		resourcev1.ResourceClaim{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceClaim(ref),
@@ -1076,6 +1080,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
 		resourcev1beta1.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
 		resourcev1beta1.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
+		resourcev1beta1.NodeAllocatableDirectMapping{}.OpenAPIModelName():                                               schema_k8sio_api_resource_v1beta1_NodeAllocatableDirectMapping(ref),
+		resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref),
 		resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref),
 		resourcev1beta1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref),
 		resourcev1beta1.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceClaim(ref),
@@ -1125,6 +1131,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_DeviceToleration(ref),
 		resourcev1beta2.ExactDeviceRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref),
 		resourcev1beta2.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref),
+		resourcev1beta2.NodeAllocatableDirectMapping{}.OpenAPIModelName():                                               schema_k8sio_api_resource_v1beta2_NodeAllocatableDirectMapping(ref),
+		resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref),
 		resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref),
 		resourcev1beta2.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta2_OpaqueDeviceConfiguration(ref),
 		resourcev1beta2.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceClaim(ref),
@@ -24850,6 +24858,72 @@ func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.
 	}
 }
 
+func schema_k8sio_api_core_v1_NodeAllocatableDirectResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableDirectResources describes direct node allocatable resource allocations.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of the resource (e.g., cpu, memory).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"quantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name", "quantity"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of the resource (e.g., cpu, memory).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"perPod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is the flat overhead quantity allocated per pod.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences)",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -24884,26 +24958,54 @@ func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.Refe
 							},
 						},
 					},
-					"resources": {
+					"direct": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
+							Description: "Direct contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.direct`. This is used by kubelet for node cgroup enforcement. Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeAllocatableDirectResources{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"overhead": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains allocations through devices mapped in `device.nodeAllocatableResourceMappings.overhead`. This is used by kubelet for node cgroup enforcement. Exactly one of Direct or Overhead must be set. Specifying both simultaneously is an invalid configuration.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()),
 									},
 								},
 							},
 						},
 					},
 				},
-				Required: []string{"resourceClaimName", "resources"},
+				Required: []string{"resourceClaimName"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			corev1.NodeAllocatableDirectResources{}.OpenAPIModelName(), corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()},
 	}
 }
 
@@ -28847,7 +28949,10 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 					"nodeAllocatableResourceClaimStatuses": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"resourceClaimName",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -47854,11 +47959,11 @@ func schema_k8sio_api_resource_v1_NetworkDeviceData(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1_NodeAllocatableDirectMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Description: "NodeAllocatableDirectMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from the count of allocated devices, the specific capacity consumed, or a combination of both.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
@@ -47879,6 +47984,60 @@ func schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref common.Refe
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"perPodReference": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is overhead applied once per pod referencing the claim on this node. This is a flat overhead incurred for every pod referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainerReference": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences)",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource. Exactly one of Direct or Overhead must be specified. Specifying both simultaneously is an invalid configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"direct": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Direct is used when the device directly models a node allocatable resource like standard CPU or memory (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance on the node. To prevent node cgroup isolation friction, the scheduler explicitly blocks sharing direct-mapped device claims across multiple pods.",
+							Ref:         ref(resourcev1.NodeAllocatableDirectMapping{}.OpenAPIModelName()),
+						},
+					},
+					"overhead": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs). Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted for individually for each pod referencing the claim.",
+							Ref:         ref(resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.NodeAllocatableDirectMapping{}.OpenAPIModelName(), resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName()},
 	}
 }
 
@@ -50702,11 +50861,11 @@ func schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableDirectMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Description: "NodeAllocatableDirectMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from the count of allocated devices, the specific capacity consumed, or a combination of both.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
@@ -50727,6 +50886,60 @@ func schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref common
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"perPodReference": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is overhead applied once per pod referencing the claim on this node. This is a flat overhead incurred for every pod referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainerReference": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences)",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource. Exactly one of Direct or Overhead must be specified. Specifying both simultaneously is an invalid configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"direct": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Direct is used when the device directly models a node allocatable resource like standard CPU or memory (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance on the node. To prevent node cgroup isolation friction, the scheduler explicitly blocks sharing direct-mapped device claims across multiple pods.",
+							Ref:         ref(resourcev1beta1.NodeAllocatableDirectMapping{}.OpenAPIModelName()),
+						},
+					},
+					"overhead": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs). Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted for individually for each pod referencing the claim.",
+							Ref:         ref(resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.NodeAllocatableDirectMapping{}.OpenAPIModelName(), resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName()},
 	}
 }
 
@@ -53176,11 +53389,11 @@ func schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableDirectMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Description: "NodeAllocatableDirectMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from the count of allocated devices, the specific capacity consumed, or a combination of both.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
@@ -53201,6 +53414,60 @@ func schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref common
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"perPodReference": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is overhead applied once per pod referencing the claim on this node. This is a flat overhead incurred for every pod referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainerReference": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences)",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource. Exactly one of Direct or Overhead must be specified. Specifying both simultaneously is an invalid configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"direct": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Direct is used when the device directly models a node allocatable resource like standard CPU or memory (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance on the node. To prevent node cgroup isolation friction, the scheduler explicitly blocks sharing direct-mapped device claims across multiple pods.",
+							Ref:         ref(resourcev1beta2.NodeAllocatableDirectMapping{}.OpenAPIModelName()),
+						},
+					},
+					"overhead": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs). Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted for individually for each pod referencing the claim.",
+							Ref:         ref(resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.NodeAllocatableDirectMapping{}.OpenAPIModelName(), resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName()},
 	}
 }
 
