@@ -811,6 +811,12 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 						fullname:           kubecontainer.BuildPodFullName(name, ns),
 					}
 				}
+			} else {
+				// The pod is terminal based on the config source, but we don't have a terminal state in the runtime cache.
+				// This means the pod never started or was already cleaned up. Mark it as terminated immediately so it
+				// will be considered inactive and not block pod admission.
+				status.terminatedAt = now
+				status.finished = true
 			}
 		}
 		p.podSyncStatuses[uid] = status

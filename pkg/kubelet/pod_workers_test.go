@@ -753,20 +753,12 @@ func TestUpdatePod(t *testing.T) {
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
 			},
-			expect: hasCancelFn(&podSyncStatus{
-				fullname:      "done-pod_ns",
-				syncedAt:      time.Unix(1, 0),
-				terminatingAt: time.Unix(1, 0),
-				startedAt:     time.Unix(3, 0),
-				terminatedAt:  time.Unix(3, 0),
-				activeUpdate: &UpdatePodOptions{
-					Pod:            newPodWithPhase("1", "done-pod", v1.PodSucceeded),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
-				},
-				gracePeriod:        30,
-				startedTerminating: true,
-				finished:           true,
-			}),
+			expect: &podSyncStatus{
+				fullname:     "done-pod_ns",
+				syncedAt:     time.Unix(1, 0),
+				terminatedAt: time.Unix(1, 0),
+				finished:     true,
+			},
 			expectKnownTerminated: true,
 		},
 		{
