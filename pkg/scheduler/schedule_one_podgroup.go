@@ -354,18 +354,21 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 			break
 		}
 
-		// UnschedulableAndUnresolvable from PlacementFeasible plugins indicates that the pod group
+		result.status = placementFeasibleStatus
+
+		// Unschedulable from PlacementFeasible plugins indicates that the pod group
 		// cannot meet its constraints regardless of how many more pods we check.
 		// We can stop the scheduling loop early.
-		if placementFeasibleStatus.Code() == fwk.UnschedulableAndUnresolvable {
-			// We need to change the code to Unschedulable to make sure preemption can be fired.
-			result.status = fwk.NewStatus(fwk.Unschedulable).WithError(placementFeasibleStatus.AsError())
+		if placementFeasibleStatus.Code() == fwk.Unschedulable {
 			break
 		}
 
-		result.status = placementFeasibleStatus
 		requiresPreemption = requiresPreemption || podResult.requiresPreemption
 		anyScheduled = anyScheduled || podResult.status.IsSuccess()
+	}
+
+	if result.status.IsWait() {
+		result.status = fwk.NewStatus(fwk.Unschedulable, result.status.Reasons()...)
 	}
 
 	if result.status.IsSuccess() {

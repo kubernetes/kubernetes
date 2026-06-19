@@ -722,11 +722,32 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 				},
 			},
 			podGroupFeasibleStatuses: []fwk.Code{
-				fwk.Unschedulable,
-				fwk.Unschedulable,
+				fwk.Wait,
+				fwk.Wait,
 				fwk.Success,
 			},
 			expectedGroupStatusCode: fwk.Success,
+			expectedPodStatus: map[string]*fwk.Status{
+				"p1": nil,
+				"p2": nil,
+				"p3": nil,
+			},
+		},
+		{
+			name: "All pods feasible, podGroup waiting",
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: []fwk.Code{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+			},
+			expectedGroupStatusCode: fwk.Unschedulable,
 			expectedPodStatus: map[string]*fwk.Status{
 				"p1": nil,
 				"p2": nil,
@@ -744,18 +765,15 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 			},
 			podGroupFeasibleStatuses: []fwk.Code{
 				fwk.Unschedulable,
-				fwk.Unschedulable,
-				fwk.Unschedulable,
 			},
 			expectedGroupStatusCode: fwk.Unschedulable,
 			expectedPodStatus: map[string]*fwk.Status{
 				"p1": nil,
-				"p2": nil,
-				"p3": nil,
+				// The algorithm stopped evaluating the pods after Unschedulable was received from PlacementFeasible.
 			},
 		},
 		{
-			name: "All pods feasible, podGroup UnschedulableAndUnresolvable",
+			name: "All pods feasible, podGroup unschedulable with 2 pods",
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
 					"p1": nil,
@@ -764,32 +782,14 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 				},
 			},
 			podGroupFeasibleStatuses: []fwk.Code{
-				fwk.UnschedulableAndUnresolvable,
-			},
-			expectedGroupStatusCode: fwk.Unschedulable,
-			expectedPodStatus: map[string]*fwk.Status{
-				"p1": nil,
-				// The algorithm stopped evaluating the pods after UnschedulableAndUnresolvable was received from PlacementFeasible.
-			},
-		},
-		{
-			name: "All pods feasible, podGroup UnschedulableAndUnresolvable with 2 pods",
-			plugin: &fakePodGroupPlugin{
-				filterStatus: map[string]*fwk.Status{
-					"p1": nil,
-					"p2": nil,
-					"p3": nil,
-				},
-			},
-			podGroupFeasibleStatuses: []fwk.Code{
+				fwk.Wait,
 				fwk.Unschedulable,
-				fwk.UnschedulableAndUnresolvable,
 			},
 			expectedGroupStatusCode: fwk.Unschedulable,
 			expectedPodStatus: map[string]*fwk.Status{
 				"p1": nil,
 				"p2": nil,
-				// The algorithm stopped evaluating the pods after UnschedulableAndUnresolvable was received from PlacementFeasible.
+				// The algorithm stopped evaluating the pods after Unschedulable was received from PlacementFeasible.
 			},
 		},
 		{
@@ -841,8 +841,8 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 				},
 			},
 			podGroupFeasibleStatuses: []fwk.Code{
-				fwk.Unschedulable,
-				fwk.Unschedulable,
+				fwk.Wait,
+				fwk.Wait,
 				fwk.Success,
 			},
 			expectedGroupStatusCode:          fwk.Unschedulable,
