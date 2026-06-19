@@ -67,6 +67,22 @@ func (w *WatchCacheStorage) StoreLocked() Snapshot {
 	return w.store
 }
 
+func (w *WatchCacheStorage) SnapshottingEnabled() bool {
+	return w.snapshots != nil && w.snapshottingEnabled.Load()
+}
+
+func (w *WatchCacheStorage) CanServeExactRV(rv uint64) bool {
+	if w.snapshots == nil {
+		return false
+	}
+	_, canServe := w.snapshots.GetLessOrEqual(rv)
+	return canServe
+}
+
+func (w *WatchCacheStorage) UpdateListResourceVersion(rv uint64) {
+	w.listResourceVersion = rv
+}
+
 func (w *WatchCacheStorage) Compact(rev uint64) {
 	if w.snapshots == nil {
 		return
@@ -83,7 +99,7 @@ func (w *WatchCacheStorage) MarkConsistent(consistent bool) {
 	}
 }
 
-func (w *WatchCacheStorage) getLatestSnapshotLocked(key, continueKey string) (Snapshot, error) {
+func (w *WatchCacheStorage) GetLatestSnapshotLocked(key, continueKey string) (Snapshot, error) {
 	if w.snapshots != nil && w.snapshottingEnabled.Load() {
 		snap, ok := w.snapshots.Latest()
 		if ok {
@@ -261,9 +277,13 @@ func (w *WatchCacheStorage) GetExactSnapshotLocked(resourceVersion uint64) (Snap
 	return snap, nil
 }
 
-// ByIndex retrieves elements from the indexer by index name and value.
-func (w *WatchCacheStorage) ByIndex(indexName, value string) ([]interface{}, error) {
-	return w.store.ByIndex(indexName, value)
+// GetByIndexSnapshot retrieves elements by index and wraps them in a Snapshot.
+func (w *WatchCacheStorage) GetByIndexSnapshot(indexName, value string) (Snapshot, error) {
+	result, err := w.store.ByIndex(indexName, value)
+	if err != nil {
+		return nil, err
+	}
+	return listSnapshot{Items: result}, nil
 }
 
 // ListResourceVersion returns the list resource version.

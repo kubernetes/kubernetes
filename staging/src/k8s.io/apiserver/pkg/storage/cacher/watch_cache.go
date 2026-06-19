@@ -88,7 +88,7 @@ type watchCache struct {
 	onReplace func()
 
 	history *watchCacheHistory
-	storage *watchCacheStorage
+	storage *store.WatchCacheStorage
 
 	config *ImmutableWatchCacheConfig
 }
@@ -150,7 +150,7 @@ func newWatchCache(
 		resourceVersion: 0,
 		config:          config,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
-		storage:         newWatchCacheStorage(config.keyFunc, indexers),
+		storage:         store.NewWatchCacheStorage(config.keyFunc, indexers),
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
@@ -494,11 +494,11 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
-		if result, err := w.storage.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return listSnapshot{Items: result}, w.resourceVersion, matchValue.IndexName, nil
+		if snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value); err == nil {
+			return snap, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	snap, err = w.storage.getLatestSnapshotLocked(key, continueKey)
+	snap, err = w.storage.GetLatestSnapshotLocked(key, continueKey)
 	return snap, w.resourceVersion, "", err
 }
 
