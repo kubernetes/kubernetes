@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package store
 
 import (
 	"testing"
@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -38,12 +37,12 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := newWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(keyFunc, indexers)
 
 	assert.True(t, s.snapshottingEnabled.Load())
 
 	t.Log("New cache collects snapshots")
-	elem1 := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
+	elem1 := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
 	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem1, 100))
 	assert.Equal(t, 1, s.snapshots.Len())
 	_, err := s.GetExactSnapshotLocked(100)
@@ -77,7 +76,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := newWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(keyFunc, indexers)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
 	_, err := s.GetExactSnapshotLocked(20)
@@ -86,7 +85,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	}
 
 	t.Log("Add object at RV 20 to create a snapshot")
-	olderElement := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "20"}}
+	olderElement := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "20"}}
 	err = s.UpdateStoreLocked(watch.Added, olderElement, 20)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -100,12 +99,12 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !ok || val.(*store.Element).Object.(*mockObject).val != "20" {
+	if !ok || val.(*Element).Object.(*mockObject).val != "20" {
 		t.Fatalf("Unexpected element in snapshot")
 	}
 
 	t.Log("Add object at RV 30 to create another snapshot")
-	newerElement := &store.Element{Key: "foo", Object: &mockObject{key: "foo", val: "30"}}
+	newerElement := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "30"}}
 	err = s.UpdateStoreLocked(watch.Modified, newerElement, 30)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -129,7 +128,17 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !ok || val.(*store.Element).Object.(*mockObject).val != "30" {
+	if !ok || val.(*Element).Object.(*mockObject).val != "30" {
 		t.Fatalf("Unexpected element in snapshot at RV 30")
 	}
+}
+
+type mockObject struct {
+	runtime.Object
+	key string
+	val string
+}
+
+func (m *mockObject) DeepCopyObject() runtime.Object {
+	return &mockObject{key: m.key, val: m.val}
 }
