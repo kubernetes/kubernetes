@@ -606,9 +606,27 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			ResourceClaimName: "myclaim",
 			Containers:        []string{"mycontainer"},
-			Resources:         map[api.ResourceName]resource.Quantity{api.ResourceCPU: resource.MustParse("1")},
+			Direct: []api.NodeAllocatableDirectResources{{
+				Name:     api.ResourceCPU,
+				Quantity: resource.MustParse("1"),
+			}},
 		},
 	}
+
+	nodeAllocatableOverheadResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
+	nodeAllocatableOverheadResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: "myclaim",
+			Containers:        []string{"mycontainer"},
+			Overhead: []api.NodeAllocatableOverheadResources{{
+				Name:         api.ResourceMemory,
+				PerPod:       ptr.To(resource.MustParse("1Gi")),
+				PerContainer: ptr.To(resource.MustParse("500Mi")),
+			}},
+		},
+	}
+
+
 
 	pcrServiceAccountIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 	pcrServiceAccounts := corev1lister.NewServiceAccountLister(pcrServiceAccountIndex)
@@ -1141,6 +1159,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid update of pod's node allocatable resource claim status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update node allocatable resource claim statuses",
+		},
+		{
+			name:       "forbid update of pod's node allocatable overhead resource claim status",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(nodeAllocatableOverheadResourceClaimPod, claimpod, podKind, nodeAllocatableOverheadResourceClaimPod.Namespace, nodeAllocatableOverheadResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
 			err:        "cannot update node allocatable resource claim statuses",
 		},
 
