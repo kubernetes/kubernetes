@@ -7041,17 +7041,7 @@ func Convert_core_PodSignature_To_v1_PodSignature(in *core.PodSignature, out *co
 }
 
 func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
-	if in.Volumes != nil {
-		in, out := &in.Volumes, &out.Volumes
-		*out = make([]core.Volume, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Volume_To_core_Volume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
-	}
+	out.Volumes = *(*[]core.Volume)(unsafe.Pointer(&in.Volumes))
 	out.InitContainers = *(*[]core.Container)(unsafe.Pointer(&in.InitContainers))
 	out.Containers = *(*[]core.Container)(unsafe.Pointer(&in.Containers))
 	out.EphemeralContainers = *(*[]core.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
@@ -7105,17 +7095,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 }
 
 func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpec, s conversion.Scope) error {
-	if in.Volumes != nil {
-		in, out := &in.Volumes, &out.Volumes
-		*out = make([]corev1.Volume, len(*in))
-		for i := range *in {
-			if err := Convert_core_Volume_To_v1_Volume(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Volumes = nil
-	}
+	out.Volumes = *(*[]corev1.Volume)(unsafe.Pointer(&in.Volumes))
 	out.InitContainers = *(*[]corev1.Container)(unsafe.Pointer(&in.InitContainers))
 	out.Containers = *(*[]corev1.Container)(unsafe.Pointer(&in.Containers))
 	out.EphemeralContainers = *(*[]corev1.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
@@ -9282,7 +9262,6 @@ func autoConvert_core_VolumeSource_To_v1_VolumeSource(in *core.VolumeSource, out
 	out.Glusterfs = (*corev1.GlusterfsVolumeSource)(unsafe.Pointer(in.Glusterfs))
 	out.PersistentVolumeClaim = (*corev1.PersistentVolumeClaimVolumeSource)(unsafe.Pointer(in.PersistentVolumeClaim))
 	out.RBD = (*corev1.RBDVolumeSource)(unsafe.Pointer(in.RBD))
-	out.Quobyte = (*corev1.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.FlexVolume = (*corev1.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))
 	out.Cinder = (*corev1.CinderVolumeSource)(unsafe.Pointer(in.Cinder))
 	out.CephFS = (*corev1.CephFSVolumeSource)(unsafe.Pointer(in.CephFS))
@@ -9292,6 +9271,7 @@ func autoConvert_core_VolumeSource_To_v1_VolumeSource(in *core.VolumeSource, out
 	out.AzureFile = (*corev1.AzureFileVolumeSource)(unsafe.Pointer(in.AzureFile))
 	out.ConfigMap = (*corev1.ConfigMapVolumeSource)(unsafe.Pointer(in.ConfigMap))
 	out.VsphereVolume = (*corev1.VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
+	out.Quobyte = (*corev1.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*corev1.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*corev1.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
 	out.Projected = (*corev1.ProjectedVolumeSource)(unsafe.Pointer(in.Projected))
