@@ -51,7 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	"k8s.io/apiserver/pkg/storage/cacher/store"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
@@ -262,8 +261,31 @@ func TestShouldDelegateList(t *testing.T) {
 				t.Fatalf("Couldn't create cacher: %v", err)
 			}
 			defer cacher.Stop()
+			oldPod := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:       "ns",
+					Name:            "pod1",
+					ResourceVersion: oldRV,
+				},
+			}
+			latestPod := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:       "ns",
+					Name:            "pod1",
+					ResourceVersion: cacheRV,
+				},
+			}
 			if snapshotAvailable {
-				cacher.watchCache.storage.snapshots.Add(uint64(mustAtoi(oldRV)), fakeIndexer{})
+				if err := cacher.watchCache.Add(oldPod); err != nil {
+					t.Fatal(err)
+				}
+				if err := cacher.watchCache.Update(latestPod); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := cacher.watchCache.Add(latestPod); err != nil {
+					t.Fatal(err)
+				}
 			}
 			result, err := delegator.ShouldDelegateList(toStorageOpts(opt), cacher)
 			if err != nil {
@@ -521,34 +543,8 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 }
 
 func TestMatchExactResourceVersionFallback(t *testing.T) {
-	tcs := []struct {
-		name               string
-		snapshotsAvailable []bool
-
-		expectStoreRequests    int
-		expectSnapshotRequests int
-	}{
-		{
-			name:                   "Disabled",
-			snapshotsAvailable:     []bool{false, false},
-			expectStoreRequests:    2,
-			expectSnapshotRequests: 1,
-		},
-		{
-			name:                   "Enabled",
-			snapshotsAvailable:     []bool{true, true},
-			expectStoreRequests:    1,
-			expectSnapshotRequests: 2,
-		},
-		{
-			name:                   "Fallback",
-			snapshotsAvailable:     []bool{true, false},
-			expectSnapshotRequests: 2,
-			expectStoreRequests:    2,
-		},
-	}
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, snapshotAvailable := range []bool{false, true} {
+		t.Run(fmt.Sprintf("SnapshotAvailable=%t", snapshotAvailable), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 			backingStorage := &cachertesting.MockStorage{}
 			expectStoreRequests := 0
@@ -563,45 +559,46 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 				}
 				return nil
 			}
+
 			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
 			if err != nil {
 				t.Fatalf("Couldn't create cacher: %v", err)
 			}
 			defer cacher.Stop()
-			snapshotRequestCount := 0
-			cacher.watchCache.RWMutex.Lock()
-			cacher.watchCache.storage.snapshots = &fakeSnapshotter{
-				getLessOrEqual: func(rv uint64) (store.Snapshot, bool) {
-					snapshotAvailable := tc.snapshotsAvailable[snapshotRequestCount]
-					snapshotRequestCount++
-					if snapshotAvailable {
-						return fakeIndexer{}, true
-					} else {
-						return nil, false
-					}
-				},
-			}
-			cacher.watchCache.RWMutex.Unlock()
+
 			if err := cacher.ready.wait(context.Background()); err != nil {
 				t.Fatalf("unexpected error waiting for the cache to be ready")
 			}
 			delegator := NewCacheDelegator(cacher, backingStorage)
 
+			if snapshotAvailable {
+				oldPod := &example.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:       "ns",
+						Name:            "pod1",
+						ResourceVersion: "20",
+					},
+				}
+				if err := cacher.watchCache.Add(oldPod); err != nil {
+					t.Fatal(err)
+				}
+			}
+
 			result := &example.PodList{}
-			err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true}, result)
+			err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true, Predicate: storage.Everything}, result)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 			if result.ResourceVersion != "20" {
 				t.Fatalf("Unexpected List response RV, got: %q, want: %d", result.ResourceVersion, 20)
 			}
-			if expectStoreRequests != tc.expectStoreRequests {
-				t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", expectStoreRequests, tc.expectStoreRequests)
+			expectStoreRequestsVal := 2
+			if snapshotAvailable {
+				expectStoreRequestsVal = 1
 			}
-			if snapshotRequestCount != tc.expectSnapshotRequests {
-				t.Fatalf("Unexpected number of requests to snapshots, got: %d, want: %d", snapshotRequestCount, tc.expectSnapshotRequests)
+			if expectStoreRequests != expectStoreRequestsVal {
+				t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", expectStoreRequests, expectStoreRequestsVal)
 			}
-
 		})
 	}
 }
@@ -3146,63 +3143,6 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	if err = cacher.ready.wait(ctx); err != nil {
 		t.Fatalf("error waiting for the cache to be ready, err: %v", err)
 	}
-}
-
-type fakeIndexer struct {
-}
-
-func (f fakeIndexer) Add(obj interface{}) error    { return nil }
-func (f fakeIndexer) Update(obj interface{}) error { return nil }
-func (f fakeIndexer) Delete(obj interface{}) error { return nil }
-func (f fakeIndexer) Clone() store.Snapshot        { return f }
-func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
-	return nil, nil
-}
-
-func (f fakeIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	return nil, false, nil
-}
-
-func (f fakeIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return nil, false, nil
-}
-
-func (f fakeIndexer) List() []interface{} {
-	return nil
-}
-
-func (f fakeIndexer) ListKeys() []string {
-	return nil
-}
-
-func (f fakeIndexer) Replace([]interface{}, string) error {
-	return nil
-}
-func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
-	return nil, nil
-}
-func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
-
-type fakeSnapshotter struct {
-	getLessOrEqual func(rv uint64) (store.Snapshot, bool)
-}
-
-var _ store.Snapshotter = (*fakeSnapshotter)(nil)
-
-func (f *fakeSnapshotter) Reset() {}
-func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (store.Snapshot, bool) {
-	if f.getLessOrEqual == nil {
-		return nil, false
-	}
-	return f.getLessOrEqual(rv)
-}
-func (f *fakeSnapshotter) Add(rv uint64, indexer store.Indexer) {}
-func (f *fakeSnapshotter) RemoveLess(rv uint64)                 {}
-func (f *fakeSnapshotter) Len() int {
-	return 0
-}
-func (f *fakeSnapshotter) Latest() (store.Snapshot, bool) {
-	return nil, false
 }
 
 // --- Sharding unit tests for filterWithAttrsAndPrefixFunction ---
