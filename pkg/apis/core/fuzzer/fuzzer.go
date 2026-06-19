@@ -65,6 +65,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
+		func(s *core.ServiceAccountTokenProjection, c randfill.Continue) {
+			c.FillNoCustom(s)
+			if s.ExpirationSeconds == nil {
+				// Defaulted; valid objects always carry a value.
+				s.ExpirationSeconds = ptr.To[int64](3600)
+			}
+		},
 		func(s *core.PodSpec, c randfill.Continue) {
 			c.FillNoCustom(s)
 			// has a default value

@@ -1210,11 +1210,15 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 		}
 		if projPath := srcPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
 			numSources++
-			if source.ServiceAccountToken.ExpirationSeconds < 10*60 {
-				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration less than 10 minutes"))
-			}
-			if source.ServiceAccountToken.ExpirationSeconds > 1<<32 {
-				allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), source.ServiceAccountToken.ExpirationSeconds, "may not specify a duration larger than 2^32 seconds"))
+			if exp := source.ServiceAccountToken.ExpirationSeconds; exp == nil {
+				allErrs = append(allErrs, field.Required(projPath.Child("expirationSeconds"), ""))
+			} else {
+				if *exp < 10*60 {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), *exp, "may not specify a duration less than 10 minutes"))
+				}
+				if *exp > 1<<32 {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("expirationSeconds"), *exp, "may not specify a duration larger than 2^32 seconds"))
+				}
 			}
 			if source.ServiceAccountToken.Path == "" {
 				allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
