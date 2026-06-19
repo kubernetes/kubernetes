@@ -274,20 +274,37 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 }
 
 // validateNodeAllocatableDRAClaimSharing ensures that a node-allocatable DRA claim is not already in use by another pod on this node.
-func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, nodeInfo fwk.NodeInfo, claim *resourceapi.ResourceClaim) *fwk.Status {
-	if claim == nil {
+func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, nodeInfo fwk.NodeInfo, claimName string, state *stateData) *fwk.Status {
+	if claimName == "" {
 		return nil
 	}
-	claimKey := types.NamespacedName{Namespace: pod.Namespace, Name: claim.Name}
-	claimStates := nodeInfo.GetNodeAllocatableDRAClaimState()
-	if state, ok := claimStates[claimKey]; ok && state != nil {
-		if state.ConsumerPods.Len() > 1 {
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s shared by multiple pods", claimKey.Name))
+
+	if !state.claimHasNodeAllocatableDirectMappedDevice[claimName] {
+		// Overhead-only claims are allowed to be shared.
+		return nil
+	}
+
+	// If it is direct-mapped, it must be exclusive. Check if any other pod on this node (either scheduled
+	// or assumed) is consuming this claim. nodeInfo.GetPods() automatically returns both scheduled and assumed pods.
+	for _, scheduledPodInfo := range nodeInfo.GetPods() {
+		scheduledPod := scheduledPodInfo.GetPod()
+		if scheduledPod.UID == pod.UID {
+			continue
 		}
-		if state.ConsumerPods.Len() == 1 && !state.ConsumerPods.Has(pod.UID) {
-			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s is already used by another pod", claimKey.Name))
+		if scheduledPod.Namespace != pod.Namespace {
+			continue
+		}
+		// We only need to check ResourceClaimName here. Claims created from templates
+		// (ResourceClaimTemplateName) are owned and uniquely generated for a single pod,
+		// meaning they are private by design and can never be shared across pods.
+		for _, podClaim := range scheduledPod.Spec.ResourceClaims {
+			if podClaim.ResourceClaimName != nil && *podClaim.ResourceClaimName == claimName {
+				// Conflict! The claim is already used by another pod on this node.
+				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s is already used by another pod", claimName))
+			}
 		}
 	}
+
 	return nil
 }
 

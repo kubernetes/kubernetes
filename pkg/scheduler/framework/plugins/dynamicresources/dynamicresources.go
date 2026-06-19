@@ -109,6 +109,14 @@ type stateData struct {
 
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
+
+	// claimHasNodeAllocatableDirectMappedDevice stores whether a claim's allocation is direct-mapped.
+	// A claim is direct-mapped if it is allocated a device that directly models a node-allocatable
+	// resource (like cpu, memory) via the NodeAllocatableResourceMappings.Direct field in the
+	// Device spec inside the ResourceSlice.
+	// Direct-mapped claims are not allowed to be shared across pods.
+	// Populated in PreFilter and read in Filter.
+	claimHasNodeAllocatableDirectMappedDevice map[string]bool
 }
 
 func (d *stateData) Clone() fwk.StateData {
@@ -576,6 +584,37 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 	}
 
+	if pl.fts.EnableDRANodeAllocatableResources {
+		s.claimHasNodeAllocatableDirectMappedDevice = make(map[string]bool)
+		for index, claim := range claims.all() {
+			allocation := claim.Status.Allocation
+			if allocation == nil {
+				// If the claim is not yet committed to the API server (no claim.Status.Allocation),
+				// we must check if there is a pending allocation from a previous pod in this
+				// scheduling cycle (e.g. for gang scheduling).
+				allocation = s.informationsForClaim[index].allocation
+			}
+			if allocation != nil {
+				isDirect := false
+				for _, result := range allocation.Devices.Results {
+					device, err := getDeviceFromManager(pl.draManager, result.Pool, result.Device)
+					if err == nil && device != nil && device.NodeAllocatableResourceMappings != nil {
+						for _, mapping := range device.NodeAllocatableResourceMappings {
+							if mapping.Direct != nil {
+								isDirect = true
+								break
+							}
+						}
+					}
+					if isDirect {
+						break
+					}
+				}
+				s.claimHasNodeAllocatableDirectMappedDevice[claim.Name] = isDirect
+			}
+		}
+	}
+
 	if numClaimsToAllocate > 0 {
 		if loggerV := logger.V(5); loggerV.Enabled() {
 			claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, claims.len())
@@ -766,14 +805,8 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			continue
 		}
 
-		if claim.Status.Allocation == nil {
-			// The claim is not allocated yet, don't have to check
-			// anything else.
-			continue
-		}
-
-		// The claim is allocated, check whether it is ready for binding.
-		if pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus {
+		// The claim is allocated in API server, check whether it is ready for binding.
+		if claim.Status.Allocation != nil && pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus {
 			ready, err := pl.isClaimReadyForBinding(claim)
 			// If the claim is not ready yet (ready false, no error) and binding has timed out
 			// or binding has failed (err non-nil), then the scheduler should consider deallocating this
@@ -787,9 +820,18 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 		}
 
-		// The claim is allocated, check if its a node-allocatable resource claim that is already allocated.
+		// Check if its a node-allocatable resource claim that is already allocated.
 		if pl.fts.EnableDRANodeAllocatableResources {
-			status := pl.validateNodeAllocatableDRAClaimSharing(pod, nodeInfo, claim)
+			allocation := claim.Status.Allocation
+			if allocation == nil {
+				// Check if there is a pending allocation from a previous pod in this cycle.
+				allocation = state.informationsForClaim[index].allocation
+			}
+			if allocation == nil {
+				// Not allocated yet, and no pending allocation. Skip.
+				continue
+			}
+			status := pl.validateNodeAllocatableDRAClaimSharing(pod, nodeInfo, claim.Name, state)
 			if status != nil {
 				return status
 			}
