@@ -170,9 +170,11 @@ func (pam *podActivatorMock) Activate(_ klog.Logger, pods map[string]*v1.Pod) {
 type mockPodGroupState struct {
 	fwk.PodGroupState
 	scheduledPodsCount int
+	allPodsCount       int
 }
 
 func (m *mockPodGroupState) ScheduledPodsCount() int { return m.scheduledPodsCount }
+func (m *mockPodGroupState) AllPodsCount() int       { return m.allPodsCount }
 
 type mockPodGroupStateLister struct {
 	state *mockPodGroupState
@@ -566,7 +568,7 @@ func TestPlacementFeasible(t *testing.T) {
 			initialScheduledCount: 1,
 		},
 		{
-			name:     "1 pod scheduled, minCount 4, first unscheduled succeeds, not enough remaining",
+			name:     "1 pod scheduled, minCount 4, first unscheduled succeeds, not enough in total",
 			minCount: 4,
 			unscheduledPods: []*v1.Pod{
 				st.MakePod().Name("p1").Obj(),
@@ -576,7 +578,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.Unschedulable,
+				fwk.UnschedulableAndUnresolvable,
 			},
 			initialScheduledCount: 1,
 		},
@@ -600,7 +602,10 @@ func TestPlacementFeasible(t *testing.T) {
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
 
-			mockState := &mockPodGroupState{scheduledPodsCount: tc.initialScheduledCount}
+			mockState := &mockPodGroupState{
+				scheduledPodsCount: tc.initialScheduledCount,
+				allPodsCount:       tc.initialScheduledCount + len(tc.unscheduledPods),
+			}
 			mockLister := &mockSharedLister{
 				podGroupStateLister: &mockPodGroupStateLister{state: mockState},
 			}
