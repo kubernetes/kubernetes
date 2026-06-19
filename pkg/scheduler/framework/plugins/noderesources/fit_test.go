@@ -2701,6 +2701,55 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 				},
 			},
 		},
+		{
+			name:                              "Pod with DRA claim specifying Overhead and EnableDRANodeAllocatableResources enabled",
+			enableDRANodeAllocatableResources: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "node-allocatable-claim",
+									},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "node-allocatable-claim",
+							ResourceClaimName: ptr.To("node-allocatable-claim"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{{
+								Name:         v1.ResourceCPU,
+								PerPod:       ptr.To(resource.MustParse("50m")),
+								PerContainer: ptr.To(resource.MustParse("50m")),
+							}},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 200, // 100m (c1) + 50m (PerPod) + 50m (PerContainer * 1 container) = 200m
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {

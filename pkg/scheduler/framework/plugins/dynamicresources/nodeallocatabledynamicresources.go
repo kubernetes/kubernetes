@@ -148,54 +148,102 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 			}
 
 			for resourceName, resourceMap := range device.NodeAllocatableResourceMappings {
-				if resourceMap.Direct == nil {
-					continue
-				}
-				directMap := resourceMap.Direct
-				quantity := resource.Quantity{}
-				if directMap.CapacityKey != nil && *directMap.CapacityKey != "" {
-					capacityKey := *directMap.CapacityKey
-					if result.ConsumedCapacity == nil {
-						return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResourceMappings for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
-					}
-					if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
-						quantity = consumed.DeepCopy()
-						if directMap.AllocationMultiplier != nil {
-							qDec := quantity.AsDec()
-							multiplier := directMap.AllocationMultiplier.DeepCopy()
-							qDec.Mul(qDec, multiplier.AsDec())
-							quantity = *resource.NewDecimalQuantity(*qDec, quantity.Format)
+				if resourceMap.Direct != nil {
+					directMap := resourceMap.Direct
+					quantity := resource.Quantity{}
+					if directMap.CapacityKey != nil && *directMap.CapacityKey != "" {
+						capacityKey := *directMap.CapacityKey
+						if result.ConsumedCapacity == nil {
+							return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResourceMappings for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
 						}
-					} else {
-						// If the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
-						continue
+						if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
+							quantity = consumed.DeepCopy()
+							if directMap.AllocationMultiplier != nil {
+								qDec := quantity.AsDec()
+								multiplier := directMap.AllocationMultiplier.DeepCopy()
+								qDec.Mul(qDec, multiplier.AsDec())
+								quantity = *resource.NewDecimalQuantity(*qDec, quantity.Format)
+							}
+						} else {
+							// If the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
+							continue
+						}
+					} else if directMap.AllocationMultiplier != nil {
+						quantity = directMap.AllocationMultiplier.DeepCopy()
 					}
-				} else if directMap.AllocationMultiplier != nil {
-					quantity = directMap.AllocationMultiplier.DeepCopy()
+
+					found := false
+					for idx := range currentClaimStatus.Direct {
+						if currentClaimStatus.Direct[idx].Name == resourceName {
+							currentClaimStatus.Direct[idx].Quantity.Add(quantity)
+							found = true
+							break
+						}
+					}
+					if !found {
+						currentClaimStatus.Direct = append(currentClaimStatus.Direct, v1.NodeAllocatableDirectResources{
+							Name:     resourceName,
+							Quantity: quantity,
+						})
+					}
+					hasNodeAllocatableClaims = true
 				}
 
-				found := false
-				for idx := range currentClaimStatus.Direct {
-					if currentClaimStatus.Direct[idx].Name == resourceName {
-						currentClaimStatus.Direct[idx].Quantity.Add(quantity)
-						found = true
-						break
+				if resourceMap.Overhead != nil {
+					overheadMap := resourceMap.Overhead
+					var perPodRef *resource.Quantity
+					var perContainerRef *resource.Quantity
+
+					if overheadMap.PerPod != nil {
+						q := overheadMap.PerPod.DeepCopy()
+						perPodRef = &q
+					}
+					if overheadMap.PerContainer != nil {
+						q := overheadMap.PerContainer.DeepCopy()
+						perContainerRef = &q
+					}
+
+					if perPodRef != nil || perContainerRef != nil {
+						found := false
+						for idx := range currentClaimStatus.Overhead {
+							if currentClaimStatus.Overhead[idx].Name == resourceName {
+								if perPodRef != nil {
+									if currentClaimStatus.Overhead[idx].PerPod == nil {
+										currentClaimStatus.Overhead[idx].PerPod = perPodRef
+									} else {
+										currentClaimStatus.Overhead[idx].PerPod.Add(*perPodRef)
+									}
+								}
+								if perContainerRef != nil {
+									if currentClaimStatus.Overhead[idx].PerContainer == nil {
+										currentClaimStatus.Overhead[idx].PerContainer = perContainerRef
+									} else {
+										currentClaimStatus.Overhead[idx].PerContainer.Add(*perContainerRef)
+									}
+								}
+								found = true
+								break
+							}
+						}
+						if !found {
+							currentClaimStatus.Overhead = append(currentClaimStatus.Overhead, v1.NodeAllocatableOverheadResources{
+								Name:         resourceName,
+								PerPod:       perPodRef,
+								PerContainer: perContainerRef,
+							})
+						}
+						hasNodeAllocatableClaims = true
 					}
 				}
-				if !found {
-					currentClaimStatus.Direct = append(currentClaimStatus.Direct, v1.NodeAllocatableDirectResources{
-						Name:     resourceName,
-						Quantity: quantity,
-					})
-				}
-				hasNodeAllocatableClaims = true
-
 			}
 		}
 
 		if hasNodeAllocatableClaims {
 			sort.Slice(currentClaimStatus.Direct, func(i, j int) bool {
 				return currentClaimStatus.Direct[i].Name < currentClaimStatus.Direct[j].Name
+			})
+			sort.Slice(currentClaimStatus.Overhead, func(i, j int) bool {
+				return currentClaimStatus.Overhead[i].Name < currentClaimStatus.Overhead[j].Name
 			})
 			claimToStatus[key.UID] = currentClaimStatus
 		}

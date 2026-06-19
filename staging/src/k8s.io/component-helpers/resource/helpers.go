@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -283,6 +284,19 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
 			for _, direct := range claimStatus.Direct {
 				addResourceList(reqs, v1.ResourceList{direct.Name: direct.Quantity})
+			}
+			// TODO(pravk03): Handle claim references by init containers and peak resource calculations.
+			for _, overhead := range claimStatus.Overhead {
+				var quantity resource.Quantity
+				if overhead.PerPod != nil {
+					quantity.Add(*overhead.PerPod)
+				}
+				if overhead.PerContainer != nil && len(claimStatus.Containers) > 0 {
+					varOverhead := overhead.PerContainer.DeepCopy()
+					varOverhead.Mul(int64(len(claimStatus.Containers)))
+					quantity.Add(varOverhead)
+				}
+				addResourceList(reqs, v1.ResourceList{overhead.Name: quantity})
 			}
 		}
 	}
