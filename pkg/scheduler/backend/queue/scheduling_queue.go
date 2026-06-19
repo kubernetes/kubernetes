@@ -1009,6 +1009,7 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 	pInfo.BackoffExpiration = time.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
+	pInfo.FlushTimestamp = time.Time{}
 
 	if p.isPodGroupMember(pod) {
 		// Done has to be called before adding the unschedulable pod group member.
@@ -1105,6 +1106,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 	pgInfo.BackoffExpiration = time.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pgInfo.WasFlushedFromUnschedulable = false
+	pgInfo.FlushTimestamp = time.Time{}
 
 	rejectorPlugins := pgInfo.UnschedulablePlugins.Union(pgInfo.PendingPlugins)
 
@@ -1155,9 +1157,13 @@ func (p *PriorityQueue) flushUnschedulableEntitiesLeftover(logger klog.Logger) {
 	currentTime := p.clock.Now()
 	for _, entity := range p.unschedulableEntities.entityInfoMap {
 		lastScheduleTime := entity.GetTimestamp()
+		if flushTime := entity.GetFlushTimestamp(); flushTime.After(lastScheduleTime) {
+			lastScheduleTime = flushTime
+		}
 		// TODO(macsko): Once the PodGroups support queueing hints, we may want to extend the max duration for PodGroups.
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
 			entity.SetWasFlushedFromUnschedulable(true)
+			entity.SetFlushTimestamp(currentTime)
 			entitiesToMove = append(entitiesToMove, entity)
 		}
 	}
