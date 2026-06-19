@@ -2192,7 +2192,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	genericfeatures.WatchListCompression: {
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	genericfeatures.WebhookRoundTripLoadBalancing: {
