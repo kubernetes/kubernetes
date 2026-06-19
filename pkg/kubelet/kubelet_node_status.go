@@ -396,6 +396,8 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 		logger.Error(err, "Error getting the current node from lister")
 		return false
 	}
+	// GetNode reads from the shared informer cache. Copy before any downstream reads.
+	originalNode = originalNode.DeepCopy()
 
 	readyIdx, originalNodeReady := nodeutil.GetNodeCondition(&originalNode.Status, v1.NodeReady)
 	if readyIdx == -1 {
@@ -507,6 +509,10 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	}
 	if originalNode == nil {
 		return fmt.Errorf("nil %q node object", kl.nodeName)
+	}
+	if tryNumber == 0 {
+		// nodeLister reads from the shared informer cache. Copy before any downstream reads.
+		originalNode = originalNode.DeepCopy()
 	}
 
 	node, changed := kl.updateNode(ctx, originalNode)

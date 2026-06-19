@@ -537,6 +537,55 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 }
 
+func TestUpdateNodeStatusCopiesSharedListerNode(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
+
+	sharedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+	sharedNodeSnapshot := sharedNode.DeepCopy()
+	kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{sharedNode}}
+	kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{
+		func(ctx context.Context, node *v1.Node) error {
+			// Simulate the shared informer cache changing after kubelet read the node.
+			sharedNode.Labels = map[string]string{
+				v1.LabelOSStable:   goruntime.GOOS,
+				v1.LabelArchStable: goruntime.GOARCH,
+			}
+			return nil
+		},
+	}
+
+	var patches [][]byte
+	kubeClient := testKubelet.fakeKubeClient
+	kubeClient.AddReactor("patch", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		patchAction := action.(core.PatchAction)
+		patches = append(patches, patchAction.GetPatch())
+		updatedNode, err := applyNodeStatusPatch(sharedNodeSnapshot, patchAction.GetPatch())
+		return true, updatedNode, err
+	})
+
+	require.NoError(t, kubelet.tryUpdateNodeStatus(tCtx, 0))
+	require.Len(t, patches, 1)
+
+	updatedNode, err := applyNodeStatusPatch(sharedNodeSnapshot, patches[0])
+	require.NoError(t, err)
+	assert.Equal(t, goruntime.GOOS, updatedNode.Labels[v1.LabelOSStable])
+	assert.Equal(t, goruntime.GOARCH, updatedNode.Labels[v1.LabelArchStable])
+}
+
 func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	if testing.Short() {
