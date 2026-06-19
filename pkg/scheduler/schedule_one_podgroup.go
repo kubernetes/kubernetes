@@ -1004,14 +1004,14 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
-	numPlacementsToFind := int32(1)
+	numPlacementsToFind := 1
 	if schedFwk.HasPlacementScorePlugins() {
 		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
 	}
 
 	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
 	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
-	if sched.shufflePlacements != nil && int(numPlacementsToFind) < len(placements) {
+	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
 		placements = slices.Clone(placements)
 		sched.shufflePlacements(placements)
 	}
@@ -1058,7 +1058,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		}
 		metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.SinceInSeconds(evaluationStart))
 
-		if len(successfulResults) >= int(numPlacementsToFind) {
+		if len(successfulResults) >= numPlacementsToFind {
 			break
 		}
 	}
@@ -1124,14 +1124,14 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
 
-	numPlacementsToFind := int32(1)
+	numPlacementsToFind := 1
 	if schedFwk.HasPlacementScorePlugins() {
 		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
 	}
 
 	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
 	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
-	if sched.shufflePlacements != nil && int(numPlacementsToFind) < len(placements) {
+	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
 		placements = slices.Clone(placements)
 		sched.shufflePlacements(placements)
 	}
@@ -1173,7 +1173,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			successfulResults[placement] = subtreeResult
 		}
 
-		if len(successfulResults) >= int(numPlacementsToFind) {
+		if len(successfulResults) >= numPlacementsToFind {
 			break
 		}
 	}
@@ -1223,19 +1223,19 @@ func randShufflePlacements(placements []*fwk.Placement) {
 
 // numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
 // its search for more feasible placements.
-func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScore *int32, placements []*fwk.Placement) (numPlacements int32) {
-	numAllPlacements := int32(len(placements))
+func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScore *int32, placements []*fwk.Placement) (numPlacements int) {
+	numAllPlacements := len(placements)
 
 	if numAllPlacements < minFeasiblePlacementsToFind {
 		return numAllPlacements
 	}
 
 	// Use profile percentageOfPlacementsToScore if it's set. Otherwise, use global percentageOfPlacementsToScore.
-	var percentage int32
+	var percentage int
 	if percentageOfPlacementsToScore != nil {
-		percentage = *percentageOfPlacementsToScore
+		percentage = int(*percentageOfPlacementsToScore)
 	} else {
-		percentage = sched.percentageOfPlacementsToScore
+		percentage = int(sched.percentageOfPlacementsToScore)
 	}
 
 	// If neither is set or the set value is 0, linearly interpolate the value between (0, 100) and (5000, 10),
@@ -1249,7 +1249,7 @@ func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScor
 			// which can be different than the number of nodes in the cluster.
 			numAllNodes += len(placement.Nodes)
 		}
-		percentage = max(minFeasiblePlacementsPercentageToFind, int32(100-numAllNodes*9/500))
+		percentage = max(minFeasiblePlacementsPercentageToFind, 100-numAllNodes*9/500)
 	}
 
 	numPlacements = max(minFeasiblePlacementsToFind, numAllPlacements*percentage/100)
