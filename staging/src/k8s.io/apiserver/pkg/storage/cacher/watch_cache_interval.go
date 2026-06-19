@@ -176,6 +176,23 @@ type historyCacheIntervalSource struct {
 	lock sync.Locker
 }
 
+// Next returns the next event from the watchCache circular buffer.
+// An error is returned if the interval has been invalidated.
+//
+// An interval can be either valid or invalid at any given point of time.
+// When the circular buffer is full and an event needs to be popped off,
+// watchCache::startIndex is incremented. In this case, an interval tracking
+// that popped event is valid only if it has already been copied to its
+// internal buffer. However, for efficiency we perform that lazily and we
+// mark an interval as invalid iff we need to copy events from the watchCache
+// and we end up needing events that have already been popped off. This
+// translates to the following condition:
+//
+//	historyCacheIntervalSource::startIndex >= watchCache::startIndex.
+//
+// When this condition becomes false, the interval is no longer valid and
+// should not be used to retrieve and serve elements from the underlying
+// source.
 func (s *historyCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	// if there are items in the buffer to return, return from
 	// the buffer.
