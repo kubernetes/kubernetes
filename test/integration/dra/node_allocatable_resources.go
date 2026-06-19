@@ -113,7 +113,7 @@ func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName s
 		statusMatchers = append(statusMatchers, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"ResourceClaimName": gomega.ContainSubstring(expected.ResourceClaimName),
 			"Containers":        gomega.Equal(expected.Containers),
-			"Resources":         gomega.Equal(expected.Resources),
+			"Direct":            gomega.Equal(expected.Direct),
 		}))
 	}
 	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.NodeAllocatableResourceClaimStatus {
@@ -175,8 +175,8 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 				memCapacityKey: {Value: resource.MustParse(nodeMemoryCapacity)},
 			},
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU:    {CapacityKey: &cpuCapacityKey},
-				v1.ResourceMemory: {CapacityKey: &memCapacityKey},
+				v1.ResourceCPU:    {Direct: &resourceapi.NodeAllocatableDirectMapping{CapacityKey: &cpuCapacityKey}},
+				v1.ResourceMemory: {Direct: &resourceapi.NodeAllocatableDirectMapping{CapacityKey: &memCapacityKey}},
 			},
 		},
 	}
@@ -218,9 +218,9 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
 		ResourceClaimName: claim.Name,
 		Containers:        []string{"my-container-1", "my-container-2"},
-		Resources: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    resource.MustParse(nodeCPUCapacity),
-			v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
+		Direct: []v1.NodeAllocatableDirectResources{
+			{Name: v1.ResourceCPU, Quantity: resource.MustParse(nodeCPUCapacity)},
+			{Name: v1.ResourceMemory, Quantity: resource.MustParse(nodeMemoryCapacity)},
 		},
 	}}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
@@ -249,13 +249,13 @@ func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
 		{
 			Name: "numa-0-cpus",
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU: {AllocationMultiplier: &numCPUsPerDevice},
+				v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &numCPUsPerDevice}},
 			},
 		},
 		{
 			Name: "numa-1-cpus",
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU: {AllocationMultiplier: &numCPUsPerDevice},
+				v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &numCPUsPerDevice}},
 			},
 		},
 	}
@@ -292,8 +292,8 @@ func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
 	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
 		ResourceClaimName: claim.Name,
 		Containers:        []string{"my-container-1", "my-container-2"},
-		Resources: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU: numCPUsPerDevice,
+		Direct: []v1.NodeAllocatableDirectResources{
+			{Name: v1.ResourceCPU, Quantity: numCPUsPerDevice},
 		},
 	}}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
@@ -308,7 +308,7 @@ func testNodeAllocatableResourceClaimSharing(tCtx ktesting.TContext) {
 		{
 			Name: "dev-sharetest",
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU: {AllocationMultiplier: &cpuMultiplier},
+				v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &cpuMultiplier}},
 			},
 		},
 	}
@@ -344,13 +344,13 @@ func testPodLevelResourceValidation(tCtx ktesting.TContext) {
 		{
 			Name: "dev0",
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU: {AllocationMultiplier: &cpuMultiplier},
+				v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &cpuMultiplier}},
 			},
 		},
 		{
 			Name: "dev1",
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU: {AllocationMultiplier: &cpuMultiplier},
+				v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &cpuMultiplier}},
 			},
 		},
 	}
@@ -439,7 +439,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 			{
 				Name: "dev-exceed-cpu",
 				NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: &cpuMultiplier},
+					v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &cpuMultiplier}},
 				},
 			},
 		}
@@ -461,7 +461,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 					cpuCapacityKey: {Value: exceedCPU},
 				},
 				NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {CapacityKey: &cpuCapacityKey},
+					v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{CapacityKey: &cpuCapacityKey}},
 				},
 				AllowMultipleAllocations: ptr.To(true),
 			},
@@ -478,7 +478,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 			{
 				Name: "dev-consume-most",
 				NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: &cpuMultiplier},
+					v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &cpuMultiplier}},
 				},
 			},
 		}
@@ -511,7 +511,7 @@ func testInsufficientNodeResources(tCtx ktesting.TContext) {
 			{
 				Name: "dev-consume-half",
 				NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: &cpuMultiplier},
+					v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: &cpuMultiplier}},
 				},
 			},
 		}
@@ -555,8 +555,8 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 				memCapacityKey: {Value: resource.MustParse(nodeMemoryCapacity)},
 			},
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU:    {CapacityKey: &cpuCapacityKey},
-				v1.ResourceMemory: {CapacityKey: &memCapacityKey},
+				v1.ResourceCPU:    {Direct: &resourceapi.NodeAllocatableDirectMapping{CapacityKey: &cpuCapacityKey}},
+				v1.ResourceMemory: {Direct: &resourceapi.NodeAllocatableDirectMapping{CapacityKey: &memCapacityKey}},
 			},
 		},
 	}
@@ -615,9 +615,9 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
 		ResourceClaimName: podName, // The genereate claim based on template contains pod name
 		Containers:        []string{"c1"},
-		Resources: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    resource.MustParse("10"),
-			v1.ResourceMemory: resource.MustParse("100"),
+		Direct: []v1.NodeAllocatableDirectResources{
+			{Name: v1.ResourceCPU, Quantity: resource.MustParse("10")},
+			{Name: v1.ResourceMemory, Quantity: resource.MustParse("100")},
 		},
 	}}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
@@ -636,7 +636,7 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 				cpuCapacityKey: {Value: resource.MustParse(nodeCPUCapacity)},
 			},
 			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-				v1.ResourceCPU: {CapacityKey: &cpuCapacityKey},
+				v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{CapacityKey: &cpuCapacityKey}},
 			},
 		},
 	}

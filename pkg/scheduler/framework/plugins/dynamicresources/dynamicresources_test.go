@@ -249,7 +249,9 @@ var (
 		nativeSlice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
 		nativeSlice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
 			v1.ResourceCPU: {
-				CapacityKey: &nodeAllocatableResourceCapacityName,
+				Direct: &resourceapi.NodeAllocatableDirectMapping{
+					CapacityKey: &nodeAllocatableResourceCapacityName,
+				},
 			},
 		}
 		return nativeSlice
@@ -3254,10 +3256,13 @@ func testPlugin(tCtx ktesting.TContext) {
 					{
 						ResourceClaimName: claimName,
 						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Resources: map[v1.ResourceName]apiresource.Quantity{
-							v1.ResourceCPU:    apiresource.MustParse("1"),
-							v1.ResourceMemory: apiresource.MustParse("1Gi"),
-						},
+						Direct: []v1.NodeAllocatableDirectResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: apiresource.MustParse("1"),
+						}, {
+							Name:     v1.ResourceMemory,
+							Quantity: apiresource.MustParse("1Gi"),
+						}},
 					},
 				}
 			},
@@ -3266,8 +3271,8 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs: func() []apiruntime.Object {
 				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU:    {AllocationMultiplier: ptr.To(apiresource.MustParse("1"))},
-					v1.ResourceMemory: {AllocationMultiplier: ptr.To(apiresource.MustParse("1Gi"))},
+					v1.ResourceCPU:    {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: ptr.To(apiresource.MustParse("1"))}},
+					v1.ResourceMemory: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: ptr.To(apiresource.MustParse("1Gi"))}},
 				}
 				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
 			}(),
@@ -3298,10 +3303,13 @@ func testPlugin(tCtx ktesting.TContext) {
 									{
 										ResourceClaimName: claimName,
 										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Resources: map[v1.ResourceName]apiresource.Quantity{
-											v1.ResourceCPU:    apiresource.MustParse("1"),
-											v1.ResourceMemory: apiresource.MustParse("1Gi"),
-										},
+										Direct: []v1.NodeAllocatableDirectResources{{
+											Name:     v1.ResourceCPU,
+											Quantity: apiresource.MustParse("1"),
+										}, {
+											Name:     v1.ResourceMemory,
+											Quantity: apiresource.MustParse("1Gi"),
+										}},
 									},
 								}
 								return p
@@ -3324,9 +3332,10 @@ func testPlugin(tCtx ktesting.TContext) {
 					{
 						ResourceClaimName: claimName,
 						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Resources: map[v1.ResourceName]apiresource.Quantity{
-							v1.ResourceCPU: apiresource.MustParse("1"),
-						},
+						Direct: []v1.NodeAllocatableDirectResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: apiresource.MustParse("1"),
+						}},
 					},
 				}
 			},
@@ -3369,9 +3378,10 @@ func testPlugin(tCtx ktesting.TContext) {
 									{
 										ResourceClaimName: claimName,
 										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Resources: map[v1.ResourceName]apiresource.Quantity{
-											v1.ResourceCPU: apiresource.MustParse("1"),
-										},
+										Direct: []v1.NodeAllocatableDirectResources{{
+											Name:     v1.ResourceCPU,
+											Quantity: apiresource.MustParse("1"),
+										}},
 									},
 								}
 								return p
@@ -3394,10 +3404,13 @@ func testPlugin(tCtx ktesting.TContext) {
 					{
 						ResourceClaimName: claimName,
 						Containers:        []string{tc.pod.Spec.Containers[0].Name},
-						Resources: map[v1.ResourceName]apiresource.Quantity{
-							v1.ResourceCPU:    apiresource.MustParse("1"),
-							v1.ResourceMemory: apiresource.MustParse("1Gi"),
-						},
+						Direct: []v1.NodeAllocatableDirectResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: apiresource.MustParse("1"),
+						}, {
+							Name:     v1.ResourceMemory,
+							Quantity: apiresource.MustParse("1Gi"),
+						}},
 					},
 				}
 			},
@@ -3406,7 +3419,9 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs: func() []apiruntime.Object {
 				slice := workerNodeSliceWithNodeAllocatableResource()
 				slice.Spec.Devices[0].NodeAllocatableResourceMappings[v1.ResourceMemory] = resourceapi.NodeAllocatableResourceMapping{
-					AllocationMultiplier: ptr.To(apiresource.MustParse("1Gi")),
+					Direct: &resourceapi.NodeAllocatableDirectMapping{
+						AllocationMultiplier: ptr.To(apiresource.MustParse("1Gi")),
+					},
 				}
 				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
 			}(),
@@ -3446,10 +3461,13 @@ func testPlugin(tCtx ktesting.TContext) {
 									{
 										ResourceClaimName: claimName,
 										Containers:        []string{podWithClaimReferenceInContainer.Spec.Containers[0].Name},
-										Resources: map[v1.ResourceName]apiresource.Quantity{
-											v1.ResourceCPU:    apiresource.MustParse("1"),
-											v1.ResourceMemory: apiresource.MustParse("1Gi"),
-										},
+										Direct: []v1.NodeAllocatableDirectResources{{
+											Name:     v1.ResourceCPU,
+											Quantity: apiresource.MustParse("1"),
+										}, {
+											Name:     v1.ResourceMemory,
+											Quantity: apiresource.MustParse("1Gi"),
+										}},
 									},
 								}
 								return p
@@ -3469,7 +3487,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			objs: func() []apiruntime.Object {
 				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: ptr.To(apiresource.MustParse("11"))}, // Exceeds node capacity of 10
+					v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: ptr.To(apiresource.MustParse("11"))}}, // Exceeds node capacity of 10
 				}
 				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
 			}(),

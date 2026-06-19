@@ -58,9 +58,9 @@ func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
 func SetDefaults_Device(obj *resourceapi.Device) {
 	// TODO: fix defaulter-gen not finding SetDefaults func on map value
 	for k, m := range obj.NodeAllocatableResourceMappings {
-		if m.AllocationMultiplier == nil {
+		if m.Direct != nil && m.Direct.AllocationMultiplier == nil {
 			q := resource.MustParse("1")
-			m.AllocationMultiplier = &q
+			m.Direct.AllocationMultiplier = &q
 			obj.NodeAllocatableResourceMappings[k] = m
 		}
 	}

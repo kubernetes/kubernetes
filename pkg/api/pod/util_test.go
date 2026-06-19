@@ -939,8 +939,8 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim",
-					Resources: map[api.ResourceName]resource.Quantity{
-						api.ResourceMemory: resource.MustParse("100Mi"),
+					Direct: []api.NodeAllocatableDirectResources{
+						{Name: api.ResourceMemory, Quantity: resource.MustParse("100Mi")},
 					},
 				},
 			},

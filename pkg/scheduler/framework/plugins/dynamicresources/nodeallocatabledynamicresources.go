@@ -134,7 +134,7 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 		currentClaimStatus := v1.NodeAllocatableResourceClaimStatus{
 			ResourceClaimName: key.Name,
 			Containers:        []string{},
-			Resources:         map[v1.ResourceName]resource.Quantity{},
+			Direct:            []v1.NodeAllocatableDirectResources{},
 		}
 
 		hasNodeAllocatableClaims := false
@@ -148,18 +148,21 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 			}
 
 			for resourceName, resourceMap := range device.NodeAllocatableResourceMappings {
+				if resourceMap.Direct == nil {
+					continue
+				}
+				directMap := resourceMap.Direct
 				quantity := resource.Quantity{}
-
-				if resourceMap.CapacityKey != nil && *resourceMap.CapacityKey != "" {
-					capacityKey := *resourceMap.CapacityKey
+				if directMap.CapacityKey != nil && *directMap.CapacityKey != "" {
+					capacityKey := *directMap.CapacityKey
 					if result.ConsumedCapacity == nil {
 						return nil, fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResourceMappings for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
 					}
 					if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
 						quantity = consumed.DeepCopy()
-						if resourceMap.AllocationMultiplier != nil {
+						if directMap.AllocationMultiplier != nil {
 							qDec := quantity.AsDec()
-							multiplier := resourceMap.AllocationMultiplier.DeepCopy()
+							multiplier := directMap.AllocationMultiplier.DeepCopy()
 							qDec.Mul(qDec, multiplier.AsDec())
 							quantity = *resource.NewDecimalQuantity(*qDec, quantity.Format)
 						}
@@ -167,24 +170,33 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 						// If the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
 						continue
 					}
-				} else if resourceMap.AllocationMultiplier != nil {
-					quantity = resourceMap.AllocationMultiplier.DeepCopy()
+				} else if directMap.AllocationMultiplier != nil {
+					quantity = directMap.AllocationMultiplier.DeepCopy()
 				}
 
-				curQuantity, ok := currentClaimStatus.Resources[resourceName]
-				if !ok {
-					currentClaimStatus.Resources[resourceName] = quantity
-				} else {
-					curQuantity.Add(quantity)
-					currentClaimStatus.Resources[resourceName] = curQuantity
+				found := false
+				for idx := range currentClaimStatus.Direct {
+					if currentClaimStatus.Direct[idx].Name == resourceName {
+						currentClaimStatus.Direct[idx].Quantity.Add(quantity)
+						found = true
+						break
+					}
 				}
-
+				if !found {
+					currentClaimStatus.Direct = append(currentClaimStatus.Direct, v1.NodeAllocatableDirectResources{
+						Name:     resourceName,
+						Quantity: quantity,
+					})
+				}
 				hasNodeAllocatableClaims = true
 
 			}
 		}
 
 		if hasNodeAllocatableClaims {
+			sort.Slice(currentClaimStatus.Direct, func(i, j int) bool {
+				return currentClaimStatus.Direct[i].Name < currentClaimStatus.Direct[j].Name
+			})
 			claimToStatus[key.UID] = currentClaimStatus
 		}
 	}

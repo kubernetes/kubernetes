@@ -914,21 +914,28 @@ func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]re
 			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
 		}
 
-		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
-			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
-		} else {
-			if mapping.AllocationMultiplier != nil {
-				if mapping.AllocationMultiplier.Sign() <= 0 {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
+		if mapping.Direct == nil && mapping.Overhead == nil {
+			allErrs = append(allErrs, field.Required(keyPath, "exactly one of direct or overhead must be set"))
+		} else if mapping.Direct != nil && mapping.Overhead != nil {
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "direct and overhead are mutually exclusive"))
+		} else if mapping.Direct != nil {
+			directPath := keyPath.Child("direct")
+			if mapping.Direct.AllocationMultiplier == nil && mapping.Direct.CapacityKey == nil {
+				allErrs = append(allErrs, field.Invalid(directPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
+			} else {
+				if mapping.Direct.AllocationMultiplier != nil {
+					if mapping.Direct.AllocationMultiplier.Sign() <= 0 {
+						allErrs = append(allErrs, field.Invalid(directPath.Child("allocationMultiplier"), mapping.Direct.AllocationMultiplier.String(), "must be positive"))
+					}
 				}
-			}
-			if mapping.CapacityKey != nil {
-				if *mapping.CapacityKey == "" {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
-				} else if capacities == nil {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				if mapping.Direct.CapacityKey != nil {
+					if *mapping.Direct.CapacityKey == "" {
+						allErrs = append(allErrs, field.Invalid(directPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+					} else if capacities == nil {
+						allErrs = append(allErrs, field.NotFound(directPath.Child("capacityKey"), *mapping.Direct.CapacityKey))
+					} else if _, exists := capacities[*mapping.Direct.CapacityKey]; !exists {
+						allErrs = append(allErrs, field.NotFound(directPath.Child("capacityKey"), *mapping.Direct.CapacityKey))
+					}
 				}
 			}
 		}

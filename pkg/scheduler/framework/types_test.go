@@ -2049,9 +2049,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu100m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 			},
@@ -2085,9 +2085,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu100m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 			},
@@ -2124,15 +2124,15 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim-1",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu100m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 				{
 					ResourceClaimName: "node-allocatable-claim-2",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU: cpu100m,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
 					},
 				},
 			},
@@ -2166,9 +2166,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim-1",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu1000m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu1000m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 			},
@@ -2217,9 +2217,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim-1",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu100m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 			},
@@ -2260,9 +2260,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim-1",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu100m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 			},
@@ -2296,9 +2296,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
 				{
 					ResourceClaimName: "node-allocatable-claim-1",
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU:    cpu100m,
-						v1.ResourceMemory: mem200M,
+					Direct: []v1.NodeAllocatableDirectResources{
+						{Name: v1.ResourceCPU, Quantity: cpu100m},
+						{Name: v1.ResourceMemory, Quantity: mem200M},
 					},
 				},
 			},

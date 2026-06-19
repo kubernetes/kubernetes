@@ -16365,9 +16365,9 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU:    resource.MustParse("1"),
-							core.ResourceMemory: resource.MustParse("1Gi"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
+							{Name: core.ResourceMemory, Quantity: resource.MustParse("1Gi")},
 						},
 					},
 				},
@@ -16382,15 +16382,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 					{
 						ResourceClaimName: "my-claim2",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceMemory: resource.MustParse("2Gi"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceMemory, Quantity: resource.MustParse("2Gi")},
 						},
 					},
 				},
@@ -16405,15 +16405,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							"example.com/foo": resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: "example.com/foo", Quantity: resource.MustParse("1")},
 						},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[example.com/foo]",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].direct[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
@@ -16424,15 +16424,15 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("-1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("-1")},
 						},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources[cpu]",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].direct[0].quantity",
 			errorMsg:    "must be non-negative",
 		},
 		{
@@ -16442,8 +16442,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "my-claim1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16460,8 +16460,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
 					{
 						Containers: []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16479,13 +16479,12 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources:         map[core.ResourceName]resource.Quantity{},
 					},
 				},
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resources",
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].direct",
 			errorMsg:    "must not be empty",
 		},
 		{
@@ -16506,8 +16505,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "my-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16532,8 +16531,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "generated-claim1",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -16561,8 +16560,8 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "non-existent-claim",
 						Containers:        []string{"c1"},
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("1"),
+						Direct: []core.NodeAllocatableDirectResources{
+							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
 						},
 					},
 				},
@@ -29214,9 +29213,10 @@ func TestValidatePodResize(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("100m"),
-						},
+						Direct: []core.NodeAllocatableDirectResources{{
+							Name:     core.ResourceCPU,
+							Quantity: resource.MustParse("100m"),
+						}},
 					},
 				}
 				return p
@@ -29232,9 +29232,10 @@ func TestValidatePodResize(t *testing.T) {
 				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
 					{
 						ResourceClaimName: "node-allocatable-claim-1",
-						Resources: map[core.ResourceName]resource.Quantity{
-							core.ResourceCPU: resource.MustParse("100m"),
-						},
+						Direct: []core.NodeAllocatableDirectResources{{
+							Name:     core.ResourceCPU,
+							Quantity: resource.MustParse("100m"),
+						}},
 					},
 				}
 				return p

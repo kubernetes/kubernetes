@@ -6209,18 +6209,18 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
 		}
 
-		resourcesFldPath := statusFldPath.Child("resources")
-		if len(nodeAllocatableStatus.Resources) == 0 {
-			allErrs = append(allErrs, field.Required(resourcesFldPath, "must not be empty"))
+		directFldPath := statusFldPath.Child("direct")
+		if len(nodeAllocatableStatus.Direct) == 0 {
+			allErrs = append(allErrs, field.Required(directFldPath, "must not be empty"))
 		}
 
-		for resourceName, quantity := range nodeAllocatableStatus.Resources {
-			keyPath := resourcesFldPath.Key(string(resourceName))
-			if !v1helper.IsNativeResource(v1.ResourceName(resourceName)) {
-				allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
+		for i, direct := range nodeAllocatableStatus.Direct {
+			itemPath := directFldPath.Index(i)
+			if !v1helper.IsNativeResource(v1.ResourceName(direct.Name)) {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), direct.Name, "must be a node allocatable resource name"))
 			}
-			if quantity.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Invalid(keyPath, quantity.String(), "must be non-negative"))
+			if direct.Quantity.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), direct.Quantity.String(), "must be non-negative"))
 			}
 		}
 	}
