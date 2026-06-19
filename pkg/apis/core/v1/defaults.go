@@ -213,12 +213,22 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// https://github.com/kubernetes/kubernetes/issues/69445
 	// In most cases the new defaulted field can added to SetDefaults_Pod instead of here, so
 	// that it only materializes in the Pod object and not all objects with a PodSpec field.
+
+	// DeprecatedServiceAccount is an alias for ServiceAccountName; keep the two
+	// in sync, with ServiceAccountName winning when both are set. This was
+	// historically applied during conversion and produces identical
+	// serializations, so it is exempt from the new-field caution above.
+	if len(obj.ServiceAccountName) == 0 {
+		obj.ServiceAccountName = obj.DeprecatedServiceAccount
+	}
+	obj.DeprecatedServiceAccount = obj.ServiceAccountName
 	if obj.DNSPolicy == "" {
 		obj.DNSPolicy = v1.DNSClusterFirst
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
+	// Always default an empty securityContext to preserve historical behavior.
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &v1.PodSecurityContext{}
 	}

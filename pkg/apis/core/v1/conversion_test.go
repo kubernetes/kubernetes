@@ -138,15 +138,15 @@ func TestPodLogOptions(t *testing.T) {
 	}
 }
 
-// TestPodSpecConversion tests that v1.ServiceAccount is an alias for
-// ServiceAccountName.
+// TestPodSpecConversion tests that ServiceAccountName and its deprecated alias
+// are preserved verbatim by conversion in both directions (keeping them in
+// sync is handled by defaulting and the pod registry strategy, not conversion).
 func TestPodSpecConversion(t *testing.T) {
 	name, other := "foo", "bar"
 
-	// Test internal -> v1. Should have both alias (DeprecatedServiceAccount)
-	// and new field (ServiceAccountName).
 	i := &core.PodSpec{
-		ServiceAccountName: name,
+		ServiceAccountName:       name,
+		DeprecatedServiceAccount: other,
 	}
 	v := v1.PodSpec{}
 	if err := legacyscheme.Scheme.Convert(i, &v, nil); err != nil {
@@ -155,32 +155,81 @@ func TestPodSpecConversion(t *testing.T) {
 	if v.ServiceAccountName != name {
 		t.Fatalf("want v1.ServiceAccountName %q, got %q", name, v.ServiceAccountName)
 	}
-	if v.DeprecatedServiceAccount != name {
-		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", name, v.DeprecatedServiceAccount)
+	if v.DeprecatedServiceAccount != other {
+		t.Fatalf("want v1.DeprecatedServiceAccount %q, got %q", other, v.DeprecatedServiceAccount)
 	}
 
-	// Test v1 -> internal. Either DeprecatedServiceAccount, ServiceAccountName,
-	// or both should translate to ServiceAccountName. ServiceAccountName wins
-	// if both are set.
-	testCases := []*v1.PodSpec{
-		// New
-		{ServiceAccountName: name},
-		// Alias
-		{DeprecatedServiceAccount: name},
-		// Both: same
-		{ServiceAccountName: name, DeprecatedServiceAccount: name},
-		// Both: different
-		{ServiceAccountName: name, DeprecatedServiceAccount: other},
+	got := core.PodSpec{}
+	if err := legacyscheme.Scheme.Convert(&v, &got, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	for k, v := range testCases {
-		got := core.PodSpec{}
-		err := legacyscheme.Scheme.Convert(v, &got, nil)
-		if err != nil {
-			t.Fatalf("unexpected error for case %d: %v", k, err)
-		}
-		if got.ServiceAccountName != name {
-			t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
-		}
+	if got.ServiceAccountName != name {
+		t.Fatalf("want core.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
+	}
+	if got.DeprecatedServiceAccount != other { //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
+		t.Fatalf("want core.DeprecatedServiceAccount %q, got %q", other, got.DeprecatedServiceAccount) //nolint:staticcheck // SA1019 DeprecatedServiceAccount must be tested for backward compatibility
+	}
+}
+
+func TestPodSpecHostNamespaceSecurityContextRoundTrip(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(spec *v1.PodSpec)
+	}{
+		{"none", func(spec *v1.PodSpec) {}},
+		{"hostNetwork", func(spec *v1.PodSpec) { spec.HostNetwork = true }},
+		{"hostPID", func(spec *v1.PodSpec) { spec.HostPID = true }},
+		{"hostIPC", func(spec *v1.PodSpec) { spec.HostIPC = true }},
+		{"hostUsers", func(spec *v1.PodSpec) { spec.HostUsers = new(true) }},
+		{"hostUsersFalse", func(spec *v1.PodSpec) { spec.HostUsers = new(false) }},
+		{"shareProcessNamespace", func(spec *v1.PodSpec) { spec.ShareProcessNamespace = new(true) }},
+		{"shareProcessNamespaceFalse", func(spec *v1.PodSpec) { spec.ShareProcessNamespace = new(false) }},
+		{"all", func(spec *v1.PodSpec) {
+			spec.HostNetwork = true
+			spec.HostIPC = true
+			spec.HostUsers = new(true)
+			spec.ShareProcessNamespace = new(true)
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &v1.Pod{}
+			tc.mutate(&in.Spec)
+			if in.Spec.SecurityContext != nil {
+				t.Fatalf("securityContext must start nil")
+			}
+			legacyscheme.Scheme.Default(in)
+			if in.Spec.SecurityContext == nil {
+				t.Errorf("securityContext must default to non-nil")
+			}
+
+			// v1 -> internal
+			internal := &core.Pod{}
+			if err := legacyscheme.Scheme.Convert(in, internal, nil); err != nil {
+				t.Fatal(err)
+			}
+			// compare across types
+			if internal.Spec.HostNetwork != in.Spec.HostNetwork ||
+				internal.Spec.HostPID != in.Spec.HostPID ||
+				internal.Spec.HostIPC != in.Spec.HostIPC ||
+				!reflect.DeepEqual(internal.Spec.HostUsers, in.Spec.HostUsers) ||
+				!reflect.DeepEqual(internal.Spec.ShareProcessNamespace, in.Spec.ShareProcessNamespace) {
+				t.Errorf("v1 -> internal:\n%s", cmp.Diff(in.Spec, internal.Spec))
+			}
+
+			// internal -> v1
+			out := &v1.Pod{}
+			if err := legacyscheme.Scheme.Convert(internal, out, nil); err != nil {
+				t.Fatal(err)
+			}
+			if out.Spec.SecurityContext == nil {
+				t.Errorf("securityContext must be an non-nil")
+			}
+			// compare round-tripped
+			if !reflect.DeepEqual(in.Spec, out.Spec) {
+				t.Errorf("internal -> v1:\n%s", cmp.Diff(in.Spec, out.Spec))
+			}
+		})
 	}
 }
 
@@ -833,7 +882,6 @@ func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
 			wantOut: &core.Pod{
 				Spec: core.PodSpec{
 					TerminationGracePeriodSeconds: ptr.To[int64](1),
-					SecurityContext:               &core.PodSecurityContext{},
 				},
 			},
 		},

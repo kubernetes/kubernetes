@@ -3920,7 +3920,7 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidati
 
 	// Only make the following checks if hostUsers is false (otherwise, the container uses the
 	// same userns as the host, and so there isn't anything to check).
-	if spec.SecurityContext == nil || spec.SecurityContext.HostUsers == nil || *spec.SecurityContext.HostUsers {
+	if spec.HostUsers == nil || *spec.HostUsers {
 		return allErrs
 	}
 
@@ -3929,17 +3929,16 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidati
 	// The tl;dr is: you can easily run into permission issues that seem unexpected, we don't
 	// know of any good use case and we can always enable them later.
 
-	// Note we already validated above spec.SecurityContext is not nil.
 	if !opts.AllowUserNamespacesHostNetworkSupport {
-		if spec.SecurityContext.HostNetwork {
+		if spec.HostNetwork {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `hostUsers` is false"))
 		}
 	}
 
-	if spec.SecurityContext.HostPID {
+	if spec.HostPID {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostPID"), "when `hostUsers` is false"))
 	}
-	if spec.SecurityContext.HostIPC {
+	if spec.HostIPC {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostIPC"), "when `hostUsers` is false"))
 	}
 	if !opts.AllowUserNamespacesWithVolumeDevices {
@@ -4007,7 +4006,7 @@ func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorLis
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostnameOverride"), "may not be specified when setHostnameAsFQDN is true"))
 	}
 	// If HostNetwork is true, HostnameOverride must not be set.
-	if spec.SecurityContext != nil && spec.SecurityContext.HostNetwork {
+	if spec.HostNetwork {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostnameOverride"), "may not be specified when hostNetwork is true"))
 	}
 	if len(*spec.HostnameOverride) > 64 {
@@ -4206,10 +4205,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 func validatePodHostNetworkDeps(spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	// For <reasons> we keep `.HostNetwork` in .SecurityContext on the internal
 	// version of Pod.
-	hostNetwork := false
-	if spec.SecurityContext != nil {
-		hostNetwork = spec.SecurityContext.HostNetwork
-	}
+	hostNetwork := spec.HostNetwork
 
 	allErrors := field.ErrorList{}
 
@@ -4645,9 +4641,9 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	}
 	gracePeriod := spec.TerminationGracePeriodSeconds
 
-	// The default for hostUsers is true, so a spec with no SecurityContext or no HostUsers field will be true.
+	// The default for hostUsers is true, so a spec with no HostUsers field will be true.
 	// If the default ever changes, this condition will need to be changed.
-	hostUsers := spec.SecurityContext == nil || spec.SecurityContext.HostUsers == nil || *spec.SecurityContext.HostUsers
+	hostUsers := spec.HostUsers == nil || *spec.HostUsers
 
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
@@ -4666,6 +4662,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
 	allErrs = append(allErrs, validatePodSpecSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"), opts)...)
+	allErrs = append(allErrs, validateShareProcessNamespace(spec, fldPath)...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, opts, fldPath.Child("affinity"))...)
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
@@ -4882,15 +4879,6 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		if securityContext.SELinuxOptions != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seLinuxOptions"), "cannot be set for a windows pod"))
 		}
-		if securityContext.HostUsers != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostUsers"), "cannot be set for a windows pod"))
-		}
-		if securityContext.HostPID {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostPID"), "cannot be set for a windows pod"))
-		}
-		if securityContext.HostIPC {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostIPC"), "cannot be set for a windows pod"))
-		}
 		if securityContext.SeccompProfile != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seccompProfile"), "cannot be set for a windows pod"))
 		}
@@ -4902,9 +4890,6 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		}
 		if len(securityContext.Sysctls) > 0 {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("sysctls"), "cannot be set for a windows pod"))
-		}
-		if securityContext.ShareProcessNamespace != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
 		}
 		if securityContext.RunAsUser != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("runAsUser"), "cannot be set for a windows pod"))
@@ -4921,6 +4906,18 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		if securityContext.SELinuxChangePolicy != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seLinuxChangePolicy"), "cannot be set for a windows pod"))
 		}
+	}
+	if spec.HostUsers != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostUsers"), "cannot be set for a windows pod"))
+	}
+	if spec.HostPID {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostPID"), "cannot be set for a windows pod"))
+	}
+	if spec.HostIPC {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostIPC"), "cannot be set for a windows pod"))
+	}
+	if spec.ShareProcessNamespace != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
 	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
 		// validate container security context
@@ -5480,7 +5477,7 @@ func IsValidSysctlName(name string) bool {
 	return sysctlContainSlashRegexp.MatchString(name)
 }
 
-func validateSysctls(securityContext *core.PodSecurityContext, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateSysctls(securityContext *core.PodSecurityContext, spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	names := make(map[string]struct{})
 	for i, s := range securityContext.Sysctls {
@@ -5492,7 +5489,7 @@ func validateSysctls(securityContext *core.PodSecurityContext, fldPath *field.Pa
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("name"), s.Name))
 		}
 		if !opts.AllowNamespacedSysctlsForHostNetAndHostIPC {
-			err := ValidateHostSysctl(s.Name, securityContext, fldPath.Index(i).Child("name"))
+			err := ValidateHostSysctl(s.Name, spec, fldPath.Index(i).Child("name"))
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -5503,12 +5500,12 @@ func validateSysctls(securityContext *core.PodSecurityContext, fldPath *field.Pa
 }
 
 // ValidateHostSysctl will return error if namespaced sysctls is applied to pod sharing the respective namespaces with the host.
-func ValidateHostSysctl(sysctl string, securityContext *core.PodSecurityContext, fldPath *field.Path) *field.Error {
+func ValidateHostSysctl(sysctl string, spec *core.PodSpec, fldPath *field.Path) *field.Error {
 	ns, _, _ := utilsysctl.GetNamespace(sysctl)
 	switch {
-	case securityContext.HostNetwork && ns == utilsysctl.NetNamespace:
+	case spec.HostNetwork && ns == utilsysctl.NetNamespace:
 		return field.Invalid(fldPath, sysctl, "may not be specified when 'hostNetwork' is true")
-	case securityContext.HostIPC && ns == utilsysctl.IPCNamespace:
+	case spec.HostIPC && ns == utilsysctl.IPCNamespace:
 		return field.Invalid(fldPath, sysctl, "may not be specified when 'hostIPC' is true")
 	}
 	return nil
@@ -5563,12 +5560,8 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
 		}
-		if securityContext.ShareProcessNamespace != nil && securityContext.HostPID && *securityContext.ShareProcessNamespace {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *securityContext.ShareProcessNamespace, "ShareProcessNamespace and HostPID cannot both be enabled"))
-		}
-
 		if len(securityContext.Sysctls) != 0 {
-			allErrs = append(allErrs, validateSysctls(securityContext, fldPath.Child("sysctls"), opts)...)
+			allErrs = append(allErrs, validateSysctls(securityContext, spec, fldPath.Child("sysctls"), opts)...)
 		}
 
 		if securityContext.FSGroupChangePolicy != nil {
@@ -5588,6 +5581,13 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 		}
 	}
 
+	return allErrs
+}
+
+func validateShareProcessNamespace(spec *core.PodSpec, fldPath *field.Path) (allErrs field.ErrorList) {
+	if spec.ShareProcessNamespace != nil && spec.HostPID && *spec.ShareProcessNamespace {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *spec.ShareProcessNamespace, "ShareProcessNamespace and HostPID cannot both be enabled"))
+	}
 	return allErrs
 }
 
@@ -8653,10 +8653,7 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path)
 		podHostProcess = podSpec.SecurityContext.WindowsOptions.HostProcess
 	}
 
-	hostNetwork := false
-	if podSpec.SecurityContext != nil {
-		hostNetwork = podSpec.SecurityContext.HostNetwork
-	}
+	hostNetwork := podSpec.HostNetwork
 
 	podshelper.VisitContainersWithPath(podSpec, fieldPath, func(c *core.Container, cFieldPath *field.Path) bool {
 		containerCount++

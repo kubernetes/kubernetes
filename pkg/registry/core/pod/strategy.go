@@ -492,12 +492,7 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
-	if pod.Spec.SecurityContext != nil {
-		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.SecurityContext.HostNetwork)
-	} else {
-		// default to false
-		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(false)
-	}
+	podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.HostNetwork)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	// TODO: add podIPs as a downward API value(s) with proper format
 	podIP := ""

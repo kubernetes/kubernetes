@@ -98,9 +98,7 @@ func TestValidateJob(t *testing.T) {
 	validPodTemplateSpecForGeneratedRestartPolicyNever.Spec.RestartPolicy = api.RestartPolicyNever
 	validHostNetPodTemplateSpec := func() api.PodTemplateSpec {
 		spec := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
-		spec.Spec.SecurityContext = &api.PodSecurityContext{
-			HostNetwork: true,
-		}
+		spec.Spec.HostNetwork = true
 		spec.Spec.Containers[0].Ports = []api.ContainerPort{{
 			ContainerPort: 12345,
 			Protocol:      api.ProtocolTCP,
@@ -2826,9 +2824,7 @@ func TestValidateCronJob(t *testing.T) {
 	validPodTemplateSpec.Labels = map[string]string{}
 	validHostNetPodTemplateSpec := func() api.PodTemplateSpec {
 		spec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
-		spec.Spec.SecurityContext = &api.PodSecurityContext{
-			HostNetwork: true,
-		}
+		spec.Spec.HostNetwork = true
 		spec.Spec.Containers[0].Ports = []api.ContainerPort{{
 			ContainerPort: 12345,
 			Protocol:      api.ProtocolTCP,

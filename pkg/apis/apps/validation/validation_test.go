@@ -247,9 +247,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					HostNetwork: true,
-				},
+				HostNetwork:   true,
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 				Containers: []api.Container{{
@@ -2362,9 +2360,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: podtest.MakePodSpec(
-				podtest.SetSecurityContext(&api.PodSecurityContext{
-					HostNetwork: true,
-				}),
+				podtest.SetHostNetwork(true),
 				podtest.SetContainers(podtest.MakeContainer("abc",
 					podtest.SetContainerPorts(api.ContainerPort{
 						ContainerPort: 12345,
@@ -2603,9 +2599,7 @@ func TestValidateDeployment(t *testing.T) {
 	successCases := []*apps.Deployment{
 		validDeployment(),
 		validDeployment(func(d *apps.Deployment) {
-			d.Spec.Template.Spec.SecurityContext = &api.PodSecurityContext{
-				HostNetwork: true,
-			}
+			d.Spec.Template.Spec.HostNetwork = true
 			d.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{{
 				ContainerPort: 12345,
 				Protocol:      api.ProtocolTCP,
@@ -3538,9 +3532,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: podtest.MakePodSpec(
-				podtest.SetSecurityContext(&api.PodSecurityContext{
-					HostNetwork: true,
-				}),
+				podtest.SetHostNetwork(true),
 				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(api.ContainerPort{
 					ContainerPort: 12345,
 					Protocol:      api.ProtocolTCP,

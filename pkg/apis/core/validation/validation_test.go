@@ -10416,7 +10416,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"populate HostNetwork": podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+			podtest.SetHostNetwork(true),
 		),
 		"populate RunAsUser SupplementalGroups FSGroup with minID 0": podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
@@ -10433,14 +10433,10 @@ func TestValidatePodSpec(t *testing.T) {
 			}),
 		),
 		"populate HostIPC": podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostIPC: true,
-			}),
+			podtest.SetHostIPC(true),
 		),
 		"populate HostPID": podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostPID: true,
-			}),
+			podtest.SetHostPID(true),
 		),
 		"populate Affinity": podtest.MakePod("",
 			podtest.SetAffinity(&core.Affinity{
@@ -10480,17 +10476,17 @@ func TestValidatePodSpec(t *testing.T) {
 		),
 		"populate HostAliases with HostNetwork": podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
+			podtest.SetHostNetwork(true),
 		),
 		"populate PriorityClassName": podtest.MakePod("",
 			podtest.SetPriorityClassName("valid-name"),
 		),
 		"populate ShareProcessNamespace": podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				ShareProcessNamespace: &[]bool{true}[0],
-			}),
+			podtest.SetShareProcessNamespace(&[]bool{true}[0]),
+		),
+		"HostPID with ShareProcessNamespace disabled": podtest.MakePod("",
+			podtest.SetHostPID(true),
+			podtest.SetShareProcessNamespace(&[]bool{false}[0]),
 		),
 		"populate RuntimeClassName": podtest.MakePod("",
 			podtest.SetRuntimeClassName("valid-sandbox"),
@@ -10585,33 +10581,23 @@ func TestValidatePodSpec(t *testing.T) {
 		"with hostNetwork hostPort unspecified": {pod: *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
+			podtest.SetHostNetwork(true),
 		)},
 		"with hostNetwork hostPort not equal to containerPort": {pod: *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
+			podtest.SetHostNetwork(true),
 		)},
 		"with hostAliases with invalid IP": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
+			podtest.SetHostNetwork(false),
 			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
 		)},
 		"with hostAliases with invalid legacy IP with strict IP validation": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
+			podtest.SetHostNetwork(false),
 			podtest.SetHostAliases(core.HostAlias{IP: "001.002.003.004", Hostnames: []string{"host1", "host2"}}),
 		)},
 		"with hostAliases with invalid hostname": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
+			podtest.SetHostNetwork(false),
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
 		)},
 		"bad supplementalGroups large than math.MaxInt32": {pod: *podtest.MakePod("",
@@ -10657,11 +10643,11 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetPriorityClassName("InvalidName"),
 		)},
 		"ShareProcessNamespace and HostPID both set": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostPID:               true,
-				ShareProcessNamespace: &[]bool{true}[0],
-			}),
-		)},
+			podtest.SetHostPID(true),
+			podtest.SetShareProcessNamespace(&[]bool{true}[0]),
+		), expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("field").Child("shareProcessNamespace"), true, "ShareProcessNamespace and HostPID cannot both be enabled"),
+		}},
 		"bad RuntimeClassName": {pod: *podtest.MakePod("",
 			podtest.SetRuntimeClassName("invalid/sandbox"),
 		)},
@@ -16674,8 +16660,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			)),
 			podtest.SetEphemeralContainers(ephemeralContainers...),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
+			podtest.SetHostNetwork(true),
 			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: proto.Bool(true),
 				},
@@ -18783,7 +18769,7 @@ func TestValidateReplicationController(t *testing.T) {
 		}),
 		mkValidReplicationController(func(rc *core.ReplicationController) {
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
-				podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+				podtest.SetHostNetwork(true),
 				podtest.SetContainers(podtest.MakeContainer("abc",
 					podtest.SetContainerPorts(core.ContainerPort{
 						ContainerPort: 12345, Protocol: core.ProtocolTCP,
@@ -23445,16 +23431,16 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.AppArmorProfile",
 		"SecurityContext.FSGroup",
 		"SecurityContext.FSGroupChangePolicy",
-		"SecurityContext.HostIPC",
-		"SecurityContext.HostNetwork",
-		"SecurityContext.HostPID",
-		"SecurityContext.HostUsers",
+		"HostIPC",
+		"HostNetwork",
+		"HostPID",
+		"HostUsers",
 		"SecurityContext.RunAsGroup",
 		"SecurityContext.RunAsUser",
 		"SecurityContext.SELinuxOptions",
 		"SecurityContext.SELinuxChangePolicy",
 		"SecurityContext.SeccompProfile",
-		"SecurityContext.ShareProcessNamespace",
+		"ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
 		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
@@ -23569,6 +23555,7 @@ func TestValidateOSFields(t *testing.T) {
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",
+		"DeprecatedServiceAccount",
 		"SecurityContext.RunAsNonRoot",
 		"ServiceAccountName",
 		"SetHostnameAsFQDN",
@@ -24318,7 +24305,7 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
 	}
-	errs := validateSysctls(validSecurityContext, field.NewPath("foo"), opts)
+	errs := validateSysctls(validSecurityContext, &core.PodSpec{}, field.NewPath("foo"), opts)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -24330,7 +24317,7 @@ func TestValidateSysctls(t *testing.T) {
 	inValidSecurityContext := &core.PodSecurityContext{
 		Sysctls: sysctls,
 	}
-	errs = validateSysctls(inValidSecurityContext, field.NewPath("foo"), opts)
+	errs = validateSysctls(inValidSecurityContext, &core.PodSpec{}, field.NewPath("foo"), opts)
 	if len(errs) != 2 {
 		t.Errorf("expected 2 validation errors. Got: %v", errs)
 	} else {
@@ -24349,7 +24336,7 @@ func TestValidateSysctls(t *testing.T) {
 	securityContextWithDup := &core.PodSecurityContext{
 		Sysctls: sysctls,
 	}
-	errs = validateSysctls(securityContextWithDup, field.NewPath("foo"), opts)
+	errs = validateSysctls(securityContextWithDup, &core.PodSpec{}, field.NewPath("foo"), opts)
 	if len(errs) != 1 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
@@ -24361,16 +24348,15 @@ func TestValidateSysctls(t *testing.T) {
 		sysctls[i].Name = sysctl
 	}
 	invalidSecurityContextWithHostNet := &core.PodSecurityContext{
-		Sysctls:     sysctls,
-		HostIPC:     false,
-		HostNetwork: true,
+		Sysctls: sysctls,
 	}
-	errs = validateSysctls(invalidSecurityContextWithHostNet, field.NewPath("foo"), opts)
+	specWithHostNet := &core.PodSpec{HostNetwork: true}
+	errs = validateSysctls(invalidSecurityContextWithHostNet, specWithHostNet, field.NewPath("foo"), opts)
 	if len(errs) != 2 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
 	opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
-	errs = validateSysctls(invalidSecurityContextWithHostNet, field.NewPath("foo"), opts)
+	errs = validateSysctls(invalidSecurityContextWithHostNet, specWithHostNet, field.NewPath("foo"), opts)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -24380,17 +24366,16 @@ func TestValidateSysctls(t *testing.T) {
 		sysctls[i].Name = sysctl
 	}
 	invalidSecurityContextWithHostIPC := &core.PodSecurityContext{
-		Sysctls:     sysctls,
-		HostIPC:     true,
-		HostNetwork: false,
+		Sysctls: sysctls,
 	}
+	specWithHostIPC := &core.PodSpec{HostIPC: true}
 	opts.AllowNamespacedSysctlsForHostNetAndHostIPC = false
-	errs = validateSysctls(invalidSecurityContextWithHostIPC, field.NewPath("foo"), opts)
+	errs = validateSysctls(invalidSecurityContextWithHostIPC, specWithHostIPC, field.NewPath("foo"), opts)
 	if len(errs) != 2 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
 	opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
-	errs = validateSysctls(invalidSecurityContextWithHostIPC, field.NewPath("foo"), opts)
+	errs = validateSysctls(invalidSecurityContextWithHostIPC, specWithHostIPC, field.NewPath("foo"), opts)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -26614,25 +26599,19 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 		},
 	}, {
 		name:    "hostUsers=true",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &trueVar,
-			},
+			HostUsers: &trueVar,
 		},
 	}, {
 		name:    "hostUsers=false & volumes",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Volumes: []core.Volume{{
 				Name: "configmap",
 				VolumeSource: core.VolumeSource{
@@ -26668,9 +26647,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false - stateful volume",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Volumes: []core.Volume{{
 				Name: "host-path",
 				VolumeSource: core.VolumeSource{
@@ -26682,9 +26659,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=true - stateful volume",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &trueVar,
-			},
+			HostUsers: &trueVar,
 			Volumes: []core.Volume{{
 				Name: "host-path",
 				VolumeSource: core.VolumeSource{
@@ -26696,36 +26671,28 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false & HostNetwork",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers:   &falseVar,
-				HostNetwork: true,
-			},
+			HostUsers:   &falseVar,
+			HostNetwork: true,
 		},
 	}, {
 		name:    "hostUsers=false & HostPID",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-				HostPID:   true,
-			},
+			HostUsers: &falseVar,
+			HostPID:   true,
 		},
 	}, {
 		name:    "hostUsers=false & HostIPC",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-				HostIPC:   true,
-			},
+			HostUsers: &falseVar,
+			HostIPC:   true,
 		},
 	}, {
 		name:    "hostUsers=false & container volumeDevice",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Containers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26738,9 +26705,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false & initContainer volumeDevice",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			InitContainers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26753,9 +26718,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false & ephemeralContainer volumeDevice",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			EphemeralContainers: []core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name: "test-container",
@@ -26769,9 +26732,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "opts: Allow... & hostUsers=false & container volumeDevice",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Containers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26787,9 +26748,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "opts: Allow... & hostUsers=false & initContainer volumeDevice",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			InitContainers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26805,9 +26764,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "opts: Allow... & hostUsers=false & ephemeralContainer volumeDevice",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			EphemeralContainers: []core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name: "test-container",
@@ -26914,9 +26871,7 @@ func TestValidatePodHostName(t *testing.T) {
 			name: "HostNetwork=true and HostnameOverride is set should error",
 			spec: core.PodSpec{
 				HostnameOverride: ptr.To("custom-host"),
-				SecurityContext: &core.PodSecurityContext{
-					HostNetwork: true,
-				},
+				HostNetwork:      true,
 			},
 			expectedErrs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec.hostnameOverride"), "hostNetwork"),
@@ -26926,9 +26881,7 @@ func TestValidatePodHostName(t *testing.T) {
 			name: "HostNetwork=false and HostnameOverride is set should not error",
 			spec: core.PodSpec{
 				HostnameOverride: ptr.To("custom-host"),
-				SecurityContext: &core.PodSecurityContext{
-					HostNetwork: false,
-				},
+				HostNetwork:      false,
 			},
 			expectedErrs: nil,
 		},
@@ -26972,8 +26925,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -26987,8 +26940,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27015,9 +26968,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -27040,9 +26991,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -27065,9 +27014,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -27085,8 +27032,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27113,8 +27060,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27140,8 +27087,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27163,8 +27110,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &falseVar,
 				},
@@ -27186,8 +27133,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27206,9 +27153,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: false,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -27223,8 +27168,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27247,8 +27192,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},

@@ -4523,7 +4523,6 @@ message PodSpec {
 
   // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
-  // +k8s:conversion-gen=false
   // +optional
   optional string serviceAccount = 9;
 
@@ -4544,19 +4543,16 @@ message PodSpec {
   // When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
   // and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
   // Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostNetwork = 11;
 
   // Use the host's pid namespace.
   // Optional: Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostPID = 12;
 
   // Use the host's ipc namespace.
   // Optional: Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostIPC = 13;
 
@@ -4565,7 +4561,6 @@ message PodSpec {
   // in the same pod, and the first process in each container will not be assigned PID 1.
   // HostPID and ShareProcessNamespace cannot both be set.
   // Optional: Default to false.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool shareProcessNamespace = 27;
 
@@ -4743,7 +4738,6 @@ message PodSpec {
   // When set to false, a new userns is created for the pod. Setting false is useful for
   // mitigating container breakout vulnerabilities even allowing users to run their
   // containers as root without actually having root privileges on the host.
-  // +k8s:conversion-gen=false
   // +optional
   optional bool hostUsers = 37;
 
