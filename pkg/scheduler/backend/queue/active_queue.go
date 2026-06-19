@@ -569,6 +569,14 @@ func (aq *activeQueue) close() {
 }
 
 // broadcast notifies the pop() operation that new pod(s) was added to the activeQueue.
+// The lock is held solely around the Broadcast call to close the check-to-wait window
+// for the cross-lock backoffQ predicate: unlockedPop() evaluates aq.backoffQPopper.lenBackoff()
+// (guarded by backoffQueue.lock) and enters aq.cond.Wait() while holding aq.lock, so a
+// broadcast() that must first acquire aq.lock can no longer land between that check and the
+// Wait() and the wakeup cannot be lost (mirrors KEP-5142 "Notifying activeQ condition when a
+// new pod appears in the backoffQ").
 func (aq *activeQueue) broadcast() {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
 	aq.cond.Broadcast()
 }
