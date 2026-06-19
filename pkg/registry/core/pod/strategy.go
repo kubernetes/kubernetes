@@ -228,6 +228,25 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
 
+	// Preserve DRA-related status fields when the pod is terminating and an old
+	// or misbehaving client (e.g. Multus CNI using a pre-DRA client-go) strips
+	// them via a pods/status update. The fields are written by the resource-claim
+	// controller and must survive until kubelet finishes unpreparing resources;
+	// losing them causes "ResourceClaim not created yet" errors (issue #139772).
+	// We only do this for terminating pods (DeletionTimestamp set) so that
+	// intentional removal via MergePatch on a live pod is not blocked.
+	if oldPod.DeletionTimestamp != nil {
+		if len(newPod.Status.ResourceClaimStatuses) == 0 && len(oldPod.Status.ResourceClaimStatuses) != 0 {
+			newPod.Status.ResourceClaimStatuses = oldPod.Status.ResourceClaimStatuses
+		}
+		if newPod.Status.ExtendedResourceClaimStatus == nil && oldPod.Status.ExtendedResourceClaimStatus != nil {
+			newPod.Status.ExtendedResourceClaimStatus = oldPod.Status.ExtendedResourceClaimStatus
+		}
+		if len(newPod.Status.NodeAllocatableResourceClaimStatuses) == 0 && len(oldPod.Status.NodeAllocatableResourceClaimStatuses) != 0 {
+			newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
+		}
+	}
+
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
