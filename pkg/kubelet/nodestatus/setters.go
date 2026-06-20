@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -195,7 +195,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 func MachineInfo(nodeName string,
 	maxPods int,
 	podsPerCore int,
-	machineInfoFunc func() (*cadvisorapiv1.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
+	machineInfoFunc func() (*cadvisorapi.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
 	capacityFunc func(localStorageCapacityIsolation bool) v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
@@ -339,7 +339,7 @@ func MachineInfo(nodeName string,
 }
 
 // VersionInfo returns a Setter that updates version-related information on the node.
-func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
+func VersionInfo(versionInfoFunc func() (*cadvisorapi.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
 	runtimeTypeFunc func() string, // typically Kubelet.containerRuntime.Type
 	runtimeVersionFunc func(ctx context.Context) (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
 ) Setter {

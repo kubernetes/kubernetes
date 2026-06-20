@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/google/cadvisor/lib => github.com/dims/cadvisor/lib v0.0.0-20260620023719-82d7fd4268a6

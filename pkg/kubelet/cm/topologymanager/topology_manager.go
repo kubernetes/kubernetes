@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"

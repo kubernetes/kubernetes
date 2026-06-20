@@ -41,6 +41,7 @@
       "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
       "github.com/google/btree": "unmaintained, archive mode",
+      "github.com/google/cadvisor": "the kubelet depends only on the lean github.com/google/cadvisor/lib module; the full module (standalone binary + v1/v2 REST API) must not be vendored",
       "github.com/google/gofuzz": "unmaintained, use sigs.k8s.io/randfill",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
@@ -107,7 +108,7 @@
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
         "github.com/go-task/slim-sprig/v3",
-        "github.com/google/cadvisor",
+        "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/json-iterator/go",
@@ -148,9 +149,8 @@
       ],
       "github.com/gogo/protobuf": [
         "github.com/containerd/containerd/api",
-        "github.com/containerd/errdefs/pkg",
         "github.com/containerd/ttrpc",
-        "github.com/google/cadvisor",
+        "github.com/google/cadvisor/lib",
         "k8s.io/code-generator"
       ],
       "github.com/golang/protobuf": [
@@ -202,7 +202,7 @@
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
         "github.com/go-task/slim-sprig/v3",
-        "github.com/google/cadvisor",
+        "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/prometheus/common",

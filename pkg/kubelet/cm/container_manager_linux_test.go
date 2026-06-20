@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -215,12 +215,12 @@ func TestGetCapacity(t *testing.T) {
 	ephemeralStorageFromCadvisor := int64(8000)
 
 	mockCadvisor := cadvisortest.NewMockInterface(t)
-	rootfs := cadvisorapiv2.FsInfo{
+	rootfs := cadvisorapi.FsInfo{
 		Capacity: 8000,
 	}
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
 	mockCadvisorError := cadvisortest.NewMockInterface(t)
-	mockCadvisorError.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{}, errors.New("Unable to get rootfs data from cAdvisor interface"))
+	mockCadvisorError.EXPECT().RootFsInfo().Return(cadvisorapi.FsInfo{}, errors.New("Unable to get rootfs data from cAdvisor interface"))
 	cases := []struct {
 		name                                 string
 		cm                                   *containerManagerImpl

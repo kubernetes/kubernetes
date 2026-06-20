@@ -37,8 +37,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	gwebsocket "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,7 +120,7 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 

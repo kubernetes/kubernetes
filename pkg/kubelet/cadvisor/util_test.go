@@ -23,9 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/cadvisor/container/crio"
-	info "github.com/google/cadvisor/info/v1"
-	infov2 "github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/lib/container/crio"
+	info "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -60,7 +59,7 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 // falls back to bare integers for non-1024-aligned sizes. See #133927.
 func TestEphemeralStorageCapacityFromFsInfo(t *testing.T) {
 	// Use a non-1024-aligned capacity typical of real filesystem sizes.
-	fsInfo := infov2.FsInfo{Capacity: 97842800000}
+	fsInfo := info.FsInfo{Capacity: 97842800000}
 	capacity := EphemeralStorageCapacityFromFsInfo(fsInfo)
 	ephemeralCapacity := capacity[v1.ResourceEphemeralStorage]
 

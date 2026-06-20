@@ -22,31 +22,28 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"path"
 	"time"
 
 	// Register supported container handlers.
-	_ "github.com/google/cadvisor/container/containerd/install"
-	_ "github.com/google/cadvisor/container/crio/install"
-	_ "github.com/google/cadvisor/container/systemd/install"
+	_ "github.com/google/cadvisor/lib/container/containerd/install"
+	_ "github.com/google/cadvisor/lib/container/crio/install"
+	_ "github.com/google/cadvisor/lib/container/systemd/install"
 
 	// Register filesystem plugins needed for container stats.
-	_ "github.com/google/cadvisor/fs/btrfs/install"
-	_ "github.com/google/cadvisor/fs/devicemapper/install"
-	_ "github.com/google/cadvisor/fs/nfs/install"
-	_ "github.com/google/cadvisor/fs/overlay/install"
-	_ "github.com/google/cadvisor/fs/tmpfs/install"
-	_ "github.com/google/cadvisor/fs/vfs/install"
-	_ "github.com/google/cadvisor/fs/zfs/install"
+	_ "github.com/google/cadvisor/lib/fs/btrfs/install"
+	_ "github.com/google/cadvisor/lib/fs/nfs/install"
+	_ "github.com/google/cadvisor/lib/fs/overlay/install"
+	_ "github.com/google/cadvisor/lib/fs/tmpfs/install"
+	_ "github.com/google/cadvisor/lib/fs/vfs/install"
+	_ "github.com/google/cadvisor/lib/fs/zfs/install"
 
-	"github.com/google/cadvisor/cache/memory"
-	cadvisormetrics "github.com/google/cadvisor/container"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"github.com/google/cadvisor/manager"
-	"github.com/google/cadvisor/utils/sysfs"
+	"github.com/google/cadvisor/lib/cache/memory"
+	cadvisormetrics "github.com/google/cadvisor/lib/container"
+	"github.com/google/cadvisor/lib/manager"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
+	"github.com/google/cadvisor/lib/utils/sysfs"
 	"github.com/opencontainers/cgroups"
 	cgroupfs2 "github.com/opencontainers/cgroups/fs2"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -99,7 +96,6 @@ func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath s
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:          struct{}{},
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
@@ -123,7 +119,7 @@ func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath s
 	}
 
 	// Create the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, includedMetrics, http.DefaultClient, cgroupRoots, nil /* containerEnvMetadataWhiteList */, "" /* perfEventsFile */, time.Duration(0) /*resctrlInterval*/)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, housekeepingConfig, includedMetrics, cgroupRoots, nil /* containerEnvMetadataWhiteList */, "" /* perfEventsFile */, time.Duration(0) /*resctrlInterval*/)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +145,7 @@ func (cc *cadvisorClient) Start() error {
 	return cc.Manager.Start()
 }
 
-func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapi.RequestOptions) (map[string]cadvisorapi.ContainerInfo, error) {
 	return cc.GetContainerInfoV2(name, options)
 }
 
@@ -161,10 +157,10 @@ func (cc *cadvisorClient) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineI
 	return cc.GetMachineInfo()
 }
 
-func (cc *cadvisorClient) ImagesFsInfo(ctx context.Context) (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) ImagesFsInfo(ctx context.Context) (cadvisorapi.FsInfo, error) {
 	label, err := cc.imageFsInfoProvider.ImageFsInfoLabel()
 	if err != nil {
-		return cadvisorapiv2.FsInfo{}, err
+		return cadvisorapi.FsInfo{}, err
 	}
 	return cc.getFsInfo(ctx, label)
 }
@@ -189,17 +185,17 @@ func isPsiEnabled(logger klog.Logger, cgroupDir, psiFile string) bool {
 	return true
 }
 
-func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) RootFsInfo() (cadvisorapi.FsInfo, error) {
 	return cc.GetDirFsInfo(cc.rootPath)
 }
 
-func (cc *cadvisorClient) getFsInfo(ctx context.Context, label string) (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) getFsInfo(ctx context.Context, label string) (cadvisorapi.FsInfo, error) {
 	res, err := cc.GetFsInfo(label)
 	if err != nil {
-		return cadvisorapiv2.FsInfo{}, err
+		return cadvisorapi.FsInfo{}, err
 	}
 	if len(res) == 0 {
-		return cadvisorapiv2.FsInfo{}, fmt.Errorf("failed to find information for the filesystem labeled %q", label)
+		return cadvisorapi.FsInfo{}, fmt.Errorf("failed to find information for the filesystem labeled %q", label)
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
@@ -209,10 +205,10 @@ func (cc *cadvisorClient) getFsInfo(ctx context.Context, label string) (cadvisor
 	return res[0], nil
 }
 
-func (cc *cadvisorClient) ContainerFsInfo(ctx context.Context) (cadvisorapiv2.FsInfo, error) {
+func (cc *cadvisorClient) ContainerFsInfo(ctx context.Context) (cadvisorapi.FsInfo, error) {
 	label, err := cc.imageFsInfoProvider.ContainerFsInfoLabel()
 	if err != nil {
-		return cadvisorapiv2.FsInfo{}, err
+		return cadvisorapi.FsInfo{}, err
 	}
 	return cc.getFsInfo(ctx, label)
 }
