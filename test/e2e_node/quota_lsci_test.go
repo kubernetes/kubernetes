@@ -48,10 +48,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 	sizeLimit := resource.MustParse("100Mi")
 	useOverLimit := 101 /* Mb */
 	useUnderLimit := 99 /* Mb */
-	// As for why we do this: see comment below at isXfs.
-	if isXfs(framework.TestContext.KubeletRootDir) {
-		useUnderLimit = 50 /* Mb */
-	}
+
 	priority := 0
 	if quotasRequested {
 		priority = 1
@@ -87,6 +84,16 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 				pod: diskConcealingPod(fmt.Sprintf("emptydir-concealed-disk-under-sizelimit-quotas-%v", quotasRequested), useUnderLimit, &v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
 				}, v1.ResourceRequirements{}),
+				prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
+					// XFS speculative preallocation can inflate apparent usage (see isXfs).
+					if isXfs(framework.TestContext.KubeletRootDir) {
+						pod.Spec.Containers[0].Command = []string{
+							"perl",
+							"-e",
+							fmt.Sprintf(writeConcealedPodCommand, filepath.Join(volumeMountPath, "file"), 50 /* Mb */),
+						}
+					}
+				},
 			},
 		})
 	})
