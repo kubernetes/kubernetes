@@ -236,13 +236,13 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	// We only do this for terminating pods (DeletionTimestamp set) so that
 	// intentional removal via MergePatch on a live pod is not blocked.
 	if oldPod.DeletionTimestamp != nil {
-		if len(newPod.Status.ResourceClaimStatuses) == 0 && len(oldPod.Status.ResourceClaimStatuses) != 0 {
+		if newPod.Status.ResourceClaimStatuses == nil && oldPod.Status.ResourceClaimStatuses != nil {
 			newPod.Status.ResourceClaimStatuses = oldPod.Status.ResourceClaimStatuses
 		}
 		if newPod.Status.ExtendedResourceClaimStatus == nil && oldPod.Status.ExtendedResourceClaimStatus != nil {
 			newPod.Status.ExtendedResourceClaimStatus = oldPod.Status.ExtendedResourceClaimStatus
 		}
-		if len(newPod.Status.NodeAllocatableResourceClaimStatuses) == 0 && len(oldPod.Status.NodeAllocatableResourceClaimStatuses) != 0 {
+		if newPod.Status.NodeAllocatableResourceClaimStatuses == nil && oldPod.Status.NodeAllocatableResourceClaimStatuses != nil {
 			newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
 		}
 	}

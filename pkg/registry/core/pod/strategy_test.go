@@ -4330,6 +4330,32 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
+			description: "allow explicit empty-slice removal of ResourceClaimStatuses on terminating pod",
+			features: map[featuregate.Feature]bool{
+				features.DynamicResourceAllocation: true,
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{
+						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{},
+				},
+			},
+		},
+		{
 			description: "preserve old ExtendedResourceClaimStatus when misbehaving client clears it on terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRAExtendedResource: true,
@@ -4423,6 +4449,32 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status:     api.PodStatus{},
+			},
+		},
+		{
+			description: "allow explicit empty-slice removal of NodeAllocatableResourceClaimStatuses on terminating pod",
+			features: map[featuregate.Feature]bool{
+				features.DRANodeAllocatableResources: true,
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
+				Status: api.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+						{ResourceClaimName: "pod-node-claim"},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{},
+				},
 			},
 		},
 	}
