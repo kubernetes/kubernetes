@@ -149,7 +149,12 @@ Usage as e2e_node.test:
 	case strings.HasPrefix(cmdName, "mounter"):
 		mounter.Main()
 	case len(os.Args) > 1 && os.Args[1] == "remote":
-		node.Main(os.Args[2:])
+		// The hard-coded verbosity in `make test-e2e-node` is 4
+		// (https://github.com/kubernetes/kubernetes/blob/17e2eda6119170e6ce1a065716432b1d37d028dd/hack/make-rules/test-e2e-node.sh#L248).
+		// Pre-pending -v4 emulates that behavior, with the difference that an explicit
+		// -v passed by the caller (typically kubetest2) could be used to override it.
+		args := append([]string{"-v=4"}, os.Args[2:]...)
+		node.Main(args)
 	default:
 		testMain(m)
 	}
