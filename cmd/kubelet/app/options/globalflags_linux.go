@@ -46,10 +46,9 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	// literals means a removed or renamed cAdvisor flag surfaces as a build/test
 	// failure (see globalflags_linux_test.go) rather than a kubelet startup panic.
 
-	// e2e node tests rely on these.
-	for _, name := range cadvisorflags.Kept() {
-		register(global, local, name)
-	}
+	// Bind only HousekeepingInterval, explicitly, so the kubelet's flags can't grow
+	// just because cadvisorflags.Kept() gains a name (a test asserts it stays there).
+	register(global, local, cadvisorflags.HousekeepingInterval)
 
 	// These flags were implicit from cadvisor, and are mistakes that should be registered deprecated:
 	const deprecated = "This is a cadvisor flag that was mistakenly registered with the Kubelet. Due to legacy concerns, it will follow the standard CLI deprecation timeline before being removed."

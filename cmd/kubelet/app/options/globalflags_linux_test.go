@@ -20,6 +20,7 @@ package options
 
 import (
 	"flag"
+	"slices"
 	"testing"
 
 	"github.com/google/cadvisor/lib/cadvisorflags"
@@ -49,4 +50,12 @@ func TestPinnedCadvisorFlagsResolve(t *testing.T) {
 // clean run proves addCadvisorFlags will not panic the kubelet at startup.
 func TestAddCadvisorFlagsDoesNotPanic(t *testing.T) {
 	addCadvisorFlags(pflag.NewFlagSet("test", pflag.ContinueOnError))
+}
+
+// TestKeptIncludesHousekeepingInterval ensures the flag addCadvisorFlags binds
+// explicitly is still listed by the library's Kept().
+func TestKeptIncludesHousekeepingInterval(t *testing.T) {
+	if !slices.Contains(cadvisorflags.Kept(), cadvisorflags.HousekeepingInterval) {
+		t.Errorf("cadvisorflags.Kept() must include HousekeepingInterval (%q); addCadvisorFlags binds it as a normal kubelet flag", cadvisorflags.HousekeepingInterval)
+	}
 }
