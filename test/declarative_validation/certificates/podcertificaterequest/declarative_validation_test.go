@@ -110,6 +110,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					ExpectedErrs: nil,
 				},
 				{
+
 					Name: "invalid missing status",
 					Conditions: []metav1.Condition{
 						meta.MkCondition(
@@ -165,6 +166,23 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					ExpectedErrs: field.ErrorList{
 						// handwritten validation requires "True"
 						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "False", []string{"True"}).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid type format not a k8s label key",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType("INVALID TYPE"),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.Invalid(
+							field.NewPath("status", "conditions").Index(0).Child("type"),
+							"INVALID TYPE",
+							"name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')",
+						).WithOrigin("format=k8s-label-key").MarkAlpha(),
+						// handwritten validation rejects unknown condition types and uses .[0] notation
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "type"), "INVALID TYPE", []string{"Issued", "Denied", "Failed"}).MarkFromImperative(),
 					},
 				},
 			}
