@@ -45,6 +45,15 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 )
 
+type fakePodStatusProvider struct {
+	statuses map[types.UID]v1.PodStatus
+}
+
+func (f *fakePodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+	status, ok := f.statuses[uid]
+	return status, ok
+}
+
 // fakePodWorkers runs sync pod function in serial, so we can have
 // deterministic behaviour in testing.
 type fakePodWorkers struct {
@@ -460,6 +469,7 @@ func createPodWorkersWithLogger(logger klog.Logger) (*podWorkers, *containertest
 		time.Second,
 		time.Millisecond,
 		fakeCache,
+		nil,
 		allocation.NewInMemoryManager(logger, nil, nil, nil, nil, nil, nil),
 	)
 	workers := w.(*podWorkers)
@@ -839,6 +849,41 @@ func TestUpdatePod(t *testing.T) {
 				RunningPod: &kubecontainer.Pod{ID: "1", Name: "orphaned-pod", Namespace: "ns"},
 			},
 			expect: nil,
+		},
+		{
+			name: "a running pod is transitioned to terminating if the status manager says it is terminal, even if the API pod phase is running",
+			update: UpdatePodOptions{
+				UpdateType: kubetypes.SyncPodUpdate,
+				Pod:        newPodWithPhase("1", "running-pod", v1.PodRunning),
+			},
+			prepare: func(t *testing.T, tCtx context.Context, w *timeIncrementingWorkers) func() {
+				w.UpdatePod(tCtx, UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					Pod:        newPodWithPhase("1", "running-pod", v1.PodRunning),
+				})
+				// Set the status manager phase to PodFailed
+				w.w.statusProvider = &fakePodStatusProvider{
+					statuses: map[types.UID]v1.PodStatus{
+						"1": {Phase: v1.PodFailed},
+					},
+				}
+				return nil
+			},
+			expect: hasCancelFn(&podSyncStatus{
+				fullname:           "running-pod_ns",
+				syncedAt:           time.Unix(1, 0),
+				startedAt:          time.Unix(3, 0),
+				terminatingAt:      time.Unix(3, 0),
+				terminatedAt:       time.Unix(5, 0),
+				gracePeriod:        30,
+				startedTerminating: true,
+				finished:           true,
+				activeUpdate: &UpdatePodOptions{
+					Pod:            newPodWithPhase("1", "running-pod", v1.PodRunning),
+					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
+				},
+			}),
+			expectKnownTerminated: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2168,6 +2213,7 @@ func TestFakePodWorkers(t *testing.T) {
 		time.Second,
 		time.Second,
 		fakeCache,
+		nil,
 		allocation.NewInMemoryManager(logger, nil, nil, nil, nil, nil, nil),
 	)
 	fakePodWorkers := &fakePodWorkers{

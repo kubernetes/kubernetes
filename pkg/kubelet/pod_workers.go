@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/utils/clock"
@@ -604,6 +605,9 @@ type podWorkers struct {
 	// podCache stores kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.ROCache
 
+	// statusProvider provides the local authoritative status of a pod
+	statusProvider status.PodStatusProvider
+
 	// allocationManager is used to allocate resources for pods
 	allocationManager allocation.Manager
 
@@ -617,6 +621,7 @@ func newPodWorkers(
 	workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.ROCache,
+	statusProvider status.PodStatusProvider,
 	allocationManager allocation.Manager,
 ) PodWorkers {
 	return &podWorkers{
@@ -630,6 +635,7 @@ func newPodWorkers(
 		resyncInterval:                     resyncInterval,
 		backOffPeriod:                      backOffPeriod,
 		podCache:                           podCache,
+		statusProvider:                     statusProvider,
 		allocationManager:                  allocationManager,
 		clock:                              clock.RealClock{},
 	}
@@ -790,7 +796,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 			fullname: kubecontainer.BuildPodFullName(name, ns),
 		}
 		// if this pod is being synced for the first time, we need to make sure it is an active pod
-		if options.Pod != nil && (options.Pod.Status.Phase == v1.PodFailed || options.Pod.Status.Phase == v1.PodSucceeded) {
+		if options.Pod != nil && (p.getPodPhase(options.Pod) == v1.PodFailed || p.getPodPhase(options.Pod) == v1.PodSucceeded) {
 			// Check to see if the pod is not running and the pod is terminal; if this succeeds then record in the podWorker that it is terminated.
 			// This is needed because after a kubelet restart, we need to ensure terminal pods will NOT be considered active in Pod Admission. See http://issues.k8s.io/105523
 			// However, `filterOutInactivePods`, considers pods that are actively terminating as active. As a result, `IsPodKnownTerminated()` needs to return true and thus `terminatedAt` needs to be set.
@@ -873,7 +879,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 			status.deleted = true
 			status.terminatingAt = now
 			becameTerminating = true
-		case pod.Status.Phase == v1.PodFailed, pod.Status.Phase == v1.PodSucceeded:
+		case p.getPodPhase(pod) == v1.PodFailed, p.getPodPhase(pod) == v1.PodSucceeded:
 			updateLogger.V(4).Info("Pod is in a terminal phase (success/failed), begin teardown")
 			status.terminatingAt = now
 			becameTerminating = true
@@ -1755,4 +1761,18 @@ func (p *podWorkers) requeueLastPodUpdate(podUID types.UID, status *podSyncStatu
 	case p.podUpdates[podUID] <- struct{}{}:
 	default:
 	}
+}
+
+// getPodPhase returns the authoritative pod phase from statusProvider if available,
+// falling back to pod.Status.Phase.
+func (p *podWorkers) getPodPhase(pod *v1.Pod) v1.PodPhase {
+	if pod == nil {
+		return ""
+	}
+	if p.statusProvider != nil {
+		if status, ok := p.statusProvider.GetPodStatus(pod.UID); ok {
+			return status.Phase
+		}
+	}
+	return pod.Status.Phase
 }
