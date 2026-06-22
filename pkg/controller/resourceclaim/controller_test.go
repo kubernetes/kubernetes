@@ -221,7 +221,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -246,7 +246,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "true"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "true", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -263,7 +263,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -288,7 +288,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
 			},
 		},
 		{
@@ -351,7 +351,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -495,7 +495,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -517,7 +517,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
 			},
 		},
 		{
@@ -608,7 +608,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -631,7 +631,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
 			},
 		},
 		{
@@ -687,7 +687,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 		{
@@ -704,7 +704,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				},
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
 			},
 		},
 		{
@@ -732,7 +732,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates: []*resourceapi.ResourceClaimTemplate{template},
 			key:       podKey(testPodWithResource),
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "failure", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "failure", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 			expectedError: "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
@@ -743,7 +743,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
 			key:                 podKey(testPodWithResource),
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "failure", adminAccess: "true"}: 1,
+				claimCreateMetricLabels{status: "failure", adminAccess: "true", ownerKind: "Pod"}: 1,
 			},
 			expectedError: "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
@@ -754,7 +754,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podGroupKey(testPodGroupWithResource),
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "failure", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "failure", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
 			},
 			expectedError: "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
@@ -1022,7 +1022,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				*makeTemplatedClaim("claimB", testPodName+"-claimB-", testNamespace, 1, makeOwnerReference(testPod, true), nil),
 			},
 			expectedMetrics: claimCreateMetrics{
-				claimCreateMetricLabels{status: "success", adminAccess: "false"}: 1,
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
 			},
 		},
 	}
@@ -2290,6 +2290,8 @@ func (em numMetrics) verify(tCtx ktesting.TContext) {
 type claimCreateMetricLabels struct {
 	status      string
 	adminAccess string
+	ownerGroup  string
+	ownerKind   string
 }
 
 type claimCreateMetrics map[claimCreateMetricLabels]float64
@@ -2317,6 +2319,8 @@ func expectMetrics(tCtx ktesting.TContext, em claimCreateMetrics) {
 			actualMetrics[claimCreateMetricLabels{
 				status:      labels["status"],
 				adminAccess: labels["admin_access"],
+				ownerGroup:  labels["owner_api_group"],
+				ownerKind:   labels["owner_api_kind"],
 			}] = metric.GetCounter().GetValue()
 		}
 	}

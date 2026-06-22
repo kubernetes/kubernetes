@@ -1880,7 +1880,8 @@ func claimPodGroupOwnerIndexFunc(obj any) ([]string, error) {
 func getClaimCreateMetricLabels(claim *resourceapi.ResourceClaim) func(string) []string {
 	return func(status string) []string {
 		adminAccess := getAdminAccessMetricLabel(claim)
-		return []string{status, adminAccess}
+		ownerGroup, ownerKind := getOwnerKindMetricLabels(claim)
+		return []string{status, adminAccess, ownerGroup, ownerKind}
 	}
 }
 
@@ -1895,6 +1896,18 @@ func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
 		}
 	}
 	return "false"
+}
+
+func getOwnerKindMetricLabels(claim *resourceapi.ResourceClaim) (group string, kind string) {
+	controller := metav1.GetControllerOfNoCopy(claim)
+	if controller == nil {
+		return
+	}
+	group, _, found := strings.Cut(controller.APIVersion, "/")
+	if !found {
+		group = ""
+	}
+	return group, controller.Kind
 }
 
 func isPodGroupClaim(bindTo resourceapi.ResourceClaimConsumerReference) bool {
