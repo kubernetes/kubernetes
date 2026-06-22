@@ -282,7 +282,7 @@ func (p *fakePlugin) Name() string {
 	return p.name
 }
 
-func (p *fakePlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
+func (p *fakePlugin) Less(fwk.QueuedEntityInfo, fwk.QueuedEntityInfo) bool {
 	return false
 }
 

@@ -44,7 +44,7 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 
 	t.Log("Starting etcd that will be used by two different instances of kube-apiserver")
-	etcdURL, etcdTearDownFn, err := framework.RunCustomEtcd(logger, "etcd_watchlist", []string{"--experimental-watch-progress-notify-interval", "1s"})
+	etcdURL, etcdTearDownFn, err := framework.RunCustomEtcd(logger, "etcd_watchlist", []string{"--watch-progress-notify-interval", "1s"})
 	require.NoError(t, err)
 	defer etcdTearDownFn()
 	etcdOptions := framework.DefaultEtcdOptions()

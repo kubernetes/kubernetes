@@ -76,7 +76,7 @@ type Webhook struct {
 	objectMatcher     *object.Matcher
 	dispatcher        Dispatcher
 	filterCompiler    cel.ConditionCompiler
-	authorizer        authorizer.Authorizer
+	authorizer        authorizer.UnconditionalAuthorizer
 
 	// Lifecycle.
 	stopCh <-chan struct{}
@@ -195,7 +195,7 @@ func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFacto
 	a.apiSource = a.apiSourceFactory(f)
 }
 
-func (a *Webhook) SetAuthorizer(authorizer authorizer.Authorizer) {
+func (a *Webhook) SetUnconditionalAuthorizer(authorizer authorizer.UnconditionalAuthorizer) {
 	a.authorizer = authorizer
 }
 

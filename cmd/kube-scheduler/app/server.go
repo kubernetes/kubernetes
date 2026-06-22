@@ -348,7 +348,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 }
 
 // buildHandlerChain wraps the given handler with the standard filters.
-func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
+func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.UnconditionalAuthorizer) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
 	failedHandler := genericapifilters.Unauthorized(scheme.Codecs)
 

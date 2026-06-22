@@ -17,6 +17,7 @@ limitations under the License.
 package resourceslice
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -213,7 +214,7 @@ func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ResourceSlice should not allow create on update")
 	}
 }
@@ -819,7 +820,22 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			listTypeAttributes:    false,
 			expectValidationError: true,
 		},
-		"keep-list-type-attributes": {
+		"keep-fields-list-type-attributes": {
+			oldObj: slice.DeepCopy(),
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			listTypeAttributes: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-list-type-attributes": {
 			oldObj: sliceWithListTypeAttributes,
 			newObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
@@ -857,6 +873,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
+				features.DRAListTypeAttributes:        tc.listTypeAttributes,
 			})
 
 			oldObj := tc.oldObj.DeepCopy()

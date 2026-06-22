@@ -92,13 +92,14 @@ func newCmdNode(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, ok := data.(*nodeData); !ok {
+			nodeData, ok := data.(*nodeData)
+			if !ok {
 				return errors.New("invalid data struct")
 			}
 			if err := nodeRunner.Run(args); err != nil {
 				return err
 			}
-			if nodeOptions.dryRun {
+			if nodeData.DryRun() {
 				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 				return nil
 			}
@@ -205,7 +206,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	getNodeRegistration := true
 	getAPIEndpoint := isControlPlaneNode
 	getComponentConfigs := true
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

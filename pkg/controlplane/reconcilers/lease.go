@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // Leases is an interface which assists in managing the set of active masters
@@ -160,6 +161,10 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 		epAdapter:    epAdapter,
 		masterLeases: masterLeases,
 	}
+}
+
+func (r *leaseEndpointReconciler) ValidateIP(ip net.IP) error {
+	return validation.ValidateEndpointIP(ip.String(), nil).ToAggregate()
 }
 
 // ReconcileEndpoints lists keys in a special etcd directory.

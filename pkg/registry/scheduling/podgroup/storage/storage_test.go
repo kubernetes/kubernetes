@@ -71,6 +71,9 @@ func validNewPodGroup() *scheduling.PodGroup {
 					MinCount: 5,
 				},
 			},
+			DisruptionMode: &scheduling.DisruptionMode{
+				Single: &scheduling.SingleDisruptionMode{},
+			},
 		},
 	}
 }
@@ -78,7 +81,7 @@ func validNewPodGroup() *scheduling.PodGroup {
 func newTester(t *testing.T, storage *genericregistry.Store) *genericregistrytest.Tester {
 	return genericregistrytest.New(t, storage).SetRequestInfo(&genericapirequest.RequestInfo{
 		APIGroup:   "scheduling.k8s.io",
-		APIVersion: "v1alpha2",
+		APIVersion: "v1alpha3",
 		Resource:   "podgroups",
 	})
 }
@@ -117,7 +120,7 @@ func TestUpdate(t *testing.T) {
 			pg.Status = scheduling.PodGroupStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:               scheduling.PodGroupScheduled,
+						Type:               scheduling.PodGroupInitiallyScheduled,
 						Status:             metav1.ConditionFalse,
 						Reason:             scheduling.PodGroupReasonUnschedulable,
 						Message:            "Test status condition message",
@@ -128,10 +131,12 @@ func TestUpdate(t *testing.T) {
 			return pg
 		},
 		// invalid update
-		// Update MinCount
+		// Switch scheduling policy
 		func(obj runtime.Object) runtime.Object {
 			pg := obj.(*scheduling.PodGroup)
-			pg.Spec.SchedulingPolicy.Gang.MinCount = 4
+			pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
+				Basic: &scheduling.BasicSchedulingPolicy{},
+			}
 			return pg
 		},
 		// invalid update
@@ -214,7 +219,7 @@ func TestUpdateStatus(t *testing.T) {
 	podGroup.Status = scheduling.PodGroupStatus{
 		Conditions: []metav1.Condition{
 			{
-				Type:               scheduling.PodGroupScheduled,
+				Type:               scheduling.PodGroupInitiallyScheduled,
 				Status:             metav1.ConditionFalse,
 				Reason:             scheduling.PodGroupReasonUnschedulable,
 				Message:            "Test status condition message",
@@ -225,7 +230,7 @@ func TestUpdateStatus(t *testing.T) {
 	statusCtx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:   "apis",
 		APIGroup:    "scheduling.k8s.io",
-		APIVersion:  "v1alpha2",
+		APIVersion:  "v1alpha3",
 		Resource:    "podgroups",
 		Subresource: "status",
 		Verb:        "update",

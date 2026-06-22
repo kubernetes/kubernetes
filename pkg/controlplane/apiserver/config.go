@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -44,6 +42,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -77,6 +76,10 @@ type Extra struct {
 
 	EnableLogsSupport bool
 	ProxyTransport    *http.Transport
+
+	// EndpointSliceGetter is a getter to look up endpoint slices for IP routing.
+	// If nil, endpoint slice routing is unavailable.
+	EndpointSliceGetter proxy.EndpointSliceGetter
 
 	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
 	// that can not be served locally
@@ -168,10 +171,8 @@ func BuildGenericConfig(
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
-			return
-		}
+	if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
+		return
 	}
 	// wrap the definitions to revert any changes from disabled features
 	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
@@ -189,11 +190,7 @@ func BuildGenericConfig(
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
-	} else {
-		s.Etcd.StorageConfig.Transport.TracerProvider = noopoteltrace.NewTracerProvider()
-	}
+	s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfigEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
@@ -279,6 +276,7 @@ func CreateConfig(
 	opts options.CompletedOptions,
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
+	endpointSliceGetter proxy.EndpointSliceGetter,
 	storageFactory *serverstorage.DefaultStorageFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	additionalInitializers []admission.PluginInitializer,
@@ -309,6 +307,8 @@ func CreateConfig(
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			EndpointSliceGetter: endpointSliceGetter,
 
 			CoordinatedLeadershipLeaseDuration: opts.CoordinatedLeadershipLeaseDuration,
 			CoordinatedLeadershipRenewDeadline: opts.CoordinatedLeadershipRenewDeadline,

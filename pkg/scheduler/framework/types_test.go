@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -81,6 +82,277 @@ func TestNewResource(t *testing.T) {
 			r := NewResource(test.resourceList)
 			if diff := cmp.Diff(test.expected, r); diff != "" {
 				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+var (
+	midPriority  = int32(100)
+	highPriority = int32(1000)
+)
+
+func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
+	timestamp := time.Now()
+	timestampNewer := timestamp.Add(time.Second)
+
+	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
+	pInfo1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").UID("uid2").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestampNewer,
+		},
+	}
+	pInfo3 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").UID("uid3").Priority(highPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo4 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod4").UID("uid4").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo5 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod5").UID("uid5").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  2,
+			Timestamp: timestamp,
+		},
+	}
+
+	tests := []struct {
+		name     string
+		a        *QueuedPodInfo
+		b        *QueuedPodInfo
+		expected int
+	}{
+		{
+			name:     "higher priority comes first",
+			a:        pInfo3,
+			b:        pInfo1,
+			expected: -1,
+		},
+		{
+			name:     "lower priority comes second",
+			a:        pInfo1,
+			b:        pInfo3,
+			expected: 1,
+		},
+		{
+			name:     "higher attempts comes first",
+			a:        pInfo5,
+			b:        pInfo1,
+			expected: -1,
+		},
+		{
+			name:     "lower attempts comes second",
+			a:        pInfo1,
+			b:        pInfo5,
+			expected: 1,
+		},
+		{
+			name:     "older timestamp comes first",
+			a:        pInfo1,
+			b:        pInfo2,
+			expected: -1,
+		},
+		{
+			name:     "newer timestamp comes second",
+			a:        pInfo2,
+			b:        pInfo1,
+			expected: 1,
+		},
+		{
+			name:     "same priority, same attempts, same timestamp",
+			a:        pInfo1,
+			b:        pInfo4,
+			expected: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := PodGroupMemberPodsOrderingFunc(test.a, test.b)
+			if got != test.expected {
+				t.Errorf("Unexpected result, want %v, got %v", test.expected, got)
+			}
+		})
+	}
+}
+
+func TestQueuedPodGroupInfoOrdering(t *testing.T) {
+	timestamp := time.Now()
+	timestampNewer := timestamp.Add(time.Minute)
+
+	opts := []cmp.Option{
+		cmp.AllowUnexported(QueuedPodInfo{}, PodInfo{}, fwk.PodResource{}),
+	}
+
+	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
+	pInfo1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod1").UID("uid1").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod2").UID("uid2").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestampNewer,
+		},
+	}
+	pInfo3 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod3").UID("uid3").Priority(highPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo4 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod4").UID("uid4").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  1,
+			Timestamp: timestamp,
+		},
+	}
+	pInfo5 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Name("pod5").UID("uid5").Priority(midPriority).Obj()},
+		QueueingParams: QueueingParams{
+			Attempts:  2,
+			Timestamp: timestamp,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		initialPods   []*QueuedPodInfo
+		podsToSet     []*QueuedPodInfo
+		podToAdd      *QueuedPodInfo
+		podToRemove   *QueuedPodInfo
+		expectedOrder []*QueuedPodInfo
+	}{
+		{
+			name:          "Add high priority pod to empty group",
+			podToAdd:      pInfo3,
+			expectedOrder: []*QueuedPodInfo{pInfo3},
+		},
+		{
+			name:          "Add lower priority pod, goes to end",
+			initialPods:   []*QueuedPodInfo{pInfo3},
+			podToAdd:      pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
+		},
+		{
+			name:          "Add pod with higher priority to front",
+			initialPods:   []*QueuedPodInfo{pInfo1, pInfo2},
+			podToAdd:      pInfo3,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
+		},
+		{
+			name:          "Add pod with same priority but lower attempts, goes to end",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5},
+			podToAdd:      pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+		},
+		{
+			name:          "Add pod with same priority but higher attempts, goes before",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo1},
+			podToAdd:      pInfo5,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+		},
+		{
+			name:          "Add pod with same priority but later timestamp, goes to end",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5},
+			podToAdd:      pInfo2,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
+		},
+		{
+			name:          "Add pod with same priority but earlier timestamp, goes before",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo2},
+			podToAdd:      pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1, pInfo2},
+		},
+		{
+			name:          "Add pod with same priority and timestamp, maintains relative order",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToAdd:      pInfo4,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo4, pInfo1, pInfo2},
+		},
+		{
+			name:          "Set pods out of order, gets sorted",
+			podsToSet:     []*QueuedPodInfo{pInfo1, pInfo2, pInfo3, pInfo4, pInfo5},
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo4, pInfo2},
+		},
+		{
+			name:          "Remove pod from middle",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToRemove:   pInfo1,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo2},
+		},
+		{
+			name:          "Remove first pod",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToRemove:   pInfo3,
+			expectedOrder: []*QueuedPodInfo{pInfo5, pInfo1, pInfo2},
+		},
+		{
+			name:          "Remove last pod",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo5, pInfo1, pInfo2},
+			podToRemove:   pInfo2,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo5, pInfo1},
+		},
+		{
+			name:          "Remove non-existent pod",
+			initialPods:   []*QueuedPodInfo{pInfo3, pInfo1},
+			podToRemove:   pInfo2,
+			expectedOrder: []*QueuedPodInfo{pInfo3, pInfo1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pgqi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{Namespace: "default", Name: "pg1"},
+			}
+			if tt.initialPods != nil {
+				pgqi.SetPods(tt.initialPods)
+			}
+
+			if tt.podsToSet != nil {
+				pgqi.SetPods(tt.podsToSet)
+			}
+			if tt.podToAdd != nil {
+				pgqi.AddPod(tt.podToAdd)
+			}
+			if tt.podToRemove != nil {
+				pgqi.RemovePod(tt.podToRemove.Pod)
+			}
+
+			if diff := cmp.Diff(tt.expectedOrder, pgqi.QueuedPodInfos, opts...); diff != "" {
+				t.Errorf("Unexpected order in QueuedPodInfos (-want, +got):\n%s", diff)
+			}
+
+			expectedUnscheduled := make([]*v1.Pod, len(tt.expectedOrder))
+			for i, qpi := range tt.expectedOrder {
+				expectedUnscheduled[i] = qpi.Pod
+			}
+			if diff := cmp.Diff(expectedUnscheduled, pgqi.UnscheduledPods); diff != "" {
+				t.Errorf("Unexpected order in UnscheduledPods (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2367,7 +2639,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	}
 }
 
-func TestCloudEvent_Match(t *testing.T) {
+func TestClusterEventMatching(t *testing.T) {
 	testCases := []struct {
 		name        string
 		event       fwk.ClusterEvent
@@ -2381,15 +2653,15 @@ func TestCloudEvent_Match(t *testing.T) {
 			wantResult:  true,
 		},
 		{
-			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
+			name:        "event with resource = 'Pod' matching with coming events carries matching actionType",
 			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
 			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
-			name:        "event with resource = 'Pod' matching with coming events carries unschedulablePod",
+			name:        "event with resource = 'Pod' also matches event with 'UnscheduledPod' resource and matching actionType",
 			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
-			comingEvent: fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
@@ -2422,6 +2694,72 @@ func TestCloudEvent_Match(t *testing.T) {
 			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
+		{
+			name:        "event with resource = 'Pod' also matches event with 'UnscheduledPod' resource and matching actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' also matches event with AssignedPod resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' also matches event with 'TargetPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeTaint},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdateNodeTaint},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match event with 'UnscheduledPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match event with 'TargetPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'TargetPod' does not match event with 'AssignedPod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match with broad 'Pod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'AssignedPod' does not match with 'WildCard' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'UnscheduledPod' does not match with broad 'Pod' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource 'UnscheduledPod' does not match with 'WildCard' resource and same actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.Add},
+			wantResult:  false,
+		},
+		{
+			name:        "WildCard matches with a pod sub-type resource 'TargetPod' and any actionType",
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			wantResult:  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2429,6 +2767,44 @@ func TestCloudEvent_Match(t *testing.T) {
 			got := MatchClusterEvents(tc.event, tc.comingEvent)
 			if got != tc.wantResult {
 				t.Fatalf("unexpected result")
+			}
+		})
+	}
+}
+
+func TestUnrollPodEvent(t *testing.T) {
+	tests := []struct {
+		name      string
+		event     fwk.ClusterEvent
+		wantTypes []fwk.EventResource
+	}{
+		{
+			name:      "Pod/Add unrolls into pod sub-types with add action type",
+			event:     fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add},
+			wantTypes: []fwk.EventResource{fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod},
+		},
+		{
+			name:      "Pod/Delete unrolls into pod sub-types with delete action type",
+			event:     fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete},
+			wantTypes: []fwk.EventResource{fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod},
+		},
+		{
+			name:      "Pod/Update unrolls into pod sub-types with update action type",
+			event:     fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
+			wantTypes: []fwk.EventResource{fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := UnrollPodEvent(tt.event)
+			for i, res := range tt.wantTypes {
+				if got[i].Resource != res {
+					t.Errorf("event[%d]: expected resource %q, got %q", i, res, got[i].Resource)
+				}
+				if got[i].ActionType != tt.event.ActionType {
+					t.Errorf("event[%d]: expected ActionType %v, got %v", i, tt.event.ActionType, got[i].ActionType)
+				}
 			}
 		})
 	}
@@ -2809,13 +3185,157 @@ func TestQueuedPodInfo_UpdateInvalidatesSignature(t *testing.T) {
 		PodSignature: fwk.PodSignature("sig-1"),
 	}
 
-	err := queuedPodInfo.Update(pod2)
+	_, err := queuedPodInfo.Update(pod2)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
 	if queuedPodInfo.PodSignature != nil {
 		t.Errorf("Expected signature to be nil after Update, got '%s'", string(queuedPodInfo.PodSignature))
+	}
+}
+
+func TestPodInfo_Update(t *testing.T) {
+	pod1 := st.MakePod().Name("pod1").UID("uid1").Obj()
+	pod2 := pod1.DeepCopy()
+	pod2.Labels = map[string]string{"foo": "bar"}
+	pod3 := st.MakePod().Name("pod2").UID("uid2").Obj()
+
+	tests := []struct {
+		name        string
+		podInfo     *PodInfo
+		pod         *v1.Pod
+		expectedErr string
+		verify      func(t *testing.T, pi *PodInfo)
+	}{
+		{
+			name:    "successful update (same UID)",
+			podInfo: func() *PodInfo { pi, _ := NewPodInfo(pod1); return pi }(),
+			pod:     pod2,
+			verify: func(t *testing.T, pi *PodInfo) {
+				if pi.Pod.Labels["foo"] != "bar" {
+					t.Errorf("Expected updated labels, got %v", pi.Pod.Labels)
+				}
+			},
+		},
+		{
+			name: "successful update (same UID) - clears cachedResource",
+			podInfo: func() *PodInfo {
+				pi, _ := NewPodInfo(pod1)
+				pi.cachedResource = &fwk.PodResource{}
+				return pi
+			}(),
+			pod: pod2,
+			verify: func(t *testing.T, pi *PodInfo) {
+				if pi.cachedResource != nil {
+					t.Errorf("Expected cachedResource to be nil after Update, got %v", pi.cachedResource)
+				}
+			},
+		},
+		{
+			name:        "failed update (different UID)",
+			podInfo:     func() *PodInfo { pi, _ := NewPodInfo(pod1); return pi }(),
+			pod:         pod3,
+			expectedErr: "pod UID mismatch",
+		},
+		{
+			name:        "failed update (nil pod)",
+			podInfo:     func() *PodInfo { pi, _ := NewPodInfo(pod1); return pi }(),
+			pod:         nil,
+			expectedErr: "cannot update with nil pod",
+		},
+		{
+			name:        "failed update (nil PodInfo.Pod)",
+			podInfo:     &PodInfo{},
+			pod:         pod1,
+			expectedErr: "cannot update PodInfo - its Pod is nil",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.podInfo.Update(tc.pod)
+			if tc.expectedErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("Expected error containing '%s', got %v", tc.expectedErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got %v", err)
+				}
+				if tc.verify != nil {
+					tc.verify(t, tc.podInfo)
+				}
+			}
+		})
+	}
+}
+
+func TestNewPodInfo(t *testing.T) {
+	affinity := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"foo": "bar"},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedErr string
+		verify      func(t *testing.T, pi *PodInfo)
+	}{
+		{
+			name:        "nil pod",
+			pod:         nil,
+			expectedErr: "pod cannot be nil",
+		},
+		{
+			name: "pod without affinity",
+			pod:  st.MakePod().Name("pod1").Obj(),
+			verify: func(t *testing.T, pi *PodInfo) {
+				if pi.Pod.Name != "pod1" {
+					t.Errorf("Expected pod name 'pod1', got %v", pi.Pod.Name)
+				}
+			},
+		},
+		{
+			name: "pod with affinity",
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod2").Obj()
+				p.Spec.Affinity = affinity
+				return p
+			}(),
+			verify: func(t *testing.T, pi *PodInfo) {
+				if len(pi.RequiredAffinityTerms) != 1 {
+					t.Errorf("Expected 1 required affinity term, got %v", len(pi.RequiredAffinityTerms))
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pi, err := NewPodInfo(tc.pod)
+			if tc.expectedErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("Expected error containing '%s', got %v", tc.expectedErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got %v", err)
+				}
+				if tc.verify != nil {
+					tc.verify(t, pi)
+				}
+			}
+		})
 	}
 }
 

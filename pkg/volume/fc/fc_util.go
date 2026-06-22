@@ -412,7 +412,7 @@ func checkPathExists(path string) (bool, error) {
 	if pathExists, pathErr := mount.PathExists(path); pathErr != nil {
 		return pathExists, fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
+		klog.Warningf("Unmap skipped because path does not exist: %v", path)
 		return pathExists, nil
 	}
 	return true, nil

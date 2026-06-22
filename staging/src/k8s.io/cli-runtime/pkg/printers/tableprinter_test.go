@@ -18,7 +18,9 @@ package printers
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -700,6 +702,137 @@ func TestPrintUnstructuredObject(t *testing.T) {
 		if !matches {
 			t.Errorf("wanted:\n%s\ngot:\n%s", test.expected, out)
 		}
+	}
+}
+
+// TestPrintTable_ConsistentAlignmentAcrossFlushes verifies that every row in
+// the output is padded to the same column widths, even when the widest cell
+// value appears after the first periodic tabwriter flush. This is a regression
+// test for a bug where printTable's periodic flush (every 100 rows) caused
+// earlier rows to be written with narrower column widths than later rows,
+// because tabwriter's RememberWidths can only grow widths on future flushes
+// and cannot retroactively re-pad already-flushed rows.
+func TestPrintTable_ConsistentAlignmentAcrossFlushes(t *testing.T) {
+	// Exercise > 2 flush intervals so we cross multiple flush boundaries,
+	// and place the widest Name cell in the final group so the first flush
+	// would otherwise fix a narrower width than the overall max.
+	const rowCount = flushInterval*2 + flushInterval/2
+	const shortName = "a"
+	const longName = "a-name-that-is-significantly-wider"
+
+	buildTable := func() *metav1.Table {
+		columns := []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string"},
+			{Name: "Status", Type: "string"},
+			{Name: "Age", Type: "string"},
+		}
+		rows := make([]metav1.TableRow, rowCount)
+		for i := range rows {
+			name := shortName
+			if i == rowCount-1 {
+				name = longName
+			}
+			rows[i] = metav1.TableRow{Cells: []interface{}{name, "Running", "5d"}}
+		}
+		return &metav1.Table{ColumnDefinitions: columns, Rows: rows}
+	}
+
+	assertAligned := func(t *testing.T, output string, expectedLines int) {
+		t.Helper()
+		lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+		if len(lines) != expectedLines {
+			t.Fatalf("expected %d lines, got %d", expectedLines, len(lines))
+		}
+		// Compare the byte offset at which each non-first column starts,
+		// across all lines. Trailing content of the final column is
+		// ignored (the header's "AGE" is legitimately wider than data
+		// rows' "5d"), but every earlier column boundary must align
+		// identically for every line.
+		wantStarts := columnStartOffsets(lines[0])
+		for i, line := range lines {
+			gotStarts := columnStartOffsets(line)
+			if len(gotStarts) != len(wantStarts) {
+				t.Errorf("line %d: found %d column boundaries, want %d\nline: %q\nref:  %q", i, len(gotStarts), len(wantStarts), line, lines[0])
+				continue
+			}
+			for j := range gotStarts {
+				if gotStarts[j] != wantStarts[j] {
+					t.Errorf("line %d: column %d starts at offset %d, want %d (misaligned across flush boundary)\nline: %q\nref:  %q", i, j+2, gotStarts[j], wantStarts[j], line, lines[0])
+					break
+				}
+			}
+		}
+	}
+
+	t.Run("WithHeaders", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		printer := NewTablePrinter(PrintOptions{})
+		if err := printer.PrintObj(buildTable(), out); err != nil {
+			t.Fatalf("PrintObj error: %v", err)
+		}
+		// header + rowCount data rows
+		assertAligned(t, out.String(), rowCount+1)
+	})
+
+	t.Run("NoHeaders", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		printer := NewTablePrinter(PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(buildTable(), out); err != nil {
+			t.Fatalf("PrintObj error: %v", err)
+		}
+		assertAligned(t, out.String(), rowCount)
+	})
+}
+
+// columnStartOffsets returns the byte offsets of the start of each non-first
+// column on a tabwriter-formatted line. A column starts at the first non-space
+// byte following a run of >=2 spaces. This matches tabwriter's inter-column
+// padding and ignores the natural variability of the final column's contents.
+func columnStartOffsets(line string) []int {
+	var offsets []int
+	for i := 2; i < len(line); i++ {
+		if line[i] != ' ' && line[i-1] == ' ' && line[i-2] == ' ' {
+			offsets = append(offsets, i)
+		}
+	}
+	return offsets
+}
+
+// TestPrintTable_LargeRowCount verifies that the optimized printTable
+// produces correct output for large tables (the primary optimization target).
+func TestPrintTable_LargeRowCount(t *testing.T) {
+	columns := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string"},
+		{Name: "Status", Type: "string"},
+		{Name: "Age", Type: "string"},
+	}
+	rowCount := 500
+	rows := make([]metav1.TableRow, rowCount)
+	for i := range rows {
+		rows[i] = metav1.TableRow{Cells: []interface{}{
+			fmt.Sprintf("pod-%d", i), "Running", "5d",
+		}}
+	}
+	table := &metav1.Table{
+		ColumnDefinitions: columns,
+		Rows:              rows,
+	}
+	out := &bytes.Buffer{}
+	printer := NewTablePrinter(PrintOptions{})
+	if err := printer.PrintObj(table, out); err != nil {
+		t.Fatalf("PrintObj error: %v", err)
+	}
+	lines := bytes.Count(out.Bytes(), []byte("\n"))
+	if lines != rowCount+1 { // +1 for header
+		t.Errorf("expected %d lines, got %d", rowCount+1, lines)
+	}
+	// Verify first and last data lines contain expected content
+	got := out.String()
+	if !strings.Contains(got, "pod-0") {
+		t.Error("output missing first row")
+	}
+	if !strings.Contains(got, fmt.Sprintf("pod-%d", rowCount-1)) {
+		t.Error("output missing last row")
 	}
 }
 

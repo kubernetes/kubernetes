@@ -172,7 +172,7 @@ var (
 			Subsystem:      APIServerComponent,
 			Name:           "watch_events_total",
 			Help:           "Number of events sent in watch clients",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource"},
 	)
@@ -182,7 +182,7 @@ var (
 			Name:           "watch_events_sizes",
 			Help:           "Watch event size distribution in bytes",
 			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource"},
 	)

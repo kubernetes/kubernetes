@@ -28,7 +28,7 @@ import (
 // LeaseCandidate defines a candidate for a Lease object.
 // Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 type LeaseCandidate struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -82,7 +82,7 @@ type LeaseCandidateSpec struct {
 
 // LeaseCandidateList is a list of Lease objects.
 type LeaseCandidateList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

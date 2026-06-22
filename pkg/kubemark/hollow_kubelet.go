@@ -91,6 +91,9 @@ func NewHollowKubelet(
 	imageService internalapi.ImageManagerService,
 	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
+	// Kubemark dependency construction does not have a higher-level logger.
+	nodeStartupLatencyTracker := kubeletutil.NewNodeStartupLatencyTracker(klog.TODO())
+
 	d := &kubelet.Dependencies{
 		KubeClient:                client,
 		HeartbeatClient:           heartbeatClient,
@@ -107,7 +110,7 @@ func NewHollowKubelet(
 		Subpather:                 &subpath.FakeSubpath{},
 		HostUtil:                  hostutil.NewFakeHostUtil(nil),
 		PodStartupLatencyTracker:  kubeletutil.NewPodStartupLatencyTracker(),
-		NodeStartupLatencyTracker: kubeletutil.NewNodeStartupLatencyTracker(),
+		NodeStartupLatencyTracker: nodeStartupLatencyTracker,
 		TracerProvider:            noopoteltrace.NewTracerProvider(),
 		Recorder:                  &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
 	}

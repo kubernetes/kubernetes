@@ -66,12 +66,14 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/testutil/metrics.go
   ./staging/src/k8s.io/component-base/metrics/testutil/metrics_test.go
   ./staging/src/k8s.io/component-base/metrics/testutil/promlint.go
+  ./staging/src/k8s.io/component-base/metrics/testutil/promlint_test.go
   ./staging/src/k8s.io/component-base/metrics/testutil/testutil.go
   ./staging/src/k8s.io/component-base/metrics/timing_histogram_test.go
   ./staging/src/k8s.io/component-base/metrics/value.go
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go
-  ./test/instrumentation/main_test.go
+  ./hack/tools/instrumentation/main.go
+  ./hack/tools/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_util_test.go
   ./test/integration/metrics/metrics_test.go

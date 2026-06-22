@@ -42,6 +42,9 @@ func (mkv mockKV) Put(ctx context.Context, key, val string, opts ...clientv3.OpO
 func (mkv mockKV) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 	return mkv.get(ctx)
 }
+func (mockKV) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamChan, error) {
+	return nil, nil
+}
 func (mockKV) Delete(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.DeleteResponse, error) {
 	return nil, nil
 }

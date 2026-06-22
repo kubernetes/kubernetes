@@ -30,13 +30,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -45,9 +46,10 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
-	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -704,6 +706,36 @@ func TestSyncHandler(t *testing.T) {
 			}()},
 			expectedMetrics: expectedMetrics{0, 0, 0, 0},
 		},
+		{
+			name: "flapping-resourceclaim-statuses",
+			pods: func() []*v1.Pod {
+				pod := makePod(testPodName, testNamespace, testPodUID,
+					*makePodResourceClaim("claimA", templateName),
+					*makePodResourceClaim("claimB", templateName),
+				)
+				// Initially only claimA is in status
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: "claimA", ResourceClaimName: ptr.To("claimA-object")},
+				}
+				return []*v1.Pod{pod}
+			}(),
+			templates: []*resourceapi.ResourceClaimTemplate{template},
+			claims: []*resourceapi.ResourceClaim{
+				makeClaim("claimA-object", testNamespace, className, makeOwnerReference(testPod, true)),
+			},
+			key: podKeyPrefix + testNamespace + "/" + testPodName,
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodName: {
+					{Name: "claimA", ResourceClaimName: ptr.To("claimA-object")},
+					{Name: "claimB", ResourceClaimName: ptr.To("test-pod-claimB--1")},
+				},
+			},
+			expectedClaims: []resourceapi.ResourceClaim{
+				*makeClaim("claimA-object", testNamespace, className, makeOwnerReference(testPod, true)),
+				*makeTemplatedClaim("claimB", testPodName+"-claimB-", testNamespace, className, 1, makeOwnerReference(testPod, true), nil),
+			},
+			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+		},
 	}
 
 	for _, tc := range tests {
@@ -731,9 +763,17 @@ func TestSyncHandler(t *testing.T) {
 					return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
 				})
 			}
+			var appliedPatches []string
+			fakeKubeClient.PrependReactor("patch", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				patchAction := action.(k8stesting.PatchAction)
+				if patchAction.GetSubresource() == "status" {
+					appliedPatches = append(appliedPatches, string(patchAction.GetPatch()))
+				}
+				return false, nil, nil
+			})
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -780,6 +820,12 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("expected error, got none")
 			}
 
+			if tc.name == "flapping-resourceclaim-statuses" {
+				assert.Len(t, appliedPatches, 1, "should have applied status once")
+				assert.Contains(t, appliedPatches[0], `"name":"claimA"`, "patch should contain claimA")
+				assert.Contains(t, appliedPatches[0], `"name":"claimB"`, "patch should contain claimB")
+			}
+
 			claims, err := fakeKubeClient.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
@@ -802,7 +848,7 @@ func TestSyncHandler(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			podGroups, err := fakeKubeClient.SchedulingV1alpha2().PodGroups("").List(tCtx, metav1.ListOptions{})
+			podGroups, err := fakeKubeClient.SchedulingV1alpha3().PodGroups("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing podgroups: %v", err)
 			}
@@ -829,7 +875,7 @@ func TestResourceClaimTemplateEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	claimTemplateClient := fakeKubeClient.ResourceV1().ResourceClaimTemplates(testNamespace)
@@ -962,7 +1008,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	setupMetrics()
@@ -1016,7 +1062,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	expectQueue(tCtx, []string{})
 
 	_, err = claimClient.Create(tCtx, testClaim, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
 	tCtx.Step("create claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1033,8 +1079,8 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Update(tCtx, testClaimAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
 	tCtx.Step("allocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1053,7 +1099,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	otherClaimAllocated := testClaimAllocated.DeepCopy()
 	otherClaimAllocated.Name += "2"
 	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
 	tCtx.Step("create allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1061,8 +1107,8 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Update(tCtx, testClaim, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
 	tCtx.Step("deallocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1070,7 +1116,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	err = claimClient.Delete(tCtx, testClaim.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
 	tCtx.Step("delete deallocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1078,7 +1124,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
 	tCtx.Step("delete allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1086,7 +1132,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Create(tCtx, templatedTestClaimWithAdmin, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	tCtx.Step("create claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1101,8 +1147,8 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdminAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	tCtx.Step("allocate claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1119,59 +1165,59 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	otherClaimAllocated = templatedTestClaimWithAdminAllocated.DeepCopy()
 	otherClaimAllocated.Name += "2"
 	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	tCtx.Step("create allocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdmin, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	tCtx.Step("deallocate claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, templatedTestClaimWithAdmin.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	tCtx.Step("delete deallocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	tCtx.Step("delete allocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Create(tCtx, extendedTestClaim, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
 	tCtx.Step("create extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Update(tCtx, extendedTestClaimAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, 1)
 	tCtx.Step("allocate extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Update(tCtx, extendedTestClaim, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, -1)
 	tCtx.Step("deallocate extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, extendedTestClaim.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
 	tCtx.Step("delete extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1194,7 +1240,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 		updateObjects   []object
 		deleteObjects   []object
 		expectedKeys    []string
-		expectedMetrics map[resourceclaimmetrics.NumResourceClaimLabels]float64
+		expectedMetrics map[controllermetrics.NumResourceClaimLabels]float64
 	}{
 		"nothing": {},
 		"new-podgroup-feature-disabled": {
@@ -1212,7 +1258,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			initialObjects: []runtime.Object{testPodGroupClaim},
 			createObjects:  []object{testPodGroupWithResourceInStatus},
 			expectedKeys:   []string{},
-			expectedMetrics: map[resourceclaimmetrics.NumResourceClaimLabels]float64{
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
 				{Allocated: "false", AdminAccess: "false"}: 1,
 			},
 		},
@@ -1221,7 +1267,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			initialObjects: []runtime.Object{testPodGroupWithResourceInStatus},
 			createObjects:  []object{testPodGroupClaim},
 			expectedKeys:   []string{testClaimKey},
-			expectedMetrics: map[resourceclaimmetrics.NumResourceClaimLabels]float64{
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
 				{Allocated: "false", AdminAccess: "false"}: 1,
 			},
 		},
@@ -1265,7 +1311,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			fakeKubeClient := createTestClient(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -1704,7 +1750,7 @@ func createResourceClaimReactor() func(action k8stesting.Action) (handled bool, 
 }
 
 type numMetrics struct {
-	metrics map[resourceclaimmetrics.NumResourceClaimLabels]float64
+	metrics map[controllermetrics.NumResourceClaimLabels]float64
 	lister  resourcelisters.ResourceClaimLister
 }
 
@@ -1723,7 +1769,7 @@ func getNumMetric(lister resourcelisters.ResourceClaimLister, logger klog.Logger
 		return numMetrics{}, fmt.Errorf("failed to gather metrics: %w", err)
 	}
 
-	metricName := "resourceclaim_controller_resource_claims"
+	metricName := "dynamic_resource_allocation_resource_claims"
 
 	em = newNumMetrics(lister)
 
@@ -1742,7 +1788,7 @@ func getNumMetric(lister resourcelisters.ResourceClaimLister, logger klog.Logger
 			source := labels["source"]
 			value := metric.GetGauge().GetValue()
 
-			em.metrics[resourceclaimmetrics.NumResourceClaimLabels{
+			em.metrics[controllermetrics.NumResourceClaimLabels{
 				Allocated:   allocated,
 				AdminAccess: adminAccess,
 				Source:      source,
@@ -1827,18 +1873,18 @@ func handleErr(t *testing.T, err error, metricName string) {
 }
 func setupMetrics() {
 	// Enable test mode to prevent global custom collector registration
-	resourceclaimmetrics.SetTestMode(true)
+	controllermetrics.SetTestMode(true)
 
 	// Reset counter metrics for each test (they are registered by the controller itself)
 	resourceclaimmetrics.ResourceClaimCreate.Reset()
 }
 
 func newNumMetrics(lister resourcelisters.ResourceClaimLister) numMetrics {
-	metrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]float64)
+	metrics := make(map[controllermetrics.NumResourceClaimLabels]float64)
 	for _, allocated := range []string{"false", "true"} {
 		for _, adminAccess := range []string{"false", "true"} {
 			for _, source := range []string{"", "extended_resource", "resource_claim_template"} {
-				metrics[resourceclaimmetrics.NumResourceClaimLabels{
+				metrics[controllermetrics.NumResourceClaimLabels{
 					Allocated:   allocated,
 					AdminAccess: adminAccess,
 					Source:      source,
@@ -1852,7 +1898,7 @@ func newNumMetrics(lister resourcelisters.ResourceClaimLister) numMetrics {
 	}
 }
 
-func (em numMetrics) withUpdates(rcLabels resourceclaimmetrics.NumResourceClaimLabels, n float64) numMetrics {
+func (em numMetrics) withUpdates(rcLabels controllermetrics.NumResourceClaimLabels, n float64) numMetrics {
 	em.metrics[rcLabels] += n
 	return numMetrics{
 		metrics: em.metrics,
@@ -1996,6 +2042,9 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if !test.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.featureGateEnabled)
 
 			tCtx := ktesting.Init(t)
@@ -2003,7 +2052,7 @@ func TestEnqueuePodExtendedResourceClaims(t *testing.T) {
 			fakeKubeClient := createTestClient()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 

@@ -243,7 +243,8 @@ func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 // commands.
 func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
-		klog.V(4).Info(debugErr.DebugError())
+		msg, args := debugErr.DebugError()
+		klog.V(4).Infof(msg, args...)
 	}
 	status, isStatus := err.(apierrors.APIStatus)
 	switch {
@@ -903,15 +904,6 @@ func scaleClient(restClientGetter genericclioptions.RESTClientGetter) (scale.Sca
 	}
 
 	return scale.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
-}
-
-func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
-	fmt.Fprintf(cmdErr, "WARNING: New generator %q specified, "+
-		"but it isn't available. "+
-		"Falling back to %q.\n",
-		newGeneratorName,
-		oldGeneratorName,
-	)
 }
 
 // Difference removes any elements of subArray from fullArray and returns the result

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -1016,9 +1017,9 @@ func TestValidateIngressCreate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		tweakIngress       func(ingress *networking.Ingress)
-		expectedErrs       field.ErrorList
-		relaxedServiceName bool
+		tweakIngress              func(ingress *networking.Ingress)
+		expectedErrs              field.ErrorList
+		disableRelaxedServiceName bool
 	}{
 		"class field set": {
 			tweakIngress: func(ingress *networking.Ingress) {
@@ -1170,7 +1171,6 @@ func TestValidateIngressCreate(t *testing.T) {
 					},
 				}}
 			},
-			relaxedServiceName: true,
 		},
 		"create default service name with RelaxedServiceNameValidation feature gate enabled": {
 			tweakIngress: func(ingress *networking.Ingress) {
@@ -1181,7 +1181,6 @@ func TestValidateIngressCreate(t *testing.T) {
 					},
 				}
 			},
-			relaxedServiceName: true,
 		},
 		"create service name with RelaxedServiceNameValidation feature gate disabled": {
 			tweakIngress: func(ingress *networking.Ingress) {
@@ -1202,7 +1201,8 @@ func TestValidateIngressCreate(t *testing.T) {
 					},
 				}}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+			disableRelaxedServiceName: true,
+			expectedErrs:              field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
 		},
 		"create default service name with RelaxedServiceNameValidation feature gate disabled": {
 			tweakIngress: func(ingress *networking.Ingress) {
@@ -1213,13 +1213,19 @@ func TestValidateIngressCreate(t *testing.T) {
 					},
 				}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("defaultBackend").Child("service").Child("name"), "1-test-default-backend", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+			expectedErrs:              field.ErrorList{field.Invalid(field.NewPath("spec").Child("defaultBackend").Child("service").Child("name"), "1-test-default-backend", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+			disableRelaxedServiceName: true,
 		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, testCase.relaxedServiceName)
+			if testCase.disableRelaxedServiceName {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.RelaxedServiceNameValidation: false,
+				})
+			}
 
 			newIngress := baseIngress.DeepCopy()
 			testCase.tweakIngress(newIngress)
@@ -1266,9 +1272,9 @@ func TestValidateIngressUpdate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		tweakIngresses     func(newIngress, oldIngress *networking.Ingress)
-		expectedErrs       field.ErrorList
-		relaxedServiceName bool
+		tweakIngresses            func(newIngress, oldIngress *networking.Ingress)
+		expectedErrs              field.ErrorList
+		disableRelaxedServiceName bool
 	}{
 		"class field set": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1661,7 +1667,8 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+			disableRelaxedServiceName: true,
+			expectedErrs:              field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
 		},
 		"update defaultBackend service to conform to relaxed service name - RelaxedServiceNameValidation disabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1678,7 +1685,8 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("defaultBackend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+			disableRelaxedServiceName: true,
+			expectedErrs:              field.ErrorList{field.Invalid(field.NewPath("spec").Child("defaultBackend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
 		},
 		"update service to conform to relaxed service name - RelaxedServiceNameValidation enabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1717,7 +1725,6 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}}
 			},
-			relaxedServiceName: true,
 		},
 		"update defaultBackend service to conform to relaxed service name - RelaxedServiceNameValidation enabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1734,7 +1741,6 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}
 			},
-			relaxedServiceName: true,
 		},
 		"updating an already existing relaxed validation service name with RelaxedServiceNameValidation disabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1773,6 +1779,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}}
 			},
+			disableRelaxedServiceName: true,
 		},
 		"updating an already existing relaxed validation defaultBackend service name with RelaxedServiceNameValidation disabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1789,6 +1796,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}
 			},
+			disableRelaxedServiceName: true,
 		},
 		"updating an already existing relaxed validation service name to a non-relaxed name with RelaxedServiceNameValidation disabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1827,6 +1835,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}}
 			},
+			disableRelaxedServiceName: true,
 		},
 		"updating an already existing relaxed validation defaultBackend service name to a non-relaxed name with RelaxedServiceNameValidation disabled": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1843,6 +1852,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 					},
 				}
 			},
+			disableRelaxedServiceName: true,
 		},
 	}
 
@@ -1851,7 +1861,10 @@ func TestValidateIngressUpdate(t *testing.T) {
 			newIngress := baseIngress.DeepCopy()
 			oldIngress := baseIngress.DeepCopy()
 			testCase.tweakIngresses(newIngress, oldIngress)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, testCase.relaxedServiceName)
+			if testCase.disableRelaxedServiceName {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, false)
+			}
 
 			errs := ValidateIngressUpdate(newIngress, oldIngress)
 
@@ -3030,6 +3043,7 @@ func TestAllowRelaxedServiceNameValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Test feature with gate disabled
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, false)
 			got := allowRelaxedServiceNameValidation(tc.ingress)
 			if got != tc.expect {

@@ -58,10 +58,10 @@ type Reader interface {
 }
 
 type writer interface {
-	SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error
+	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error
 	SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error
-	SetPodLevelResources(podUID types.UID, alloc *v1.ResourceRequirements) error
-	RemovePod(podUID types.UID) error
+	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
+	RemovePod(logger klog.Logger, podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
 }

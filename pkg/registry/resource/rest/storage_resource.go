@@ -43,7 +43,7 @@ import (
 
 type RESTStorageProvider struct {
 	NamespaceClient v1.NamespaceInterface
-	Authorizer      authorizer.Authorizer
+	Authorizer      authorizer.UnconditionalAuthorizer
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {

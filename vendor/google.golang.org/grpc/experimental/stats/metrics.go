@@ -20,9 +20,26 @@
 package stats
 
 import (
+	"context"
+
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/stats"
 )
+
+type customLabelKey struct{}
+
+// NewContextWithCustomLabel returns a new context with the provided custom label
+// attached. The label will be propagated to all metric instruments specified in gRFC A108.
+func NewContextWithCustomLabel(ctx context.Context, label string) context.Context {
+	return context.WithValue(ctx, customLabelKey{}, label)
+}
+
+// CustomLabelFromContext returns the custom label from the context if it exists.
+// If the custom label is not present, it returns an empty string.
+func CustomLabelFromContext(ctx context.Context) string {
+	label, _ := ctx.Value(customLabelKey{}).(string)
+	return label
+}
 
 // MetricsRecorder records on metrics derived from metric registry.
 // Implementors must embed UnimplementedMetricsRecorder.

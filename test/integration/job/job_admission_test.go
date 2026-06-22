@@ -31,8 +31,8 @@ import (
 
 func TestJobAdmissionParallelismUpdate(t *testing.T) {
 	enabledFeatureGates := featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:       true,
-		features.EnableWorkloadWithJob: true,
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
 	}
 
 	cases := map[string]struct {
@@ -79,8 +79,8 @@ func TestJobAdmissionParallelismUpdate(t *testing.T) {
 		},
 		"parallelism update allowed when feature gates are disabled": {
 			featureGates: featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:       false,
-				features.EnableWorkloadWithJob: false,
+				features.GenericWorkload: false,
+				features.WorkloadWithJob: false,
 			},
 			jobSpec: batchv1.JobSpec{
 				Parallelism: ptr.To[int32](4),
@@ -90,8 +90,8 @@ func TestJobAdmissionParallelismUpdate(t *testing.T) {
 		},
 		"parallelism update allowed when only GenericWorkload is enabled": {
 			featureGates: featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:       true,
-				features.EnableWorkloadWithJob: false,
+				features.GenericWorkload: true,
+				features.WorkloadWithJob: false,
 			},
 			jobSpec: batchv1.JobSpec{
 				Parallelism: ptr.To[int32](4),

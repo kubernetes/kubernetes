@@ -76,7 +76,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(provisioner) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, provisioner)).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath, provisioner).MarkCoveredByDeclarative())
 	}
 	if len(provisioner) > 0 {
 		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
@@ -210,7 +210,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 		return allErrs
 	}
 	if len(e.Message) > maxVolumeErrorMessageSize {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxAttachedVolumeMetadataSize))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxVolumeErrorMessageSize))
 	}
 
 	if e.ErrorCode != nil {

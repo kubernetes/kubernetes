@@ -1222,6 +1222,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -1284,7 +1285,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 				return true, nil, fmt.Errorf("try again")
 			})
 
-			kubelet.fastStatusUpdateOnce()
+			kubelet.fastStatusUpdateOnce(tCtx)
 
 			assert.True(t, kubelet.containerRuntimeReadyExpected)
 			assert.Equal(t, tc.wantCalls, callCount)

@@ -788,6 +788,18 @@ var _ = SIGDescribe("Security Context", func() {
 				},
 			}
 		}
+		nodeSupportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(node).NotTo(gomega.BeNil())
+			if node.Status.Features != nil {
+				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
+				if supportsSupplementalGroupsPolicy != nil && *supportsSupplementalGroupsPolicy {
+					return true
+				}
+			}
+			return false
+		}
 		waitForContainerUser := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedContainerUser *v1.ContainerUser) error {
 			return framework.Gomega().Eventually(ctx,
 				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
@@ -857,6 +869,9 @@ var _ = SIGDescribe("Security Context", func() {
 					ginkgo.By("creating a pod", func() {
 						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyMerge)))
 					})
+					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+					}
 				})
 				ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
 					expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
@@ -870,6 +885,9 @@ var _ = SIGDescribe("Security Context", func() {
 					ginkgo.By("creating a pod", func() {
 						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(nil))
 					})
+					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+					}
 				})
 				ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
 					expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
@@ -881,8 +899,15 @@ var _ = SIGDescribe("Security Context", func() {
 				var pod *v1.Pod
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					ginkgo.By("creating a pod", func() {
-						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
+						pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
+						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
+						var err error
+						pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
 					})
+					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+					}
 				})
 				ginkgo.It("it should NOT add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
 					expectStrictPolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)

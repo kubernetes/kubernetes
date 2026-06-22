@@ -48,7 +48,7 @@ var (
 	)
 	storeResourceVersion = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
-			Subsystem:      "informer",
+			Subsystem:      subsystem,
 			Name:           "store_resource_version",
 			Help:           "The 15 least significant digits of the resource version of the store.",
 			StabilityLevel: k8smetrics.ALPHA,

@@ -118,7 +118,7 @@ const (
 
 // KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// enableServer enables Kubelet's secured server.
 	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
@@ -328,18 +328,18 @@ type KubeletConfiguration struct {
 	// +optional
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
-	// status. If node lease feature is not enabled, it is also the frequency that
-	// kubelet posts node status to master.
-	// Note: When node lease feature is not enabled, be cautious when changing the
-	// constant, it must work with nodeMonitorGracePeriod in nodecontroller.
+	// status and checks if an update to the API server is necessary. Status
+	// is posted to the API server either when it changes or when
+	// nodeStatusReportFrequency has elapsed since the last report.
 	// Default: "10s"
 	// +optional
 	NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency,omitempty"`
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master if node status does not change. Kubelet will ignore this
-	// frequency and post node status immediately if any change is detected. It is
-	// only used when node lease feature is enabled. nodeStatusReportFrequency's
-	// default value is 5m. But if nodeStatusUpdateFrequency is set explicitly,
+	// status to the API server if node status does not change. Kubelet will
+	// ignore this frequency and post node status immediately if any change
+	// is detected.
+	// nodeStatusReportFrequency's default value is 5m. But if
+	// nodeStatusUpdateFrequency is set explicitly,
 	// nodeStatusReportFrequency's default value will be set to
 	// nodeStatusUpdateFrequency for backward compatibility.
 	// Default: "5m"
@@ -1040,7 +1040,7 @@ type KubeletAnonymousAuthentication struct {
 // This type is used internally by the Kubelet for tracking checkpointed dynamic configs.
 // It exists in the kubeletconfig API group because it is classified as a versioned input to the Kubelet.
 type SerializedNodeConfigSource struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// source is the source that we are serializing.
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
@@ -1084,7 +1084,7 @@ type CrashLoopBackOffConfig struct {
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials
@@ -1172,7 +1172,7 @@ type UserNamespaces struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePullIntent struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Image is the image spec from a Container's `image` field.
 	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
@@ -1188,7 +1188,7 @@ type ImagePullIntent struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePulledRecord struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// LastUpdatedTime is the time of the last update to this record
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`

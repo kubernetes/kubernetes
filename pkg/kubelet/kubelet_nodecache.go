@@ -31,7 +31,7 @@ func (kl *Kubelet) GetCachedNode(ctx context.Context, useCache bool) (*v1.Node, 
 	if useCache {
 		return kl.getCachedNode(ctx)
 	}
-	return kl.getNodeSync()
+	return kl.getNodeSync(ctx)
 }
 
 // getCachedNode compares the currently cached node to the node in the informer,
@@ -66,11 +66,11 @@ func (kl *Kubelet) getCachedNode(ctx context.Context) (*v1.Node, error) {
 
 // getNodeSync forces a refresh of the cache by making a synchronous call to the API server
 // for the most recent node info.
-func (kl *Kubelet) getNodeSync() (*v1.Node, error) {
+func (kl *Kubelet) getNodeSync(ctx context.Context) (*v1.Node, error) {
 	if kl.kubeClient == nil {
-		return kl.initialNode(context.Background())
+		return kl.initialNode(ctx)
 	}
-	node, err := kl.kubeClient.CoreV1().Nodes().Get(context.Background(), string(kl.nodeName), metav1.GetOptions{})
+	node, err := kl.kubeClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

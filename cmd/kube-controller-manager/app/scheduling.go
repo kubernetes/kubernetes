@@ -50,7 +50,7 @@ func newPodGroupProtectionController(ctx context.Context, controllerContext Cont
 
 	pgProtectionController, err := podgroupprotection.NewPodGroupProtectionController(
 		klog.FromContext(ctx),
-		controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups(),
+		controllerContext.InformerFactory.Scheduling().V1alpha3().PodGroups(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		client,
 	)

@@ -43,7 +43,7 @@ const (
 //
 // It increases suffix to generate the next id.
 // The count field may overflow to timestamp field, which is intentional.
-// It helps to extend the event window to 2^56. This doesn't break that
+// It helps to extend the event window to 2^48. This doesn't break that
 // id generated after restart is unique because etcd throughput is <<
 // 256req/ms(250k reqs/second).
 type Generator struct {

@@ -34,6 +34,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/kubernetes"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
@@ -72,6 +73,8 @@ type Config struct {
 
 	Proxy    ProxyConfig
 	Services ServicesConfig
+
+	EndpointSliceGetter proxy.EndpointSliceGetter
 }
 
 type ProxyConfig struct {
@@ -100,12 +103,12 @@ type legacyProvider struct {
 	primaryServiceClusterIPAllocator ipallocator.Interface
 	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
-	authorizer                       authorizer.Authorizer
+	authorizer                       authorizer.UnconditionalAuthorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
-func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
+func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvider, error) {
 	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err
@@ -207,7 +210,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		p.primaryServiceClusterIPAllocator.IPFamily(),
 		p.serviceClusterIPAllocators,
 		p.serviceNodePortAllocator,
-		endpointsStorage,
+		p.EndpointSliceGetter,
 		podStorage.Pod,
 		p.Proxy.Transport)
 	if err != nil {
@@ -534,8 +537,12 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		}()
 		select {
 		case <-done:
+
+		case <-context.Done():
+			return goerrors.New("unable to perform initial IP and Port allocation check (context cancelled)")
+
 		case <-time.After(time.Minute):
-			return goerrors.New("unable to perform initial IP and Port allocation check")
+			return goerrors.New("unable to perform initial IP and Port allocation check (timeout)")
 		}
 
 		return nil

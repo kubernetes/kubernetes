@@ -503,7 +503,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(goodName), badMultipleListValue, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(goodName).Child("strings"), []string{}, "must not be empty if specified"),
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(goodName), badMultipleListValueWithEmptyList, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("strings").Index(0), badListStringValueTooLong.StringValues[0], resourceapi.DeviceAttributeMaxValueLength),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("strings").Index(0), badListStringValueTooLong.StringValues[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkCoveredByDeclarative(),
 				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("versions").Index(0), badListVersionValueTooLong.VersionValues[0], "must be a string compatible with semver.org spec 2.0.0"),
 				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("versions").Index(0), badListVersionValueTooLong.VersionValues[0], resourceapi.DeviceAttributeMaxValueLength),
 				field.Invalid(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("bools"), []bool{}, "must not be empty if specified"),
@@ -1041,7 +1041,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"missing-counter-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), ""),
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "").MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 0)
@@ -1172,7 +1172,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"missing-counter-consumes-counter": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), ""),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)

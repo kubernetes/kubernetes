@@ -103,6 +103,17 @@ func (as ContainerMemoryAssignments) Clone() ContainerMemoryAssignments {
 // PodMemoryAssignments stores memory assignments of pods
 type PodMemoryAssignments map[string]PodEntry
 
+// Clone returns a copy of PodMemoryAssignments
+func (as PodMemoryAssignments) Clone() PodMemoryAssignments {
+	clone := make(PodMemoryAssignments)
+	for pod, entry := range as {
+		clone[pod] = PodEntry{
+			MemoryBlocks: append([]Block{}, entry.MemoryBlocks...),
+		}
+	}
+	return clone
+}
+
 // PodEntry represents pod-level memory assignments for a pod
 type PodEntry struct {
 	MemoryBlocks []Block `json:"memoryBlocks,omitempty"`

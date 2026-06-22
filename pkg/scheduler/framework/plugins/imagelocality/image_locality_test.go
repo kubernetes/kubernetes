@@ -111,6 +111,17 @@ func TestImageLocalityPriority(t *testing.T) {
 		},
 	}
 
+	test30300AsContainers := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+			{
+				Image: "gcr.io/300",
+			},
+		},
+	}
+
 	test30Init300 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
@@ -360,19 +371,34 @@ func TestImageLocalityPriority(t *testing.T) {
 			name:         "pod with multiple small images",
 		},
 		{
-			// Pod: gcr.io/300 gcr.io/30
+			// Pod: gcr.io/30  ImageVolume: gcr.io/300
 
 			// Node1
 			// Image: gcr.io/300:latest 300MB
-			// Score: 100 * (300M * 1/2 - 23M) / (1000M - 23M) = 12
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M * 2 - 23M) = 6
 
 			// Node2
 			// Image: gcr.io/30:latest 30MB
-			// Score:  100 * (30M - 23M) / (1000M - 23M) = 0
+			// Score: 0 (30M * 1/2 < 23M, min-threshold)
 			pod:          &v1.Pod{Spec: testImageVolume},
 			nodes:        []*v1.Node{makeImageNode("node1", node300600900), makeImageNode("node2", node400030)},
-			expectedList: []fwk.NodeScore{{Name: "node1", Score: 12}, {Name: "node2", Score: 0}},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
 			name:         "pod with ImageVolume",
+		},
+		{
+			// Pod: gcr.io/30  gcr.io/300
+
+			// Node1
+			// Image: gcr.io/300:latest 300MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M * 2 - 23M) = 6
+
+			// Node2
+			// Image: gcr.io/30:latest 30MB
+			// Score: 0 (30M * 1/2 < 23M, min-threshold)
+			pod:          &v1.Pod{Spec: test30300AsContainers},
+			nodes:        []*v1.Node{makeImageNode("node1", node300600900), makeImageNode("node2", node400030)},
+			expectedList: []fwk.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
+			name:         "same images as ImageVolume pod but as regular container images",
 		},
 		{
 			// Pod: gcr.io/30  InitContainers: gcr.io/300

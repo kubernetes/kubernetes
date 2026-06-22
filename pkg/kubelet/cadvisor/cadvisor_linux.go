@@ -39,6 +39,7 @@ import (
 	_ "github.com/google/cadvisor/fs/overlay/install"
 	_ "github.com/google/cadvisor/fs/tmpfs/install"
 	_ "github.com/google/cadvisor/fs/vfs/install"
+	_ "github.com/google/cadvisor/fs/zfs/install"
 
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
@@ -156,7 +157,7 @@ func (cc *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return cc.GetVersionInfo()
 }
 
-func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (cc *cadvisorClient) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
 

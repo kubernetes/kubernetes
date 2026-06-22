@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -35,7 +37,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var errNotImplemented = errors.New("not implemented")
@@ -43,6 +45,9 @@ var errNotImplemented = errors.New("not implemented")
 type fakeEtcdClient struct {
 	members   []*pb.Member
 	endpoints []string
+
+	memberListFunc    func(context.Context, ...clientv3.OpOption) (*clientv3.MemberListResponse, error)
+	memberPromoteFunc func(context.Context, uint64) (*clientv3.MemberPromoteResponse, error)
 }
 
 // Close shuts down the client's etcd connections.
@@ -57,7 +62,10 @@ func (f *fakeEtcdClient) Endpoints() []string {
 }
 
 // MemberList lists the current cluster membership.
-func (f *fakeEtcdClient) MemberList(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+func (f *fakeEtcdClient) MemberList(ctx context.Context, opts ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+	if f.memberListFunc != nil {
+		return f.memberListFunc(ctx, opts...)
+	}
 	return &clientv3.MemberListResponse{
 		Members: f.members,
 	}, nil
@@ -79,7 +87,10 @@ func (f *fakeEtcdClient) MemberRemove(_ context.Context, id uint64) (*clientv3.M
 }
 
 // MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
-func (f *fakeEtcdClient) MemberPromote(_ context.Context, id uint64) (*clientv3.MemberPromoteResponse, error) {
+func (f *fakeEtcdClient) MemberPromote(ctx context.Context, id uint64) (*clientv3.MemberPromoteResponse, error) {
+	if f.memberPromoteFunc != nil {
+		return f.memberPromoteFunc(ctx, id)
+	}
 	return nil, errNotImplemented
 }
 
@@ -178,7 +189,7 @@ func TestGetClientURLByIP(t *testing.T) {
 func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 	tests := []struct {
 		name              string
-		pods              []testresources.FakeStaticPod
+		pods              []staticpodutil.FakeStaticPod
 		expectedEndpoints []string
 		expectedErr       bool
 	}{
@@ -189,7 +200,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 		},
 		{
 			name: "ipv4 endpoint in pod annotation; port is preserved",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component: constants.Etcd,
 					Annotations: map[string]string{
@@ -229,14 +240,14 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 	tests := []struct {
 		name              string
-		pods              []testresources.FakeStaticPod
+		pods              []staticpodutil.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
 		expectedEndpoints []string
 		expectedErr       bool
 	}{
 		{
 			name: "exactly one pod with annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -247,7 +258,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name: "two pods; one is missing annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -267,7 +278,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name: "exactly one pod with annotation; all requests fail",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -313,7 +324,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 	tests := []struct {
 		name              string
-		pods              []testresources.FakeStaticPod
+		pods              []staticpodutil.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
 		expectedEndpoints []string
 		expectedErr       bool
@@ -324,7 +335,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "exactly one pod with annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -335,7 +346,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "two pods; one is missing annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -350,7 +361,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "two pods with annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -366,7 +377,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "exactly one pod with annotation; request fails",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -819,6 +830,342 @@ func TestGetMemberStatus(t *testing.T) {
 			}
 			if (err != nil) != tt.wantError {
 				t.Errorf("getMemberStatus() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+type fakeEtcdClientWithStatusResponse struct {
+	fakeEtcdClient
+	statusResponses     map[string]*clientv3.StatusResponse
+	statusRequestErrors map[string]error
+}
+
+// Status gets the status of the endpoint.
+func (f *fakeEtcdClientWithStatusResponse) Status(_ context.Context, ep string) (*clientv3.StatusResponse, error) {
+	if f.statusRequestErrors != nil {
+		if _, ok := f.statusRequestErrors[ep]; ok {
+			return nil, f.statusRequestErrors[ep]
+		}
+	}
+	return f.statusResponses[ep], nil
+}
+
+func TestEvaluateClusterStatus(t *testing.T) {
+	testCases := []struct {
+		name               string
+		Endpoints          []string
+		newEtcdClient      func(endpoints []string) (etcdClient, error)
+		wantClusterHealthy bool
+		wantMemberErrors   bool
+	}{
+		{
+			name:      "all the three members are healthy",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {},
+						"https://192.168.10.300:2379": {},
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: true,
+			wantMemberErrors:   false,
+		},
+		{
+			name:      "one out of three members has errors",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {Errors: []string{"etcdserver: mvcc: database space exceeded"}},
+						"https://192.168.10.300:2379": {},
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: true,
+			wantMemberErrors:   true,
+		},
+		{
+			name:      "one out of three members is unreachable",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {},
+						"https://192.168.10.300:2379": {},
+					},
+					statusRequestErrors: map[string]error{
+						"https://192.168.10.200:2379": errors.New("context deadline exceeded"),
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: true,
+			wantMemberErrors:   true,
+		},
+		{
+			name:      "two out of three members has errors",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {Errors: []string{"etcdserver: mvcc: database space exceeded"}},
+						"https://192.168.10.300:2379": {Errors: []string{"etcdserver: mvcc: data corrupted"}},
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: false,
+			wantMemberErrors:   true,
+		},
+		{
+			name:      "two out of three members are unreachable",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {},
+						"https://192.168.10.300:2379": {},
+					},
+					statusRequestErrors: map[string]error{
+						"https://192.168.10.200:2379": errors.New("context deadline exceeded"),
+						"https://192.168.10.300:2379": errors.New("context deadline exceeded"),
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: false,
+			wantMemberErrors:   true,
+		},
+	}
+
+	// Temporarily reduce the etcd API call timeout from 2 minutes to 1 second.
+	oldActiveTimeout := kubeadmapi.GetActiveTimeouts()
+	newActiveTimeout := oldActiveTimeout.DeepCopy()
+	newActiveTimeout.EtcdAPICall = &metav1.Duration{Duration: 1 * time.Second}
+	kubeadmapi.SetActiveTimeouts(newActiveTimeout)
+	defer func() {
+		kubeadmapi.SetActiveTimeouts(oldActiveTimeout)
+	}()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Client{
+				Endpoints:     tc.Endpoints,
+				newEtcdClient: tc.newEtcdClient,
+			}
+			_, gotClusterHealthy, err := c.getClusterStatus()
+
+			if gotClusterHealthy != tc.wantClusterHealthy {
+				t.Errorf("gotClusterHealthy = %t, want = %t", gotClusterHealthy, tc.wantClusterHealthy)
+			}
+
+			if tc.wantMemberErrors != (err != nil) {
+				t.Errorf("gotMemberErrors = %v, wantMemberErrors = %t", err, tc.wantMemberErrors)
+			}
+		})
+	}
+}
+
+func TestMemberPromote(t *testing.T) {
+	learnerID := uint64(12345)
+
+	const (
+		initialEndpoint  = "https://192.168.10.100:2379"
+		promotedEndpoint = "https://192.168.10.200:2379"
+	)
+
+	member := func(isLearner bool) *pb.Member {
+		return &pb.Member{
+			ID:         learnerID,
+			Name:       "cp-1",
+			PeerURLs:   []string{"https://192.168.10.200:2380"},
+			ClientURLs: []string{promotedEndpoint},
+			IsLearner:  isLearner,
+		}
+	}
+
+	type memberListResult struct {
+		members []*pb.Member
+		err     error
+	}
+
+	type memberPromoteResult struct {
+		resp *clientv3.MemberPromoteResponse
+		err  error
+	}
+
+	tests := []struct {
+		name                 string
+		memberListResults    []memberListResult
+		memberPromoteResults []memberPromoteResult
+		wantErr              bool
+		wantEndpoint         string
+		wantPromoteCalls     int
+		minMemberListCalls   int
+	}{
+		{
+			name: "successful promotion adds endpoint",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(true)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					resp: &clientv3.MemberPromoteResponse{
+						Members: []*pb.Member{member(false)},
+					},
+				},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   1,
+			minMemberListCalls: 2,
+		},
+		{
+			name: "already promoted after transient promote failure adds endpoint",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(false)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					err: context.DeadlineExceeded,
+				},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   1,
+			minMemberListCalls: 3,
+		},
+		{
+			name: "already promoted before promote attempt adds endpoint",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(false)}},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   0,
+			minMemberListCalls: 2,
+		},
+		{
+			name: "member list error before promote is retried",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{err: errNotImplemented},
+				{members: []*pb.Member{member(true)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					resp: &clientv3.MemberPromoteResponse{
+						Members: []*pb.Member{member(false)},
+					},
+				},
+			},
+			wantEndpoint:       promotedEndpoint,
+			wantPromoteCalls:   1,
+			minMemberListCalls: 3,
+		},
+		{
+			name: "promotion keeps failing",
+			memberListResults: []memberListResult{
+				{members: []*pb.Member{member(true)}},
+				{members: []*pb.Member{member(true)}},
+			},
+			memberPromoteResults: []memberPromoteResult{
+				{
+					err: context.DeadlineExceeded,
+				},
+			},
+			wantErr:            true,
+			wantPromoteCalls:   -1,
+			minMemberListCalls: 1,
+		},
+	}
+
+	oldActiveTimeout := kubeadmapi.GetActiveTimeouts()
+	newActiveTimeout := oldActiveTimeout.DeepCopy()
+	newActiveTimeout.EtcdAPICall = &metav1.Duration{
+		Duration: 3 * constants.EtcdAPICallRetryInterval,
+	}
+	kubeadmapi.SetActiveTimeouts(newActiveTimeout)
+	defer kubeadmapi.SetActiveTimeouts(oldActiveTimeout)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			memberListCalls := 0
+			memberPromoteCalls := 0
+
+			fakeClient := &fakeEtcdClient{}
+
+			fakeClient.memberListFunc = func(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
+				if len(tt.memberListResults) == 0 {
+					t.Fatal("MemberList called without configured results")
+				}
+
+				resultIndex := memberListCalls
+				if resultIndex >= len(tt.memberListResults) {
+					resultIndex = len(tt.memberListResults) - 1
+				}
+				result := tt.memberListResults[resultIndex]
+				memberListCalls++
+
+				if result.err != nil {
+					return nil, result.err
+				}
+				return &clientv3.MemberListResponse{
+					Members: result.members,
+				}, nil
+			}
+
+			fakeClient.memberPromoteFunc = func(_ context.Context, _ uint64) (*clientv3.MemberPromoteResponse, error) {
+				if len(tt.memberPromoteResults) == 0 {
+					t.Fatalf("unexpected MemberPromote call")
+				}
+
+				resultIndex := memberPromoteCalls
+				if resultIndex >= len(tt.memberPromoteResults) {
+					resultIndex = len(tt.memberPromoteResults) - 1
+				}
+				result := tt.memberPromoteResults[resultIndex]
+				memberPromoteCalls++
+
+				return result.resp, result.err
+			}
+
+			c := &Client{
+				Endpoints: []string{initialEndpoint},
+			}
+			c.newEtcdClient = func(_ []string) (etcdClient, error) {
+				return fakeClient, nil
+			}
+			c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
+				return fakeClient.MemberList(context.Background())
+			}
+
+			err := c.MemberPromote(learnerID)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("MemberPromote() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantPromoteCalls >= 0 && memberPromoteCalls != tt.wantPromoteCalls {
+				t.Fatalf("MemberPromote calls = %d, want %d", memberPromoteCalls, tt.wantPromoteCalls)
+			}
+
+			if memberListCalls < tt.minMemberListCalls {
+				t.Fatalf("MemberList calls = %d, want at least %d", memberListCalls, tt.minMemberListCalls)
+			}
+
+			if tt.wantEndpoint != "" && !slices.Contains(c.Endpoints, tt.wantEndpoint) {
+				t.Fatalf("expected endpoint %q to be added, got %v", tt.wantEndpoint, c.Endpoints)
 			}
 		})
 	}

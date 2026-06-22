@@ -23,7 +23,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -38,10 +37,10 @@ func (dc *DeploymentController) rollback(ctx context.Context, d *apps.Deployment
 	}
 
 	allRSs := append(allOldRSs, newRS)
-	rollbackTo := getRollbackTo(d)
+	rollbackRevision := *getRollbackTo(d)
 	// If rollback revision is 0, rollback to the last revision
-	if rollbackTo.Revision == 0 {
-		if rollbackTo.Revision = deploymentutil.LastRevision(logger, allRSs); rollbackTo.Revision == 0 {
+	if rollbackRevision == 0 {
+		if rollbackRevision = deploymentutil.LastRevision(logger, allRSs); rollbackRevision == 0 {
 			// If we still can't find the last revision, gives up rollback
 			dc.emitRollbackWarningEvent(d, deploymentutil.RollbackRevisionNotFound, "Unable to find last revision.")
 			// Gives up rollback
@@ -54,14 +53,14 @@ func (dc *DeploymentController) rollback(ctx context.Context, d *apps.Deployment
 			logger.V(4).Info("Unable to extract revision from deployment's replica set", "replicaSet", klog.KObj(rs), "err", err)
 			continue
 		}
-		if v == rollbackTo.Revision {
+		if v == rollbackRevision {
 			logger.V(4).Info("Found replica set with desired revision", "replicaSet", klog.KObj(rs), "revision", v)
 			// rollback by copying podTemplate.Spec from the replica set
 			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
 			// no-op if the spec matches current deployment's podTemplate.Spec
 			performedRollback, err := dc.rollbackToTemplate(ctx, d, rs)
 			if performedRollback && err == nil {
-				dc.emitRollbackNormalEvent(d, fmt.Sprintf("Rolled back deployment %q to revision %d", d.Name, rollbackTo.Revision))
+				dc.emitRollbackNormalEvent(d, fmt.Sprintf("Rolled back deployment %q to revision %d", d.Name, rollbackRevision))
 			}
 			return err
 		}
@@ -121,8 +120,8 @@ func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(ctx context.C
 	return err
 }
 
-// TODO: Remove this when extensions/v1beta1 and apps/v1beta1 Deployment are dropped.
-func getRollbackTo(d *apps.Deployment) *extensions.RollbackConfig {
+// getRollbackTo returns the revision to roll back to from the deprecated rollback annotation, or nil if absent or invalid.
+func getRollbackTo(d *apps.Deployment) *int64 {
 	// Extract the annotation used for round-tripping the deprecated RollbackTo field.
 	revision := d.Annotations[apps.DeprecatedRollbackTo]
 	if revision == "" {
@@ -133,19 +132,17 @@ func getRollbackTo(d *apps.Deployment) *extensions.RollbackConfig {
 		// If it's invalid, ignore it.
 		return nil
 	}
-	return &extensions.RollbackConfig{
-		Revision: revision64,
-	}
+	return &revision64
 }
 
-// TODO: Remove this when extensions/v1beta1 and apps/v1beta1 Deployment are dropped.
-func setRollbackTo(d *apps.Deployment, rollbackTo *extensions.RollbackConfig) {
-	if rollbackTo == nil {
+// setRollbackTo sets the deprecated rollback annotation to the given revision, or clears it if revision is nil.
+func setRollbackTo(d *apps.Deployment, revision *int64) {
+	if revision == nil {
 		delete(d.Annotations, apps.DeprecatedRollbackTo)
 		return
 	}
 	if d.Annotations == nil {
 		d.Annotations = make(map[string]string)
 	}
-	d.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(rollbackTo.Revision, 10)
+	d.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(*revision, 10)
 }

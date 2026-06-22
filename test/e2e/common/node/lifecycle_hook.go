@@ -277,7 +277,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe(framework.WithNodeConformance(), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -714,7 +714,12 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
 			p := podClient.Create(ctx, podWithHook)
 			defer podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, gracePeriod*time.Second))
+			// Use the framework PodDelete timeout instead of gracePeriod*time.Second so
+			// we have headroom for slower runtimes (e.g. VM-isolated containers) to
+			// transition through Terminated. The actual correctness check below uses
+			// the container's intrinsic StartedAt/FinishedAt timestamps and is unaffected
+			// by how long we waited here.
+			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, f.Timeouts.PodDelete))
 
 			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 			if err != nil {

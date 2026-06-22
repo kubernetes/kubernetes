@@ -5639,6 +5639,21 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		t.Errorf("numComments (%d) != 0 after partial resync when numEndpoints (%d) > threshold (%d)", numComments, expectedEndpoints+3, largeClusterEndpointsThreshold)
 	}
 
+	// Even if FullSyncPeriod has elapsed, large-cluster mode should keep this as
+	// a partial resync when there are no explicit changes requiring a full sync.
+	if !fp.largeClusterMode {
+		t.Fatalf("expected to be in large cluster mode")
+	}
+	expectedLastFullSync := time.Now().Add(-proxyutil.FullSyncPeriod).Add(-time.Second)
+	fp.lastFullSync = expectedLastFullSync
+	err := fp.syncProxyRules()
+	if err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+	if !fp.lastFullSync.Equal(expectedLastFullSync) {
+		t.Fatalf("expected periodic sync in large cluster mode to skip full sync: lastFullSync changed from %v to %v", expectedLastFullSync, fp.lastFullSync)
+	}
+
 	// Now force a full resync and confirm that it rewrites the older services with
 	// no comments as well.
 	fp.forceSyncProxyRules()

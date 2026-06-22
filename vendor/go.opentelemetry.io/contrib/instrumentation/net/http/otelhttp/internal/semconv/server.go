@@ -15,12 +15,13 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv/v1.39.0"
-	"go.opentelemetry.io/otel/semconv/v1.39.0/httpconv"
+	"go.opentelemetry.io/otel/semconv/v1.41.0"
+	"go.opentelemetry.io/otel/semconv/v1.41.0/httpconv"
 )
 
 type RequestTraceAttrsOpts struct {
@@ -36,7 +37,7 @@ type ResponseTelemetry struct {
 	WriteError error
 }
 
-type HTTPServer struct{
+type HTTPServer struct {
 	requestBodySizeHistogram  httpconv.ServerRequestBodySize
 	responseBodySizeHistogram httpconv.ServerResponseBodySize
 	requestDurationHistogram  httpconv.ServerRequestDuration
@@ -242,28 +243,19 @@ type MetricAttributes struct {
 	StatusCode           int
 	Route                string
 	AdditionalAttributes []attribute.KeyValue
+	Err                  error
 }
 
 type MetricData struct {
-	RequestSize int64
-
-	// The request duration, in milliseconds
-	ElapsedTime float64
+	RequestSize     int64
+	RequestDuration time.Duration
 }
 
-var (
-	metricAddOptionPool = &sync.Pool{
-		New: func() any {
-			return &[]metric.AddOption{}
-		},
-	}
-
-	metricRecordOptionPool = &sync.Pool{
-		New: func() any {
-			return &[]metric.RecordOption{}
-		},
-	}
-)
+var metricRecordOptionPool = &sync.Pool{
+	New: func() any {
+		return &[]metric.RecordOption{}
+	},
+}
 
 func (n HTTPServer) RecordMetrics(ctx context.Context, md ServerMetricData) {
 	attributes := n.MetricAttributes(md.ServerName, md.Req, md.StatusCode, md.Route, md.AdditionalAttributes)
@@ -272,14 +264,32 @@ func (n HTTPServer) RecordMetrics(ctx context.Context, md ServerMetricData) {
 	*recordOpts = append(*recordOpts, o)
 	n.requestBodySizeHistogram.Inst().Record(ctx, md.RequestSize, *recordOpts...)
 	n.responseBodySizeHistogram.Inst().Record(ctx, md.ResponseSize, *recordOpts...)
-	n.requestDurationHistogram.Inst().Record(ctx, md.ElapsedTime/1000.0, o)
+	n.requestDurationHistogram.Inst().Record(ctx, durationToSeconds(md.RequestDuration), o)
 	*recordOpts = (*recordOpts)[:0]
 	metricRecordOptionPool.Put(recordOpts)
 }
 
+// SpanName returns the span name for an HTTP request following the
+// OpenTelemetry HTTP semantic conventions.
+// It returns "{method} {route}" when the request has a pattern,
+// or just "{method}" when no route is available.
+// Non-standard HTTP methods are replaced by "HTTP".
+func (n HTTPServer) SpanName(r *http.Request) string {
+	method := strings.ToUpper(r.Method)
+	if _, ok := methodLookup[method]; !ok {
+		method = "HTTP"
+	}
+
+	route := httpRoute(r.Pattern)
+	if route != "" {
+		return method + " " + route
+	}
+	return method
+}
+
 func (n HTTPServer) method(method string) (attribute.KeyValue, attribute.KeyValue) {
 	if method == "" {
-		return semconv.HTTPRequestMethodGet, attribute.KeyValue{}
+		return semconv.HTTPRequestMethodOther, attribute.KeyValue{}
 	}
 	if attr, ok := methodLookup[method]; ok {
 		return attr, attribute.KeyValue{}
@@ -289,7 +299,7 @@ func (n HTTPServer) method(method string) (attribute.KeyValue, attribute.KeyValu
 	if attr, ok := methodLookup[strings.ToUpper(method)]; ok {
 		return attr, orig
 	}
-	return semconv.HTTPRequestMethodGet, orig
+	return semconv.HTTPRequestMethodOther, orig
 }
 
 func (n HTTPServer) scheme(https bool) attribute.KeyValue { //nolint:revive // ignore linter
@@ -371,10 +381,12 @@ func (n HTTPServer) MetricAttributes(server string, req *http.Request, statusCod
 	if statusCode > 0 {
 		num++
 	}
-
+	if route == "" && req.Pattern != "" {
+		route = httpRoute(req.Pattern)
+	}
 	if route != "" {
-        num++
-    }
+		num++
+	}
 
 	attributes := slices.Grow(additionalAttributes, num)
 	attributes = append(attributes,
@@ -397,7 +409,7 @@ func (n HTTPServer) MetricAttributes(server string, req *http.Request, statusCod
 	}
 
 	if route != "" {
-        attributes = append(attributes, semconv.HTTPRoute(route))
-    }
+		attributes = append(attributes, semconv.HTTPRoute(route))
+	}
 	return attributes
 }

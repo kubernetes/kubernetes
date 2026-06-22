@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -154,7 +153,8 @@ func TestUpdateStatus(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewClusterScopeContext(storage.Store)
+	statusCtx := genericregistrytest.NewClusterScopeContext(storage.Store, "status")
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	deviceTaintStart := validNewDeviceTaint("foo")
@@ -171,7 +171,7 @@ func TestUpdateStatus(t *testing.T) {
 		Message:            "100 pods left",
 		LastTransitionTime: metav1.Time{Time: time.Now().Truncate(time.Second)},
 	}}
-	_, _, err = statusStorage.Update(ctx, deviceTaint.Name, rest.DefaultUpdatedObjectInfo(deviceTaint), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(statusCtx, deviceTaint.Name, rest.DefaultUpdatedObjectInfo(deviceTaint), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

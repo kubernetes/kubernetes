@@ -293,29 +293,6 @@ func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatu
 	return nil
 }
 
-// The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
-// as an alias for ServiceAccountName.
-func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_core_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// DeprecatedServiceAccount is an alias for ServiceAccountName.
-	out.DeprecatedServiceAccount = in.ServiceAccountName
-
-	if in.SecurityContext != nil {
-		// the host namespace fields have to be handled here for backward compatibility
-		// with v1.0.0
-		out.HostPID = in.SecurityContext.HostPID
-		out.HostNetwork = in.SecurityContext.HostNetwork
-		out.HostIPC = in.SecurityContext.HostIPC
-		out.ShareProcessNamespace = in.SecurityContext.ShareProcessNamespace
-		out.HostUsers = in.SecurityContext.HostUsers
-	}
-
-	return nil
-}
-
 func Convert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
 	if err := autoConvert_core_NodeSpec_To_v1_NodeSpec(in, out, s); err != nil {
 		return err
@@ -343,31 +320,6 @@ func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s
 	if len(in.PodCIDR) > 0 && len(in.PodCIDRs) == 0 {
 		out.PodCIDRs = []string{in.PodCIDR}
 	}
-	return nil
-}
-
-func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_PodSpec_To_core_PodSpec(in, out, s); err != nil {
-		return err
-	}
-
-	// We support DeprecatedServiceAccount as an alias for ServiceAccountName.
-	// If both are specified, ServiceAccountName (the new field) wins.
-	if in.ServiceAccountName == "" {
-		out.ServiceAccountName = in.DeprecatedServiceAccount
-	}
-
-	// the host namespace fields have to be handled specially for backward compatibility
-	// with v1.0.0
-	if out.SecurityContext == nil {
-		out.SecurityContext = new(core.PodSecurityContext)
-	}
-	out.SecurityContext.HostNetwork = in.HostNetwork
-	out.SecurityContext.HostPID = in.HostPID
-	out.SecurityContext.HostIPC = in.HostIPC
-	out.SecurityContext.ShareProcessNamespace = in.ShareProcessNamespace
-	out.SecurityContext.HostUsers = in.HostUsers
-
 	return nil
 }
 

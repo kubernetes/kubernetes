@@ -2307,7 +2307,7 @@ func TestConstrainedImpersonationParallel(t *testing.T) {
 	}
 }
 
-func (c *constrainedImpersonationTest) benchmarkHandler(withImpersonation func(http.Handler, authorizer.Authorizer, runtime.NegotiatedSerializer) http.Handler) http.Handler {
+func (c *constrainedImpersonationTest) benchmarkHandler(withImpersonation func(http.Handler, authorizer.UnconditionalAuthorizer, runtime.NegotiatedSerializer) http.Handler) http.Handler {
 	s := runtime.NewScheme()
 	metav1.AddToGroupVersion(s, metav1.SchemeGroupVersion)
 	addImpersonation := withImpersonation(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}), c, serializer.NewCodecFactory(s))
@@ -2324,7 +2324,7 @@ func BenchmarkImpersonation(b *testing.B) {
 
 	type impersonationHandler struct {
 		name     string
-		fn       func(http.Handler, authorizer.Authorizer, runtime.NegotiatedSerializer) http.Handler
+		fn       func(http.Handler, authorizer.UnconditionalAuthorizer, runtime.NegotiatedSerializer) http.Handler
 		isLegacy bool
 	}
 

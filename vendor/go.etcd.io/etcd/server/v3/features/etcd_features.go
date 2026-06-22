@@ -74,30 +74,29 @@ const (
 	// alpha: v3.6
 	// main PR: https://github.com/etcd-io/etcd/pull/17661
 	SetMemberLocalAddr featuregate.Feature = "SetMemberLocalAddr"
+	// FastLeaseKeepAlive enables lease renewal to skip waiting for the applied index.
+	// owner: @aaronjzhang
+	// beta: v3.7
+	// main PR: https://github.com/etcd-io/etcd/pull/20589
+	FastLeaseKeepAlive featuregate.Feature = "FastLeaseKeepAlive"
+	// PriorityRequest enables certain kinds of requests(e.g. LeaseRevoke) having higher priority to be applied under overload conditions.
+	// owner: @silentred
+	// alpha: v3.7
+	// main PR: https://github.com/etcd-io/etcd/pull/20492
+	PriorityRequest featuregate.Feature = "PriorityRequest"
 )
 
-var (
-	DefaultEtcdServerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-		StopGRPCServiceOnDefrag:      {Default: false, PreRelease: featuregate.Alpha},
-		InitialCorruptCheck:          {Default: false, PreRelease: featuregate.Alpha},
-		CompactHashCheck:             {Default: false, PreRelease: featuregate.Alpha},
-		TxnModeWriteWithSharedBuffer: {Default: true, PreRelease: featuregate.Beta},
-		LeaseCheckpoint:              {Default: false, PreRelease: featuregate.Alpha},
-		LeaseCheckpointPersist:       {Default: false, PreRelease: featuregate.Alpha},
-		SetMemberLocalAddr:           {Default: false, PreRelease: featuregate.Alpha},
-	}
-	// ExperimentalFlagToFeatureMap is the map from the cmd line flags of experimental features
-	// to their corresponding feature gates.
-	// Deprecated: Only add existing experimental features here. DO NOT use for new features.
-	ExperimentalFlagToFeatureMap = map[string]featuregate.Feature{
-		"experimental-stop-grpc-service-on-defrag":       StopGRPCServiceOnDefrag,
-		"experimental-initial-corrupt-check":             InitialCorruptCheck,
-		"experimental-compact-hash-check-enabled":        CompactHashCheck,
-		"experimental-txn-mode-write-with-shared-buffer": TxnModeWriteWithSharedBuffer,
-		"experimental-enable-lease-checkpoint":           LeaseCheckpoint,
-		"experimental-enable-lease-checkpoint-persist":   LeaseCheckpointPersist,
-	}
-)
+var DefaultEtcdServerFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	StopGRPCServiceOnDefrag:      {Default: false, PreRelease: featuregate.Alpha},
+	InitialCorruptCheck:          {Default: false, PreRelease: featuregate.Alpha},
+	CompactHashCheck:             {Default: false, PreRelease: featuregate.Alpha},
+	TxnModeWriteWithSharedBuffer: {Default: true, PreRelease: featuregate.Beta},
+	LeaseCheckpoint:              {Default: false, PreRelease: featuregate.Alpha},
+	LeaseCheckpointPersist:       {Default: false, PreRelease: featuregate.Alpha},
+	SetMemberLocalAddr:           {Default: false, PreRelease: featuregate.Alpha},
+	FastLeaseKeepAlive:           {Default: true, PreRelease: featuregate.Beta},
+	PriorityRequest:              {Default: false, PreRelease: featuregate.Alpha},
+}
 
 func NewDefaultServerFeatureGate(name string, lg *zap.Logger) featuregate.FeatureGate {
 	fg := featuregate.New(fmt.Sprintf("%sServerFeatureGate", name), lg)

@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -70,14 +71,38 @@ var (
 	containerRestartPolicyAlways       = v1.ContainerRestartPolicyAlways
 )
 
-func createTestRuntimeManager(tCtx ktesting.TContext) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
-	return createTestRuntimeManagerWithErrors(tCtx, nil)
+type testRuntimeManagerOptions struct {
+	errors   map[string][]error
+	recorder *record.FakeRecorder
 }
 
-func createTestRuntimeManagerWithErrors(tCtx ktesting.TContext, errors map[string][]error) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+type testRuntimeManagerOption func(*testRuntimeManagerOptions)
+
+func withErrors(errors map[string][]error) testRuntimeManagerOption {
+	return func(o *testRuntimeManagerOptions) {
+		o.errors = errors
+	}
+}
+
+func withRecorder(recorder *record.FakeRecorder) testRuntimeManagerOption {
+	return func(o *testRuntimeManagerOptions) {
+		o.recorder = recorder
+	}
+}
+
+func createTestRuntimeManager(ctx context.Context, opts ...testRuntimeManagerOption) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	options := &testRuntimeManagerOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if options.recorder == nil {
+		options.recorder = &record.FakeRecorder{}
+	}
+
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
-	if errors != nil {
-		fakeRuntimeService.Errors = errors
+	if options.errors != nil {
+		fakeRuntimeService.Errors = options.errors
 	}
 	fakeImageService := apitest.NewFakeImageService()
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
@@ -88,7 +113,7 @@ func createTestRuntimeManagerWithErrors(tCtx ktesting.TContext, errors map[strin
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(tCtx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""))
+	manager, err := newFakeKubeRuntimeManager(ctx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""), options.recorder)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
@@ -1010,6 +1035,95 @@ func TestSyncPodWithRestartAllContainers(t *testing.T) {
 	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
 }
 
+func TestSyncPodNoEventsInSteadyState(t *testing.T) {
+	simplecontainer := v1.Container{
+		Name:            "foo1",
+		Image:           "busybox",
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+
+	type testCase struct {
+		name    string
+		podspec v1.PodSpec
+	}
+
+	testCases := []testCase{
+		{
+			name: "simple pod",
+			podspec: v1.PodSpec{
+				Containers: []v1.Container{simplecontainer},
+			},
+		},
+		{
+			name: "pod with image volume",
+			podspec: v1.PodSpec{
+				Containers: []v1.Container{simplecontainer},
+				Volumes: []v1.Volume{
+					{
+						Name: "image-volume",
+						VolumeSource: v1.VolumeSource{
+							Image: &v1.ImageVolumeSource{Reference: "image1:latest", PullPolicy: v1.PullAlways},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	consumeEvents := func(recorder *record.FakeRecorder) []string {
+		var events []string
+		for {
+			select {
+			case ev := <-recorder.Events:
+				events = append(events, ev)
+			default:
+				return events
+			}
+		}
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a recorder with a large enough buffer to hold all events generated during a single sync
+			recorder := record.NewFakeRecorder(100)
+
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx, withRecorder(recorder))
+			require.NoError(t, err)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: tc.podspec,
+			}
+
+			// Sync the pod and store the resulting pod status.
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+			require.NoError(t, result.Error())
+
+			runtimePod, err := m.GetPod(tCtx, pod.UID)
+			require.NoError(t, err)
+			podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+			require.NoError(t, err)
+
+			// We need to consume events from the initial sync, but their content is not important.
+			events := consumeEvents(recorder)
+			t.Logf("recorded events during initial sync: %v", events)
+
+			// Sync again, passing in pod status from the previous sync. This should be steady state.
+			result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+			require.NoError(t, result.Error())
+
+			events = consumeEvents(recorder)
+			assert.Empty(t, events, "no events expected during steady state")
+		})
+	}
+}
+
 // A helper function to get a basic pod and its status assuming all sandbox and
 // containers are running and ready.
 func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
@@ -1773,7 +1887,7 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
@@ -2088,7 +2202,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				}
 				// Sync the state manager with the base (old) values before the resize
 				resources := pod.Spec.InitContainers[0].Resources
-				require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, pod.Spec.InitContainers[0].Name, resources))
+				require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, pod.Spec.InitContainers[0].Name, resources))
 			}
 
 			if test.mutatePodFn != nil {
@@ -2848,8 +2962,7 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status, false)
+		actions := m.computePodActions(tCtx, pod, status, false)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -2936,7 +3049,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -2957,11 +3070,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	setupActuatedResources := func(pod *v1.Pod, container *v1.Container, actuatedResources v1.ResourceRequirements) {
 		actuatedContainer := container.DeepCopy()
 		actuatedContainer.Resources = actuatedResources
-		require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+		require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
 	}
 
 	setupActuatedPodResources := func(pod *v1.Pod, actuatedPodResources *v1.ResourceRequirements) {
-		require.NoError(t, m.actuatedState.SetPodLevelResources(pod.UID, actuatedPodResources))
+		require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources))
 
 	}
 
@@ -3802,7 +3915,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			if test.setupFn != nil {
 				test.setupFn(pod)
 			}
-			t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
+			t.Cleanup(func() { _ = m.actuatedState.RemovePod(logger, pod.UID) })
 
 			for idx := range pod.Spec.Containers {
 				// compute hash
@@ -4112,7 +4225,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		t.Skip("unsupported OS")
 	}
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
@@ -4472,7 +4585,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, _, m, err := createTestRuntimeManagerWithErrors(tCtx, tc.runtimeErrors)
+			_, _, m, err := createTestRuntimeManager(tCtx, withErrors(tc.runtimeErrors))
 			require.NoError(t, err)
 			m.cpuCFSQuota = true // Enforce CPU Limits
 
@@ -4536,7 +4649,7 @@ func TestDoPodResizeAction(t *testing.T) {
 						v1.ResourceMemory: *resource.NewQuantity(tc.currentPodLevelResources.memoryLimit, resource.BinarySI),
 					},
 				}
-				require.NoError(t, m.actuatedState.SetPodLevelResources(pod.UID, initialActuated))
+				require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, initialActuated))
 			}
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
@@ -5006,6 +5119,7 @@ func TestIncrementImageVolumeMetrics(t *testing.T) {
 }
 
 func TestIsPodResizeInProgress(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	type testResources struct {
 		cpuReq, cpuLim, memReq, memLim int64
 	}
@@ -5313,7 +5427,6 @@ func TestIsPodResizeInProgress(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inplacePodLevelResizeEnabled)
-			tCtx := ktesting.Init(t)
 			_, _, m, err := createTestRuntimeManager(tCtx)
 			require.NoError(t, err)
 
@@ -5354,7 +5467,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 				if c.actuated != nil {
 					actuatedContainer := container.DeepCopy()
 					actuatedContainer.Resources = mkRequirements(*c.actuated)
-					require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+					require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
 
 					fetched, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.True(t, found)
@@ -5371,7 +5484,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 				if test.podLevelResources.actuated != nil {
 					actuatedReqs := mkRequirements(*test.podLevelResources.actuated)
-					require.NoError(t, m.actuatedState.SetPodLevelResources(pod.UID, &actuatedReqs))
+					require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, &actuatedReqs))
 
 					fetched, found := m.actuatedState.GetPodLevelResources(pod.UID)
 					require.True(t, found)

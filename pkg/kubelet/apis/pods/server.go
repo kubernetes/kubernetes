@@ -48,17 +48,17 @@ type broadcaster struct {
 	incoming chan PodWatchEvent
 }
 
-func NewBroadcaster() *broadcaster {
+func NewBroadcaster(ctx context.Context) *broadcaster {
 	b := &broadcaster{
 		clients:  make(map[chan PodWatchEvent]struct{}),
 		incoming: make(chan PodWatchEvent, 1000),
 	}
-	go b.run()
+	go b.run(ctx)
 	return b
 }
 
-func (b *broadcaster) run() {
-	logger := klog.FromContext(context.Background())
+func (b *broadcaster) run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	for event := range b.incoming {
 		b.lock.RLock()
 		// We collect clients to drop to avoid modifying the map during iteration
@@ -89,31 +89,28 @@ func (b *broadcaster) run() {
 	}
 }
 
-func (b *broadcaster) Register(client chan PodWatchEvent) {
+func (b *broadcaster) Register(logger klog.Logger, client chan PodWatchEvent) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	b.clients[client] = struct{}{}
-	logger := klog.FromContext(context.Background())
 	logger.Info("Registered new watch client", "totalClients", len(b.clients))
 }
 
-func (b *broadcaster) Unregister(client chan PodWatchEvent) {
+func (b *broadcaster) Unregister(logger klog.Logger, client chan PodWatchEvent) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	if _, ok := b.clients[client]; ok {
 		delete(b.clients, client)
 		close(client)
 	}
-	logger := klog.FromContext(context.Background())
 	logger.Info("Unregistered watch client", "totalClients", len(b.clients))
 }
 
-func (b *broadcaster) Broadcast(event PodWatchEvent) {
+func (b *broadcaster) Broadcast(logger klog.Logger, event PodWatchEvent) {
 	select {
 	case b.incoming <- event:
 	default:
 		// This should realistically never happen because run() purges slow clients.
-		logger := klog.FromContext(context.Background())
 		logger.Info("Broadcaster internal buffer full, dropping event.")
 		metrics.PodWatchEventsDroppedTotal.Inc()
 	}
@@ -136,7 +133,7 @@ func NewPodsServer(broadcaster *broadcaster, podManager pod.Manager, statusProvi
 	}
 }
 
-// NewPodsServerForTest creates a new PodServer with an injectable ticker for testing.
+// NewPodsServerForTest creates a new PodServer for testing.
 func NewPodsServerForTest(broadcaster *broadcaster, podManager pod.Manager, statusProvider podstatus.PodStatusProvider) *PodsServer {
 	return &PodsServer{
 		podManager:     podManager,
@@ -146,20 +143,19 @@ func NewPodsServerForTest(broadcaster *broadcaster, podManager pod.Manager, stat
 }
 
 // OnPodUpdated is called when a pod's spec and status are coherent.
-func (s *PodsServer) OnPodUpdated(pod *v1.Pod, status v1.PodStatus, isAdded bool) {
+func (s *PodsServer) OnPodUpdated(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, isAdded bool) {
 	eventType := watch.Modified
 	if isAdded {
 		eventType = watch.Added
 	}
 	podCopy := *pod
 	podCopy.Status = status
-	s.broadcaster.Broadcast(PodWatchEvent{Type: eventType, UID: pod.UID, Pod: &podCopy})
-	logger := klog.FromContext(context.Background())
+	s.broadcaster.Broadcast(logger, PodWatchEvent{Type: eventType, UID: pod.UID, Pod: &podCopy})
 	logger.Info("Pod update broadcasted", "podUID", pod.UID, "type", eventType)
 }
 
 // OnPodRemoved is called when a pod is removed.
-func (s *PodsServer) OnPodRemoved(pod *v1.Pod) {
+func (s *PodsServer) OnPodRemoved(logger klog.Logger, pod *v1.Pod) {
 	minimalPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pod.Name,
@@ -167,8 +163,7 @@ func (s *PodsServer) OnPodRemoved(pod *v1.Pod) {
 			UID:       pod.UID,
 		},
 	}
-	s.broadcaster.Broadcast(PodWatchEvent{Type: watch.Deleted, UID: pod.UID, Pod: minimalPod})
-	logger := klog.FromContext(context.Background())
+	s.broadcaster.Broadcast(logger, PodWatchEvent{Type: watch.Deleted, UID: pod.UID, Pod: minimalPod})
 	logger.Info("Pod removed broadcasted", "podUID", pod.UID)
 }
 
@@ -237,9 +232,9 @@ func (s *PodsServer) WatchPods(req *podsv1alpha1.WatchPodsRequest, stream podsv1
 	logger.Info("WatchPods called", "client", clientAddr)
 
 	clientChannel := make(chan PodWatchEvent, 100)
-	s.broadcaster.Register(clientChannel)
+	s.broadcaster.Register(logger, clientChannel)
 	defer func() {
-		s.broadcaster.Unregister(clientChannel)
+		s.broadcaster.Unregister(logger, clientChannel)
 		logger.Info("Watch client disconnected", "client", clientAddr)
 	}()
 

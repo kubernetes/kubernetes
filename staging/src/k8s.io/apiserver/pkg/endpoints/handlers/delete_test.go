@@ -426,7 +426,7 @@ func TestAuthorizeUnsafeDelete(t *testing.T) {
 		name    string
 		reqInfo *request.RequestInfo
 		attr    admission.Attributes
-		authz   authorizer.Authorizer
+		authz   authorizer.UnconditionalAuthorizer
 		err     func(admission.Attributes) error
 	}{
 		{
@@ -691,7 +691,7 @@ func TestDeleteResourceWithUnsafeDeletionFlow(t *testing.T) {
 		registryHasUnsafeDeleter *bool
 		// what the user passes in the delete options for ignoreStoreReadErrorWithClusterBreakingPotential
 		ignoreReadErr *bool
-		authorizer    authorizer.Authorizer
+		authorizer    authorizer.UnconditionalAuthorizer
 		// want
 		normalFlowWant       *deletionFlowTracker // what the normal deletion flow should observe
 		unsafeFlowWant       *deletionFlowTracker // what the unsafe deletion flow should observe

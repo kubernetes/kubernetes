@@ -51,7 +51,7 @@ func (cu *cadvisorUnsupported) GetRequestedContainersInfo(containerName string, 
 	return nil, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) MachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (cu *cadvisorUnsupported) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	return nil, errUnsupported
 }
 

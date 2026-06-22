@@ -29,6 +29,8 @@ import (
 type ClusterServer struct {
 	cluster api.Cluster
 	server  *etcdserver.EtcdServer
+	// we want compile errors if new methods are added
+	pb.UnsafeClusterServer
 }
 
 func NewClusterServer(s *etcdserver.EtcdServer) *ClusterServer {
@@ -88,12 +90,12 @@ func (cs *ClusterServer) MemberUpdate(ctx context.Context, r *pb.MemberUpdateReq
 }
 
 func (cs *ClusterServer) MemberList(ctx context.Context, r *pb.MemberListRequest) (*pb.MemberListResponse, error) {
-	if r.Linearizable {
-		if err := cs.server.LinearizableReadNotify(ctx); err != nil {
-			return nil, togRPCError(err)
-		}
+	members, err := cs.server.MemberList(ctx, r)
+	if err != nil {
+		return nil, togRPCError(err)
 	}
-	membs := membersToProtoMembers(cs.cluster.Members())
+
+	membs := membersToProtoMembers(members)
 	return &pb.MemberListResponse{Header: cs.header(), Members: membs}, nil
 }
 

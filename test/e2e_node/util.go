@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -35,8 +34,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/util/procfs"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +131,7 @@ func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.L
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
-	client, conn, err := podresources.GetV1alpha1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	client, conn, err := podresources.GetV1alpha1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting grpc client: %w", err)
 	}
@@ -153,7 +150,7 @@ func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResour
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %w", err)
 	}
-	client, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	client, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting gRPC client: %w", err)
 	}
@@ -182,10 +179,22 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	})
 }
 
+func addBeforeEachForCleaningUpPods(f *framework.Framework) {
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		ginkgo.By("Deleting any Pods created by previous test(s) in all namespaces")
+		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, p := range l.Items {
+			framework.Logf("Deleting pod: %s in %s", p.Name, p.Namespace)
+			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		}
+	})
+}
+
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
+		return e2enode.HealthCheck(kubeletHealthCheckURL)
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	// Wait for the Kubelet to be ready.
@@ -287,7 +296,11 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
 	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
-	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
+	r, err := remote.NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(runtimeEndpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithUseStreaming(useStreaming).
+		Build(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -297,7 +310,11 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
+	i, err := remote.NewRemoteImageServiceBuilder().
+		WithEndpoint(imageManagerEndpoint).
+		WithConnectionTimeout(connectionTimeout).
+		WithUseStreaming(useStreaming).
+		Build(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -422,7 +439,7 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 
 	// wait until the kubelet health check fail
 	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
+		return e2enode.HealthCheck(kubeletHealthCheckURL)
 	}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
 
 	return func(ctx context.Context) {
@@ -431,27 +448,6 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 		waitForKubeletToStart(ctx, f)
 	}
-}
-
-func kubeletHealthCheck(url string) bool {
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	insecureHTTPClient := &http.Client{
-		Transport: insecureTransport,
-	}
-
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
-	resp, err := insecureHTTPClient.Do(req)
-	if err != nil {
-		klog.Warningf("Health check on %q failed, error=%v", url, err)
-	} else if resp.StatusCode != http.StatusOK {
-		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
-	}
-	return err == nil && resp.StatusCode == http.StatusOK
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/kubernetes/fake"
 	podapi "k8s.io/kubernetes/pkg/api/pod"
@@ -176,10 +177,10 @@ func TestEvictionWithETCD(t *testing.T) {
 					pdbsCopy = append(pdbsCopy, pdbCopy)
 				}
 
-				testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 				storage, _, statusStorage, server := newStorage(t)
 				defer server.Terminate(t)
 				defer storage.Store.DestroyFunc()
+				testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 				pod := validNewPod()
 				pod.Name = tc.podName
@@ -258,6 +259,7 @@ func TestEviction(t *testing.T) {
 		expectError         string
 		podPhase            api.PodPhase
 		podName             string
+		expectedCause       metav1.CauseType
 		expectedDeleteCount int
 		podTerminating      bool
 		prc                 *api.PodCondition
@@ -550,6 +552,39 @@ func TestEviction(t *testing.T) {
 			},
 		},
 		{
+			name: "matching pdbs with negative disruptions allowed, pod running",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: -1},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t-neg", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         `poddisruptionbudget.policy "foo" is forbidden: pdb disruptions allowed is negative: Forbidden: The disruption budget foo does not allow evicting pods currently: pdb disruptions allowed is negative`,
+			podPhase:            api.PodRunning,
+			podName:             "t-neg",
+			expectedDeleteCount: 0,
+			expectedCause:       policyv1.DisruptionBudgetCause,
+			policies:            []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)},
+		},
+		{
+			name: "matching pdbs with too many disrupted pods, pod running",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 1,
+					DisruptedPods:      makeDisruptedPods(MaxDisruptedPodSize + 1),
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t-big", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         `poddisruptionbudget.policy "foo" is forbidden: DisruptedPods map too big - too many evictions not confirmed by PDB controller: Forbidden: The disruption budget foo does not allow evicting pods currently: too many pending evictions not confirmed by PDB controller`,
+			podPhase:            api.PodRunning,
+			podName:             "t-big",
+			expectedDeleteCount: 0,
+			expectedCause:       policyv1.DisruptionBudgetCause,
+			policies:            []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)},
+		},
+		{
 			name: "the error includes the reason when the condition.Status is False",
 			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
@@ -598,7 +633,9 @@ func TestEviction(t *testing.T) {
 					pdbsCopy = append(pdbsCopy, pdbCopy)
 				}
 
-				testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+				testContext := genericapirequest.WithRequestInfo(
+					genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault),
+					&genericapirequest.RequestInfo{APIGroup: "", APIVersion: "v1", Resource: "pods"})
 				ms := &mockStore{
 					deleteCount: 0,
 				}
@@ -638,6 +675,11 @@ func TestEviction(t *testing.T) {
 
 				if tc.expectedDeleteCount != ms.deleteCount {
 					t.Errorf("expected delete count=%v, got %v; name %v", tc.expectedDeleteCount, ms.deleteCount, pod.Name)
+				}
+				if tc.expectedCause != "" {
+					if !apierrors.HasStatusCause(err, tc.expectedCause) {
+						t.Errorf("expected cause %v not found in error %v", tc.expectedCause, err)
+					}
 				}
 			})
 		}
@@ -692,10 +734,10 @@ func TestEvictionWithDeleteOptions(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 			storage, _, _, server := newStorage(t)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
+			testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			pod := validNewPod()
 			pod.Labels = map[string]string{"a": "true"}
@@ -764,10 +806,10 @@ func TestEvictionPDBStatus(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 			storage, _, statusStorage, server := newStorage(t)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
+			testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			client := fake.NewSimpleClientset(tc.pdb)
 			for _, podName := range []string{"foo-1", "foo-2"} {
@@ -864,11 +906,10 @@ func TestAddConditionAndDelete(t *testing.T) {
 		},
 	}
 
-	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
+	testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 	client := fake.NewSimpleClientset()
 	evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
@@ -1039,4 +1080,12 @@ func errToString(err error) string {
 		}
 	}
 	return result
+}
+
+func makeDisruptedPods(n int) map[string]metav1.Time {
+	pods := make(map[string]metav1.Time, n)
+	for i := range n {
+		pods[fmt.Sprintf("pod-%d", i)] = metav1.Now()
+	}
+	return pods
 }

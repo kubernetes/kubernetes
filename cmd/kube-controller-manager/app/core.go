@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
-	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
@@ -77,19 +76,6 @@ const (
 	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
 	defaultNodeMaskCIDRIPv6 = 64
 )
-
-func newServiceLBControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.ServiceLBController,
-		aliases: []string{"service"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: service-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure service controller.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
 
 func newNodeIpamControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
@@ -243,32 +229,6 @@ func newTaintEvictionController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(tec.Run, controllerName), nil
-}
-
-func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.CloudNodeLifecycleController,
-		aliases: []string{"cloud-node-lifecycle"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: node-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure node lifecyle controller.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
-
-func newNodeRouteControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.NodeRouteController,
-		aliases: []string{"route"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: configure-cloud-routes is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure cloud provider routes.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
 }
 
 func newPersistentVolumeBinderControllerDescriptor() *ControllerDescriptor {

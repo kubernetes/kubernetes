@@ -17,6 +17,7 @@ limitations under the License.
 package devicetaintrule
 
 import (
+	"context"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -78,7 +79,7 @@ func TestDeviceTaintRuleStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("DeviceTaintRule must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("DeviceTaintRule should not allow create on update")
 	}
 }

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
+	"strings"
 
 	"k8s.io/utils/cpuset"
 )
@@ -35,6 +37,32 @@ func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
 		maps.Copy(ret[pod], as[pod])
 	}
 	return ret
+}
+
+// String returns a string representation of ContainerCPUAssignments.
+// Pod and container names are sorted alphabetically to ensure deterministic output.
+// The sorting overhead is acceptable since this method is used for logging and debugging only.
+func (as ContainerCPUAssignments) String() string {
+	var sb strings.Builder
+	sb.WriteString("{")
+
+	for i, pod := range slices.Sorted(maps.Keys(as)) {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		containerMap := as[pod]
+		fmt.Fprintf(&sb, "%q:{", pod)
+
+		for j, container := range slices.Sorted(maps.Keys(containerMap)) {
+			if j > 0 {
+				sb.WriteString(",")
+			}
+			fmt.Fprintf(&sb, "%q:%q", container, containerMap[container].String())
+		}
+		sb.WriteString("}")
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 // PodCPUAssignments contains pod-level CPU assignments.

@@ -325,6 +325,7 @@ func (irecorder *innerEventRecorder) Eventf(object runtime.Object, eventtype, re
 
 func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
+		//nolint:forbidigo // Legacy usage
 		irecorder.recorder.AnnotatedEventf(ref, annotations, eventtype, reason, messageFmt, args...)
 	}
 

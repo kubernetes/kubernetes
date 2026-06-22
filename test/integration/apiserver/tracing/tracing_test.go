@@ -465,7 +465,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -573,7 +572,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -779,7 +777,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -905,7 +902,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -1049,7 +1045,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",
@@ -1143,7 +1138,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "grpc"
 						},
 					},
-					events: []string{"message"},
 				},
 				{
 					name: "SerializeObject",

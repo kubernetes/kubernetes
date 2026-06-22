@@ -445,19 +445,21 @@ type Plugin interface {
 type PreEnqueuePlugin interface {
 	Plugin
 	// PreEnqueue is called prior to adding Pods to activeQ or backoffQ.
+	// An unsuccessful status marks the pod as gated and moves it to unschedulableQ.
+	// Gated pods are only re-evaluated on events registered by the gating plugin or wildcard events.
 	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
 }
 
-// LessFunc is the function to sort pod info
-type LessFunc func(podInfo1, podInfo2 QueuedPodInfo) bool
+// LessFunc is the function to sort entity info
+type LessFunc func(entity1, entity2 QueuedEntityInfo) bool
 
 // QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
-// These plugins are used to sort pods in the scheduling queue. Only one queue sort
+// These plugins are used to sort entities in the scheduling queue. Only one queue sort
 // plugin may be enabled at a time.
 type QueueSortPlugin interface {
 	Plugin
-	// Less are used to sort pods in the scheduling queue.
-	Less(QueuedPodInfo, QueuedPodInfo) bool
+	// Less are used to sort entities in the scheduling queue.
+	Less(QueuedEntityInfo, QueuedEntityInfo) bool
 }
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
@@ -793,9 +795,10 @@ type PlacementScorePlugin interface {
 	// ScorePlacement calculates a score for a given Placement.
 	// This function is called only for Placements that have been deemed feasible for the sufficient number of pods in the PodGroup scheduling cycle.
 	// The PodGroupAssignments indicates the node assigned to each pod within this Placement.
+	// The state is scoped to the Placement being scored and can be used to access the owning PodGroup cycle state.
 	// The returned score is a int64 with higher scores generally indicating more preferable Placements.
 	// Plugins can implement various scoring strategies, such as bin packing to minimize resource fragmentation.
-	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
+	ScorePlacement(ctx context.Context, state PlacementCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
 
 	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
 	PlacementScoreExtensions() PlacementScoreExtensions
@@ -901,9 +904,9 @@ type Parallelizer interface {
 // PodActivator abstracts operations in the scheduling queue.
 type PodActivator interface {
 	// Activate moves the given pods to activeQ.
-	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// If a pod isn't found in unschedulableEntities or backoffQ and it's in-flight,
 	// the wildcard event is registered so that the pod will be requeued when it comes back.
-	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// But, if a pod isn't found in unschedulableEntities or backoffQ and it's not in-flight (i.e., completely unknown pod),
 	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }

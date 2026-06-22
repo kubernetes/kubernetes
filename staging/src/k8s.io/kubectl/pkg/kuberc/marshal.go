@@ -26,17 +26,17 @@ import (
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 	"k8s.io/kubectl/pkg/config/scheme"
 	"k8s.io/kubectl/pkg/config/v1beta1"
-	"sigs.k8s.io/yaml"
 )
 
-// decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
-// Once it finds, it returns the compatible kuberc object as well as accumulated errors during the iteration.
+// decodePreference iterates over the yamls in kuberc file to find the first supported Preference version.
+// Once it finds, it returns the internal object as well as accumulated errors during the iteration.
 func decodePreference(kubercFile string) (*config.Preference, error) {
 	kubercBytes, err := os.ReadFile(kubercFile)
 	if err != nil {
@@ -104,23 +104,38 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 	return nil, nil
 }
 
+// LoadPreference loads the kuberc file, and returns v1beta1.Preference object
+func LoadPreference(kubercFile string) (*v1beta1.Preference, error) {
+	internal, err := decodePreference(kubercFile)
+	if err != nil {
+		return nil, err
+	}
+	prefs, err := scheme.Scheme.ConvertToVersion(internal, v1beta1.SchemeGroupVersion)
+	if err != nil {
+		return nil, fmt.Errorf("error converting Preferences to v1beta1.Preferences: %w", err)
+	}
+	return prefs.(*v1beta1.Preference), nil
+}
+
 // SavePreference saves the preference to the kuberc file
-func SavePreference(pref *v1beta1.Preference, file string, out io.Writer) error {
-	dir := filepath.Dir(file)
+func SavePreference(pref *v1beta1.Preference, kubercFile string, out io.Writer) error {
+	dir := filepath.Dir(kubercFile)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
-
-	data, err := yaml.Marshal(pref)
+	file, err := os.OpenFile(kubercFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to marshal preferences: %w", err)
-	}
-
-	if err := os.WriteFile(file, data, 0644); err != nil {
 		return fmt.Errorf("failed to write kuberc file: %w", err)
 	}
 
-	fmt.Fprintf(out, "Updated %s\n", file) // nolint:errcheck
+	const mediaType = runtime.ContentTypeYAML
+	yamlInfo, _ := runtime.SerializerInfoForMediaType(scheme.StrictCodecs.SupportedMediaTypes(), mediaType)
+	encoder := scheme.StrictCodecs.EncoderForVersion(yamlInfo.Serializer, v1beta1.SchemeGroupVersion)
+	if err := encoder.Encode(pref, file); err != nil {
+		return fmt.Errorf("failed to marshal preferences: %w", err)
+	}
+
+	fmt.Fprintf(out, "Updated %s\n", kubercFile) // nolint:errcheck
 	return nil
 }
 

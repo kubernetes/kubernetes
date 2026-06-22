@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -63,53 +62,22 @@ func TestPreEnqueue(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodChange(t *testing.T) {
-	testcases := map[string]struct {
-		pod            *v1.Pod
-		oldObj, newObj interface{}
-		expectedHint   fwk.QueueingHint
-		expectedErr    bool
-	}{
-		"backoff-wrong-old-object": {
-			pod:          &v1.Pod{},
-			oldObj:       "not-a-pod",
-			expectedHint: fwk.Queue,
-			expectedErr:  true,
-		},
-		"backoff-wrong-new-object": {
-			pod:          &v1.Pod{},
-			newObj:       "not-a-pod",
-			expectedHint: fwk.Queue,
-			expectedErr:  true,
-		},
-		"skip-queue-on-other-pod-updated": {
-			pod:          st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).UID("uid0").Obj(),
-			oldObj:       st.MakePod().Name("p1").SchedulingGates([]string{"foo", "bar"}).UID("uid1").Obj(),
-			newObj:       st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).UID("uid1").Obj(),
-			expectedHint: fwk.QueueSkip,
-		},
-		"queue-on-the-unsched-pod-updated": {
-			pod:          st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
-			oldObj:       st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
-			newObj:       st.MakePod().Name("p").SchedulingGates([]string{}).Obj(),
-			expectedHint: fwk.Queue,
-		},
+func TestIsSchedulableAfterUpdateTargetPodSchedulingGatesEliminated(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	p, err := New(ctx, nil, nil, feature.Features{})
+	if err != nil {
+		t.Fatalf("Creating plugin: %v", err)
 	}
 
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil, feature.Features{})
-			if err != nil {
-				t.Fatalf("Creating plugin: %v", err)
-			}
-			actualHint, err := p.(*SchedulingGates).isSchedulableAfterUpdatePodSchedulingGatesEliminated(logger, tc.pod, tc.oldObj, tc.newObj)
-			if tc.expectedErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
-		})
+	pod := st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj()
+	oldObj := st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj()
+	newObj := st.MakePod().Name("p").Obj()
+
+	actualHint, err := p.(*SchedulingGates).isSchedulableAfterUpdateTargetPodSchedulingGatesEliminated(logger, pod, oldObj, newObj)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(fwk.Queue, actualHint); diff != "" {
+		t.Errorf("unexpected hint (-want, +got):\n%s", diff)
 	}
 }

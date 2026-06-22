@@ -145,13 +145,13 @@ func MakeProgressTracker(maxInflight int, maxBytes uint64) ProgressTracker {
 }
 
 // ConfState returns a ConfState representing the active configuration.
-func (p *ProgressTracker) ConfState() pb.ConfState {
-	return pb.ConfState{
+func (p *ProgressTracker) ConfState() *pb.ConfState {
+	return &pb.ConfState{
 		Voters:         p.Voters[0].Slice(),
 		VotersOutgoing: p.Voters[1].Slice(),
 		Learners:       quorum.MajorityConfig(p.Learners).Slice(),
 		LearnersNext:   quorum.MajorityConfig(p.LearnersNext).Slice(),
-		AutoLeave:      p.AutoLeave,
+		AutoLeave:      new(p.AutoLeave),
 	}
 }
 

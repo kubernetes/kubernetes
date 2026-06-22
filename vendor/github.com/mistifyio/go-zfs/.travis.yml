@@ -1,0 +1,43 @@
+language: go
+dist: trusty
+sudo: required
+cache:
+  directories:
+    - $HOME/.ccache
+    - $HOME/zfs
+
+branches:
+  only:
+    - master
+
+env:
+  - rel=0.6.5.11
+  - rel=0.7.6
+
+go:
+  - "1.10.x"
+  - master
+
+before_install:
+  - export MAKEFLAGS=-j$(($(grep -c '^processor' /proc/cpuinfo) * 2 + 1))
+  - export PATH=/usr/lib/ccache:$PATH
+  - go get github.com/alecthomas/gometalinter
+  - gometalinter --install --update
+  - sudo apt-get update -y && sudo apt-get install -y libattr1-dev libblkid-dev linux-headers-$(uname -r) tree uuid-dev
+  - mkdir -p $HOME/zfs
+  - cd $HOME/zfs
+  - [[ -d spl-$rel.tar.gz ]] || curl -L https://github.com/zfsonlinux/zfs/releases/download/zfs-$rel/spl-$rel.tar.gz | tar xz
+  - [[ -d zfs-$rel.tar.gz ]] || curl -L https://github.com/zfsonlinux/zfs/releases/download/zfs-$rel/zfs-$rel.tar.gz | tar xz
+  - (cd spl-$rel && ./configure --prefix=/usr && make && sudo make install)
+  - (cd zfs-$rel && ./configure --prefix=/usr && make && sudo make install)
+  - sudo modprobe zfs
+  - cd $TRAVIS_BUILD_DIR
+
+script:
+  - sudo -E $(which go) test -v ./...
+  - gometalinter --vendor --vendored-linters ./... || true
+  - gometalinter --errors --vendor --vendored-linters ./...
+
+notifications:
+  email: false
+  irc: "chat.freenode.net#cerana"

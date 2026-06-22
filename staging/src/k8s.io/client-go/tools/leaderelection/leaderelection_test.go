@@ -745,6 +745,65 @@ func TestReleaseMethodCallsGet(t *testing.T) {
 	}
 }
 
+// TestReleaseRetriesOnConflict verifies that release retries when the
+// Update call returns a conflict error (e.g. from an inflight renew).
+func TestReleaseRetriesOnConflict(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	objectType := "leases"
+	var conflicted bool
+
+	lockMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+			HolderIdentity:       "baz",
+			LeaseDurationSeconds: 10,
+		}), nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		if !conflicted {
+			conflicted = true
+			return true, nil, errors.NewConflict(coordinationv1.Resource("leases"), "bar", fmt.Errorf("the object has been modified"))
+		}
+		return true, action.(fakeclient.UpdateAction).GetObject(), nil
+	})
+
+	lock := &rl.LeaseLock{
+		LeaseMeta:  lockMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 10 * time.Second,
+		RenewDeadline: 5 * time.Second,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader: func(l string) {},
+		},
+	}
+	observedRawRecord := GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "baz"})
+	le := &LeaderElector{
+		config:            lec,
+		observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "baz"},
+		observedRawRecord: observedRawRecord,
+		observedTime:      time.Now(),
+		clock:             clock.RealClock{},
+		metrics:           globalMetricsFactory.newLeaderMetrics(),
+	}
+
+	if !le.release(logger) {
+		t.Error("release should have succeeded after retrying on conflict")
+	}
+	if !conflicted {
+		t.Error("expected conflict to have occurred")
+	}
+}
+
 func TestReleaseOnCancellation_Leases(t *testing.T) {
 	testReleaseOnCancellation(t, "leases")
 }

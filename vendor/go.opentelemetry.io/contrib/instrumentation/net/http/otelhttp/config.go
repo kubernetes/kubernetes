@@ -194,6 +194,9 @@ func WithServerName(server string) Option {
 
 // WithMetricAttributesFn returns an Option to set a function that maps an HTTP request to a slice of attribute.KeyValue.
 // These attributes will be included in metrics for every request.
+//
+// Deprecated: WithMetricAttributesFn is deprecated and will be removed in a
+// future release. Use [Labeler] instead.
 func WithMetricAttributesFn(metricAttributesFn func(r *http.Request) []attribute.KeyValue) Option {
 	return optionFunc(func(c *config) {
 		c.MetricAttributesFn = metricAttributesFn

@@ -35,7 +35,7 @@ import (
 // unexpected side effect and in order to keep existing policies backwards
 // compatible we always check that the "create" verb is allowed.
 // Ref: https://issues.k8s.io/133515
-func ensureAuthorizedForVerb(ctx context.Context, a authorizer.Authorizer, verb string) error {
+func ensureAuthorizedForVerb(ctx context.Context, a authorizer.UnconditionalAuthorizer, verb string) error {
 	requestInfo, ok := genericapirequest.RequestInfoFrom(ctx)
 	if !ok {
 		return apierrors.NewInternalError(errors.New("no request info in context"))

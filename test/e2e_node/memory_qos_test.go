@@ -159,6 +159,7 @@ func memqosMakePod(name, namespace string, requests, limits v1.ResourceList) *v1
 			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: new(int64(1)),
 			Containers: []v1.Container{
 				{
 					Name:    "test",
@@ -176,6 +177,7 @@ func memqosMakePod(name, namespace string, requests, limits v1.ResourceList) *v1
 
 var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("memory-qos")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
@@ -307,6 +309,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:    "test",
@@ -341,6 +344,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:    "container-1",
@@ -609,12 +613,9 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
-			restartKubelet(ctx, true)
-			waitForKubeletToStart(ctx, f)
+			updateKubeletConfig(ctx, f, newCfg, true)
 
-			// QoS-class cgroup memory.low is cleared by the periodic setMemoryQoS loop
-			// (periodicQOSCgroupUpdateInterval = 1 minute) plus kubelet startup time.
+			// Stale QoS-class cgroup memory.low is cleared at kubelet startup.
 			var burstableCgroupPath string
 			if cgroupDriver == "systemd" {
 				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
@@ -627,9 +628,130 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
 				"burstable QoS memory.low should reset to 0 when MemoryQoS is disabled")
 
-			// NOTE: Pod-level and container-level memory.low values persist after rollback.
-			// Pod-level: clearing via systemd SetUnitProperties interferes with other cgroup settings.
-			// Container-level: requires CRI runtime support for Unified in UpdateContainerResources.
+			// Pod and container memory.low values persist but have no effect
+			// since cgroup v2 memory protection is hierarchical (parent=0 wins).
+		})
+
+		ginkgo.It("should clear stale memory.high when MemoryQoS is disabled and container is resized", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			pod := memqosMakePod("memqos-resize-rollback", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("128Mi"),
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("256Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+
+			memHigh, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high with MemoryQoS enabled: %s", memHigh)
+			gomega.Expect(memHigh).NotTo(gomega.Equal("max"),
+				"memory.high should be a computed value when MemoryQoS is enabled")
+
+			ginkgo.By("Disabling MemoryQoS feature gate")
+			newCfg := oldCfg.DeepCopy()
+			if newCfg.FeatureGates == nil {
+				newCfg.FeatureGates = make(map[string]bool)
+			}
+			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, newCfg, true)
+
+			memHighStale, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high after disabling MemoryQoS (stale): %s", memHighStale)
+			gomega.Expect(memHighStale).NotTo(gomega.Equal("max"),
+				"memory.high should still be stale before resize")
+
+			ginkgo.By("Resizing the container to trigger updateContainerResources")
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("160Mi")
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("320Mi")
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			gomega.Eventually(ctx, func() string {
+				val, _ := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("max"),
+				"memory.high should be 'max' after resize with MemoryQoS disabled")
+		})
+
+		ginkgo.It("should not clobber other cgroup values when clearing stale memory protection at startup", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			e2epod.NewPodClient(f).CreateSync(ctx, memqosMakePod("memqos-clobber-check", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			))
+
+			var burstableCgroupPath string
+			if cgroupDriver == "systemd" {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
+			} else {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods", "burstable")
+			}
+
+			ginkgo.By("Verifying memory.low is non-zero while MemoryQoS is enabled")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.BeNumerically(">", int64(0)),
+				"memory.low should be non-zero when MemoryQoS is enabled with burstable pods")
+
+			ginkgo.By("Recording baseline cgroup values before rollback")
+			cgroupFiles := []string{"cpu.max", "memory.max"}
+			baselines := make(map[string]string)
+			for _, cgFile := range cgroupFiles {
+				filePath := filepath.Join(burstableCgroupPath, cgFile)
+				if _, statErr := os.Stat(filePath); os.IsNotExist(statErr) {
+					continue
+				}
+				val, err := memqosReadCgroupFile(burstableCgroupPath, cgFile)
+				framework.ExpectNoError(err, "reading baseline %s", cgFile)
+				baselines[cgFile] = val
+				framework.Logf("baseline %s: %s", cgFile, val)
+			}
+
+			ginkgo.By("Disabling MemoryQoS and restarting kubelet")
+			newCfg := oldCfg.DeepCopy()
+			if newCfg.FeatureGates == nil {
+				newCfg.FeatureGates = make(map[string]bool)
+			}
+			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, newCfg, true)
+
+			ginkgo.By("Verifying memory.low was cleared to 0 at startup")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"memory.low should be cleared at startup when MemoryQoS is disabled")
+
+			ginkgo.By("Verifying other cgroup values were not clobbered by the rollback")
+			for cgFile, baseline := range baselines {
+				post, err := memqosReadCgroupFile(burstableCgroupPath, cgFile)
+				framework.ExpectNoError(err, "reading post-rollback %s", cgFile)
+				framework.Logf("post-rollback %s: got=%s, baseline=%s", cgFile, post, baseline)
+				gomega.Expect(post).To(gomega.Equal(baseline),
+					fmt.Sprintf("%s changed after rollback", cgFile))
+			}
 		})
 	})
 
@@ -820,6 +942,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:  "mem-eater",
@@ -882,6 +1005,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:  "oom-trigger",
@@ -927,6 +1051,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					Namespace: f.Namespace.Name,
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: new(int64(1)),
 					Containers: []v1.Container{
 						{
 							Name:    "test",

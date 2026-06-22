@@ -34,7 +34,7 @@ import (
 // For a given service there may be multiple EndpointSlice objects, selected by
 // labels, which must be joined to produce the full set of endpoints.
 type EndpointSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// addressType specifies the type of address carried by this EndpointSlice.

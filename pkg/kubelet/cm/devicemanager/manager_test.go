@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -432,9 +433,11 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 
 	// Tests adding another resource.
 	resourceName2 := "resource2"
-	e2 := &endpointImpl{}
+	e2 := &endpointImpl{socket: socketName}
 	e2.client = plugin.NewPluginClient(resourceName2, socketName, testManager)
-	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
+	eInfo := endpointInfo{e: e2, opts: nil}
+	testManager.endpoints[resourceName2] = eInfo
+	testManager.endpointStore[resourceName2] = map[string]*endpointInfo{socketName: &eInfo}
 	callback(logger, resourceName2, devs)
 	capacity, allocatable, removedResources = testManager.GetCapacity()
 	as.Len(capacity, 2)
@@ -808,6 +811,7 @@ type MockEndpoint struct {
 	getPreferredAllocationFunc func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
 	allocateFunc               func(devs []string) (*pluginapi.AllocateResponse, error)
 	initChan                   chan []string
+	socket                     string
 }
 
 func (m *MockEndpoint) preStartContainer(_ context.Context, devs []string) (*pluginapi.PreStartContainerResponse, error) {
@@ -834,6 +838,10 @@ func (m *MockEndpoint) setStopTime(t time.Time) {}
 func (m *MockEndpoint) isStopped() bool { return false }
 
 func (m *MockEndpoint) stopGracePeriodExpired() bool { return false }
+
+func (m *MockEndpoint) socketPath() string {
+	return m.socket
+}
 
 func makePod(limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
@@ -2090,6 +2098,9 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 
 	for description, test := range testCases {
 		t.Run(description, func(t *testing.T) {
+			if !test.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
 
 			pod := &v1.Pod{
@@ -2160,9 +2171,12 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 		resourceName: resourceName,
 		client:       plugin.NewPluginClient(resourceName, socketName, manager),
 		stopTime:     time.Now().Add(-endpointStopGracePeriod * 2), // make the grace period expired
+		socket:       socketName,
 	}
 
-	manager.endpoints[resourceName] = endpointInfo{e: ep, opts: nil}
+	eInfo := endpointInfo{e: ep, opts: nil}
+	manager.endpoints[resourceName] = eInfo
+	manager.endpointStore[resourceName] = map[string]*endpointInfo{socketName: &eInfo}
 	devs := []*pluginapi.Device{
 		{ID: "Device1", Health: pluginapi.Healthy},
 		{ID: "Device2", Health: pluginapi.Healthy},

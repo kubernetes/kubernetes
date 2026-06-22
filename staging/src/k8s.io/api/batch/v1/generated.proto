@@ -30,6 +30,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/batch/v1";
 
 // CronJob represents the configuration of a single cron job.
+// +k8s:supportsSubresource="/status"
 message CronJob {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -127,6 +128,7 @@ message CronJobStatus {
 }
 
 // Job represents the configuration of a single job.
+// +k8s:supportsSubresource="/status"
 message Job {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -251,6 +253,8 @@ message JobSpec {
   // It can be null or up to completions. It is required and must be
   // less than or equal to 10^4 when is completions greater than 10^5.
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
   optional int32 maxFailedIndexes = 13;
 
   // A label query over pods that should match the pod count.
@@ -408,9 +412,6 @@ message JobStatus {
 
   // The number of pods which are terminating (in phase Pending or Running
   // and have a deletionTimestamp).
-  //
-  // This field is beta-level. The job controller populates the field when
-  // the feature gate JobPodReplacementPolicy is enabled (enabled by default).
   // +optional
   optional int32 terminating = 11;
 

@@ -566,6 +566,77 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 	}
 }
 
+func TestTryLoadPrivatePublicKeyFromDisk(t *testing.T) {
+	tests := []struct {
+		desc       string
+		privateKey crypto.Signer
+		publicKey  crypto.PublicKey
+		writePub   bool
+		wantErr    bool
+	}{
+		{
+			desc:       "RSA private key and RSA public key",
+			privateKey: rootCAKey,
+			publicKey:  rootCAKey.Public(),
+			writePub:   true,
+			wantErr:    false,
+		},
+		{
+			desc:       "ECDSA private key and ECDSA public key",
+			privateKey: ecdsaP256Key,
+			publicKey:  ecdsaP256Key.Public(),
+			writePub:   true,
+			wantErr:    false,
+		},
+		{
+			desc:       "RSA private key and ECDSA public key",
+			privateKey: rootCAKey,
+			publicKey:  ecdsaP256Key.Public(),
+			writePub:   true,
+			wantErr:    true,
+		},
+		{
+			desc:       "ECDSA private key and RSA public key",
+			privateKey: ecdsaP256Key,
+			publicKey:  rootCAKey.Public(),
+			writePub:   true,
+			wantErr:    true,
+		},
+		{
+			desc:       "missing public key file",
+			privateKey: rootCAKey,
+			writePub:   false,
+			wantErr:    true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.desc, func(t *testing.T) {
+			tmpdir, err := os.MkdirTemp("", "")
+			if err != nil {
+				t.Fatalf("Couldn't create tmpdir")
+			}
+			defer func() { _ = os.RemoveAll(tmpdir) }()
+
+			err = WriteKey(tmpdir, "foo", rt.privateKey)
+			if err != nil {
+				t.Fatalf("failed to write private key: %v", err)
+			}
+			if rt.writePub {
+				err = WritePublicKey(tmpdir, "foo", rt.publicKey)
+				if err != nil {
+					t.Fatalf("failed to write public key: %v", err)
+				}
+			}
+
+			_, _, actual := TryLoadPrivatePublicKeyFromDisk(tmpdir, "foo")
+			if (actual != nil) != rt.wantErr {
+				t.Fatalf("TryLoadPrivatePublicKeyFromDisk() error = %v, wantErr %v", actual, rt.wantErr)
+			}
+		})
+	}
+}
+
 func TestPathsForCertAndKey(t *testing.T) {
 	crtPath, keyPath := PathsForCertAndKey("/foo", "bar")
 	expectedPath := filepath.FromSlash("/foo/bar.crt")

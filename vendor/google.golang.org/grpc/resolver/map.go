@@ -20,6 +20,7 @@ package resolver
 
 import (
 	"encoding/base64"
+	"iter"
 	"sort"
 	"strings"
 )
@@ -135,6 +136,7 @@ func (a *AddressMapV2[T]) Len() int {
 }
 
 // Keys returns a slice of all current map keys.
+// Deprecated: Use AddressMapV2.All() instead.
 func (a *AddressMapV2[T]) Keys() []Address {
 	ret := make([]Address, 0, a.Len())
 	for _, entryList := range a.m {
@@ -146,6 +148,7 @@ func (a *AddressMapV2[T]) Keys() []Address {
 }
 
 // Values returns a slice of all current map values.
+// Deprecated: Use AddressMapV2.All() instead.
 func (a *AddressMapV2[T]) Values() []T {
 	ret := make([]T, 0, a.Len())
 	for _, entryList := range a.m {
@@ -154,6 +157,19 @@ func (a *AddressMapV2[T]) Values() []T {
 		}
 	}
 	return ret
+}
+
+// All returns an iterator over all elements.
+func (a *AddressMapV2[T]) All() iter.Seq2[Address, T] {
+	return func(yield func(Address, T) bool) {
+		for _, entryList := range a.m {
+			for _, entry := range entryList {
+				if !yield(entry.addr, entry.value) {
+					return
+				}
+			}
+		}
+	}
 }
 
 type endpointMapKey string
@@ -223,6 +239,7 @@ func (em *EndpointMap[T]) Len() int {
 // the unordered set of addresses. Thus, endpoint information returned is not
 // the full endpoint data (drops duplicated addresses and attributes) but can be
 // used for EndpointMap accesses.
+// Deprecated: Use EndpointMap.All() instead.
 func (em *EndpointMap[T]) Keys() []Endpoint {
 	ret := make([]Endpoint, 0, len(em.endpoints))
 	for _, en := range em.endpoints {
@@ -232,12 +249,29 @@ func (em *EndpointMap[T]) Keys() []Endpoint {
 }
 
 // Values returns a slice of all current map values.
+// Deprecated: Use EndpointMap.All() instead.
 func (em *EndpointMap[T]) Values() []T {
 	ret := make([]T, 0, len(em.endpoints))
 	for _, val := range em.endpoints {
 		ret = append(ret, val.value)
 	}
 	return ret
+}
+
+// All returns an iterator over all elements.
+// The map keys are endpoints specifying the addresses present in the endpoint
+// map, in which uniqueness is determined by the unordered set of addresses.
+// Thus, endpoint information returned is not the full endpoint data (drops
+// duplicated addresses and attributes) but can be used for EndpointMap
+// accesses.
+func (em *EndpointMap[T]) All() iter.Seq2[Endpoint, T] {
+	return func(yield func(Endpoint, T) bool) {
+		for _, en := range em.endpoints {
+			if !yield(en.decodedKey, en.value) {
+				return
+			}
+		}
+	}
 }
 
 // Delete removes the specified endpoint from the map.

@@ -234,7 +234,7 @@ func newInsecureStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	return newStorage(t, nil, nil, replicaLimitsResolver)
 }
 
-func newStorage(t *testing.T, authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T, authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, admissionregistration.Resource("validatingadmissionpolicybindings"))
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,

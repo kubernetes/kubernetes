@@ -28,7 +28,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/ptr"
 )
 
@@ -62,10 +62,10 @@ func NewHollowProxy(
 ) *HollowProxy {
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Config: &proxyconfigapi.KubeProxyConfiguration{
-				Mode:             proxyconfigapi.ProxyMode("fake"),
+			Config: &kubeproxyconfig.KubeProxyConfiguration{
+				Mode:             kubeproxyconfig.ProxyMode("fake"),
 				ConfigSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-				Linux: proxyconfigapi.KubeProxyLinuxConfiguration{
+				Linux: kubeproxyconfig.KubeProxyLinuxConfiguration{
 					OOMScoreAdj: ptr.To[int32](0),
 				},
 			},

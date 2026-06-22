@@ -30,6 +30,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	netutils "k8s.io/utils/net"
 )
@@ -171,9 +172,12 @@ func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) fiel
 func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
 	validModes := sets.New[string](
 		string(kubeproxyconfig.ProxyModeIPTables),
-		string(kubeproxyconfig.ProxyModeIPVS),
 		string(kubeproxyconfig.ProxyModeNFTables),
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyIPVS) {
+		validModes.Insert(string(kubeproxyconfig.ProxyModeIPVS))
+	}
 
 	if mode == "" || validModes.Has(string(mode)) {
 		return nil

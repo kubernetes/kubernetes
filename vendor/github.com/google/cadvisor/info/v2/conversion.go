@@ -285,6 +285,7 @@ func InstCpuStats(last, cur *v1.ContainerStats) (*CpuInstStats, error) {
 func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace string) ContainerSpec {
 	specV2 := ContainerSpec{
 		CreationTime:     specV1.CreationTime,
+		StartTime:        specV1.StartTime,
 		HasCpu:           specV1.HasCpu,
 		HasMemory:        specV1.HasMemory,
 		HasHugetlb:       specV1.HasHugetlb,

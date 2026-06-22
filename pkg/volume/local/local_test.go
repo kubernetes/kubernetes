@@ -546,9 +546,8 @@ func TestConstructVolumeSpec(t *testing.T) {
 			}
 			mounter := plug.host.GetMounter()
 			fakeMountPoints := []mount.MountPoint{}
-			for _, mp := range tt.mountPoints {
-				fakeMountPoint := mp
-				fakeMountPoint.Path = filepath.Join(tmpDir, mp.Path)
+			for _, fakeMountPoint := range tt.mountPoints {
+				fakeMountPoint.Path = filepath.Join(tmpDir, fakeMountPoint.Path)
 				fakeMountPoints = append(fakeMountPoints, fakeMountPoint)
 			}
 			mounter.(*mount.FakeMounter).MountPoints = fakeMountPoints

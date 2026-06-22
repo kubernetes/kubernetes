@@ -5518,13 +5518,13 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{ResourceIsPod: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "image.reference",
 			}},
 		}, {
-			name: "image volume with empty reference on other object",
+			name: "image volume with empty reference allowed for ratcheting",
 			vol: core.Volume{
 				Name: "image-volume",
 				VolumeSource: core.VolumeSource{
@@ -5534,7 +5534,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{ResourceIsPod: false},
+			opts: PodValidationOptions{AllowEmptyImageVolumeReference: true},
 		}, {
 			name: "image volume with wrong pullPolicy",
 			vol: core.Volume{
@@ -7878,7 +7878,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
-		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -7893,7 +7893,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
-		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %#v", h)
 		}
 	}
@@ -10416,7 +10416,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"populate HostNetwork": podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+			podtest.SetHostNetwork(true),
 		),
 		"populate RunAsUser SupplementalGroups FSGroup with minID 0": podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
@@ -10433,14 +10433,10 @@ func TestValidatePodSpec(t *testing.T) {
 			}),
 		),
 		"populate HostIPC": podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostIPC: true,
-			}),
+			podtest.SetHostIPC(true),
 		),
 		"populate HostPID": podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostPID: true,
-			}),
+			podtest.SetHostPID(true),
 		),
 		"populate Affinity": podtest.MakePod("",
 			podtest.SetAffinity(&core.Affinity{
@@ -10480,17 +10476,17 @@ func TestValidatePodSpec(t *testing.T) {
 		),
 		"populate HostAliases with HostNetwork": podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
+			podtest.SetHostNetwork(true),
 		),
 		"populate PriorityClassName": podtest.MakePod("",
 			podtest.SetPriorityClassName("valid-name"),
 		),
 		"populate ShareProcessNamespace": podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				ShareProcessNamespace: &[]bool{true}[0],
-			}),
+			podtest.SetShareProcessNamespace(&[]bool{true}[0]),
+		),
+		"HostPID with ShareProcessNamespace disabled": podtest.MakePod("",
+			podtest.SetHostPID(true),
+			podtest.SetShareProcessNamespace(&[]bool{false}[0]),
 		),
 		"populate RuntimeClassName": podtest.MakePod("",
 			podtest.SetRuntimeClassName("valid-sandbox"),
@@ -10585,33 +10581,23 @@ func TestValidatePodSpec(t *testing.T) {
 		"with hostNetwork hostPort unspecified": {pod: *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
+			podtest.SetHostNetwork(true),
 		)},
 		"with hostNetwork hostPort not equal to containerPort": {pod: *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
-			}),
+			podtest.SetHostNetwork(true),
 		)},
 		"with hostAliases with invalid IP": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
+			podtest.SetHostNetwork(false),
 			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
 		)},
 		"with hostAliases with invalid legacy IP with strict IP validation": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
+			podtest.SetHostNetwork(false),
 			podtest.SetHostAliases(core.HostAlias{IP: "001.002.003.004", Hostnames: []string{"host1", "host2"}}),
 		)},
 		"with hostAliases with invalid hostname": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: false,
-			}),
+			podtest.SetHostNetwork(false),
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
 		)},
 		"bad supplementalGroups large than math.MaxInt32": {pod: *podtest.MakePod("",
@@ -10657,11 +10643,11 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetPriorityClassName("InvalidName"),
 		)},
 		"ShareProcessNamespace and HostPID both set": {pod: *podtest.MakePod("",
-			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostPID:               true,
-				ShareProcessNamespace: &[]bool{true}[0],
-			}),
-		)},
+			podtest.SetHostPID(true),
+			podtest.SetShareProcessNamespace(&[]bool{true}[0]),
+		), expectedErrors: field.ErrorList{
+			field.Invalid(field.NewPath("field").Child("shareProcessNamespace"), true, "ShareProcessNamespace and HostPID cannot both be enabled"),
+		}},
 		"bad RuntimeClassName": {pod: *podtest.MakePod("",
 			podtest.SetRuntimeClassName("invalid/sandbox"),
 		)},
@@ -11155,7 +11141,7 @@ func TestValidatePod(t *testing.T) {
 						Sources: []core.VolumeProjection{{
 							ServiceAccountToken: &core.ServiceAccountTokenProjection{
 								Audience:          "foo-audience",
-								ExpirationSeconds: 6000,
+								ExpirationSeconds: ptr.To[int64](6000),
 								Path:              "foo-path",
 							},
 						}},
@@ -12674,8 +12660,67 @@ func TestValidatePod(t *testing.T) {
 							Sources: []core.VolumeProjection{{
 								ServiceAccountToken: &core.ServiceAccountTokenProjection{
 									Audience:          "foo-audience",
-									ExpirationSeconds: 6000,
+									ExpirationSeconds: ptr.To[int64](6000),
 									Path:              "foo-path",
+								},
+							}},
+						},
+					},
+				}),
+			),
+		},
+		"serviceaccount token projected volume with expiration too short": {
+			expectedError: "may not specify a duration less than 10 minutes",
+			spec: *podtest.MakePod("123",
+				podtest.SetServiceAccountName("default"),
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{{
+								ServiceAccountToken: &core.ServiceAccountTokenProjection{
+									Audience:          "foo-audience",
+									ExpirationSeconds: ptr.To[int64](300),
+									Path:              "foo-path",
+								},
+							}},
+						},
+					},
+				}),
+			),
+		},
+		"serviceaccount token projected volume with expiration too long": {
+			expectedError: "may not specify a duration larger than 2^32 seconds",
+			spec: *podtest.MakePod("123",
+				podtest.SetServiceAccountName("default"),
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{{
+								ServiceAccountToken: &core.ServiceAccountTokenProjection{
+									Audience:          "foo-audience",
+									ExpirationSeconds: ptr.To[int64](1 << 33),
+									Path:              "foo-path",
+								},
+							}},
+						},
+					},
+				}),
+			),
+		},
+		"serviceaccount token projected volume with no expiration specified": {
+			expectedError: "Required value",
+			spec: *podtest.MakePod("123",
+				podtest.SetServiceAccountName("default"),
+				podtest.SetVolumes(core.Volume{
+					Name: "projected-volume",
+					VolumeSource: core.VolumeSource{
+						Projected: &core.ProjectedVolumeSource{
+							Sources: []core.VolumeProjection{{
+								ServiceAccountToken: &core.ServiceAccountTokenProjection{
+									Audience: "foo-audience",
+									Path:     "foo-path",
 								},
 							}},
 						},
@@ -16615,8 +16660,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			)),
 			podtest.SetEphemeralContainers(ephemeralContainers...),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
+			podtest.SetHostNetwork(true),
 			podtest.SetSecurityContext(&core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: proto.Bool(true),
 				},
@@ -16946,12 +16991,12 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name                string
-		tweakSvc            func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs             int
-		legacyIPs           bool
-		newTrafficDist      bool
-		relaxedServiceNames bool
+		name                       string
+		tweakSvc                   func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs                    int
+		legacyIPs                  bool
+		disableNewTrafficDist      bool
+		disableRelaxedServiceNames bool
 	}{{
 		name:     "default",
 		tweakSvc: func(s *core.Service) {},
@@ -18210,15 +18255,13 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
 			},
-			newTrafficDist: true,
-			numErrs:        0,
+			numErrs: 0,
 		}, {
 			name: "valid: trafficDistribution field set to PreferSameNode with feature gate",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
-			newTrafficDist: true,
-			numErrs:        0,
+			numErrs: 0,
 		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
@@ -18230,24 +18273,25 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
 			},
-			numErrs: 1,
+			numErrs:               1,
+			disableNewTrafficDist: true,
 		}, {
 			name: "invalid: trafficDistribution field set to PreferSameNode without feature gate",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
-			numErrs: 1,
+			numErrs:               1,
+			disableNewTrafficDist: true,
 		}, {
 
-			name:                "valid: service name begins with a digit feature gate enabled",
-			relaxedServiceNames: true,
+			name: "valid: service name begins with a digit feature gate enabled",
 			tweakSvc: func(s *core.Service) {
 				s.Name = "1-test-service"
 			},
 			numErrs: 0,
 		}, {
-			name:                "invalid: service name begins with a digit feature gate disabled",
-			relaxedServiceNames: false,
+			name:                       "invalid: service name begins with a digit feature gate disabled",
+			disableRelaxedServiceNames: true,
 			tweakSvc: func(s *core.Service) {
 				s.Name = "1-test-service"
 			},
@@ -18257,12 +18301,19 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.newTrafficDist {
+			if tc.disableNewTrafficDist {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			}
+
+			if tc.disableRelaxedServiceNames {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.RelaxedServiceNameValidation: false,
+				})
+			}
+
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.PreferSameTrafficDistribution: tc.newTrafficDist,
-				features.RelaxedServiceNameValidation:  tc.relaxedServiceNames,
+				features.PreferSameTrafficDistribution: !tc.disableNewTrafficDist,
 				features.StrictIPCIDRValidation:        !tc.legacyIPs,
 			})
 			svc := makeValidService()
@@ -18718,7 +18769,7 @@ func TestValidateReplicationController(t *testing.T) {
 		}),
 		mkValidReplicationController(func(rc *core.ReplicationController) {
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
-				podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+				podtest.SetHostNetwork(true),
 				podtest.SetContainers(podtest.MakeContainer("abc",
 					podtest.SetContainerPorts(core.ContainerPort{
 						ContainerPort: 12345, Protocol: core.ProtocolTCP,
@@ -19708,10 +19759,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name                string
-		tweakSvc            func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs             int
-		relaxedServiceNames bool
+		name                       string
+		tweakSvc                   func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs                    int
+		disableRelaxedServiceNames bool
 	}{{
 		name: "no change",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
@@ -20979,16 +21030,20 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Name = "1-test-service"
 				newSvc.Labels["foo"] = "bar"
 			},
-			relaxedServiceNames: false,
-			numErrs:             0,
+			disableRelaxedServiceNames: true,
+			numErrs:                    0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+
+			if tc.disableRelaxedServiceNames {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.StrictIPCIDRValidation:       true,
-				features.RelaxedServiceNameValidation: tc.relaxedServiceNames,
+				features.RelaxedServiceNameValidation: !tc.disableRelaxedServiceNames,
 			})
 
 			oldSvc := makeValidService()
@@ -23376,16 +23431,16 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.AppArmorProfile",
 		"SecurityContext.FSGroup",
 		"SecurityContext.FSGroupChangePolicy",
-		"SecurityContext.HostIPC",
-		"SecurityContext.HostNetwork",
-		"SecurityContext.HostPID",
-		"SecurityContext.HostUsers",
+		"HostIPC",
+		"HostNetwork",
+		"HostPID",
+		"HostUsers",
 		"SecurityContext.RunAsGroup",
 		"SecurityContext.RunAsUser",
 		"SecurityContext.SELinuxOptions",
 		"SecurityContext.SELinuxChangePolicy",
 		"SecurityContext.SeccompProfile",
-		"SecurityContext.ShareProcessNamespace",
+		"ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
 		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
@@ -23500,6 +23555,7 @@ func TestValidateOSFields(t *testing.T) {
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",
+		"DeprecatedServiceAccount",
 		"SecurityContext.RunAsNonRoot",
 		"ServiceAccountName",
 		"SetHostnameAsFQDN",
@@ -24249,7 +24305,7 @@ func TestValidateSysctls(t *testing.T) {
 	for i, sysctl := range valid {
 		sysctls[i].Name = sysctl
 	}
-	errs := validateSysctls(validSecurityContext, field.NewPath("foo"), opts)
+	errs := validateSysctls(validSecurityContext, &core.PodSpec{}, field.NewPath("foo"), opts)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -24261,7 +24317,7 @@ func TestValidateSysctls(t *testing.T) {
 	inValidSecurityContext := &core.PodSecurityContext{
 		Sysctls: sysctls,
 	}
-	errs = validateSysctls(inValidSecurityContext, field.NewPath("foo"), opts)
+	errs = validateSysctls(inValidSecurityContext, &core.PodSpec{}, field.NewPath("foo"), opts)
 	if len(errs) != 2 {
 		t.Errorf("expected 2 validation errors. Got: %v", errs)
 	} else {
@@ -24280,7 +24336,7 @@ func TestValidateSysctls(t *testing.T) {
 	securityContextWithDup := &core.PodSecurityContext{
 		Sysctls: sysctls,
 	}
-	errs = validateSysctls(securityContextWithDup, field.NewPath("foo"), opts)
+	errs = validateSysctls(securityContextWithDup, &core.PodSpec{}, field.NewPath("foo"), opts)
 	if len(errs) != 1 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
@@ -24292,16 +24348,15 @@ func TestValidateSysctls(t *testing.T) {
 		sysctls[i].Name = sysctl
 	}
 	invalidSecurityContextWithHostNet := &core.PodSecurityContext{
-		Sysctls:     sysctls,
-		HostIPC:     false,
-		HostNetwork: true,
+		Sysctls: sysctls,
 	}
-	errs = validateSysctls(invalidSecurityContextWithHostNet, field.NewPath("foo"), opts)
+	specWithHostNet := &core.PodSpec{HostNetwork: true}
+	errs = validateSysctls(invalidSecurityContextWithHostNet, specWithHostNet, field.NewPath("foo"), opts)
 	if len(errs) != 2 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
 	opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
-	errs = validateSysctls(invalidSecurityContextWithHostNet, field.NewPath("foo"), opts)
+	errs = validateSysctls(invalidSecurityContextWithHostNet, specWithHostNet, field.NewPath("foo"), opts)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -24311,17 +24366,16 @@ func TestValidateSysctls(t *testing.T) {
 		sysctls[i].Name = sysctl
 	}
 	invalidSecurityContextWithHostIPC := &core.PodSecurityContext{
-		Sysctls:     sysctls,
-		HostIPC:     true,
-		HostNetwork: false,
+		Sysctls: sysctls,
 	}
+	specWithHostIPC := &core.PodSpec{HostIPC: true}
 	opts.AllowNamespacedSysctlsForHostNetAndHostIPC = false
-	errs = validateSysctls(invalidSecurityContextWithHostIPC, field.NewPath("foo"), opts)
+	errs = validateSysctls(invalidSecurityContextWithHostIPC, specWithHostIPC, field.NewPath("foo"), opts)
 	if len(errs) != 2 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
 	opts.AllowNamespacedSysctlsForHostNetAndHostIPC = true
-	errs = validateSysctls(invalidSecurityContextWithHostIPC, field.NewPath("foo"), opts)
+	errs = validateSysctls(invalidSecurityContextWithHostIPC, specWithHostIPC, field.NewPath("foo"), opts)
 	if len(errs) != 0 {
 		t.Errorf("unexpected validation errors: %v", errs)
 	}
@@ -24895,7 +24949,6 @@ func TestCrossNamespaceSource(t *testing.T) {
 
 	for _, tc := range testCases {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.AnyVolumeDataSource:            true,
 			features.CrossNamespaceVolumeDataSource: true,
 		})
 		opts := PersistentVolumeClaimSpecValidationOptions{}
@@ -26546,25 +26599,19 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 		},
 	}, {
 		name:    "hostUsers=true",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &trueVar,
-			},
+			HostUsers: &trueVar,
 		},
 	}, {
 		name:    "hostUsers=false & volumes",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Volumes: []core.Volume{{
 				Name: "configmap",
 				VolumeSource: core.VolumeSource{
@@ -26600,9 +26647,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false - stateful volume",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Volumes: []core.Volume{{
 				Name: "host-path",
 				VolumeSource: core.VolumeSource{
@@ -26614,9 +26659,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=true - stateful volume",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &trueVar,
-			},
+			HostUsers: &trueVar,
 			Volumes: []core.Volume{{
 				Name: "host-path",
 				VolumeSource: core.VolumeSource{
@@ -26628,36 +26671,28 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false & HostNetwork",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers:   &falseVar,
-				HostNetwork: true,
-			},
+			HostUsers:   &falseVar,
+			HostNetwork: true,
 		},
 	}, {
 		name:    "hostUsers=false & HostPID",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-				HostPID:   true,
-			},
+			HostUsers: &falseVar,
+			HostPID:   true,
 		},
 	}, {
 		name:    "hostUsers=false & HostIPC",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-				HostIPC:   true,
-			},
+			HostUsers: &falseVar,
+			HostIPC:   true,
 		},
 	}, {
 		name:    "hostUsers=false & container volumeDevice",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Containers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26670,9 +26705,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false & initContainer volumeDevice",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			InitContainers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26685,9 +26718,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "hostUsers=false & ephemeralContainer volumeDevice",
 		success: false,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			EphemeralContainers: []core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name: "test-container",
@@ -26701,9 +26732,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "opts: Allow... & hostUsers=false & container volumeDevice",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			Containers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26719,9 +26748,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "opts: Allow... & hostUsers=false & initContainer volumeDevice",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			InitContainers: []core.Container{{
 				Name: "test-container",
 				VolumeDevices: []core.VolumeDevice{{
@@ -26737,9 +26764,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name:    "opts: Allow... & hostUsers=false & ephemeralContainer volumeDevice",
 		success: true,
 		spec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostUsers: &falseVar,
-			},
+			HostUsers: &falseVar,
 			EphemeralContainers: []core.EphemeralContainer{{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 					Name: "test-container",
@@ -26846,9 +26871,7 @@ func TestValidatePodHostName(t *testing.T) {
 			name: "HostNetwork=true and HostnameOverride is set should error",
 			spec: core.PodSpec{
 				HostnameOverride: ptr.To("custom-host"),
-				SecurityContext: &core.PodSecurityContext{
-					HostNetwork: true,
-				},
+				HostNetwork:      true,
 			},
 			expectedErrs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec.hostnameOverride"), "hostNetwork"),
@@ -26858,9 +26881,7 @@ func TestValidatePodHostName(t *testing.T) {
 			name: "HostNetwork=false and HostnameOverride is set should not error",
 			spec: core.PodSpec{
 				HostnameOverride: ptr.To("custom-host"),
-				SecurityContext: &core.PodSecurityContext{
-					HostNetwork: false,
-				},
+				HostNetwork:      false,
 			},
 			expectedErrs: nil,
 		},
@@ -26904,8 +26925,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -26919,8 +26940,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -26947,9 +26968,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -26972,9 +26991,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -26997,9 +27014,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -27017,8 +27032,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27045,8 +27060,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27072,8 +27087,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27095,8 +27110,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &falseVar,
 				},
@@ -27118,8 +27133,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27138,9 +27153,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: false,
 		podSpec: &core.PodSpec{
-			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
-			},
+			HostNetwork: true,
 			Containers: []core.Container{{
 				Name: containerName,
 				SecurityContext: &core.SecurityContext{
@@ -27155,8 +27168,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     true,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27179,8 +27192,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		expectError:     false,
 		allowPrivileged: true,
 		podSpec: &core.PodSpec{
+			HostNetwork: true,
 			SecurityContext: &core.PodSecurityContext{
-				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: &trueVar,
 				},
@@ -27753,110 +27766,66 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 
 func TestValidateSleepAction(t *testing.T) {
 	fldPath := field.NewPath("root")
-	getInvalidStr := func(gracePeriod int64) string {
-		return fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d). Enable AllowPodLifecycleSleepActionZeroValue feature gate for zero sleep.", gracePeriod)
-	}
 
-	getInvalidStrWithZeroValueEnabled := func(gracePeriod int64) string {
+	getInvalidStr := func(gracePeriod int64) string {
 		return fmt.Sprintf("must be non-negative and less than terminationGracePeriodSeconds (%d)", gracePeriod)
 	}
 
 	testCases := []struct {
-		name             string
-		action           *core.SleepAction
-		gracePeriod      int64
-		zeroValueEnabled bool
-		expectErr        field.ErrorList
+		name        string
+		action      *core.SleepAction
+		gracePeriod int64
+		expectErr   field.ErrorList
 	}{
 		{
 			name: "valid setting",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod:      30,
-			zeroValueEnabled: false,
+			gracePeriod: 30,
 		},
 		{
 			name: "negative seconds",
 			action: &core.SleepAction{
 				Seconds: -1,
 			},
-			gracePeriod:      30,
-			zeroValueEnabled: false,
-			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+			gracePeriod: 30,
+			expectErr:   field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
 		},
 		{
 			name: "longer than gracePeriod",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod:      3,
-			zeroValueEnabled: false,
-			expectErr:        field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+			gracePeriod: 3,
+			expectErr:   field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
 		},
 		{
-			name: "sleep duration of zero with zero value feature gate disabled",
+			name: "sleep duration of zero",
 			action: &core.SleepAction{
 				Seconds: 0,
 			},
-			gracePeriod:      30,
-			zeroValueEnabled: false,
-			expectErr:        field.ErrorList{field.Invalid(fldPath, 0, getInvalidStr(30))},
+			gracePeriod: 30,
 		},
 		{
-			name: "sleep duration of zero with zero value feature gate enabled",
+			name: "zero grace period duration",
 			action: &core.SleepAction{
 				Seconds: 0,
 			},
-			gracePeriod:      30,
-			zeroValueEnabled: true,
+			gracePeriod: 0,
 		},
 		{
-			name: "invalid sleep duration (negative value) with zero value disabled",
-			action: &core.SleepAction{
-				Seconds: -1,
-			},
-			gracePeriod:      30,
-			zeroValueEnabled: false,
-			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
-		},
-		{
-			name: "invalid sleep duration (negative value) with zero value enabled",
-			action: &core.SleepAction{
-				Seconds: -1,
-			},
-			gracePeriod:      30,
-			zeroValueEnabled: true,
-			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStrWithZeroValueEnabled(30))},
-		},
-		{
-			name: "zero grace period duration with zero value enabled",
-			action: &core.SleepAction{
-				Seconds: 0,
-			},
-			gracePeriod:      0,
-			zeroValueEnabled: true,
-		},
-		{
-			name: "nil grace period with zero value disabled",
+			name: "nil grace period",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			zeroValueEnabled: false,
-			expectErr:        field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(0))},
-		},
-		{
-			name: "nil grace period with zero value enabled",
-			action: &core.SleepAction{
-				Seconds: 0,
-			},
-			zeroValueEnabled: true,
+			expectErr: field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(0))},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath, PodValidationOptions{AllowPodLifecycleSleepActionZeroValue: tc.zeroValueEnabled})
+			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath)
 
 			if len(tc.expectErr) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
@@ -27871,162 +27840,76 @@ func TestValidateSleepAction(t *testing.T) {
 	}
 }
 
-// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to GA
 func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	testCases := []struct {
-		name           string
-		expectError    bool
-		featureEnabled bool
-		dnsConfig      *core.PodDNSConfig
+		name        string
+		expectError bool
+		dnsConfig   *core.PodDNSConfig
 	}{
 		{
-			name:           "beginswith underscore, contains underscore, featuregate enabled",
-			expectError:    false,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			name:        "beginswith underscore, contains underscore",
+			expectError: false,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
 		},
 		{
-			name:           "contains underscore, featuregate enabled",
-			expectError:    false,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+			name:        "contains underscore",
+			expectError: false,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
 		},
 		{
-			name:           "is dot, featuregate enabled",
-			expectError:    false,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+			name:        "is dot",
+			expectError: false,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"."}},
 		},
 		{
-			name:           "two dots, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+			name:        "two dots",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{".."}},
 		},
 		{
-			name:           "underscore and dot, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+			name:        "underscore and dot",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"_."}},
 		},
 		{
-			name:           "dash and dot, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+			name:        "dash and dot",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"-."}},
 		},
 		{
-			name:           "two underscore and dot, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+			name:        "two underscore and dot",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"__."}},
 		},
 		{
-			name:           "dot and two underscore, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+			name:        "dot and two underscore",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{".__"}},
 		},
 		{
-			name:           "dot and underscore, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+			name:        "dot and underscore",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"._"}},
 		},
 		{
-			name:           "lot of underscores, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+			name:        "lot of underscores",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"____________"}},
 		},
 		{
-			name:           "a regular name, featuregate enabled",
-			expectError:    false,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+			name:        "a regular name",
+			expectError: false,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"example.com"}},
 		},
 		{
-			name:           "unicode character, featuregate enabled",
-			expectError:    true,
-			featureEnabled: true,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
-		},
-		{
-			name:           "begins with underscore, contains underscore, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
-		},
-		{
-			name:           "contains underscore, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
-		},
-		{
-			name:           "is dot, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
-		},
-		{
-			name:           "two dots, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
-		},
-		{
-			name:           "underscore and dot, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
-		},
-		{
-			name:           "dash and dot, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
-		},
-		{
-			name:           "two underscore and dot, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
-		},
-		{
-			name:           "dot and two underscore, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
-		},
-		{
-			name:           "dot and underscore, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
-		},
-		{
-			name:           "lot of underscores, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
-		},
-		{
-			name:           "a regular name, featuregate disabled",
-			expectError:    false,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
-		},
-		{
-			name:           "unicode character, featuregate disabled",
-			expectError:    true,
-			featureEnabled: false,
-			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+			name:        "unicode character",
+			expectError: true,
+			dnsConfig:   &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{AllowRelaxedDNSSearchValidation: testCase.featureEnabled})
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{})
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

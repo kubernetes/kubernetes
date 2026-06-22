@@ -47,9 +47,13 @@ import (
 	"k8s.io/utils/clock"
 )
 
+const jitterDefault = 1.0
+
 // Housekeeping interval.
 var enableLoadReader = flag.Bool("enable_load_reader", false, "Whether to enable cpu load reader")
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
+var InitialSplayFactor = flag.Float64("initial_splay_factor", jitterDefault, "Factor for the initial splay b/w the container housekeepings, default is 1.0. If negative value is passed, the value will be reset to default")
+var JitterFactor = flag.Float64("jitter_factor", jitterDefault, "Factor for the jitters after the initial splay b/w the container housekeepings, default is 1.0. If negative value is passed, the value will be reset to default")
 
 // TODO: replace regular expressions with something simpler, such as strings.Split().
 // cgroup type chosen to fetch the cgroup path of a process.
@@ -91,6 +95,9 @@ type containerData struct {
 	housekeepingInterval     time.Duration
 	maxHousekeepingInterval  time.Duration
 	allowDynamicHousekeeping bool
+	firstHousekeeping        bool
+	initialSplayFactor       float64
+	jitterFactor             float64
 	infoLastUpdatedTime      atomicTime // Unix nano
 	statsLastUpdatedTime     atomicTime // Unix nano
 	lastErrorTime            time.Time
@@ -121,11 +128,11 @@ type containerData struct {
 }
 
 // jitter returns a time.Duration between duration and duration + maxFactor * duration,
-// to allow clients to avoid converging on periodic behavior.  If maxFactor is 0.0, a
-// suggested default value will be chosen.
+// to allow clients to avoid converging on periodic behavior. If maxFactor is 0.0, no
+// jitter is applied. If maxFactor is negative, a suggested default value will be chosen.
 func jitter(duration time.Duration, maxFactor float64) time.Duration {
-	if maxFactor <= 0.0 {
-		maxFactor = 1.0
+	if maxFactor < 0.0 {
+		maxFactor = jitterDefault
 	}
 	wait := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
 	return wait
@@ -458,6 +465,9 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		housekeepingInterval:     *HousekeepingInterval,
 		maxHousekeepingInterval:  maxHousekeepingInterval,
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
+		firstHousekeeping:        true,
+		initialSplayFactor:       *InitialSplayFactor,
+		jitterFactor:             *JitterFactor,
 		logUsage:                 logUsage,
 		loadAvg:                  -1.0, // negative value indicates uninitialized.
 		loadDAvg:                 -1.0, // negative value indicates uninitialized.
@@ -491,7 +501,6 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		cont.summaryReader = nil
 		klog.V(5).Infof("Failed to create summary reader for %q: %v", ref.Name, err)
 	}
-
 	return cont, nil
 }
 
@@ -519,7 +528,13 @@ func (cd *containerData) nextHousekeepingInterval() time.Duration {
 		}
 	}
 
-	return jitter(cd.housekeepingInterval, 1.0)
+	jitterFactor := cd.jitterFactor
+	if cd.firstHousekeeping {
+		jitterFactor = cd.initialSplayFactor
+		cd.firstHousekeeping = false
+	}
+
+	return jitter(cd.housekeepingInterval, jitterFactor)
 }
 
 // TODO(vmarmol): Implement stats collecting as a custom collector.

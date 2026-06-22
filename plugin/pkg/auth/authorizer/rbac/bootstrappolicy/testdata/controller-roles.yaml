@@ -963,6 +963,14 @@ items:
     - list
     - watch
   - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:

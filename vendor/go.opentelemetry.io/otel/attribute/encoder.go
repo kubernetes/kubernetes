@@ -53,7 +53,7 @@ var (
 	_ Encoder = &defaultAttrEncoder{}
 
 	// encoderIDCounter is for generating IDs for other attribute encoders.
-	encoderIDCounter uint64
+	encoderIDCounter atomic.Uint64
 
 	defaultEncoderOnce     sync.Once
 	defaultEncoderID       = NewEncoderID()
@@ -64,7 +64,7 @@ var (
 // once per each type of attribute encoder. Preferably in init() or in var
 // definition.
 func NewEncoderID() EncoderID {
-	return EncoderID{value: atomic.AddUint64(&encoderIDCounter, 1)}
+	return EncoderID{value: encoderIDCounter.Add(1)}
 }
 
 // DefaultEncoder returns an attribute encoder that encodes attributes in such
@@ -105,7 +105,9 @@ func (d *defaultAttrEncoder) Encode(iter Iterator) string {
 		if keyValue.Value.Type() == STRING {
 			copyAndEscape(buf, keyValue.Value.AsString())
 		} else {
-			_, _ = buf.WriteString(keyValue.Value.Emit())
+			_, _ = buf.WriteString(
+				keyValue.Value.Emit(),
+			) //nolint:staticcheck // Preserve the existing default encoder output.
 		}
 	}
 	return buf.String()

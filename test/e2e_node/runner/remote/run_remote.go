@@ -26,18 +26,23 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	_ "k8s.io/kubernetes/test/e2e_node/remote/gce"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
-var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
-var _ = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
-var _ = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var _ = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-var _ = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
+var testSuite = remote.CommandLine.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
+
+// Unused, preserved for backward compatibility? `kubetest2 noop -test=node` passes at least `-runtime-config`.
+var _ = remote.CommandLine.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
+var _ = remote.CommandLine.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var _ = remote.CommandLine.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var _ = remote.CommandLine.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 
 func main() {
+	copyFlags(remote.CommandLine, flag.CommandLine)
+	copyFlags(builder.CommandLine, flag.CommandLine)
 	klog.InitFlags(nil)
 	flag.Parse()
 
@@ -48,4 +53,10 @@ func main() {
 			remote.GetTestSuiteKeys())
 	}
 	remote.RunRemoteTestSuite(suite)
+}
+
+func copyFlags(from, to *flag.FlagSet) {
+	from.VisitAll(func(f *flag.Flag) {
+		to.Var(f.Value, f.Name, f.Usage)
+	})
 }

@@ -46,11 +46,12 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	filesutil "k8s.io/kubernetes/cmd/kubeadm/app/util/files/testing"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
 
 func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
@@ -75,7 +76,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	tmpdir := t.TempDir()
 
 	// Adds a pki folder with a ca certs to the temp folder
-	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
+	pkidir := certstestutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 	// Creates InitConfigurations pointing to the pkidir folder
 	cfgs := []*kubeadmapi.InitConfiguration{
@@ -237,8 +238,8 @@ func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 	config := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://1.2.3.4:1234", "myClientName", "test-cluster", "myOrg1", "myOrg2")
 
 	// Asserts spec data are propagated to the kubeconfig
-	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
-	kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myClientName", "myOrg1", "myOrg2")
+	kubeconfigutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
+	kubeconfigutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myClientName", "myOrg1", "myOrg2")
 }
 
 func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
@@ -249,8 +250,8 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 	config := setupKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456", "test-cluster")
 
 	// Asserts spec data are propagated to the kubeconfig
-	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
-	kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myClientName", "123456")
+	kubeconfigutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
+	kubeconfigutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myClientName", "123456")
 }
 
 func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
@@ -324,7 +325,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			}
 
 			// Assert that the created file is there
-			testutil.AssertFileExists(t, tmpdir, "test.conf")
+			filesutil.AssertFileExists(t, tmpdir, "test.conf")
 		})
 	}
 }
@@ -360,7 +361,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 			tmpdir := t.TempDir()
 
 			// Adds a pki folder with a ca certs to the temp folder
-			pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
+			pkidir := certstestutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 			// Creates an InitConfiguration pointing to the pkidir folder
 			cfg := &kubeadmapi.InitConfiguration{
@@ -382,7 +383,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 			}
 
 			// Assert expected files are there
-			testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
+			filesutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
 		})
 	}
 }
@@ -435,7 +436,7 @@ func TestWriteKubeConfig(t *testing.T) {
 	tmpdir := t.TempDir()
 
 	// Adds a pki folder with a ca cert to the temp folder
-	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
+	pkidir := certstestutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
@@ -496,16 +497,16 @@ func TestWriteKubeConfig(t *testing.T) {
 			}
 
 			// checks that CLI flags are properly propagated
-			kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
+			kubeconfigutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
 
 			if test.withClientCert {
 				// checks that kubeconfig files have expected client cert
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myUser", "myOrg")
+				kubeconfigutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myUser", "myOrg")
 			}
 
 			if test.withToken {
 				// checks that kubeconfig files have expected token
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "12345")
+				kubeconfigutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "12345")
 			}
 		})
 	}
@@ -909,7 +910,7 @@ func setupKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, apiSer
 func TestEnsureAdminClusterRoleBinding(t *testing.T) {
 	dir := t.TempDir()
 
-	cfg := testutil.GetDefaultInternalConfig(t)
+	cfg := configutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = dir
 
 	ca := certsphase.KubeadmCertRootCA()
@@ -971,7 +972,7 @@ func TestEnsureAdminClusterRoleBinding(t *testing.T) {
 				}
 			}
 
-			client, err := EnsureAdminClusterRoleBinding(dir, ensureRBACFunc)
+			client, err := EnsureAdminClusterRoleBinding(dir, &kubeadmapi.APIEndpoint{}, ensureRBACFunc)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", err != nil, tc.expectedError, err)
 			}
@@ -1122,7 +1123,7 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 
 func TestCreateKubeConfigAndCSR(t *testing.T) {
 	tmpDir := t.TempDir()
-	testutil.SetupEmptyFiles(t, tmpDir, "testfile", "bar.csr", "bar.key")
+	filesutil.SetupEmptyFiles(t, tmpDir, "testfile", "bar.csr", "bar.key")
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 
 	type args struct {

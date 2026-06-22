@@ -54,7 +54,7 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return f.decision, f.reason, f.err
 }
 
-func newStorage(t *testing.T, authz authorizer.Authorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T, authz authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, certificates.SchemeGroupVersion.WithResource("podcertificaterequests").GroupResource())
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -242,7 +242,7 @@ func TestUpdateStatus(t *testing.T) {
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
-	test := genericregistrytest.New(t, statusStorage.store)
+	test := genericregistrytest.New(t, statusStorage.store, "status")
 	test.SetUserInfo(&user.DefaultInfo{
 		Name: "foo",
 	})
@@ -309,7 +309,7 @@ func TestUpdateStatusStompsSpec(t *testing.T) {
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
-	test := genericregistrytest.New(t, statusStorage.store)
+	test := genericregistrytest.New(t, statusStorage.store, "status")
 	test.SetUserInfo(&user.DefaultInfo{
 		Name: "foo",
 	})
@@ -355,7 +355,7 @@ func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
-	test := genericregistrytest.New(t, statusStorage.store)
+	test := genericregistrytest.New(t, statusStorage.store, "status")
 	test.SetUserInfo(&user.DefaultInfo{
 		Name: "foo",
 	})

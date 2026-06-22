@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Build Kubernetes release images. This will build the server target binaries,
-# and create wrap them in Docker images, see `make release` for full releases
+# and wrap them in Docker images, see `make release` for full releases
 
 set -o errexit
 set -o nounset

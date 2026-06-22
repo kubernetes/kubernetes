@@ -55,6 +55,7 @@ message ServerStorageVersion {
 }
 
 // Storage version of a specific resource.
+// +k8s:supportsSubresource="/status"
 message StorageVersion {
   // metadata is the standard object metadata.
   // The name is <group>.<resource>.

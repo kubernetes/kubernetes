@@ -297,8 +297,11 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		Release: v1.20
 		Testname: EmptyDir, Memory backed volume is sized to specified limit
 		Description: A Pod created with an 'emptyDir' Volume backed by memory should be sized to user provided value.
+		This test is marked LinuxOnly since Windows supports emptyDir volumes, but not memory-backed emptyDir volumes.
 	*/
-	f.It("pod should support memory backed volumes of specified size", f.WithNodeConformance(), func(ctx context.Context) {
+	f.It("pod should support memory backed volumes of specified size [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+
 		var (
 			volumeName                 = "shared-data"
 			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"

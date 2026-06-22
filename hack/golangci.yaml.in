@@ -93,14 +93,14 @@ linters:
 
       # The Kubernetes naming convention for conversion functions uses underscores
       # and intentionally deviates from normal Go conventions to make those function
-      # names more readable. Same for SetDefaults_*.
+      # names more readable. Same for SetDefaults_* and ValidateCustom_*.
       #
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
       - linters:
           - staticcheck
           - revive
-        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_|ValidateCustom_)|exported: exported function (Convert|SetDefaults|ValidateCustom)_.* should be of the form)"
 
       # The generated swagger docs also don't follow the naming convention.
       - linters:
@@ -229,6 +229,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: \.AnnotatedEventf$
+          # https://github.com/kubernetes/kubernetes/pull/137270
+          msg: "Do not use AnnotatedEventf. Events are fire-and-forget and aggressively throttled; do not rely on them to pass state or metadata for programmatic triggers."
         - pattern: md5\.*
           # https://github.com/kubernetes/kubernetes/issues/129652
           msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash
@@ -306,12 +309,9 @@ linters:
         #
         # A useful hint for new code.
         - minmax
-        {{- end }}
         # simplify code by using go1.26's new(expr)
-        # should only be updated in old code where it really matters (= always disable in base)
-        # and needs to remain disabled as hint until Go 1.26 is also available for backported code (https://github.com/kubernetes/kubernetes/issues/137595)
+        # should only be updated in old code where it really matters.
         - newexpr
-        {{- if .Base }}
         # use iterators instead of Len/At-style APIs
         # should only be updated in old code where it really matters.
         - stditerators

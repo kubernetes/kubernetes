@@ -51,10 +51,9 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
 func TestCommandsGenerated(t *testing.T) {
@@ -105,7 +104,7 @@ func TestCommandsGenerated(t *testing.T) {
 func TestRunRenewCommands(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	cfg := testutil.GetDefaultInternalConfig(t)
+	cfg := configutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = tmpDir
 
 	// Generate all the CA
@@ -279,7 +278,7 @@ func TestRunRenewCommands(t *testing.T) {
 			if len(test.Args) > 0 {
 				args = test.Args + " " + args
 			}
-			err := cmdtestutil.RunSubCommand(t, renewCmds, test.command, io.Discard, args)
+			err := runSubCommand(t, renewCmds, test.command, io.Discard, args)
 			// certs renew doesn't support positional Args
 			if (err != nil) != test.expectedError {
 				t.Errorf("failed to run renew commands, expected error: %t, actual error: %v", test.expectedError, err)
@@ -490,7 +489,7 @@ func TestRunCmdCertsExpiration(t *testing.T) {
 		clientSetFromFile = kubeconfigutil.ClientSetFromFile
 	}()
 
-	cfg := testutil.GetDefaultInternalConfig(t)
+	cfg := configutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = kdir
 
 	// Generate all the CA
@@ -698,4 +697,16 @@ kubernetesVersion: %s`,
 			runTestCase(t, tc)
 		})
 	}
+}
+
+func runSubCommand(t *testing.T, subCmds []*cobra.Command, command string, output io.Writer, args ...string) error {
+	for _, cmd := range subCmds {
+		if cmd.Name() == command {
+			cmd.SetOut(output)
+			cmd.SetArgs(args)
+			return cmd.Execute()
+		}
+	}
+	t.Fatalf("Unable to find sub command %s", command)
+	return nil
 }

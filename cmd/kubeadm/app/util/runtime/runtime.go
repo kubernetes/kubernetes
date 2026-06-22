@@ -214,8 +214,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 	errChan := make(chan error, len(images))
 
 	klog.V(1).Info("pulling all images in parallel")
-	for _, img := range images {
-		image := img
+	for _, image := range images {
 		go func() {
 			if ifNotPresent {
 				exists := imageExistsFunc(image)

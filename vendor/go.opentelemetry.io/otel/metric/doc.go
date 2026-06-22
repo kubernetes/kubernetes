@@ -24,10 +24,10 @@ all instruments fall into two overlapping logical categories: asynchronous or
 synchronous, and int64 or float64.
 
 All synchronous instruments ([Int64Counter], [Int64UpDownCounter],
-[Int64Histogram], [Float64Counter], [Float64UpDownCounter], and
-[Float64Histogram]) are used to measure the operation and performance of source
-code during the source code execution. These instruments only make measurements
-when the source code they instrument is run.
+[Int64Histogram], [Int64Gauge], [Float64Counter], [Float64UpDownCounter],
+[Float64Histogram], and [Float64Gauge]) are used to measure the operation and
+performance of source code during the source code execution. These instruments
+only make measurements when the source code they instrument is run.
 
 All asynchronous instruments ([Int64ObservableCounter],
 [Int64ObservableUpDownCounter], [Int64ObservableGauge],
@@ -50,9 +50,11 @@ incrementally increase in value. UpDownCounters ([Int64UpDownCounter],
 values that can increase and decrease. When more information needs to be
 conveyed about all the synchronous measurements made during a collection cycle,
 a Histogram ([Int64Histogram] and [Float64Histogram]) should be used. Finally,
-when just the most recent measurement needs to be conveyed about an
-asynchronous measurement, a Gauge ([Int64ObservableGauge] and
-[Float64ObservableGauge]) should be used.
+when just the most recent measurement needs to be conveyed, a Gauge
+([Int64Gauge], [Float64Gauge], [Int64ObservableGauge], and
+[Float64ObservableGauge]) should be used: the synchronous variants record an
+instantaneous value at a specific point in code, while the observable variants
+sample the value via a callback once per collection cycle.
 
 See the [OpenTelemetry documentation] for more information about instruments
 and their intended use.
@@ -80,11 +82,11 @@ Measurements are made by recording values and information about the values with
 an instrument. How these measurements are recorded depends on the instrument.
 
 Measurements for synchronous instruments ([Int64Counter], [Int64UpDownCounter],
-[Int64Histogram], [Float64Counter], [Float64UpDownCounter], and
-[Float64Histogram]) are recorded using the instrument methods directly. All
-counter instruments have an Add method that is used to measure an increment
-value, and all histogram instruments have a Record method to measure a data
-point.
+[Int64Histogram], [Int64Gauge], [Float64Counter], [Float64UpDownCounter],
+[Float64Histogram], and [Float64Gauge]) are recorded using the instrument
+methods directly. All counter instruments have an Add method that is used to
+measure an increment value, and all histogram and synchronous gauge
+instruments have a Record method to measure a data point.
 
 Asynchronous instruments ([Int64ObservableCounter],
 [Int64ObservableUpDownCounter], [Int64ObservableGauge],
@@ -106,6 +108,31 @@ respectively):
 
 If the criteria are not met, use the RegisterCallback method of the [Meter] that
 created the instrument to register a [Callback].
+
+# Avoiding Expensive Computations
+
+All synchronous instruments provide an Enabled method that reports whether the
+instrument will process measurements for the given context. When no SDK is
+registered or the instrument is otherwise disabled, Enabled returns false. This
+can be used to avoid expensive measurement work when a measurement will not be
+recorded:
+
+	if counter.Enabled(ctx) {
+		counter.Add(ctx, 1, metric.WithAttributes(expensiveAttributes()...))
+	}
+
+This is especially valuable when computing attributes is expensive.
+[WithAttributes] performs non-trivial work on every call to build an
+[attribute.Set] from the provided attributes, and that work is wasted if the
+measurement is not recorded.
+
+For performance sensitive code where the same attribute set is used repeatedly,
+prefer [WithAttributeSet]. It accepts a pre-built [attribute.Set], letting you
+pay the construction cost once and reuse it across many measurements:
+
+	attrs := attribute.NewSet(attribute.String("key", "val"))
+	// ... later, on each call:
+	counter.Add(ctx, 1, metric.WithAttributeSet(attrs))
 
 # API Implementations
 

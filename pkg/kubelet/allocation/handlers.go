@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -54,7 +55,7 @@ type podResizesAdmitHandler struct {
 	logger            klog.Logger
 }
 
-func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (h *podResizesAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	if attrs.Operation != lifecycle.ResizeOperation {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}

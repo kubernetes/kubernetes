@@ -159,7 +159,7 @@ func (p *parserHelper) id(ctx any) int64 {
 		offset.Start = p.sourceInfo.ComputeOffset(int32(c.GetLine()), int32(c.GetColumn()))
 		offset.Stop = offset.Start + int32(len(c.GetText()))
 	case common.Location:
-		offset.Start = p.sourceInfo.ComputeOffset(int32(c.Line()), int32(c.Column()))
+		offset.Start = p.sourceInfo.ComputeOffsetAbsolute(int32(c.Line()), int32(c.Column()))
 		offset.Stop = offset.Start
 	case ast.OffsetRange:
 		offset = c

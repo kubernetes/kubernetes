@@ -54,17 +54,16 @@ var (
 
 	// XDSEndpointHashKeyBackwardCompat controls the parsing of the endpoint hash
 	// key from EDS LbEndpoint metadata. Endpoint hash keys can be disabled by
-	// setting "GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT" to "true". When the
-	// implementation of A76 is stable, we will flip the default value to false
-	// in a subsequent release. A final release will remove this environment
-	// variable, enabling the new behavior unconditionally.
-	XDSEndpointHashKeyBackwardCompat = boolFromEnv("GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT", true)
+	// setting "GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT" to "true". A future
+	// release will remove this environment variable, enabling the new behavior
+	// unconditionally.
+	XDSEndpointHashKeyBackwardCompat = boolFromEnv("GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT", false)
 
 	// RingHashSetRequestHashKey is set if the ring hash balancer can get the
 	// request hash header by setting the "requestHashHeader" field, according
-	// to gRFC A76. It can be enabled by setting the environment variable
-	// "GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY" to "true".
-	RingHashSetRequestHashKey = boolFromEnv("GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY", false)
+	// to gRFC A76. It can be disabled by setting the environment variable
+	// "GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY" to "false".
+	RingHashSetRequestHashKey = boolFromEnv("GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY", true)
 
 	// ALTSHandshakerKeepaliveParams is set if we should add the
 	// KeepaliveParams when dial the ALTS handshaker service.
@@ -78,6 +77,14 @@ var (
 	//   - The DNS resolver is being used.
 	EnableDefaultPortForProxyTarget = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_DEFAULT_PORT_FOR_PROXY_TARGET", true)
 
+	// CaseSensitiveBalancerRegistries is set if the balancer registry should be
+	// case-sensitive. This is disabled by default, but can be enabled by setting
+	// the env variable "GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES"
+	// to "true".
+	//
+	// TODO: After 2 releases, we will enable the env var by default.
+	CaseSensitiveBalancerRegistries = boolFromEnv("GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES", false)
+
 	// XDSAuthorityRewrite indicates whether xDS authority rewriting is enabled.
 	// This feature is defined in gRFC A81 and is enabled by setting the
 	// environment variable GRPC_EXPERIMENTAL_XDS_AUTHORITY_REWRITE to "true".
@@ -88,6 +95,14 @@ var (
 	// feature can be disabled by setting the environment variable
 	// GRPC_EXPERIMENTAL_PF_WEIGHTED_SHUFFLING to "false".
 	PickFirstWeightedShuffling = boolFromEnv("GRPC_EXPERIMENTAL_PF_WEIGHTED_SHUFFLING", true)
+
+	// XDSRecoverPanicInResourceParsing indicates whether the xdsclient should
+	// recover from panics while parsing xDS resources.
+	//
+	// This feature can be disabled (e.g. for fuzz testing) by setting the
+	// environment variable "GRPC_GO_EXPERIMENTAL_XDS_RESOURCE_PANIC_RECOVERY"
+	// to "false".
+	XDSRecoverPanicInResourceParsing = boolFromEnv("GRPC_GO_EXPERIMENTAL_XDS_RESOURCE_PANIC_RECOVERY", true)
 
 	// DisableStrictPathChecking indicates whether strict path checking is
 	// disabled. This feature can be disabled by setting the environment
@@ -104,6 +119,23 @@ var (
 	// A future release will remove this environment variable, enabling strict
 	// path checking behavior unconditionally.
 	DisableStrictPathChecking = boolFromEnv("GRPC_GO_EXPERIMENTAL_DISABLE_STRICT_PATH_CHECKING", false)
+
+	// EnablePriorityLBChildPolicyCache controls whether the priority balancer
+	// should cache child balancers that are removed from the LB policy config,
+	// for a period of 15 minutes. This is disabled by default, but can be
+	// enabled by setting the env variable
+	// GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE to true.
+	EnablePriorityLBChildPolicyCache = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE", false)
+
+	// EnableHTTPFramerReadBufferPooling enables the use of the
+	// readyreader.Reader interface to perform non-memory-pinning reads,
+	// provided the underlying net.Conn supports it. This reduces memory usage
+	// when subchannels are idle.
+	//
+	// This environment variable serves as an escape hatch to disable the
+	// feature if unforeseen issues arise, and it will be removed in a future
+	// release.
+	EnableHTTPFramerReadBufferPooling = boolFromEnv("GRPC_GO_EXPERIMENTAL_HTTP_FRAMER_READ_BUFFER_POOLING", true)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

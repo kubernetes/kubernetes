@@ -245,13 +245,13 @@ func (c *stringFormatterV2) Fixed(precision int) func(ref.Val) (string, error) {
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.IntType)
 			}
-			return fmt.Sprintf(fmtStr, argInt), nil
+			return fmt.Sprintf(fmtStr, float64(argInt)), nil
 		case types.UintType:
 			argUint, ok := arg.Value().(uint64)
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.UintType)
 			}
-			return fmt.Sprintf(fmtStr, argUint), nil
+			return fmt.Sprintf(fmtStr, float64(argUint)), nil
 		case types.DoubleType:
 			argDbl, ok := arg.Value().(float64)
 			if !ok {
@@ -283,13 +283,13 @@ func (c *stringFormatterV2) Scientific(precision int) func(ref.Val) (string, err
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.IntType)
 			}
-			return fmt.Sprintf(fmtStr, argInt), nil
+			return fmt.Sprintf(fmtStr, float64(argInt)), nil
 		case types.UintType:
 			argUint, ok := arg.Value().(uint64)
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.UintType)
 			}
-			return fmt.Sprintf(fmtStr, argUint), nil
+			return fmt.Sprintf(fmtStr, float64(argUint)), nil
 		case types.DoubleType:
 			argDbl, ok := arg.Value().(float64)
 			if !ok {

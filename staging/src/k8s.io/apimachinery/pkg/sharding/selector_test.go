@@ -26,7 +26,7 @@ import (
 
 // testObject is a minimal runtime.Object for testing.
 type testObject struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata"`
 }
 

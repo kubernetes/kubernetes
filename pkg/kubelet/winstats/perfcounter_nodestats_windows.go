@@ -35,9 +35,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -188,13 +186,19 @@ func (p *perfCounterNodeStatsClient) getMachineInfo(logger klog.Logger) (*cadvis
 		BootID:         bootId,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		numOfPysicalCores, numOfSockets, topology, err := processorInfo(logger, relationAll)
-		if err != nil {
-			return nil, err
-		}
-
-		mi.NumPhysicalCores = numOfPysicalCores
+	// Topology must be populated unconditionally on Windows. It is consumed by
+	// kubelet startup validation (e.g. the ReservedSystemCPUs subset check in
+	// cmd/kubelet/app/server.go) and by the static CPU manager policy itself,
+	// neither of which is gated by WindowsCPUAndMemoryAffinity. The gate only
+	// controls whether kubelet pushes the resulting affinity to the runtime
+	// (see cpu_manager_windows.go and internal_container_lifecycle_windows.go),
+	// which is the actual feature surface — discovery of topology is not.
+	// This matches Linux, where cAdvisor always populates MachineInfo.Topology.
+	numOfPhysicalCores, numOfSockets, topology, err := processorInfo(logger, relationAll)
+	if err != nil {
+		logger.Error(err, "failed to discover Windows CPU topology; continuing without topology data")
+	} else {
+		mi.NumPhysicalCores = numOfPhysicalCores
 		mi.NumSockets = numOfSockets
 		mi.Topology = topology
 	}

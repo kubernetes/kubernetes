@@ -60,24 +60,24 @@ type ls2lcClientStream struct{ chanClientStream }
 type ls2lcServerStream struct{ chanServerStream }
 
 func (s *ls2lcClientStream) Send(rr *pb.LeaseKeepAliveRequest) error {
-	return s.SendMsg(rr)
+	return s.SendMsg(rr) //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (s *ls2lcClientStream) Recv() (*pb.LeaseKeepAliveResponse, error) {
 	var v any
-	if err := s.RecvMsg(&v); err != nil {
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*pb.LeaseKeepAliveResponse), nil
 }
 
 func (s *ls2lcServerStream) Send(rr *pb.LeaseKeepAliveResponse) error {
-	return s.SendMsg(rr)
+	return s.SendMsg(rr) //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (s *ls2lcServerStream) Recv() (*pb.LeaseKeepAliveRequest, error) {
 	var v any
-	if err := s.RecvMsg(&v); err != nil {
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*pb.LeaseKeepAliveRequest), nil

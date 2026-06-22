@@ -32,11 +32,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // NamespacedResourcesDeleterInterface is the interface to delete a namespace with all resources in it.
@@ -530,7 +528,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	}
 	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
-	if _, hasPods := groupVersionResources[podsGVR]; hasPods && utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
+	if _, hasPods := groupVersionResources[podsGVR]; hasPods {
 		// Ensure all pods in the namespace are deleted first
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, podsGVR, namespace, namespaceDeletedAt)
 		if err != nil {
@@ -564,7 +562,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 
 	// Proceed with deleting other resources in the namespace
 	for gvr := range groupVersionResources {
-		if utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) && gvr.Group == podsGVR.Group &&
+		if gvr.Group == podsGVR.Group &&
 			gvr.Version == podsGVR.Version && gvr.Resource == podsGVR.Resource {
 			continue
 		}

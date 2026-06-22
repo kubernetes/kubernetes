@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -42,28 +43,31 @@ const (
 var (
 	listCacheCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_total",
-			Help:           "Number of LIST requests served from watch cache",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_total",
+			Help:              "Number of LIST requests served from watch cache",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource", "index"},
 	)
 	listCacheNumFetched = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_fetched_objects_total",
-			Help:           "Number of objects read from watch cache in the course of serving a LIST request",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_fetched_objects_total",
+			Help:              "Number of objects read from watch cache in the course of serving a LIST request",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource", "index"},
 	)
 	listCacheNumReturned = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "cache_list_returned_objects_total",
-			Help:           "Number of objects returned for a LIST request from watch cache",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Namespace:         namespace,
+			Name:              "cache_list_returned_objects_total",
+			Help:              "Number of objects returned for a LIST request from watch cache",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)
@@ -161,6 +165,29 @@ var (
 		[]string{"group", "resource"},
 	)
 
+	WatchCacheInitializationErrors = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "initialization_errors_total",
+			Help:           "Counter of watch cache initialization errors broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatchCacheInitializationDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "initialization_duration_seconds",
+			Help:           "Histogram of watch cache initialization duration in seconds, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180, 600},
+		},
+		[]string{"group", "resource"},
+	)
+
 	WatchCacheReadWait = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
@@ -227,6 +254,8 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
 		legacyregistry.MustRegister(WatchCacheInitializations)
+		legacyregistry.MustRegister(WatchCacheInitializationErrors)
+		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
@@ -242,6 +271,7 @@ func RecordListCacheMetrics(groupResource schema.GroupResource, indexName string
 	listCacheCount.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Inc()
 	listCacheNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Add(float64(numFetched))
 	listCacheNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendWatchCache, indexName, numFetched, 0, numReturned)
 }
 
 // RecordResourceVersion sets the current resource version for a given resource type.

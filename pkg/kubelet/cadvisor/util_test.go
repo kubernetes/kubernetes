@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/cadvisor/container/crio"
 	info "github.com/google/cadvisor/info/v1"
+	infov2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -50,6 +51,31 @@ func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 	actual := CapacityFromMachineInfo(machineInfo)
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("when set hugepages true, got resource list %v, want %v", actual, expected)
+	}
+}
+
+// TestEphemeralStorageCapacityFromFsInfo verifies that capacity uses DecimalSI.
+// Allocatable inherits capacity's format via DeepCopy().Sub() in setters.go.
+// DecimalSI produces clean suffixed values for any byte count, while BinarySI
+// falls back to bare integers for non-1024-aligned sizes. See #133927.
+func TestEphemeralStorageCapacityFromFsInfo(t *testing.T) {
+	// Use a non-1024-aligned capacity typical of real filesystem sizes.
+	fsInfo := infov2.FsInfo{Capacity: 97842800000}
+	capacity := EphemeralStorageCapacityFromFsInfo(fsInfo)
+	ephemeralCapacity := capacity[v1.ResourceEphemeralStorage]
+
+	if ephemeralCapacity.Format != resource.DecimalSI {
+		t.Errorf("capacity format = %v, want DecimalSI", ephemeralCapacity.Format)
+	}
+
+	// Simulate allocatable derivation (setters.go): allocatable = capacity - reservation.
+	// DeepCopy preserves the format, so allocatable inherits DecimalSI from capacity.
+	allocatable := ephemeralCapacity.DeepCopy()
+	reservation := resource.MustParse("1Gi")
+	allocatable.Sub(reservation)
+
+	if allocatable.Format != resource.DecimalSI {
+		t.Errorf("allocatable format = %v, want DecimalSI (inherited from capacity)", allocatable.Format)
 	}
 }
 

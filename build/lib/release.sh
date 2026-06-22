@@ -303,7 +303,7 @@ function kube::release::create_docker_images_for_server() {
     mkdir -p "${images_dir}"
 
     # registry.k8s.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
-    # We can use KUBE_DOCKER_REGISTRY to include and extra registry in the docker archive.
+    # We can use KUBE_DOCKER_REGISTRY to include an extra registry in the docker archive.
     # If we use KUBE_DOCKER_REGISTRY="registry.k8s.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
     local -r docker_registry="registry.k8s.io"
     # Docker tags cannot contain '+'

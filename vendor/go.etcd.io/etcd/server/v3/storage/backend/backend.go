@@ -147,6 +147,9 @@ type BackendConfig struct {
 	UnsafeNoFsync bool `json:"unsafe-no-fsync"`
 	// Mlock prevents backend database file to be swapped
 	Mlock bool
+	// Timeout is the amount of time to wait to obtain a file lock.
+	// When set to zero it will wait indefinitely.
+	Timeout time.Duration
 
 	// Hooks are getting executed during lifecycle of Backend's transactions.
 	Hooks Hooks
@@ -170,6 +173,12 @@ func New(bcfg BackendConfig) Backend {
 func WithMmapSize(size uint64) BackendConfigOption {
 	return func(bcfg *BackendConfig) {
 		bcfg.MmapSize = size
+	}
+}
+
+func WithTimeout(timeout time.Duration) BackendConfigOption {
+	return func(bcfg *BackendConfig) {
+		bcfg.Timeout = timeout
 	}
 }
 
@@ -199,6 +208,7 @@ func newBackend(bcfg BackendConfig) *backend {
 	bopts.NoGrowSync = bcfg.UnsafeNoFsync
 	bopts.Mlock = bcfg.Mlock
 	bopts.Logger = newBoltLoggerZap(bcfg)
+	bopts.Timeout = bcfg.Timeout
 
 	db, err := bolt.Open(bcfg.Path, 0o600, bopts)
 	if err != nil {

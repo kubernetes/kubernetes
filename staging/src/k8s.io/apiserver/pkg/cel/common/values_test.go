@@ -1070,7 +1070,7 @@ func evalExpression(t *testing.T, env *cel.Env, expression string, activation ma
 }
 
 type Struct struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata"`
 
 	S string  `json:"s"`
@@ -1085,7 +1085,7 @@ type Struct struct {
 }
 
 type StructOmitEmpty struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	S string  `json:"s,omitempty"`
@@ -1100,7 +1100,7 @@ type StructOmitEmpty struct {
 }
 
 type StructOmitZero struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
 	S string  `json:"s,omitzero"`
@@ -1172,7 +1172,7 @@ func (s Nested) DeepCopyObject() runtime.Object {
 }
 
 type Complex struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	ID          string             `json:"id"`

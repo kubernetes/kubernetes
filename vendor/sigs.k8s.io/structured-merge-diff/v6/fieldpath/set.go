@@ -19,6 +19,7 @@ package fieldpath
 import (
 	"fmt"
 	"iter"
+	"slices"
 	"sort"
 	"strings"
 
@@ -486,19 +487,13 @@ func (s *SetNodeMap) Copy() SetNodeMap {
 
 // Descend adds pe to the set if necessary, returning the associated subset.
 func (s *SetNodeMap) Descend(pe PathElement) *Set {
-	loc := sort.Search(len(s.members), func(i int) bool {
-		return !s.members[i].pathElement.Less(pe)
+	loc, found := slices.BinarySearchFunc(s.members, pe, func(a setNode, b PathElement) int {
+		return a.pathElement.Compare(b)
 	})
-	if loc == len(s.members) {
-		s.members = append(s.members, setNode{pathElement: pe, set: &Set{}})
+	if found {
 		return s.members[loc].set
 	}
-	if s.members[loc].pathElement.Equals(pe) {
-		return s.members[loc].set
-	}
-	s.members = append(s.members, setNode{})
-	copy(s.members[loc+1:], s.members[loc:])
-	s.members[loc] = setNode{pathElement: pe, set: &Set{}}
+	s.members = slices.Insert(s.members, loc, setNode{pathElement: pe, set: &Set{}})
 	return s.members[loc].set
 }
 
@@ -523,13 +518,10 @@ func (s *SetNodeMap) Empty() bool {
 
 // Get returns (the associated set, true) or (nil, false) if there is none.
 func (s *SetNodeMap) Get(pe PathElement) (*Set, bool) {
-	loc := sort.Search(len(s.members), func(i int) bool {
-		return !s.members[i].pathElement.Less(pe)
+	loc, found := slices.BinarySearchFunc(s.members, pe, func(a setNode, b PathElement) int {
+		return a.pathElement.Compare(b)
 	})
-	if loc == len(s.members) {
-		return nil, false
-	}
-	if s.members[loc].pathElement.Equals(pe) {
+	if found {
 		return s.members[loc].set, true
 	}
 	return nil, false

@@ -36,39 +36,46 @@ const (
 	BackoffComplete = "BackoffComplete"
 	// PopFromBackoffQ is the event when a pod is popped from backoffQ when activeQ is empty.
 	PopFromBackoffQ = "PopFromBackoffQ"
-	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
+	// ForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
-	// UnschedulableTimeout is the event when a pod is moved from unschedulablePods
+	// UnschedulableTimeout is the event when a pod is moved from unschedulableEntities
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
 )
 
 var (
 	// EventAssignedPodAdd is the event when an assigned pod is added.
-	EventAssignedPodAdd = fwk.ClusterEvent{Resource: assignedPod, ActionType: fwk.Add}
+	EventAssignedPodAdd = fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add}
 	// EventAssignedPodUpdate is the event when an assigned pod is updated.
-	EventAssignedPodUpdate = fwk.ClusterEvent{Resource: assignedPod, ActionType: fwk.Update}
+	EventAssignedPodUpdate = fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Update}
 	// EventAssignedPodDelete is the event when an assigned pod is deleted.
-	EventAssignedPodDelete = fwk.ClusterEvent{Resource: assignedPod, ActionType: fwk.Delete}
+	EventAssignedPodDelete = fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}
 	// EventUnscheduledPodAdd is the event when an unscheduled pod is added.
-	EventUnscheduledPodAdd = fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.Add}
+	EventUnscheduledPodAdd = fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}
 	// EventUnscheduledPodUpdate is the event when an unscheduled pod is updated.
-	EventUnscheduledPodUpdate = fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.Update}
+	EventUnscheduledPodUpdate = fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}
 	// EventUnscheduledPodDelete is the event when an unscheduled pod is deleted.
-	EventUnscheduledPodDelete = fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.Delete}
+	EventUnscheduledPodDelete = fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Delete}
+	// EventTargetPodUpdate is the event when a target pod is being updated.
+	EventTargetPodUpdate = fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update}
 	// EventUnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
 	EventUnschedulableTimeout = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: UnschedulableTimeout}
-	// EventForceActivate is the event when a pod is moved from unschedulablePods/backoffQ to activeQ.
+	// EventForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ to activeQ.
 	EventForceActivate = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: ForceActivate}
 )
 
 // PodSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).
 // Once we have other pod update events, we should update here as well.
-func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fwk.ClusterEvent) {
-	r := assignedPod
-	if newPod.Spec.NodeName == "" {
-		r = unschedulablePod
+// isTargetPod indicates whether the pod is the direct subject of this update event.
+func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod bool) (events []fwk.ClusterEvent) {
+	var r fwk.EventResource
+	if newPod.Spec.NodeName != "" {
+		r = fwk.AssignedPod
+	} else if isTargetPod {
+		r = fwk.TargetPod
+	} else {
+		r = fwk.UnscheduledPod
 	}
 
 	podChangeExtractors := []podChangeExtractor{

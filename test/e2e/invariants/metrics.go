@@ -20,12 +20,10 @@ package invariants
 
 import (
 	"context"
-	"strings"
 
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	"k8s.io/kubernetes/test/e2e/invariants/metrics"
 
 	"github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
@@ -64,62 +62,6 @@ var _ = ginkgo.ReportAfterSuite("Invariant Metrics", func(ctx ginkgo.SpecContext
 	checkInvariantMetrics(ctx)
 })
 
-// apiServerMetricInvariant represents an api-server metric invariant, all
-// fields must be specified
-type apiServerMetricInvariant struct {
-	// Metric is the metric name
-	Metric string
-	// SIG associated with the invariant
-	// Bugs related to this invariant check failing should be labeled with
-	// this SIG.
-	SIG string
-	// Owners are the individuals responsible for the invariant
-	// Bugs related to this invariant check failing should be assigned to these
-	// GitHub handles
-	Owners []string
-	// IsValid should return false if the metric samples violate the invariant
-	IsValid func(testutil.Samples) bool
-}
-
-// Please speak to SIG-Testing leads before adding anything here.
-// All fields must be specified
-var apiServerMetricInvariants = []apiServerMetricInvariant{
-	{
-		// TODO: Migrate to apiserver_validation_declarative_validation_parity_discrepancies_total
-		// when it reaches beta / when this metric is deprecated.
-		// For now we uare using the previous beta metric.
-		Metric: "apiserver_validation_declarative_validation_mismatch_total",
-		SIG:    "api-machinery",
-		Owners: []string{"aaron-prindle", "jpbetz", "thockin"},
-		IsValid: func(samples testutil.Samples) bool {
-			// declarative validation mismatch should never be non-zero
-			for _, sample := range samples {
-				if sample.Value != 0 {
-					return false
-				}
-			}
-			return true
-		},
-	},
-	{
-		// TODO: Migrate to apiserver_validation_declarative_validation_panics_total
-		// when it reaches beta / when this metric is deprecated.
-		// For now we uare using the previous beta metric.
-		Metric: "apiserver_validation_declarative_validation_panic_total",
-		SIG:    "api-machinery",
-		Owners: []string{"aaron-prindle", "jpbetz", "thockin"},
-		IsValid: func(samples testutil.Samples) bool {
-			// declarative validation panics should never be non-zero
-			for _, sample := range samples {
-				if sample.Value != 0 {
-					return false
-				}
-			}
-			return true
-		},
-	},
-}
-
 func checkInvariantMetrics(ctx context.Context) {
 	// Grab metrics
 	config, err := framework.LoadConfig()
@@ -130,53 +72,9 @@ func checkInvariantMetrics(ctx context.Context) {
 	if err != nil {
 		framework.Failf("error loading client config: %v", err)
 	}
-	grabber, err := e2emetrics.NewMetricsGrabber(ctx, c, nil, config, false, false, false, true, false, false)
-	if err != nil {
-		framework.Failf("error creating metrics grabber: %v", err)
-	}
-	apiserverMetrics, err := grabber.GrabFromAPIServer(ctx)
-	if err != nil {
-		framework.Failf("error grabbing api-server metrics: %v", err)
-	}
 
 	// Check invariant metrics.
-	//
-	//
-	// Please speak to SIG-Testing leads before adding anything here.
-	for _, invariant := range apiServerMetricInvariants {
-		checkAPIServerInvariant(apiserverMetrics, &invariant)
-	}
-}
-
-func checkAPIServerInvariant(metrics e2emetrics.APIServerMetrics, invariant *apiServerMetricInvariant) {
-	metric := invariant.Metric
-	samples, ok := metrics[metric]
-	if !ok || len(samples) == 0 {
-		framework.Failf(
-			`Invariant failed for missing metric: %v
-
-If this failed on a pull request, please check if the PR changes may be related to the failure.
-If not, you can also search for an existing GitHub issue before filing a new issue.
-
-If this failed in a periodic CI job, please file a bug and /assign the owners.
-
-Owners for this metric: %v
-Associated SIG: %v`,
-			metric, strings.Join(invariant.Owners, " "), invariant.SIG,
-		)
-	}
-	if !invariant.IsValid(samples) {
-		framework.Failf(
-			`Invariant failed for metric: %v
-
-If this failed on a pull request, please check if the PR changes may be related to the failure.
-If not, you can also search for an existing GitHub issue before filing a new issue.
-
-If this failed in a periodic CI job, please file a bug and /assign the owners.
-
-Owners for this metric: %v
-Associated SIG: %v`,
-			metric, strings.Join(invariant.Owners, " "), invariant.SIG,
-		)
+	if err := metrics.CheckMetricInvariants(ctx, c, false); err != nil {
+		framework.Failf("Invariant check failed: %v", err)
 	}
 }

@@ -17,29 +17,20 @@ limitations under the License.
 package create
 
 import (
-	"context"
 	"fmt"
-	"io"
 	"net/url"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
-	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -55,6 +46,7 @@ type CreateOptions struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 
 	ValidationDirective string
+	CreateAnnotation    bool
 
 	fieldManager string
 
@@ -63,8 +55,9 @@ type CreateOptions struct {
 	EditBeforeCreate bool
 	Raw              string
 
-	Recorder genericclioptions.Recorder
-	PrintObj func(obj kruntime.Object) error
+	Recorder    genericclioptions.Recorder
+	PrintObj    func(obj kruntime.Object) error
+	editOptions *editor.EditOptions
 
 	genericiooptions.IOStreams
 }
@@ -111,7 +104,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunCreate(f, cmd))
+			cmdutil.CheckErr(o.RunCreate(f))
 		},
 	}
 
@@ -209,6 +202,24 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
+	if o.EditBeforeCreate {
+		editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, o.IOStreams)
+		editOptions.FilenameOptions = o.FilenameOptions
+		editOptions.ValidateOptions = cmdutil.ValidateOptions{
+			ValidationDirective: o.ValidationDirective,
+		}
+		editOptions.PrintFlags = o.PrintFlags
+		editOptions.ApplyAnnotation = o.CreateAnnotation
+		editOptions.RecordFlags = o.RecordFlags
+		editOptions.FieldManager = "kubectl-create"
+		if err := editOptions.Complete(f, []string{}, cmd); err != nil {
+			return err
+		}
+		o.editOptions = editOptions
+	}
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -222,7 +233,14 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 }
 
 // RunCreate performs the creation
-func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *CreateOptions) RunCreate(f cmdutil.Factory) error {
+	if o.EditBeforeCreate {
+		if o.editOptions == nil {
+			return fmt.Errorf("EditBeforeCreate requires edit options to be initialized via Complete()")
+		}
+		return o.editOptions.Run()
+	}
+
 	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
 	// the validator enforces this, so
 	if len(o.Raw) > 0 {
@@ -231,10 +249,6 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 			return err
 		}
 		return rawhttp.RawPost(restClient, o.IOStreams, o.Raw, o.FilenameOptions.Filenames[0])
-	}
-
-	if o.EditBeforeCreate {
-		return RunEditOnCreate(f, o.PrintFlags, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions, o.fieldManager)
 	}
 
 	schema, err := f.Validator(o.ValidationDirective)
@@ -266,7 +280,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, scheme.DefaultJSONEncoder()); err != nil {
+		if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -300,29 +314,6 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	return nil
 }
 
-// RunEditOnCreate performs edit on creation
-func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags, recordFlags *genericclioptions.RecordFlags, ioStreams genericiooptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions, fieldManager string) error {
-	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
-	editOptions.FilenameOptions = *options
-	validationDirective, err := cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-	editOptions.ValidateOptions = cmdutil.ValidateOptions{
-		ValidationDirective: string(validationDirective),
-	}
-	editOptions.PrintFlags = printFlags
-	editOptions.ApplyAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
-	editOptions.RecordFlags = recordFlags
-	editOptions.FieldManager = "kubectl-create"
-
-	err = editOptions.Complete(f, []string{}, cmd)
-	if err != nil {
-		return err
-	}
-	return editOptions.Run()
-}
-
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 	argsLen := cmd.ArgsLenAtDash()
@@ -334,137 +325,4 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", argsLen)
 	}
 	return args[0], nil
-}
-
-// CreateSubcommandOptions is an options struct to support create subcommands
-type CreateSubcommandOptions struct {
-	// PrintFlags holds options necessary for obtaining a printer
-	PrintFlags *genericclioptions.PrintFlags
-	// Name of resource being created
-	Name string
-	// StructuredGenerator is the resource generator for the object being created
-	StructuredGenerator generate.StructuredGenerator
-	DryRunStrategy      cmdutil.DryRunStrategy
-	CreateAnnotation    bool
-	FieldManager        string
-	ValidationDirective string
-
-	Namespace        string
-	EnforceNamespace bool
-
-	Mapper        meta.RESTMapper
-	DynamicClient dynamic.Interface
-
-	PrintObj printers.ResourcePrinterFunc
-
-	genericiooptions.IOStreams
-}
-
-// NewCreateSubcommandOptions returns initialized CreateSubcommandOptions
-func NewCreateSubcommandOptions(ioStreams genericiooptions.IOStreams) *CreateSubcommandOptions {
-	return &CreateSubcommandOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		IOStreams:  ioStreams,
-	}
-}
-
-// Complete completes all the required options
-func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, generator generate.StructuredGenerator) error {
-	name, err := NameFromCommandArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-
-	o.Name = name
-	o.StructuredGenerator = generator
-	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
-	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
-
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
-	printer, err := o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-
-	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	o.PrintObj = func(obj kruntime.Object, out io.Writer) error {
-		return printer.PrintObj(obj, out)
-	}
-
-	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	o.DynamicClient, err = f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Run executes a create subcommand using the specified options
-func (o *CreateSubcommandOptions) Run() error {
-	obj, err := o.StructuredGenerator.StructuredGenerate()
-	if err != nil {
-		return err
-	}
-	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, scheme.DefaultJSONEncoder()); err != nil {
-		return err
-	}
-	if o.DryRunStrategy != cmdutil.DryRunClient {
-		// create subcommands have compiled knowledge of things they create, so type them directly
-		gvks, _, err := scheme.Scheme.ObjectKinds(obj)
-		if err != nil {
-			return err
-		}
-		gvk := gvks[0]
-		mapping, err := o.Mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
-		if err != nil {
-			return err
-		}
-
-		asUnstructured := &unstructured.Unstructured{}
-		if err := scheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
-			return err
-		}
-		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			o.Namespace = ""
-		}
-		createOptions := metav1.CreateOptions{}
-		if o.FieldManager != "" {
-			createOptions.FieldManager = o.FieldManager
-		}
-		createOptions.FieldValidation = o.ValidationDirective
-
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			createOptions.DryRun = []string{metav1.DryRunAll}
-		}
-		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(context.TODO(), asUnstructured, createOptions)
-		if err != nil {
-			return err
-		}
-
-		// ensure we pass a versioned object to the printer
-		obj = actualObject
-	} else {
-		if meta, err := meta.Accessor(obj); err == nil && o.EnforceNamespace {
-			meta.SetNamespace(o.Namespace)
-		}
-	}
-
-	return o.PrintObj(obj, o.Out)
 }

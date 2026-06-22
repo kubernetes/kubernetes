@@ -93,14 +93,14 @@ linters:
 
       # The Kubernetes naming convention for conversion functions uses underscores
       # and intentionally deviates from normal Go conventions to make those function
-      # names more readable. Same for SetDefaults_*.
+      # names more readable. Same for SetDefaults_* and ValidateCustom_*.
       #
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
       - linters:
           - staticcheck
           - revive
-        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_|ValidateCustom_)|exported: exported function (Convert|SetDefaults|ValidateCustom)_.* should be of the form)"
 
       # The generated swagger docs also don't follow the naming convention.
       - linters:
@@ -147,10 +147,7 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
-        path: "staging/src/k8s.io/api/(apps|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
-      - text: "field .* is missing godoc comment"
-        path: "staging/src/k8s.io/api/autoscaling/"
-      
+        path: "staging/src/k8s.io/api/(apps|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
       
       # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
       - text: 'notimestamp: naming convention "notimestamp": field TokenRequestStatus.ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
@@ -234,7 +231,7 @@ linters:
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
       - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-        path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|apps|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|networking|resource|storage)"
+        path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|flowcontrol|networking|storage)"
       
       # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
       - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -249,7 +246,7 @@ linters:
       # The (PodGroupSpec|PodGroupTemplate).SchedulingPolicy field is a union type, but is not marked up as a union, nor does nonpointerstructs understand unions today.
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
-        path: "staging/src/k8s.io/api/scheduling/v1alpha2/types.go"
+        path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
 
       - linters:
         - forbidigo
@@ -350,12 +347,6 @@ linters:
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
             contextual k8s.io/kubernetes/pkg/kubelet/.*
-            # Temporary carve-outs for PR1 split safety: these files still have legacy global klog calls.
-            # TODO: remove each exclusion as follow-up PRs migrate the file to contextual logging.
-            -contextual k8s.io/kubernetes/pkg/kubelet/kubelet_resources.go
-            -contextual k8s.io/kubernetes/pkg/kubelet/kubelet_volumes.go
-            -contextual k8s.io/kubernetes/pkg/kubelet/pod_container_deletor.go
-            -contextual k8s.io/kubernetes/pkg/kubelet/volume_host.go
       sorted:
         # Installed there by hack/verify-golangci-lint.sh.
         path: _output/local/bin/sorted.so
@@ -476,6 +467,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: \.AnnotatedEventf$
+          # https://github.com/kubernetes/kubernetes/pull/137270
+          msg: "Do not use AnnotatedEventf. Events are fire-and-forget and aggressively throttled; do not rely on them to pass state or metadata for programmatic triggers."
         - pattern: md5\.*
           # https://github.com/kubernetes/kubernetes/issues/129652
           msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash
@@ -515,10 +509,6 @@ linters:
         # consistency with existing code
         # and it's just syntactic sugar.
         - any
-        # simplify code by using go1.26's new(expr)
-        # should only be updated in old code where it really matters (= always disable in base)
-        # and needs to remain disabled as hint until Go 1.26 is also available for backported code (https://github.com/kubernetes/kubernetes/issues/137595)
-        - newexpr
         # Suggest replacing omitempty with omitzero for struct fields.
         #
         # Disabled because might interfere

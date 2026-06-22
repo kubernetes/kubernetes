@@ -66,7 +66,7 @@ func RunCordonOrUncordon(drainer *Helper, node *corev1.Node, desired bool) error
 	err, patchErr := c.PatchOrReplaceWithContext(drainer.Ctx, drainer.Client, false)
 	if err != nil {
 		if patchErr != nil {
-			return fmt.Errorf("cordon error: %s; merge patch error: %w", err.Error(), patchErr)
+			return fmt.Errorf("cordon error: %w; merge patch error: %w", err, patchErr)
 		}
 		return fmt.Errorf("cordon error: %w", err)
 	}

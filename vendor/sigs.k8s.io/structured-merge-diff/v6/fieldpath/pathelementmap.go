@@ -17,7 +17,7 @@ limitations under the License.
 package fieldpath
 
 import (
-	"sort"
+	"slices"
 
 	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
@@ -82,32 +82,23 @@ func MakePathElementMap(size int) PathElementMap {
 // Insert adds the pathelement and associated value in the map.
 // If insert is called twice with the same PathElement, the value is replaced.
 func (s *PathElementMap) Insert(pe PathElement, v interface{}) {
-	loc := sort.Search(len(s.members), func(i int) bool {
-		return !s.members[i].PathElement.Less(pe)
+	loc, found := slices.BinarySearchFunc(s.members, pe, func(a pathElementValue, b PathElement) int {
+		return a.PathElement.Compare(b)
 	})
-	if loc == len(s.members) {
-		s.members = append(s.members, pathElementValue{pe, v})
-		return
-	}
-	if s.members[loc].PathElement.Equals(pe) {
+	if found {
 		s.members[loc].Value = v
 		return
 	}
-	s.members = append(s.members, pathElementValue{})
-	copy(s.members[loc+1:], s.members[loc:])
-	s.members[loc] = pathElementValue{pe, v}
+	s.members = slices.Insert(s.members, loc, pathElementValue{PathElement: pe, Value: v})
 }
 
 // Get retrieves the value associated with the given PathElement from the map.
 // (nil, false) is returned if there is no such PathElement.
 func (s *PathElementMap) Get(pe PathElement) (interface{}, bool) {
-	loc := sort.Search(len(s.members), func(i int) bool {
-		return !s.members[i].PathElement.Less(pe)
+	loc, found := slices.BinarySearchFunc(s.members, pe, func(a pathElementValue, b PathElement) int {
+		return a.PathElement.Compare(b)
 	})
-	if loc == len(s.members) {
-		return nil, false
-	}
-	if s.members[loc].PathElement.Equals(pe) {
+	if found {
 		return s.members[loc].Value, true
 	}
 	return nil, false

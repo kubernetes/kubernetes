@@ -56,10 +56,6 @@ func (levelTagValidator) ValidScopes() sets.Set[Scope] {
 	return levelTagsValidScopes
 }
 
-// LateTagValidator indicates that this validator has to run AFTER the listType
-// and listMapKey tags.
-func (levelTagValidator) LateTagValidator() {}
-
 func (ltv *levelTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	if tag.ValueType != codetags.ValueTypeTag || tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
@@ -84,15 +80,14 @@ func (ltv *levelTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		return Validations{}, err
 	}
 
-	result := Validations{}
-	result.Variables = append(result.Variables, validations.Variables...)
-	for _, fn := range validations.Functions {
-		f := fn
-		f.StabilityLevel = ltv.level
-		result.AddFunction(f)
-	}
-
-	return result, nil
+	validations = WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
+		if fn.StabilityLevelSelfManaged {
+			return fn
+		}
+		fn.StabilityLevel = ltv.level
+		return fn
+	})
+	return validations, nil
 }
 
 func (ltv *levelTagValidator) Docs() TagDoc {

@@ -39,7 +39,7 @@ import (
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceClaimApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec describes what is being requested and how to configure it.

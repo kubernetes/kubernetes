@@ -49,7 +49,7 @@ run_plugins_tests() {
   kube::test::if_has_string "${output_message}" 'plugin foo'
 
   # check arguments passed to the plugin
-  output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins/bar" kubectl bar arg1)
+  output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/bar" kubectl bar arg1)
   kube::test::if_has_string "${output_message}" 'test/fixtures/pkg/kubectl/plugins/bar/kubectl-bar arg1'
 
   # ensure that a kubectl command supersedes a plugin that overshadows it
@@ -64,6 +64,24 @@ run_plugins_tests() {
   # ensure that a kubectl create cronjob builtin command supersedes a plugin that overshadows it
   output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/create" kubectl create cronjob --help)
   kube::test::if_has_not_string "${output_message}" 'plugin cronjob as a subcommand of kubectl create command'
+
+  # ensure that the KUBECTL_PATH environment variable is available to plugins
+  output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/baz" kubectl baz)
+  kube::test::if_has_string "${output_message}" "I am plugin baz"
+  kube::test::if_has_string "${output_message}" "KUBECTL_PATH=/.*/kubectl"
+  kube::test::if_has_string "${output_message}" "CUSTOM_ENV_VAR=<UNSET>"
+
+  # ensure that the other environment variables are available to plugins
+  output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/baz" CUSTOM_ENV_VAR=abc kubectl baz)
+  kube::test::if_has_string "${output_message}" "I am plugin baz"
+  kube::test::if_has_string "${output_message}" "KUBECTL_PATH=/.*/kubectl"
+  kube::test::if_has_string "${output_message}" "CUSTOM_ENV_VAR=abc"
+
+  # ensure that the KUBECTL_PATH environment variable cannot be overridden by caller
+  output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/baz" KUBECTL_PATH=invalid kubectl baz)
+  kube::test::if_has_string "${output_message}" "I am plugin baz"
+  kube::test::if_has_string "${output_message}" "KUBECTL_PATH=/.*/kubectl"
+  kube::test::if_has_string "${output_message}" "CUSTOM_ENV_VAR=<UNSET>"
 
   rm -fr "${TEMP_PATH}"
 

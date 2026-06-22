@@ -29,7 +29,7 @@ package v1
 // Note that this is identical to a configmap volume source without the default
 // mode.
 type ConfigMapProjectionApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
+	LocalObjectReferenceApplyConfiguration `json:""`
 	// items if unspecified, each key-value pair in the Data field of the referenced
 	// ConfigMap will be projected into the volume as a file whose name is the
 	// key and content is the value. If specified, the listed keys will be

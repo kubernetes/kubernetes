@@ -49,6 +49,10 @@ type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
 
+	// Time at which the container was started.
+	// This may be unset if the runtime does not provide it.
+	StartTime time.Time `json:"start_time,omitempty"`
+
 	// Metadata labels associated with this container.
 	Labels map[string]string `json:"labels,omitempty"`
 	// Metadata envs associated with this container. Only whitelisted envs are added.
@@ -187,6 +191,12 @@ func (s *ContainerSpec) Eq(b *ContainerSpec) bool {
 	// Creation within 1s of each other.
 	diff := s.CreationTime.Sub(b.CreationTime)
 	if (diff > time.Second) || (diff < -time.Second) {
+		return false
+	}
+
+	// Start time within 1s of each other.
+	startDiff := s.StartTime.Sub(b.StartTime)
+	if (startDiff > time.Second) || (startDiff < -time.Second) {
 		return false
 	}
 
@@ -446,6 +456,13 @@ type MemoryStats struct {
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
 
 	PSI PSIStats `json:"psi"`
+
+	Events MemoryEvents `json:"events,omitempty"`
+}
+
+type MemoryEvents struct {
+	High uint64 `json:"high"`
+	Max  uint64 `json:"max"`
 }
 
 type CPUSetStats struct {
@@ -1127,6 +1144,9 @@ type OomKillEventData struct {
 
 	// The name of the killed process
 	ProcessName string `json:"process_name"`
+
+	// the constraint that triggered the OOM
+	Constraint string `json:"constraint"`
 }
 
 // Information related to a container deletion event

@@ -69,6 +69,9 @@ var (
 	// ErrValueTooLarge is returned when inserting a value that is larger than MaxValueSize.
 	ErrValueTooLarge = errors.New("value too large")
 
+	// ErrMaxSizeReached is returned when the configured maximum size of the data file is reached.
+	ErrMaxSizeReached = errors.New("database reached maximum size")
+
 	// ErrIncompatibleValue is returned when trying to create or delete a bucket
 	// on an existing non-bucket key or when trying to create or delete a
 	// non-bucket key on an existing bucket key.

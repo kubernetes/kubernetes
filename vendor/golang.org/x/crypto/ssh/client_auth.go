@@ -274,10 +274,14 @@ func pickSignatureAlgorithm(signer Signer, extensions map[string][]byte) (MultiA
 	}
 
 	// Filter algorithms based on those supported by MultiAlgorithmSigner.
+	// Iterate over the signer's algorithms first to preserve its preference order.
+	supportedKeyAlgos := algorithmsForKeyFormat(keyFormat)
 	var keyAlgos []string
-	for _, algo := range algorithmsForKeyFormat(keyFormat) {
-		if slices.Contains(as.Algorithms(), underlyingAlgo(algo)) {
-			keyAlgos = append(keyAlgos, algo)
+	for _, signerAlgo := range as.Algorithms() {
+		if idx := slices.IndexFunc(supportedKeyAlgos, func(algo string) bool {
+			return underlyingAlgo(algo) == signerAlgo
+		}); idx >= 0 {
+			keyAlgos = append(keyAlgos, supportedKeyAlgos[idx])
 		}
 	}
 

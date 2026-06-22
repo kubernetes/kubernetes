@@ -1,0 +1,8 @@
+rules:
+  - selectorRegexp: ^(k8s.io/kubernetes/test/utils/ktesting|k8s.io/klog|sigs.k8s.io/yaml|github.com/go-logr|github.com/onsi/gomega|go.uber.org/goleak)
+    allowedPrefixes: [ "" ]
+  # Any package without a dot in the first part of the name is a standard package.
+  - selectorRegexp: ^[a-z]*($|/)
+    allowedPrefixes: [ "" ]
+  - selectorRegexp: .*
+    forbiddenPrefixes: [ "" ]

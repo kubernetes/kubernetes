@@ -116,10 +116,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 	}
 }
 
-func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-	// TODO: pass context to Admit when migrating this component to
-	// contextual logging
-	ctx := context.TODO()
+func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	logger := klog.FromContext(ctx)
 	node, err := w.getNodeAnyWayFunc(ctx, true)
 	if err != nil {

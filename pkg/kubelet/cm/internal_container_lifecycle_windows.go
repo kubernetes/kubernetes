@@ -52,11 +52,11 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(logger klog.Logger, 
 	// Gather all CPUs associated with the selected NUMA nodes
 	var allNumaNodeCPUs []winstats.GroupAffinity
 	for _, numaNode := range sets.List(numaNodes) {
-		affinity, err := winstats.GetCPUsforNUMANode(uint16(numaNode))
+		affinities, err := winstats.GetCPUsforNUMANode(uint16(numaNode))
 		if err != nil {
 			return fmt.Errorf("failed to get CPUs for NUMA node %d: %v", numaNode, err)
 		}
-		allNumaNodeCPUs = append(allNumaNodeCPUs, *affinity)
+		allNumaNodeCPUs = append(allNumaNodeCPUs, affinities...)
 	}
 
 	var finalCPUSet = computeFinalCpuSet(allocatedCPUs, allNumaNodeCPUs)

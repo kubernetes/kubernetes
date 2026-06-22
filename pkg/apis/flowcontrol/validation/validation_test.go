@@ -1127,6 +1127,38 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		expectedErrors: field.ErrorList{
 			field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)),
 		},
+	}, {
+		name: "spec.type empty should fail with required",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-empty-type",
+			},
+			Spec: flowcontrol.PriorityLevelConfigurationSpec{
+				Type: "",
+			},
+		},
+		expectedErrors: field.ErrorList{
+			field.Required(field.NewPath("spec").Child("type"), "").MarkCoveredByDeclarative(),
+		},
+	}, {
+		name: "spec.limited.limitResponse.type empty should fail with required",
+		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-empty-lr-type",
+			},
+			Spec: flowcontrol.PriorityLevelConfigurationSpec{
+				Type: flowcontrol.PriorityLevelEnablementLimited,
+				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+					NominalConcurrencyShares: 42,
+					LimitResponse: flowcontrol.LimitResponse{
+						Type: "",
+					},
+				},
+			},
+		},
+		expectedErrors: field.ErrorList{
+			field.Required(field.NewPath("spec").Child("limited").Child("limitResponse").Child("type"), "").MarkCoveredByDeclarative(),
+		},
 	}}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {

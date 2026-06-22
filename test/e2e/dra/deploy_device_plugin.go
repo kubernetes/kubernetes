@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // deployDevicePlugin deploys https://github.com/kubernetes/kubernetes/tree/111a2a0d2dfe13639724506f674bc4f342ccfbab/test/images/sample-device-plugin

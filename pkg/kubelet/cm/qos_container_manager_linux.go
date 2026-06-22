@@ -110,6 +110,14 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 			resourceParameters.CPUShares = &minShares
 		}
 
+		// Stale memory.low from a previously enabled MemoryQoS state can persist
+		// across kubelet restarts. Reset to 0 so rollback takes effect.
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
+			if qosClass == v1.PodQOSBurstable {
+				resourceParameters.Unified = map[string]string{Cgroup2MemoryLow: "0"}
+			}
+		}
+
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
 			Name:               containerName,
@@ -353,9 +361,9 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
 		return err
 	}
 
-	// Update cgroup v2 memory.min settings. Called regardless of the MemoryQoS
-	// feature gate to clear stale values when the feature is disabled.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	// Update cgroup v2 memory.min settings. Called only when MemoryQoS is
+	// enabled and cgroups v2 is the unified mode.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(logger, qosConfigs)
 	}
 

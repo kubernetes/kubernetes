@@ -171,9 +171,6 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 					quantity = resourceMap.AllocationMultiplier.DeepCopy()
 				}
 
-				if currentClaimStatus.Resources == nil {
-					currentClaimStatus.Resources = make(map[v1.ResourceName]resource.Quantity)
-				}
 				curQuantity, ok := currentClaimStatus.Resources[resourceName]
 				if !ok {
 					currentClaimStatus.Resources[resourceName] = quantity

@@ -34,11 +34,9 @@ import (
 	"sigs.k8s.io/randfill"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apidiscoveryv2scheme "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -348,80 +346,6 @@ func TestServiceGC(t *testing.T) {
 
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 	require.Equal(t, 1, getCacheLen())
-}
-
-// TestV2Beta1Skew tests that aggregated apiservers that only serve V2Beta1
-// are still supported
-func TestV2Beta1Skew(t *testing.T) {
-	apiGroup := apidiscoveryv2.APIGroupDiscoveryList{Items: []apidiscoveryv2.APIGroupDiscovery{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "stable.example.com"},
-			Versions: []apidiscoveryv2.APIVersionDiscovery{
-				{
-					Version:   "v1",
-					Freshness: "Current",
-					Resources: []apidiscoveryv2.APIResourceDiscovery{
-						{
-							Resource:     "parent-with-kind",
-							ResponseKind: &metav1.GroupVersionKind{Kind: "ParentWithKind"},
-							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
-								{Subresource: "subresource-with-kind", ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithKind"}},
-							},
-						},
-					},
-				},
-			},
-		},
-	}}
-
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
-
-	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
-
-	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "v1.stable.example.com",
-		},
-		Spec: apiregistrationv1.APIServiceSpec{
-			Group:   "stable.example.com",
-			Version: "v1",
-			Service: &apiregistrationv1.ServiceReference{
-				Name: "test-service",
-			},
-		},
-	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Force a v2beta1 response from the aggregated apiserver
-		v2b := apidiscoveryv2beta1.APIGroupDiscoveryList{}
-		err := apidiscoveryv2scheme.Convertv2APIGroupDiscoveryListTov2beta1APIGroupDiscoveryList(&apiGroup, &v2b, nil)
-		if err != nil {
-			t.Errorf("unexpected error %v", err)
-			return
-		}
-		converted, err := json.Marshal(v2b)
-		if err != nil {
-			t.Errorf("unexpected error %v", err)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json;"+"g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
-		w.WriteHeader(200)
-		_, err = w.Write(converted)
-		if err != nil {
-			t.Errorf("unexpected error %v", err)
-			return
-		}
-	}))
-	testCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go aggregatedManager.Run(testCtx.Done(), nil)
-	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
-
-	response, _, parsed := fetchPath(aggregatedResourceManager, "")
-	if response.StatusCode != 200 {
-		t.Fatalf("unexpected status code %d", response.StatusCode)
-	}
-
-	checkAPIGroups(t, apiGroup, parsed)
 }
 
 // Test that a handler associated with an APIService gets pinged after the

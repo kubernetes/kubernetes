@@ -742,7 +742,7 @@ func (r *Reflector) list(ctx context.Context) error {
 	case <-listCh:
 	}
 
-	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
+	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err}, trace.Field{Key: "count", Value: meta.LenList(list)})
 	if err != nil {
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
 	}

@@ -41,7 +41,7 @@ run_kubectl_help_tests() {
   kube::test::if_has_string "$(LANG=en_US.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
   kube::test::if_has_string "$(LANG=fr_FR.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
   kube::test::if_has_string "$(LANG=it_IT.UTF-8 kubectl uncordon --help)" "Contrassegna il nodo come programmabile."
-  kube::test::if_has_string "$(LANG=ja_JP.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
+  kube::test::if_has_string "$(LANG=ja_JP.UTF-8 kubectl uncordon --help)" "Nodeをスケジュール可能な状態としてマークする。"
   kube::test::if_has_string "$(LANG=ko_KR.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
   kube::test::if_has_string "$(LANG=pt_BR.UTF-8 kubectl uncordon --help)" "Remove a restrição de execução de workloads no node."
   kube::test::if_has_string "$(LANG=zh_CN.UTF-8 kubectl uncordon --help)" "标记节点为可调度。"

@@ -316,7 +316,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported on Windows.")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	const (
 		podUID    types.UID = "12345-abcd"
@@ -490,8 +490,8 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 			}
 
 			if test.actuatedResources != nil {
-				require.NoError(t, m.actuatedState.SetContainerResources(podUID, meta.Name, *test.actuatedResources))
-				t.Cleanup(func() { _ = m.actuatedState.RemovePod(podUID) })
+				require.NoError(t, m.actuatedState.SetContainerResources(logger, podUID, meta.Name, *test.actuatedResources))
+				t.Cleanup(func() { _ = m.actuatedState.RemovePod(logger, podUID) })
 			}
 
 			actual := m.toKubeContainerStatus(tCtx, podUID, input, cid.Type)

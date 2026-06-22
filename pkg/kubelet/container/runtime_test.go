@@ -25,9 +25,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestParseContainerID(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name     string
 		input    string
@@ -62,7 +64,7 @@ func TestParseContainerID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ParseContainerID(tt.input)
+			result := ParseContainerID(logger, tt.input)
 			assert.Equal(t, tt.expected, result, "ParseContainerID(%q)", tt.input)
 		})
 	}

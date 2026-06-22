@@ -65,17 +65,20 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 	if !ok {
 		return Validations{}, fmt.Errorf("missing required option name positional argument")
 	}
-	result := Validations{}
-	if validations, err := itv.validator.ExtractTagValidations(context, *tag.ValueTag); err != nil {
+
+	validations, err := itv.validator.ExtractTagValidations(context, *tag.ValueTag)
+	if err != nil {
 		return Validations{}, err
-	} else {
-		for _, fn := range validations.Functions {
-			f := Function(itv.TagName(), fn.Flags, ifOption, optionArg.Value, itv.enabled, WrapperFunction{Function: fn, ObjType: context.Type})
-			result.Variables = append(result.Variables, validations.Variables...)
-			result.AddFunction(f)
-		}
-		return result, nil
 	}
+
+	return WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
+		objType := context.Type
+		if scope == ParentContext {
+			objType = context.ParentType
+		}
+
+		return Function(itv.TagName(), fn.Flags, ifOption, optionArg.Value, itv.enabled, WrapperFunction{Function: fn, ObjType: objType})
+	}), nil
 }
 
 func (itv ifTagValidator) Docs() TagDoc {

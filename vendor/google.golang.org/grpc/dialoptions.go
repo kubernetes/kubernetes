@@ -705,10 +705,11 @@ func WithDisableHealthCheck() DialOption {
 func defaultDialOptions() dialOptions {
 	return dialOptions{
 		copts: transport.ConnectOptions{
-			ReadBufferSize:  defaultReadBufSize,
-			WriteBufferSize: defaultWriteBufSize,
-			UserAgent:       grpcUA,
-			BufferPool:      mem.DefaultBufferPool(),
+			ReadBufferSize:    defaultReadBufSize,
+			WriteBufferSize:   defaultWriteBufSize,
+			SharedWriteBuffer: true,
+			UserAgent:         grpcUA,
+			BufferPool:        mem.DefaultBufferPool(),
 		},
 		bs:                       internalbackoff.DefaultExponential,
 		idleTimeout:              30 * time.Minute,

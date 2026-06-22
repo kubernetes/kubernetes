@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 
@@ -44,6 +45,10 @@ func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
 	indexValidator := func(_ int) bool { return true }
 
 	return newCacheInterval(startIndex, endIndex, indexer, indexValidator, 0, locker)
+}
+
+func historySource(wci *watchCacheInterval) *historyCacheIntervalSource {
+	return wci.source.(*historyCacheIntervalSource)
 }
 
 func bufferFromEvents(events []*watchCacheEvent) *watchCacheIntervalBuffer {
@@ -201,33 +206,34 @@ func TestFillBuffer(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			events := generateEvents(0, c.numEventsToFill)
 			wci := intervalFromEvents(events)
+			src := historySource(wci)
 
 			for i := 0; i < len(events); i++ {
 				if i%bufferSize == 0 {
-					wci.fillBuffer()
+					src.fillBuffer()
 				}
-				event, ok := wci.buffer.next()
+				event, ok := src.buffer.next()
 				if err := verifyEvent(ok, event, events[i]); err != nil {
 					t.Error(err)
 				}
 				// If we have already received bufferSize number of events,
 				// buffer should be empty and we should receive no event.
 				if i%bufferSize == bufferSize-1 {
-					event, ok := wci.buffer.next()
+					event, ok := src.buffer.next()
 					if err := verifyNoEvent(ok, event); err != nil {
 						t.Error(err)
 					}
 				}
 			}
 			// buffer should be empty and return no event.
-			event, ok := wci.buffer.next()
+			event, ok := src.buffer.next()
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
 			}
 			// Buffer should be empty now, an additional fillBuffer()
 			// should make no difference.
-			wci.fillBuffer()
-			event, ok = wci.buffer.next()
+			src.fillBuffer()
+			event, ok = src.buffer.next()
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
 			}
@@ -294,19 +300,20 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
 			}
 			indexerFunc := func(i int) *watchCacheEvent {
-				return wc.cache[i%wc.capacity]
+				return wc.history.cache[i%wc.history.capacity]
 			}
 
 			wci := newCacheInterval(
 				c.intervalStartIndex,
-				wc.endIndex,
+				wc.history.endIndex,
 				indexerFunc,
-				wc.isIndexValidLocked,
+				wc.history.isIndexValidLocked,
 				wc.resourceVersion,
 				&wc.RWMutex,
 			)
+			src := historySource(wci)
 
-			numExpectedEvents := wc.endIndex - c.intervalStartIndex
+			numExpectedEvents := wc.history.endIndex - c.intervalStartIndex
 			for i := 0; i < numExpectedEvents; i++ {
 				// Simulate and test interval invalidation iff
 				// the watchCache itself is not empty.
@@ -318,8 +325,8 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					// copying over events from the underlying watch cache,
 					// i.e. freshly filling in the interval buffer.
 					if i%bufferSize == 0 && i != c.eventsAddedToWatchcache {
-						originalCacheStartIndex := wc.startIndex
-						wc.startIndex = wci.startIndex + 1
+						originalCacheStartIndex := wc.history.startIndex
+						wc.history.startIndex = src.startIndex + 1
 						event, err := wci.Next()
 						if err == nil {
 							t.Errorf("expected non-nil error")
@@ -328,7 +335,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 							t.Errorf("expected nil event, got %v", *event)
 						}
 						// Restore startIndex.
-						wc.startIndex = originalCacheStartIndex
+						wc.history.startIndex = originalCacheStartIndex
 					}
 				}
 
@@ -338,7 +345,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				// or when received is equal to the number of expected events.
 				// The latter happens when partial filling occurs and no more
 				// events are left post the partial fill.
-				if wci.buffer.isEmpty() != (i%bufferSize == 0 || i == numExpectedEvents) {
+				if src.buffer.isEmpty() != (i%bufferSize == 0 || i == numExpectedEvents) {
 					t.Error("expected empty interval buffer")
 					return
 				}
@@ -349,8 +356,8 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					return
 				}
 
-				expectedIndex := (c.intervalStartIndex + i) % wc.capacity
-				expectedEvent := wc.cache[expectedIndex]
+				expectedIndex := (c.intervalStartIndex + i) % wc.history.capacity
+				expectedEvent := wc.history.cache[expectedIndex]
 				if err := verifyEvent(true, event, expectedEvent); err != nil {
 					t.Error(err)
 				}
@@ -373,7 +380,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
+	store := store.NewIndexer(nil)
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -400,12 +407,6 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 
 	for i := 0; i < numEvents; i++ {
-		// The interval buffer can never be empty unless
-		// all elements obtained through List() have been
-		// returned.
-		if wci.buffer.isEmpty() && i != numEvents {
-			t.Fatal("expected non-empty interval buffer")
-		}
 		event, err := wci.Next()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -423,8 +424,55 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		}
 	}
 
-	// The interval's buffer should now be empty.
-	if !wci.buffer.isEmpty() {
-		t.Error("expected cache interval's buffer to be empty")
+	// All events should have been consumed.
+	event, err := wci.Next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if event != nil {
+		t.Errorf("expected nil event after consuming all events, got %v", *event)
+	}
+}
+
+// TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
+// events sorted by Key for both indexer backends.
+func TestCacheIntervalFromStoreSorted(t *testing.T) {
+	cases := []struct {
+		name    string
+		indexer store.Indexer
+	}{
+		{"btree", store.NewIndexer(nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const n = 50
+			// Insert in reverse-key order so any code path that returns
+			// items in insertion order trivially fails the sorted check below.
+			for i := n - 1; i >= 0; i-- {
+				key := fmt.Sprintf("pod-%08d", i)
+				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
+				err := tc.indexer.Add(elem)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := make([]string, 0, n)
+			for range n {
+				ev, err := wci.Next()
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, ev.Key)
+			}
+			if !sort.StringsAreSorted(got) {
+				t.Errorf("events not sorted by key: %v", got)
+			}
+		})
 	}
 }

@@ -2,6 +2,8 @@ BRANCH=`git rev-parse --abbrev-ref HEAD`
 COMMIT=`git rev-parse --short HEAD`
 GOLDFLAGS="-X main.branch $(BRANCH) -X main.commit $(COMMIT)"
 GOFILES = $(shell find . -name \*.go)
+REPOSITORY_ROOT := $(shell git rev-parse --show-toplevel)
+GOTOOLCHAIN ?= go$(shell cat $(REPOSITORY_ROOT)/.go-version)
 
 TESTFLAGS_RACE=-race=false
 ifdef ENABLE_RACE
@@ -33,7 +35,7 @@ fmt:
 	@!(gofmt -l -s -d ${GOFILES} | grep '[a-z]')
 
 	@echo "Verifying goimports, failures can be fixed with ./scripts/fix.sh"
-	@!(go run golang.org/x/tools/cmd/goimports@latest -l -d ${GOFILES} | grep '[a-z]')
+	@!(go tool golang.org/x/tools/cmd/goimports -l -d ${GOFILES} | grep '[a-z]')
 
 .PHONY: lint
 lint:
@@ -44,12 +46,12 @@ test:
 	@echo "hashmap freelist test"
 	BBOLT_VERIFY=all TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} -timeout ${TESTFLAGS_TIMEOUT}
 	BBOLT_VERIFY=all TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} ./internal/...
-	BBOLT_VERIFY=all TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} ./cmd/bbolt
+	BBOLT_VERIFY=all TEST_FREELIST_TYPE=hashmap go test -v ${TESTFLAGS} ./cmd/bbolt/...
 
 	@echo "array freelist test"
 	BBOLT_VERIFY=all TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} -timeout ${TESTFLAGS_TIMEOUT}
 	BBOLT_VERIFY=all TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} ./internal/...
-	BBOLT_VERIFY=all TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} ./cmd/bbolt
+	BBOLT_VERIFY=all TEST_FREELIST_TYPE=array go test -v ${TESTFLAGS} ./cmd/bbolt/...
 
 .PHONY: coverage
 coverage:
@@ -71,16 +73,12 @@ clean: # Clean binaries
 	rm -f ./bin/${BOLT_CMD}
 
 .PHONY: gofail-enable
-gofail-enable: install-gofail
-	gofail enable .
+gofail-enable:
+	go tool go.etcd.io/gofail enable .
 
 .PHONY: gofail-disable
-gofail-disable: install-gofail
-	gofail disable .
-
-.PHONY: install-gofail
-install-gofail:
-	go install go.etcd.io/gofail
+gofail-disable:
+	go tool go.etcd.io/gofail disable .
 
 .PHONY: test-failpoint
 test-failpoint:
@@ -99,10 +97,6 @@ test-robustness: gofail-enable build
 .PHONY: test-benchmark-compare
 # Runs benchmark tests on the current git ref and the given REF, and compares
 # the two.
-test-benchmark-compare: install-benchstat
+test-benchmark-compare:
 	@git fetch
 	./scripts/compare_benchmarks.sh $(REF)
-
-.PHONY: install-benchstat
-install-benchstat:
-	go install golang.org/x/perf/cmd/benchstat@latest

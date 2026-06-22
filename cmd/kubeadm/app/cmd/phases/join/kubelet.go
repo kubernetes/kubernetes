@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -196,13 +195,11 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	}
 
 	// Write the instance kubelet configuration file to disk.
-	if features.Enabled(initCfg.FeatureGates, features.NodeLocalCRISocket) {
-		kubeletConfig := &kubeletconfig.KubeletConfiguration{
-			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
-		}
-		if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
-			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
-		}
+	kubeletConfig := &kubeletconfig.KubeletConfiguration{
+		ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
+	}
+	if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
+		return errors.Wrap(err, "error writing instance kubelet configuration to disk")
 	}
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -36,7 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1827,7 +1828,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1841,7 +1842,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`class my-resource-class: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`class my-resource-class: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1861,7 +1862,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1877,12 +1878,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 					},
 				},
 				prescore: result{
 					// This is the error found during Filter.
-					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: healthy`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: healthy. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 				},
 			},
 		},
@@ -1961,6 +1962,31 @@ func testPlugin(tCtx ktesting.TContext) {
 							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
 							return out
 						},
+					},
+				},
+			},
+		},
+		"bind-failure-preserves-inflight-until-unreserve": {
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{addAllocationTimestamp(allocatedClaim)},
+					status:         fwk.NewStatus(fwk.Unschedulable, `claim bind error`),
+				},
+				unreserveAfterBindFailure: &result{},
+			},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						return true, nil, apierrors.NewBadRequest("claim bind error")
 					},
 				},
 			},
@@ -2232,7 +2258,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                      want{},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2302,7 +2328,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2324,7 +2350,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2347,7 +2373,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2370,7 +2396,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2386,16 +2412,17 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
-					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:       fwk.NewStatus(fwk.Unschedulable, `patch error`),
+					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
+					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
+					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					status:         fwk.NewStatus(fwk.Unschedulable, `patch error`),
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2418,7 +2445,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2440,7 +2467,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2462,7 +2489,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2479,7 +2506,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				unreserveBeforePreBind: &result{},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2494,7 +2521,8 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+					status:         fwk.NewStatus(fwk.Unschedulable, `claim creation errors`),
 				},
 				unreserveAfterBindFailure: &result{
 					removed: []metav1.Object{reserve(extendedResourceClaim, podWithExtendedResourceName)},
@@ -2510,7 +2538,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["failure"]))
 			},
@@ -2700,7 +2728,8 @@ func testPlugin(tCtx ktesting.TContext) {
 					}()},
 				},
 				prebind: result{
-					assumedClaim: reserve(bindClaim, podWithClaimName),
+					inFlightClaims: []metav1.Object{bindClaim},
+					assumedClaim:   reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -2731,7 +2760,8 @@ func testPlugin(tCtx ktesting.TContext) {
 					}()},
 				},
 				prebind: result{
-					assumedClaim: reserve(bindClaim, podWithClaimName),
+					inFlightClaims: []metav1.Object{bindClaim},
+					assumedClaim:   reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -3500,7 +3530,9 @@ func testPlugin(tCtx ktesting.TContext) {
 				EnableDRAConsumableCapacity:        tc.enableDRAConsumableCapacity,
 				EnableDRAWorkloadResourceClaims:    tc.enableDRAWorkloadResourceClaims,
 			}
-
+			if !tc.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 			if tc.disableDRAAdminAccess {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
@@ -4030,7 +4062,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		tCtx.ExpectNoError(err, "create resource class")
 	}
 	for _, podGroup := range podGroups {
-		_, err := tc.client.SchedulingV1alpha2().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		_, err := tc.client.SchedulingV1alpha3().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create pod group")
 	}
 
@@ -4304,10 +4336,10 @@ func testIsSchedulableAfterClaimChange(tCtx ktesting.TContext) {
 	}
 }
 
-func TestIsSchedulableAfterPodChange(t *testing.T) {
-	testIsSchedulableAfterPodChange(ktesting.Init(t))
+func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
+	testIsSchedulableAfterTargetPodUpdate(ktesting.Init(t))
 }
-func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
+func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		objs     []apiruntime.Object
 		pod      *v1.Pod
@@ -4326,17 +4358,6 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 			pod:      podWithClaimTemplate,
 			obj:      podWithClaimTemplateInStatus,
 			wantHint: fwk.Queue,
-		},
-		"wrong-pod": {
-			objs: []apiruntime.Object{pendingClaim},
-			pod: func() *v1.Pod {
-				pod := podWithClaimTemplate.DeepCopy()
-				pod.Name += "2"
-				pod.UID += "2" // This is the relevant difference.
-				return pod
-			}(),
-			obj:      podWithClaimTemplateInStatus,
-			wantHint: fwk.QueueSkip,
 		},
 		"missing-claim": {
 			objs:     nil,
@@ -4369,7 +4390,7 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 				EnableDRAResourceClaimDeviceStatus: true,
 			}
 			testCtx := setup(tCtx, nil, nil, tc.claims, nil, nil, tc.objs, features, false, nil)
-			gotHint, err := testCtx.p.isSchedulableAfterPodChange(tCtx.Logger(), tc.pod, nil, tc.obj)
+			gotHint, err := testCtx.p.isSchedulableAfterTargetPodUpdate(tCtx.Logger(), tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
 					tCtx.Fatal("want an error, got none")
@@ -4401,14 +4422,25 @@ func (m *mockDeviceClassResolver) GetDeviceClass(resourceName v1.ResourceName) *
 // k8s.io/dynamic-resource-allocation/structured because that code has no access
 // to feature gate definitions.
 func TestAllocatorSelection(t *testing.T) {
+	// We want to be sure that each feature as identified by the fields in structured.Features
+	// is covered by a dedicated test cases.
+	allFeatures := sets.New[string]()
+	coveredFeatures := sets.New[string]()
+	featureType := reflect.TypeFor[structured.Features]()
+	for field := range featureType.Fields() {
+		allFeatures.Insert(field.Name)
+	}
+
 	for name, tc := range map[string]struct {
 		features             string
+		usingFeatureGroup    bool
 		expectImplementation string
 	}{
 		// The most conservative implementation: only used when explicitly asking
 		// for the most stable Kubernetes (no alpha or beta features).
 		"only-GA": {
 			features:             "AllAlpha=false,AllBeta=false",
+			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},
 
@@ -4416,13 +4448,47 @@ func TestAllocatorSelection(t *testing.T) {
 		// is used.
 		"default": {
 			features:             "",
+			usingFeatureGroup:    true,
 			expectImplementation: "incubating",
 		},
 
-		// Alpha features need the experimental implementation.
+		// Alpha features may need the experimental implementation, if there are any
+		// and if those influence allocation.
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
+			usingFeatureGroup:    true,
+			expectImplementation: "experimental",
+		},
+
+		// Let's also determine which allocator is picked for each of the
+		// individual features which influence that decision.
+		"AdminAccess": {
+			features:             "AllAlpha=false,AllBeta=false,DRAAdminAccess=true",
+			expectImplementation: "stable",
+		},
+		"ConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true",
 			expectImplementation: "incubating",
+		},
+		"DeviceBindingAndStatus": {
+			features:             "AllAlpha=false,AllBeta=false,DRAResourceClaimDeviceStatus=true,DRADeviceBindingConditions=true",
+			expectImplementation: "incubating",
+		},
+		"DeviceTaints": {
+			features:             "AllAlpha=false,AllBeta=false,DRADeviceTaints=true",
+			expectImplementation: "stable",
+		},
+		"ListTypeAttributes": {
+			features:             "AllAlpha=false,AllBeta=false,DRAListTypeAttributes=true",
+			expectImplementation: "experimental",
+		},
+		"PartitionableDevices": {
+			features:             "AllAlpha=false,AllBeta=false,DRAPartitionableDevices=true",
+			expectImplementation: "stable",
+		},
+		"PrioritizedList": {
+			features:             "AllAlpha=false,AllBeta=false,DRAPrioritizedList=true",
+			expectImplementation: "stable",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -4440,7 +4506,20 @@ func TestAllocatorSelection(t *testing.T) {
 			if !strings.Contains(allocatorType, tc.expectImplementation) {
 				tCtx.Fatalf("Expected allocator implementation %q, got %s", tc.expectImplementation, allocatorType)
 			}
+
+			if !tc.usingFeatureGroup {
+				for field := range featureType.Fields() {
+					if !reflect.ValueOf(features).FieldByName(field.Name).IsZero() {
+						coveredFeatures.Insert(field.Name)
+					}
+				}
+			}
 		})
+	}
+
+	notCovered := allFeatures.Difference(coveredFeatures)
+	if len(notCovered) > 0 {
+		t.Errorf("Some feature fields in %T were never set by any of the dedicated sub-tests: %s\nA test case for a new feature is missing and/or AllocatorFeatures was not updated to set the field.", structured.Features{}, strings.Join(sets.List(notCovered), ", "))
 	}
 }
 
@@ -4466,6 +4545,19 @@ func Test_computesScore(t *testing.T) {
 			},
 			allocations: nodeAllocation{},
 			expectErr:   true,
+		},
+		"mix-of-allocated-and-unallocated-claims": {
+			claims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+				pendingClaim2,
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					*allocationResult2,
+				},
+			},
+			expectedScore: 0,
+			expectErr:     false,
 		},
 		"single-request-only-subrequest-allocated": {
 			claims: []*resourceapi.ResourceClaim{

@@ -61,7 +61,10 @@ type ResourceVersionController struct {
 	svmSynced       cache.InformerSynced
 	queue           workqueue.TypedRateLimitingInterface[string]
 	kubeClient      clientset.Interface
-	mapper          meta.RESTMapper
+	mapper          meta.ResettableRESTMapper
+
+	lastResetLock sync.Mutex
+	lastReset     time.Time
 }
 
 func NewResourceVersionController(
@@ -70,7 +73,7 @@ func NewResourceVersionController(
 	discoveryClient discovery.DiscoveryInterface,
 	metadataClient metadata.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
-	mapper meta.RESTMapper,
+	mapper meta.ResettableRESTMapper,
 ) *ResourceVersionController {
 	logger := klog.FromContext(ctx)
 
@@ -215,6 +218,7 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		// our GC cache could be missing a recently created custom resource, so give it some time to catch up
 		// we resync discovery every 30 seconds so twice that should be sufficient
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
+			rv.resetMapperIfStale()
 			return fmt.Errorf("resource does not exist in our rest mapper, requeuing to attempt again")
 		}
 		return rv.failMigration(ctx, toBeProcessedSVM, "resource does not exist in discovery")
@@ -361,4 +365,13 @@ func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svm
 		return err
 	}
 	return nil
+}
+
+func (rv *ResourceVersionController) resetMapperIfStale() {
+	rv.lastResetLock.Lock()
+	defer rv.lastResetLock.Unlock()
+	if time.Since(rv.lastReset) > 10*time.Second {
+		rv.mapper.Reset()
+		rv.lastReset = time.Now()
+	}
 }

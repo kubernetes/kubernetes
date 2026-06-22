@@ -167,14 +167,15 @@ Most test cases have a threshold set for the largest `performance` workloads.
 By default, these are defined for the `Average` statistic of the `SchedulingThroughput` metric. 
 It is possible to use other metric by configuring `thresholdMetricSelector` per test case or workload. 
 
+If the actual metric value is below the threshold, the test will fail.
+
 ### How to calculate the threshold
 
-The initial values for scheduling throughput thresholds were calculated through an analysis of historical data, 
-specifically focusing on the minimum, average, and standard deviation values for each workload 
-(see [#126871](https://github.com/kubernetes/kubernetes/pull/126871)). 
-Our goal is to set the thresholds somewhat pessimistically to minimize flakiness, 
-so it's recommended to set the threshold slightly below the observed historical minimum. 
-Depending on variability of data, the threshold can be lowered more. 
+The current values for scheduling throughput thresholds were calculated through an analysis of historical data, taking the minimum average value from the most recent 250 test runs.
+
+It's important to note that any test failure will result in a workflow failure,
+and consecutive workflow failures will raise an alert.
+Our goal is to set the thresholds somewhat pessimistically to minimize flakiness.
 
 Thresholds should be adjusted based on the flakiness level and minima observed in the future. 
 Remember to set the value for newly added test cases as well, 

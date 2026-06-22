@@ -49,7 +49,7 @@ func (pl *PodGroupPodsCount) Name() string {
 // Both scheduled (assumed/assigned) pods and the proposed assignments are taken into consideration
 // when computing the score. This ensures that the relative difference between choices is reduced,
 // and small changes to the total count result in small changes to the score.
-func (pl *PodGroupPodsCount) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *PodGroupPodsCount) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
 	if err != nil {
 		return 0, fwk.AsStatus(err)

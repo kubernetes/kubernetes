@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,24 +37,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
-	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1alpha2"
+	schedulingapply "k8s.io/client-go/applyconfigurations/scheduling/v1alpha3"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/utils/ptr"
 )
 
@@ -186,7 +188,8 @@ func NewController(
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
 
-	resourceclaimmetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
+	resourceclaimmetrics.RegisterMetrics()
+	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -861,10 +864,25 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	if newPodClaims != nil {
 		// Patch the pod status with the new information about
 		// generated ResourceClaims.
-		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(newPodClaims))
-		for podClaimName, resourceClaimName := range newPodClaims {
-			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(podClaimName).WithResourceClaimName(resourceClaimName))
+		mergedStatuses := make(map[string]string)
+		for _, status := range pod.Status.ResourceClaimStatuses {
+			if status.ResourceClaimName != nil {
+				mergedStatuses[status.Name] = *status.ResourceClaimName
+			}
 		}
+		maps.Copy(mergedStatuses, newPodClaims)
+
+		names := make([]string, 0, len(mergedStatuses))
+		for name := range mergedStatuses {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+
+		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(names))
+		for _, name := range names {
+			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(name).WithResourceClaimName(mergedStatuses[name]))
+		}
+
 		podApply := corev1apply.Pod(name, namespace).WithStatus(corev1apply.PodStatus().WithResourceClaimStatuses(statuses...))
 		if _, err := ec.kubeClient.CoreV1().Pods(namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update pod %s/%s ResourceClaimStatuses: %v", namespace, name, err)
@@ -1159,7 +1177,7 @@ func (ec *Controller) syncPodGroup(ctx context.Context, namespace, name string) 
 			statuses = append(statuses, schedulingapply.PodGroupResourceClaimStatus().WithName(podGroupClaimName).WithResourceClaimName(resourceClaimName))
 		}
 		podGroupApply := schedulingapply.PodGroup(name, namespace).WithStatus(schedulingapply.PodGroupStatus().WithResourceClaimStatuses(statuses...))
-		if _, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+		if _, err := ec.kubeClient.SchedulingV1alpha3().PodGroups(namespace).ApplyStatus(ctx, podGroupApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update PodGroup %s/%s ResourceClaimStatuses: %w", namespace, name, err)
 		}
 	}
@@ -1429,7 +1447,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// scheduling its Pods would be bad. We have to be
 					// absolutely sure and thus have to check with
 					// the API server.
-					podGroup, err := ec.kubeClient.SchedulingV1alpha2().PodGroups(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
+					podGroup, err := ec.kubeClient.SchedulingV1alpha3().PodGroups(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
 					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
@@ -1752,11 +1770,11 @@ type customCollector struct {
 var _ metrics.StableCollector = &customCollector{}
 
 func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
-	ch <- resourceclaimmetrics.NumResourceClaimsDesc
+	ch <- controllermetrics.NumResourceClaimsDesc
 }
 
 func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	rcMetrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]int)
+	rcMetrics := make(map[controllermetrics.NumResourceClaimLabels]int)
 	rcList, err := collector.rcLister.List(labels.Everything())
 	if err != nil {
 		collector.logger.Error(err, "failed to list resource claims for metrics collection")
@@ -1775,11 +1793,11 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 		} else if val, ok := rc.Annotations[resourceapi.PodResourceClaimAnnotation]; ok && val != "" {
 			source = "resource_claim_template"
 		}
-		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
+		rcMetrics[controllermetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
 	}
 	for rcLabels, count := range rcMetrics {
 		ch <- metrics.NewLazyConstMetric(
-			resourceclaimmetrics.NumResourceClaimsDesc,
+			controllermetrics.NumResourceClaimsDesc,
 			metrics.GaugeValue,
 			float64(count),
 			rcLabels.Allocated,

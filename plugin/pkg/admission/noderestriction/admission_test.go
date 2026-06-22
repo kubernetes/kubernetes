@@ -243,7 +243,7 @@ type admitTestCase struct {
 	features             featuregate.FeatureGate
 	setupFunc            func(t *testing.T)
 	err                  string
-	authz                authorizer.Authorizer
+	authz                authorizer.UnconditionalAuthorizer
 }
 
 func (a *admitTestCase) run(t *testing.T) {
@@ -600,6 +600,15 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 	extendedResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
 	extendedResourceClaimPod.Status.ExtendedResourceClaimStatus = &api.PodExtendedResourceClaimStatus{ResourceClaimName: "myclaim"}
+
+	nodeAllocatableResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
+	nodeAllocatableResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: "myclaim",
+			Containers:        []string{"mycontainer"},
+			Resources:         map[api.ResourceName]resource.Quantity{api.ResourceCPU: resource.MustParse("1")},
+		},
+	}
 
 	pcrServiceAccountIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 	pcrServiceAccounts := corev1lister.NewServiceAccountLister(pcrServiceAccountIndex)
@@ -1128,6 +1137,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			attributes: admission.NewAttributesRecord(extendedResourceClaimPod, claimpod, podKind, extendedResourceClaimPod.Namespace, extendedResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
 			err:        "annot update extended resource claim status",
 		},
+		{
+			name:       "forbid update of pod's node allocatable resource claim status",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update node allocatable resource claim statuses",
+		},
 
 		// My node object
 		{
@@ -1408,7 +1423,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, coremypod.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        `serviceaccounts "mysa" is forbidden: audience "foo" not found in pod spec volume, system:node:mynode is not authorized to request tokens for this audience`,
+			err:        `serviceaccounts "mysa" is forbidden: system:node:mynode is not authorized to request tokens for audience "foo"`,
 			authz: fakeAuthorizer{
 				t:                  t,
 				serviceAccountName: "mysa",
@@ -1438,7 +1453,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithCSI.Name, v1mypodWithCSI.UID, []string{"bar"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        `audience "bar" not found in pod spec volume, system:node:mynode is not authorized to request tokens for this audience`,
+			err:        `system:node:mynode is not authorized to request tokens for audience "bar"`,
 			authz: fakeAuthorizer{
 				t:                  t,
 				serviceAccountName: "mysa",
@@ -1485,7 +1500,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithPVCRefCSI.Name, v1mypodWithPVCRefCSI.UID, []string{"bar"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        `audience "bar" not found in pod spec volume, system:node:mynode is not authorized to request tokens for this audience`,
+			err:        `system:node:mynode is not authorized to request tokens for audience "bar"`,
 			authz: fakeAuthorizer{
 				t:                  t,
 				serviceAccountName: "mysa",
@@ -1549,7 +1564,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithEphemeralVolume.Name, v1mypodWithEphemeralVolume.UID, []string{"bar"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        `audience "bar" not found in pod spec volume, system:node:mynode is not authorized to request tokens for this audience`,
+			err:        `system:node:mynode is not authorized to request tokens for audience "bar"`,
 			authz: fakeAuthorizer{
 				t:                  t,
 				serviceAccountName: "mysa",
@@ -1670,7 +1685,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				requestAudience:    "foo",
 				decision:           authorizer.DecisionDeny,
 			},
-			err: `serviceaccounts "mysa" is forbidden: audience "foo" not found in pod spec volume, system:node:mynode is not authorized to request tokens for this audience`,
+			err: `serviceaccounts "mysa" is forbidden: system:node:mynode is not authorized to request tokens for audience "foo"`,
 		},
 
 		// Unrelated objects
