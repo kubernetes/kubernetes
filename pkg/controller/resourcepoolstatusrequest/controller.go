@@ -25,6 +25,7 @@ import (
 
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,13 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	resourcev1informers "k8s.io/client-go/informers/resource/v1"
 	resourcev1alpha3informers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourcev1beta2informers "k8s.io/client-go/informers/resource/v1beta2"
 	clientset "k8s.io/client-go/kubernetes"
 	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	resourcev1alpha3listers "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcev1beta2listers "k8s.io/client-go/listers/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -73,6 +78,10 @@ type Controller struct {
 	// claimLister can list/get ResourceClaims from the shared informer's store
 	claimLister resourcev1listers.ResourceClaimLister
 
+	// taintRuleLister can list/get DeviceTaintRules from the shared informer's store.
+	// Only consulted when the DRADeviceTaintRules feature gate is enabled.
+	taintRuleLister resourcev1beta2listers.DeviceTaintRuleLister
+
 	// requestSynced returns true if the ResourcePoolStatusRequest store has been synced
 	requestSynced cache.InformerSynced
 
@@ -81,6 +90,9 @@ type Controller struct {
 
 	// claimSynced returns true if the ResourceClaim store has been synced
 	claimSynced cache.InformerSynced
+
+	// taintRuleSynced returns true if the DeviceTaintRule store has been synced
+	taintRuleSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue for processing ResourcePoolStatusRequests
 	workqueue workqueue.TypedRateLimitingInterface[string]
@@ -93,6 +105,7 @@ func NewController(
 	requestInformer resourcev1alpha3informers.ResourcePoolStatusRequestInformer,
 	sliceInformer resourcev1informers.ResourceSliceInformer,
 	claimInformer resourcev1informers.ResourceClaimInformer,
+	taintRuleInformer resourcev1beta2informers.DeviceTaintRuleInformer,
 ) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 
@@ -105,6 +118,13 @@ func NewController(
 		sliceSynced:   sliceInformer.Informer().HasSynced,
 		claimSynced:   claimInformer.Informer().HasSynced,
 		workqueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+	}
+
+	// Only consume the DeviceTaintRule informer when the gate is enabled, so
+	// clusters that don't serve the v1beta2 API don't block on its cache sync.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		c.taintRuleLister = taintRuleInformer.Lister()
+		c.taintRuleSynced = taintRuleInformer.Informer().HasSynced
 	}
 
 	// Register metrics
@@ -143,7 +163,11 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	// Wait for the caches to be synced before starting workers
 	logger.Info("Waiting for informer caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.requestSynced, c.sliceSynced, c.claimSynced) {
+	syncs := []cache.InformerSynced{c.requestSynced, c.sliceSynced, c.claimSynced}
+	if c.taintRuleSynced != nil {
+		syncs = append(syncs, c.taintRuleSynced)
+	}
+	if !cache.WaitForCacheSync(ctx.Done(), syncs...) {
 		logger.Error(nil, "Failed to wait for caches to sync")
 		return
 	}
@@ -264,8 +288,22 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	return nil
 }
 
-// hasUnavailableTaint reports whether the device carries a taint that makes it
-// unschedulable (NoSchedule or NoExecute), and so should count as unavailable.
+// deviceUnavailable reports whether a device should count as unavailable,
+// considering both its embedded taints and any matching DeviceTaintRules.
+func deviceUnavailable(driver, pool string, device *resourcev1.Device, rules []*resourcev1beta2.DeviceTaintRule) bool {
+	if hasUnavailableTaint(device) {
+		return true
+	}
+	for _, rule := range rules {
+		if ruleMakesDeviceUnavailable(rule, driver, pool, device.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasUnavailableTaint reports whether the device carries an embedded taint that
+// makes it unschedulable (NoSchedule or NoExecute).
 func hasUnavailableTaint(device *resourcev1.Device) bool {
 	for _, taint := range device.Taints {
 		switch taint.Effect {
@@ -274,6 +312,30 @@ func hasUnavailableTaint(device *resourcev1.Device) bool {
 		}
 	}
 	return false
+}
+
+// ruleMakesDeviceUnavailable reports whether a DeviceTaintRule selects the given
+// device and applies a NoSchedule/NoExecute taint. A nil selector matches nothing.
+func ruleMakesDeviceUnavailable(rule *resourcev1beta2.DeviceTaintRule, driver, pool, device string) bool {
+	switch rule.Spec.Taint.Effect {
+	case resourcev1beta2.DeviceTaintEffectNoSchedule, resourcev1beta2.DeviceTaintEffectNoExecute:
+	default:
+		return false
+	}
+	sel := rule.Spec.DeviceSelector
+	if sel == nil {
+		return false
+	}
+	if sel.Driver != nil && *sel.Driver != driver {
+		return false
+	}
+	if sel.Pool != nil && *sel.Pool != pool {
+		return false
+	}
+	if sel.Device != nil && *sel.Device != device {
+		return false
+	}
+	return true
 }
 
 // calculatePoolStatus computes the pool status on-demand by reading directly
@@ -307,6 +369,17 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	if err != nil {
 		logger.Error(err, "Failed to list ResourceSlices")
 		return errorStatus("Failed to list ResourceSlices: " + err.Error())
+	}
+
+	// DeviceTaintRules taint devices externally (admin-applied), independent of
+	// the driver's embedded taints. Only consulted when the gate is enabled.
+	var taintRules []*resourcev1beta2.DeviceTaintRule
+	if c.taintRuleLister != nil && utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		taintRules, err = c.taintRuleLister.List(labels.Everything())
+		if err != nil {
+			logger.Error(err, "Failed to list DeviceTaintRules")
+			return errorStatus("Failed to list DeviceTaintRules: " + err.Error())
+		}
 	}
 
 	// Pass 1: Find max generation per pool
@@ -346,7 +419,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		deviceCount := int32(len(slice.Spec.Devices))
 		unavailCount := int32(0)
 		for i := range slice.Spec.Devices {
-			if hasUnavailableTaint(&slice.Spec.Devices[i]) {
+			if deviceUnavailable(slice.Spec.Driver, slicePoolName, &slice.Spec.Devices[i], taintRules) {
 				unavailCount++
 			}
 		}

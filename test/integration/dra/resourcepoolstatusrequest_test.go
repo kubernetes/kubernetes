@@ -135,6 +135,7 @@ func (c *resourcePoolStatusRequestControllerSingleton) start(tCtx ktesting.TCont
 		c.informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		c.informerFactory.Resource().V1().ResourceSlices(),
 		c.informerFactory.Resource().V1().ResourceClaims(),
+		c.informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	tCtx.ExpectNoError(err, "create ResourcePoolStatusRequest controller")
 
