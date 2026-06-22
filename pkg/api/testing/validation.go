@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
@@ -295,11 +294,7 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	}
 
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
-		errs := strategy.Validate(c, obj)
-		if dv, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
-			errs = dv.ValidateDeclaratively(c, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(c, obj, nil))
-		}
-		return errs
+		return rest.ValidateCreate(c, obj, strategy)
 	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
@@ -327,11 +322,7 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	}
 
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
-		errs := strategy.ValidateUpdate(c, obj, old)
-		if dv, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
-			errs = dv.ValidateDeclaratively(c, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(c, obj, old))
-		}
-		return errs
+		return rest.ValidateUpdate(c, obj, old, strategy)
 	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }

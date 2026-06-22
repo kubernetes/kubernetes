@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	registry "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicybinding"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -70,6 +71,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, &registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidBinding()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, &registry.Strategy)
+
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -81,6 +85,13 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "admissionregistration.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "validatingadmissionpolicybindings",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	testCases := map[string]struct {
 		oldObj       admissionregistration.ValidatingAdmissionPolicyBinding
 		updateObj    admissionregistration.ValidatingAdmissionPolicyBinding
@@ -108,18 +119,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "admissionregistration.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "validatingadmissionpolicybindings",
-				Name:              "valid-binding",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, &registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidBinding()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, &registry.Strategy)
 }
 
 func mkValidBinding(tweaks ...func(obj *admissionregistration.ValidatingAdmissionPolicyBinding)) admissionregistration.ValidatingAdmissionPolicyBinding {
