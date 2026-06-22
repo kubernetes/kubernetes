@@ -130,6 +130,7 @@ func TestPendingPodGroupMemberPods_Update(t *testing.T) {
 	pod2 := st.MakePod().Name("pod2").Namespace("ns1").PodGroupName("pg1").Obj()
 
 	pInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, pod1)}
+	updatedPodInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewTestPodInfo(t, updatedPod1)}
 	pgInfo1 := newQueuedPodGroupInfoForLookup(pod1)
 
 	tests := []struct {
@@ -138,21 +139,21 @@ func TestPendingPodGroupMemberPods_Update(t *testing.T) {
 		pgInfoLookup *framework.QueuedPodGroupInfo
 		updatePod    *v1.Pod
 		checkPod     *v1.Pod
-		wantUpdated  bool
+		wantUpdated  *framework.QueuedPodInfo
 	}{
 		{
 			name:         "update existing pod",
 			podsToAdd:    []*framework.QueuedPodInfo{pInfo1},
 			pgInfoLookup: pgInfo1,
 			updatePod:    updatedPod1,
-			wantUpdated:  true,
+			wantUpdated:  updatedPodInfo1,
 		},
 		{
 			name:         "update non-existent pod",
 			podsToAdd:    []*framework.QueuedPodInfo{pInfo1},
 			pgInfoLookup: pgInfo1,
 			updatePod:    pod2,
-			wantUpdated:  false,
+			wantUpdated:  nil,
 		},
 	}
 
@@ -163,16 +164,9 @@ func TestPendingPodGroupMemberPods_Update(t *testing.T) {
 				ppm.add(newQueuedPodGroupInfoForLookup(pInfo.Pod), pInfo.DeepCopy())
 			}
 
-			updated := ppm.update(tt.pgInfoLookup, tt.updatePod)
-			if updated != tt.wantUpdated {
-				t.Fatalf("Expected updated pod: %v, got: %v", tt.wantUpdated, updated)
-			}
-
-			if tt.wantUpdated {
-				got := ppm.getPod(tt.pgInfoLookup, tt.updatePod)
-				if diff := cmp.Diff(tt.updatePod, got.Pod); diff != "" {
-					t.Errorf("Unexpected pod (-want,+got)\n%s", diff)
-				}
+			pInfo := ppm.update(tt.pgInfoLookup, tt.updatePod)
+			if diff := cmp.Diff(tt.wantUpdated, pInfo, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+				t.Errorf("Unexpected updated pod (-want,+got)\n%s", diff)
 			}
 		})
 	}

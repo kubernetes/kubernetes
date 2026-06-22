@@ -74,16 +74,16 @@ func (p *pendingPodGroupMemberPods) getPod(pgInfoLookup framework.QueuedEntityIn
 }
 
 // update refreshes the pod object for a member of the specified pod group.
-// It returns true if the pod was found and updated, false otherwise.
-func (p *pendingPodGroupMemberPods) update(pgInfoLookup framework.QueuedEntityInfo, newPod *v1.Pod) bool {
+// It returns the updated pod info if the pod was found, nil otherwise.
+func (p *pendingPodGroupMemberPods) update(pgInfoLookup framework.QueuedEntityInfo, newPod *v1.Pod) *framework.QueuedPodInfo {
 	pgKey := queuedEntityKeyFunc(pgInfoLookup)
 	for _, pInfo := range p.podGroupToPods[pgKey] {
 		if pInfo.Pod.Name == newPod.Name && pInfo.Pod.Namespace == newPod.Namespace {
 			pInfo.Pod = newPod
-			return true
+			return pInfo
 		}
 	}
-	return false
+	return nil
 }
 
 // delete removes a specific pod from the tracked members of a pod group.
