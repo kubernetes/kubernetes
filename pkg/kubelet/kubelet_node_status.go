@@ -633,16 +633,64 @@ func (kl *Kubelet) markVolumesFromNode(node *v1.Node) {
 	kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
 }
 
+// nodeRefWithUID returns a copy of the Kubelet's static node ObjectReference with
+// the Node's UID populated on a best-effort basis.
+//
+// kl.nodeRef is constructed once at Kubelet startup (see NewMainKubelet), before
+// the Node object is guaranteed to exist in the apiserver, so it intentionally
+// carries only kind+name and no UID (see https://github.com/kubernetes/kubernetes/issues/42701).
+// As a result every event the kubelet records against the node has
+// involvedObject.uid unset, which prevents consumers such as `kubectl describe
+// node` from correlating those events with the Node by UID
+// (see https://github.com/kubernetes/kubernetes/issues/138524).
+//
+// Once the Node is visible in the local cache we resolve the UID once and cache
+// the resulting reference in kl.cachedNodeRef. It is not refreshed: if the Node
+// were deleted and recreated with a new UID while this kubelet keeps running,
+// events would keep using the original UID.
+func (kl *Kubelet) nodeRefWithUID() *v1.ObjectReference {
+	// Fast path: a reference with the UID already resolved has been cached.
+	if ref := kl.cachedNodeRef.Load(); ref != nil {
+		return ref
+	}
+
+	// kl.nodeRef is written once at construction in NewMainKubelet and never
+	// reassigned, so there is no concurrent writer to guard against here. The nil
+	// check only matters for tests that do not set it.
+	if kl.nodeRef == nil {
+		return nil
+	}
+
+	ref := *kl.nodeRef
+	if ref.UID == "" {
+		// In standalone mode there is no apiserver, hence no Node UID to resolve.
+		if kl.kubeClient == nil {
+			return kl.nodeRef
+		}
+		node, err := kl.nodeLister.Get(string(kl.nodeName))
+		if err != nil || node.UID == "" {
+			// UID not known yet; return the name-only reference and retry next time.
+			return kl.nodeRef
+		}
+		ref.UID = node.UID
+	}
+
+	// Cache the resolved reference. CompareAndSwap keeps the first winner if two
+	// goroutines resolve concurrently; Load then returns whichever won.
+	kl.cachedNodeRef.CompareAndSwap(nil, &ref)
+	return kl.cachedNodeRef.Load()
+}
+
 // recordNodeStatusEvent records an event of the given type with the given
 // message for the node.
 func (kl *Kubelet) recordNodeStatusEvent(logger klog.Logger, eventType, event string) {
 	logger.V(2).Info("Recording event message for node", "node", klog.KRef("", string(kl.nodeName)), "event", event)
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
+	kl.recorder.Eventf(kl.nodeRefWithUID(), eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // recordEvent records an event for this node, the Kubelet's nodeRef is passed to the recorder
 func (kl *Kubelet) recordEvent(eventType, event, message string) {
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, "%s", message)
+	kl.recorder.Eventf(kl.nodeRefWithUID(), eventType, event, "%s", message)
 }
 
 // record if node schedulable change.
