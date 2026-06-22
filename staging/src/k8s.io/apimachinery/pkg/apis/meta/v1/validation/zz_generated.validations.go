@@ -28,6 +28,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -66,7 +67,36 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.Condition.Status has no validation
+	{ // field v1.Condition.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ConditionStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ConditionStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.Condition) *v1.ConditionStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
 
 	{ // field v1.Condition.ObservedGeneration
 		fn := func(
@@ -102,5 +132,20 @@ func Validate_Condition(
 	// field v1.Condition.LastTransitionTime has no validation
 	// field v1.Condition.Reason has no validation
 	// field v1.Condition.Message has no validation
+	return errs
+}
+
+var symbolsForConditionStatus = sets.New(v1.ConditionFalse, v1.ConditionTrue, v1.ConditionUnknown)
+
+// Validate_ConditionStatus validates an instance of ConditionStatus according
+// to declarative validation rules in the API schema.
+func Validate_ConditionStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *v1.ConditionStatus) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForConditionStatus, nil).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	return errs
 }

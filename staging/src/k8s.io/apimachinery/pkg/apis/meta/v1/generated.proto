@@ -203,6 +203,7 @@ message Condition {
   // +required
   // +kubebuilder:validation:Required
   // +kubebuilder:validation:Enum=True;False;Unknown
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string status = 2;
 
   // observedGeneration represents the .metadata.generation that the condition was set based upon.

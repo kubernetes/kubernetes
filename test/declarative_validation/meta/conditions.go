@@ -60,6 +60,28 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 		},
 		{
+			Name: "invalid missing status",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakStatus("")),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Required(fldPath.Index(0).Child("status"), "").MarkAlpha(),
+			},
+		},
+		{
+			Name: "invalid status value",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakStatus("Invalid")),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.NotSupported(
+					fldPath.Index(0).Child("status"),
+					metav1.ConditionStatus("Invalid"),
+					[]string{"False", "True", "Unknown"},
+				).MarkAlpha(),
+			},
+		},
+		{
 			Name: "invalid negative observedGeneration",
 			Conditions: []metav1.Condition{
 				MkCondition(TweakObservedGeneration(-1)),

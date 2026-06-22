@@ -103,6 +103,10 @@ func init() {
 			"status.conditions[*].observedGeneration": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status.conditions[*].status": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.conditions[*].type": {
 				{ErrorType: "FieldValueRequired"},
 			},
