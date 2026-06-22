@@ -1771,6 +1771,12 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "dra-pod",
 			Namespace: ns.Name,
+			// Finalizer prevents immediate hard-deletion for unscheduled pods.
+			// Without NodeName, CheckGracefulDelete forces grace period=0 which
+			// removes the pod from etcd synchronously before DeletionTimestamp
+			// can be observed. The finalizer ensures Delete sets DeletionTimestamp
+			// while keeping the pod in etcd until we clean up below.
+			Finalizers: []string{"test/delay-deletion"},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
@@ -1837,5 +1843,12 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 		t.Error("ResourceClaimStatuses were cleared by old-client UpdateStatus on terminating pod — fix not working")
 	} else {
 		t.Logf("ResourceClaimStatuses preserved correctly: %v", updated.Status.ResourceClaimStatuses)
+	}
+
+	// Remove the test finalizer so the pod can be cleaned up by namespace deletion.
+	toClean := updated.DeepCopy()
+	toClean.Finalizers = nil
+	if _, err := client.CoreV1().Pods(ns.Name).Update(ctx, toClean, metav1.UpdateOptions{}); err != nil {
+		t.Logf("cleanup: remove test finalizer: %v", err)
 	}
 }
