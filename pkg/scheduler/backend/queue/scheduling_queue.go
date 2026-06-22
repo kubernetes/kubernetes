@@ -48,8 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/clock"
@@ -125,8 +123,6 @@ type SchedulingQueue interface {
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
-	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
-	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent)
 
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -1385,33 +1381,6 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 	}
 }
 
-// AssignedPodAdded is called when a bound pod is added. Creation of this pod
-// may make pending pods with matching affinity terms schedulable.
-func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
-	p.lock.Lock()
-
-	// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
-	// because Pod related events shouldn't make Pods that rejected by single-node scheduling requirement schedulable.
-	p.moveEntitiesToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, pod), framework.EventAssignedPodAdd, nil, pod)
-	p.lock.Unlock()
-}
-
-// AssignedPodUpdated is called when a bound pod is updated. Change of labels
-// may make pending pods with matching affinity terms schedulable.
-func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event fwk.ClusterEvent) {
-	p.lock.Lock()
-	if (framework.MatchClusterEvents(fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, event)) {
-		// In this case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
-		// because Pod related events may make Pods that were rejected by NodeResourceFit schedulable.
-		p.moveAllToActiveOrBackoffQueue(logger, event, oldPod, newPod, nil)
-	} else {
-		// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
-		// because Pod related events only make Pods rejected by cross topology term schedulable.
-		p.moveEntitiesToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, newPod), event, oldPod, newPod)
-	}
-	p.lock.Unlock()
-}
-
 // NOTE: this function assumes a lock has been acquired in the caller.
 // moveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
 // This function adds all pods and then signals the condition variable to ensure that
@@ -1517,37 +1486,6 @@ func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, e
 	if activated {
 		p.activeQ.broadcast()
 	}
-}
-
-// getUnschedulablePodsWithCrossTopologyTerm returns unschedulable pods which either of following conditions is met:
-// - have any affinity term that matches "pod".
-// - rejected by PodTopologySpread plugin.
-// NOTE: this function assumes lock has been acquired in caller.
-func (p *PriorityQueue) getUnschedulablePodsWithCrossTopologyTerm(logger klog.Logger, pod *v1.Pod) []framework.QueuedEntityInfo {
-	nsLabels := interpodaffinity.GetNamespaceLabelsSnapshot(logger, pod.Namespace, p.nsLister)
-
-	var entitiesToMove []framework.QueuedEntityInfo
-	for _, entity := range p.unschedulableEntities.entityInfoMap {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-			if pInfo.UnschedulablePlugins.Has(podtopologyspread.Name) && pod.Namespace == pInfo.Pod.Namespace {
-				// This Pod may be schedulable now by this Pod event.
-				// Any pod matches for an entity, can move to the next entity.
-				entitiesToMove = append(entitiesToMove, entity)
-				return false
-			}
-
-			for _, term := range pInfo.RequiredAffinityTerms {
-				if term.Matches(pod, nsLabels) {
-					// Any pod matches for an entity, can move to the next entity.
-					entitiesToMove = append(entitiesToMove, entity)
-					return false
-				}
-			}
-			return true
-		})
-	}
-
-	return entitiesToMove
 }
 
 // PodsInActiveQ returns all the Pods in the activeQ.
