@@ -116,6 +116,10 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
 		node.Status.DeclaredFeatures = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && !nodePodPreemptionPolicyInUse(oldNode) {
+		node.Spec.PodPreemptionPolicy = nil
+	}
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -133,6 +137,14 @@ func nodeConfigSourceInUse(node *api.Node) bool {
 func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateNode(node)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (nodeStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.InPlacePodVerticalScalingSchedulerPreemption): utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -325,4 +337,9 @@ func supplementalGroupsPolicyInUse(node *api.Node) bool {
 // nodeDeclaredFeaturesInUse returns true if the node.status has DeclaredFeatures
 func nodeDeclaredFeaturesInUse(node *api.Node) bool {
 	return node != nil && node.Status.DeclaredFeatures != nil
+}
+
+// nodePodPreemptionPolicyInUse returns true if the node.spec has PodPreemptionPolicy
+func nodePodPreemptionPolicyInUse(node *api.Node) bool {
+	return node != nil && node.Spec.PodPreemptionPolicy != nil
 }
