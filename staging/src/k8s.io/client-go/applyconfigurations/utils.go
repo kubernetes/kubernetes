@@ -34,7 +34,6 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,6 +47,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -88,7 +88,6 @@ import (
 	applyconfigurationscertificatesv1alpha1 "k8s.io/client-go/applyconfigurations/certificates/v1alpha1"
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
 	applyconfigurationscoordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
-	applyconfigurationscoordinationv1alpha1 "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/client-go/applyconfigurations/coordination/v1alpha2"
 	applyconfigurationscoordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
@@ -103,6 +102,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
 	internal "k8s.io/client-go/applyconfigurations/internal"
+	applyconfigurationslifecyclev1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
 	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
@@ -584,34 +584,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscoordinationv1.LeaseApplyConfiguration{}
 	case coordinationv1.SchemeGroupVersion.WithKind("LeaseSpec"):
 		return &applyconfigurationscoordinationv1.LeaseSpecApplyConfiguration{}
-
-		// Group=coordination.k8s.io, Version=v1alpha1
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("Eviction"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionPodReference"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionPodReferenceApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequest"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionRequestApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestPodReference"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionRequestPodReferenceApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestSpec"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionRequestSpecApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestStatus"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionRequestStatusApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestTarget"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionRequestTargetApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionSpec"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionSpecApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionStatus"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionStatusApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionTarget"):
-		return &applyconfigurationscoordinationv1alpha1.EvictionTargetApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("Requester"):
-		return &applyconfigurationscoordinationv1alpha1.RequesterApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("ResponderStatus"):
-		return &applyconfigurationscoordinationv1alpha1.ResponderStatusApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("TargetResponder"):
-		return &applyconfigurationscoordinationv1alpha1.TargetResponderApplyConfiguration{}
 
 		// Group=coordination.k8s.io, Version=v1alpha2
 	case v1alpha2.SchemeGroupVersion.WithKind("LeaseCandidate"):
@@ -1366,6 +1338,34 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsapiserverinternalv1alpha1.StorageVersionConditionApplyConfiguration{}
 	case apiserverinternalv1alpha1.SchemeGroupVersion.WithKind("StorageVersionStatus"):
 		return &applyconfigurationsapiserverinternalv1alpha1.StorageVersionStatusApplyConfiguration{}
+
+		// Group=lifecycle.k8s.io, Version=v1alpha1
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("Eviction"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionPodReference"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionPodReferenceApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequest"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestPodReference"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestPodReferenceApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestSpec"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestSpecApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestStatus"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestTarget"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestTargetApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionSpec"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionSpecApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionStatus"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionTarget"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionTargetApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("Requester"):
+		return &applyconfigurationslifecyclev1alpha1.RequesterApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("ResponderStatus"):
+		return &applyconfigurationslifecyclev1alpha1.ResponderStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("TargetResponder"):
+		return &applyconfigurationslifecyclev1alpha1.TargetResponderApplyConfiguration{}
 
 		// Group=meta.k8s.io, Version=v1
 	case metav1.SchemeGroupVersion.WithKind("Condition"):

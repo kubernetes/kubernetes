@@ -36,7 +36,6 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +48,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -208,12 +208,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case coordinationv1.SchemeGroupVersion.WithResource("leases"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1().Leases().Informer()}, nil
 
-		// Group=coordination.k8s.io, Version=v1alpha1
-	case coordinationv1alpha1.SchemeGroupVersion.WithResource("evictions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1alpha1().Evictions().Informer()}, nil
-	case coordinationv1alpha1.SchemeGroupVersion.WithResource("evictionrequests"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1alpha1().EvictionRequests().Informer()}, nil
-
 		// Group=coordination.k8s.io, Version=v1alpha2
 	case v1alpha2.SchemeGroupVersion.WithResource("leasecandidates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1alpha2().LeaseCandidates().Informer()}, nil
@@ -313,6 +307,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=internal.apiserver.k8s.io, Version=v1alpha1
 	case apiserverinternalv1alpha1.SchemeGroupVersion.WithResource("storageversions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Internal().V1alpha1().StorageVersions().Informer()}, nil
+
+		// Group=lifecycle.k8s.io, Version=v1alpha1
+	case lifecyclev1alpha1.SchemeGroupVersion.WithResource("evictions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Lifecycle().V1alpha1().Evictions().Informer()}, nil
+	case lifecyclev1alpha1.SchemeGroupVersion.WithResource("evictionrequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Lifecycle().V1alpha1().EvictionRequests().Informer()}, nil
 
 		// Group=networking.k8s.io, Version=v1
 	case networkingv1.SchemeGroupVersion.WithResource("ipaddresses"):

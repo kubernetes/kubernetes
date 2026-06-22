@@ -18,10 +18,6 @@
     {
       "groupVersion": "coordination.k8s.io/v1alpha2",
       "version": "v1alpha2"
-    },
-    {
-      "groupVersion": "coordination.k8s.io/v1alpha1",
-      "version": "v1alpha1"
     }
   ]
 }

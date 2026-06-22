@@ -43,7 +43,6 @@ import (
 	certificatesv1alpha1 "k8s.io/client-go/kubernetes/typed/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
-	coordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -56,6 +55,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	lifecyclev1alpha1 "k8s.io/client-go/kubernetes/typed/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
@@ -102,7 +102,6 @@ type Interface interface {
 	CertificatesV1() certificatesv1.CertificatesV1Interface
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1alpha1Interface
-	CoordinationV1alpha1() coordinationv1alpha1.CoordinationV1alpha1Interface
 	CoordinationV1alpha2() coordinationv1alpha2.CoordinationV1alpha2Interface
 	CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface
 	CoordinationV1() coordinationv1.CoordinationV1Interface
@@ -116,6 +115,7 @@ type Interface interface {
 	FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface
 	FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface
 	FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3Interface
+	LifecycleV1alpha1() lifecyclev1alpha1.LifecycleV1alpha1Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	NodeV1() nodev1.NodeV1Interface
@@ -161,7 +161,6 @@ type Clientset struct {
 	certificatesV1                *certificatesv1.CertificatesV1Client
 	certificatesV1beta1           *certificatesv1beta1.CertificatesV1beta1Client
 	certificatesV1alpha1          *certificatesv1alpha1.CertificatesV1alpha1Client
-	coordinationV1alpha1          *coordinationv1alpha1.CoordinationV1alpha1Client
 	coordinationV1alpha2          *coordinationv1alpha2.CoordinationV1alpha2Client
 	coordinationV1beta1           *coordinationv1beta1.CoordinationV1beta1Client
 	coordinationV1                *coordinationv1.CoordinationV1Client
@@ -175,6 +174,7 @@ type Clientset struct {
 	flowcontrolV1beta1            *flowcontrolv1beta1.FlowcontrolV1beta1Client
 	flowcontrolV1beta2            *flowcontrolv1beta2.FlowcontrolV1beta2Client
 	flowcontrolV1beta3            *flowcontrolv1beta3.FlowcontrolV1beta3Client
+	lifecycleV1alpha1             *lifecyclev1alpha1.LifecycleV1alpha1Client
 	networkingV1                  *networkingv1.NetworkingV1Client
 	networkingV1beta1             *networkingv1beta1.NetworkingV1beta1Client
 	nodeV1                        *nodev1.NodeV1Client
@@ -293,11 +293,6 @@ func (c *Clientset) CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1al
 	return c.certificatesV1alpha1
 }
 
-// CoordinationV1alpha1 retrieves the CoordinationV1alpha1Client
-func (c *Clientset) CoordinationV1alpha1() coordinationv1alpha1.CoordinationV1alpha1Interface {
-	return c.coordinationV1alpha1
-}
-
 // CoordinationV1alpha2 retrieves the CoordinationV1alpha2Client
 func (c *Clientset) CoordinationV1alpha2() coordinationv1alpha2.CoordinationV1alpha2Interface {
 	return c.coordinationV1alpha2
@@ -361,6 +356,11 @@ func (c *Clientset) FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2In
 // FlowcontrolV1beta3 retrieves the FlowcontrolV1beta3Client
 func (c *Clientset) FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3Interface {
 	return c.flowcontrolV1beta3
+}
+
+// LifecycleV1alpha1 retrieves the LifecycleV1alpha1Client
+func (c *Clientset) LifecycleV1alpha1() lifecyclev1alpha1.LifecycleV1alpha1Interface {
+	return c.lifecycleV1alpha1
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client
@@ -588,10 +588,6 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.coordinationV1alpha1, err = coordinationv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
-	if err != nil {
-		return nil, err
-	}
 	cs.coordinationV1alpha2, err = coordinationv1alpha2.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -641,6 +637,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 		return nil, err
 	}
 	cs.flowcontrolV1beta3, err = flowcontrolv1beta3.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	cs.lifecycleV1alpha1, err = lifecyclev1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +768,6 @@ func New(c rest.Interface) *Clientset {
 	cs.certificatesV1 = certificatesv1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
 	cs.certificatesV1alpha1 = certificatesv1alpha1.New(c)
-	cs.coordinationV1alpha1 = coordinationv1alpha1.New(c)
 	cs.coordinationV1alpha2 = coordinationv1alpha2.New(c)
 	cs.coordinationV1beta1 = coordinationv1beta1.New(c)
 	cs.coordinationV1 = coordinationv1.New(c)
@@ -782,6 +781,7 @@ func New(c rest.Interface) *Clientset {
 	cs.flowcontrolV1beta1 = flowcontrolv1beta1.New(c)
 	cs.flowcontrolV1beta2 = flowcontrolv1beta2.New(c)
 	cs.flowcontrolV1beta3 = flowcontrolv1beta3.New(c)
+	cs.lifecycleV1alpha1 = lifecyclev1alpha1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)
 	cs.nodeV1 = nodev1.New(c)
