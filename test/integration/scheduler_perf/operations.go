@@ -41,7 +41,12 @@ import (
 )
 
 // createAny defines an op where some object gets created from a YAML file.
-// The nameset can be specified.
+// The namespace can be specified.
+// Go templating is supported with some additional methods (see getTemplateFuncs)
+// and parameters:
+// .Index: start index for counting
+// .Count: number of items to create
+// .<template param>: a member of the operation's templateParams
 type createAny struct {
 	// Must match createAnyOpcode.
 	Opcode operationCode
@@ -844,6 +849,7 @@ func getTemplateFuncs() template.FuncMap {
 		"AddInt":        addInt,
 		"DivideFloat":   divideFloat,
 		"DivideInt":     divideInt,
+		"Int":           toInt,
 		"Mod":           mod,
 		"MultiplyFloat": multiplyFloat,
 		"MultiplyInt":   multiplyInt,
@@ -877,6 +883,33 @@ func toFloat64(val any) float64 {
 		}
 	}
 	panic(fmt.Sprintf("cannot cast %v to float64", val))
+}
+
+func toInt(val any) int {
+	switch i := val.(type) {
+	case float64:
+		return int(i)
+	case float32:
+		return int(i)
+	case int64:
+		return int(i)
+	case int32:
+		return int(i)
+	case int:
+		return i
+	case uint64:
+		return int(i)
+	case uint32:
+		return int(i)
+	case uint:
+		return int(i)
+	case string:
+		v, err := strconv.Atoi(i)
+		if err == nil {
+			return v
+		}
+	}
+	panic(fmt.Sprintf("cannot cast %v to int", val))
 }
 
 func addInt(numbers ...any) int {
