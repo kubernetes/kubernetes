@@ -23,10 +23,14 @@ import (
 
 	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestCalculatePoolStatus(t *testing.T) {
@@ -336,6 +340,7 @@ func TestCalculatePoolStatus(t *testing.T) {
 				informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 				informerFactory.Resource().V1().ResourceSlices(),
 				informerFactory.Resource().V1().ResourceClaims(),
+				informerFactory.Resource().V1beta2().DeviceTaintRules(),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create controller: %v", err)
@@ -464,6 +469,7 @@ func TestSyncRequest(t *testing.T) {
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
@@ -519,6 +525,7 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
@@ -597,6 +604,7 @@ func TestSkipProcessedRequest(t *testing.T) {
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
@@ -711,7 +719,7 @@ func makeRequest(driver string) *resourcev1alpha3.ResourcePoolStatusRequest {
 }
 
 // runCalculatePoolStatus seeds the informer stores and runs the computation.
-func runCalculatePoolStatus(t *testing.T, request *resourcev1alpha3.ResourcePoolStatusRequest, slices []*resourcev1.ResourceSlice, claims []*resourcev1.ResourceClaim) resourcev1alpha3.ResourcePoolStatusRequestStatus {
+func runCalculatePoolStatus(t *testing.T, request *resourcev1alpha3.ResourcePoolStatusRequest, slices []*resourcev1.ResourceSlice, claims []*resourcev1.ResourceClaim, rules ...*resourcev1beta2.DeviceTaintRule) resourcev1alpha3.ResourcePoolStatusRequestStatus {
 	t.Helper()
 	_, ctx := ktesting.NewTestContext(t)
 	fakeClient := fake.NewClientset()
@@ -720,6 +728,7 @@ func runCalculatePoolStatus(t *testing.T, request *resourcev1alpha3.ResourcePool
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
@@ -734,7 +743,30 @@ func runCalculatePoolStatus(t *testing.T, request *resourcev1alpha3.ResourcePool
 			t.Fatalf("Failed to add claim: %v", err)
 		}
 	}
+	for _, rule := range rules {
+		if err := informerFactory.Resource().V1beta2().DeviceTaintRules().Informer().GetStore().Add(rule); err != nil {
+			t.Fatalf("Failed to add taint rule: %v", err)
+		}
+	}
 	return controller.calculatePoolStatus(ctx, request)
+}
+
+// makeDeviceTaintRule taints the named device in a pool via an external rule.
+func makeDeviceTaintRule(name, driver, pool, device string, effect resourcev1beta2.DeviceTaintEffect) *resourcev1beta2.DeviceTaintRule {
+	return &resourcev1beta2.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: resourcev1beta2.DeviceTaintRuleSpec{
+			DeviceSelector: &resourcev1beta2.DeviceTaintSelector{
+				Driver: &driver,
+				Pool:   &pool,
+				Device: &device,
+			},
+			Taint: resourcev1beta2.DeviceTaint{
+				Key:    "example.com/maintenance",
+				Effect: effect,
+			},
+		},
+	}
 }
 
 func requireSinglePool(t *testing.T, status resourcev1alpha3.ResourcePoolStatusRequestStatus) resourcev1alpha3.PoolStatus {
@@ -813,6 +845,36 @@ func TestCalculatePoolStatus_UnavailableFromTaints(t *testing.T) {
 	}
 }
 
+// A matching DeviceTaintRule marks a device unavailable only when the
+// DRADeviceTaintRules gate is enabled.
+func TestCalculatePoolStatus_UnavailableFromTaintRule(t *testing.T) {
+	driver := "test.example.com"
+	slices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
+	rule := makeDeviceTaintRule("rule-1", driver, "pool-1", "device-0", resourcev1beta2.DeviceTaintEffectNoSchedule)
+
+	t.Run("gate-enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, true)
+		pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil, rule))
+		if got := derefInt32(pool.UnavailableDevices); got != 1 {
+			t.Errorf("UnavailableDevices = %d, want 1 (rule applies when gate on)", got)
+		}
+		if got := derefInt32(pool.AvailableDevices); got != 3 {
+			t.Errorf("AvailableDevices = %d, want 3", got)
+		}
+	})
+
+	t.Run("gate-disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintRules, false)
+		pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil, rule))
+		if got := derefInt32(pool.UnavailableDevices); got != 0 {
+			t.Errorf("UnavailableDevices = %d, want 0 (rule ignored when gate off)", got)
+		}
+		if got := derefInt32(pool.AvailableDevices); got != 4 {
+			t.Errorf("AvailableDevices = %d, want 4", got)
+		}
+	})
+}
+
 func TestIsOlderThan(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -866,6 +928,7 @@ func TestShouldDeleteRequest(t *testing.T) {
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
@@ -1021,6 +1084,7 @@ func TestCleanupExpiredRequests(t *testing.T) {
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1beta2().DeviceTaintRules(),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create controller: %v", err)
