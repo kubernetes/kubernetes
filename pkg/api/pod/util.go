@@ -775,6 +775,7 @@ func dropDisabledFields(
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+	DropInitContainerAnnotations(podAnnotations)
 }
 
 // setHostnameOverrideInUse returns true if any pod's spec defines HostnameOverride field.
@@ -1904,4 +1905,20 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+var initContainerAnnotations = map[string]struct{}{
+	"pod.beta.kubernetes.io/init-containers":          {},
+	"pod.alpha.kubernetes.io/init-containers":         {},
+	"pod.beta.kubernetes.io/init-container-statuses":  {},
+	"pod.alpha.kubernetes.io/init-container-statuses": {},
+}
+
+// DropInitContainerAnnotations deletes the legacy alpha/beta init container
+// annotations from the provided map in place. Support for these annotations was
+// removed in v1.8 in favor of the Spec.InitContainers field.
+func DropInitContainerAnnotations(annotations map[string]string) {
+	for k := range initContainerAnnotations {
+		delete(annotations, k)
+	}
 }

@@ -1369,3 +1369,43 @@ func TestEtcdPodIPsReadCompatibility(t *testing.T) {
 		t.Errorf("expected podIPs synthesized from podIP by storage-decode defaulting, got %#v", served.Status.PodIPs)
 	}
 }
+
+// TestEtcdCreateBindingScrubsLegacyAnnotations pins that binding annotations
+// receive the same legacy init-container annotation scrub Pod defaulting
+// applies, since the binding write path merges them into the pod without
+// passing through defaulting.
+func TestEtcdCreateBindingScrubsLegacyAnnotations(t *testing.T) {
+	storage, bindingStorage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+	if _, err := storage.Create(ctx, validNewPod(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := bindingStorage.Create(ctx, "foo", &api.Binding{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
+			Name:      "foo",
+			Annotations: map[string]string{
+				"pod.beta.kubernetes.io/init-containers": "[]",
+				"kept":                                   "value",
+			},
+		},
+		Target: api.ObjectReference{Name: "machine"},
+	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pod := obj.(*api.Pod)
+	if _, ok := pod.Annotations["pod.beta.kubernetes.io/init-containers"]; ok {
+		t.Errorf("expected legacy init-container annotation to be scrubbed from binding, got %v", pod.Annotations)
+	}
+	if pod.Annotations["kept"] != "value" {
+		t.Errorf("expected unrelated binding annotation to be kept, got %v", pod.Annotations)
+	}
+}
