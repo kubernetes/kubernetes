@@ -1897,3 +1897,52 @@ func TestControllerV2JobAlreadyExistsButDifferentOwner(t *testing.T) {
 		t.Fatalf("Unexpected job's namespace, got: %s, expected %s", jobControl.GetJobNamespace[0], cj.Namespace)
 	}
 }
+
+func TestControllerV2ProcessNextItemClearFailureRate(t *testing.T) {
+
+	t.Run("cronjob controller resets rate limiter successfully", func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
+
+		cj := cronJob()
+		cj.Spec.Suspend = ptr.To(true)
+		cj.Spec.Schedule = onTheHour
+		cjCopy := cj.DeepCopy()
+
+		client := fake.NewSimpleClientset(cjCopy)
+		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+
+		jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		jm.jobControl = &fakeJobControl{}
+		jm.cronJobControl = &fakeCJControl{CronJob: cjCopy}
+		jm.now = justBeforeTheHour
+
+		key, _ := controller.KeyFunc(cjCopy)
+
+		// add a forced N rate limit failure to replicate scenario where for a key a previous error exists.
+		for range 2 {
+			jm.queue.AddRateLimited(key)
+			k, quit := jm.queue.Get()
+			if quit {
+				t.Fatal("queue shut down unexpectedly")
+			}
+			jm.queue.Done(k)
+			// no clearing of the rate limit failure/backoff count.
+		}
+		if requeues := jm.queue.NumRequeues(key); requeues != 2 {
+			t.Fatalf("expected >0 requeues after priming, got %d", requeues)
+		}
+
+		// attempt to process a cron job.
+		jm.queue.Add(key)
+		jm.processNextWorkItem(ctx)
+
+		if requeues := jm.queue.NumRequeues(key); requeues != 0 {
+			t.Errorf("cronjob controller: expected NumRequeues 0 after successful sync, got %d "+
+				"(rate limiter failure count was not reset — queue.Forget was not called)", requeues)
+		}
+	})
+}

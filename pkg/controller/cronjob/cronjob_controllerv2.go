@@ -204,6 +204,8 @@ func (jm *ControllerV2) processNextWorkItem(ctx context.Context) bool {
 	case requeueAfter != nil:
 		jm.queue.Forget(key)
 		jm.queue.AddAfter(key, *requeueAfter)
+	default:
+		jm.queue.Forget(key)
 	}
 	return true
 }
