@@ -70,6 +70,23 @@ const (
 	// resources using the Kubernetes API only.
 	AllowUnsafeMalformedObjectDeletion featuregate.Feature = "AllowUnsafeMalformedObjectDeletion"
 
+	// owner: @vinayakankugoyal
+	// kep: https://kep.k8s.io/4633
+	//
+	// Allows us to enable anonymous auth for only certain apiserver endpoints.
+	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
+
+	// owner: @deads2k
+	// kep: https://kep.k8s.io/4601
+	//
+	// Allows authorization to use field and label selectors.
+	AuthorizeWithSelectors featuregate.Feature = "AuthorizeWithSelectors"
+
+	// owner: @serathius
+	//
+	// Replaces watch cache hashmap implementation with a btree based one, bringing performance improvements.
+	BtreeWatchCache featuregate.Feature = "BtreeWatchCache"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	//
@@ -329,6 +346,23 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	AnonymousAuthConfigurableEndpoints: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	AuthorizeWithSelectors: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
+	},
+
+	BtreeWatchCache: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	CBORServingAndStorage: {

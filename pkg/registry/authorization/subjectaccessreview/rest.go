@@ -24,7 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
@@ -62,6 +64,13 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	subjectAccessReview, ok := obj.(*authorizationapi.SubjectAccessReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SubjectAccessReview: %#v", obj))
+	}
+	// clear fields if the featuregate is disabled
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		if subjectAccessReview.Spec.ResourceAttributes != nil {
+			subjectAccessReview.Spec.ResourceAttributes.FieldSelector = nil
+			subjectAccessReview.Spec.ResourceAttributes.LabelSelector = nil
+		}
 	}
 	if errs := authorizationvalidation.ValidateSubjectAccessReview(subjectAccessReview); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(subjectAccessReview.Kind), "", errs)

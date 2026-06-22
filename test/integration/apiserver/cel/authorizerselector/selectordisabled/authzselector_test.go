@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package selectorenabled
+package selectordisabled
 
 import (
 	"testing"
@@ -22,8 +22,8 @@ import (
 	"k8s.io/kubernetes/test/integration/apiserver/cel/authorizerselector"
 )
 
-// TestAuthzSelectorsLibraryEnabled ensures that the authzselectors library feature enablement works properly.
+// TestAuthzSelectorsLibraryDisabled ensures that the authzselectors library feature disablement works properly.
 // CEL envs and compilers cached per process mean this must be the only test in this package.
-func TestAuthzSelectorsLibraryEnabled(t *testing.T) {
-	authorizerselector.RunAuthzSelectorsLibraryTests(t, true)
+func TestAuthzSelectorsLibraryDisabled(t *testing.T) {
+	authorizerselector.RunAuthzSelectorsLibraryTests(t, false)
 }

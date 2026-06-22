@@ -2069,6 +2069,23 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	genericfeatures.AnonymousAuthConfigurableEndpoints: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.AuthorizeWithSelectors: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
+	},
+
+	genericfeatures.BtreeWatchCache: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
 	genericfeatures.CBORServingAndStorage: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2595,6 +2612,12 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
 
 	genericfeatures.AllowUnsafeMalformedObjectDeletion: {},
+
+	genericfeatures.AnonymousAuthConfigurableEndpoints: {},
+
+	genericfeatures.AuthorizeWithSelectors: {},
+
+	genericfeatures.BtreeWatchCache: {},
 
 	genericfeatures.CBORServingAndStorage: {},
 

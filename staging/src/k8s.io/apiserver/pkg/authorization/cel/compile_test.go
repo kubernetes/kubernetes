@@ -24,7 +24,11 @@ import (
 
 	v1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestCompileCELExpression(t *testing.T) {
@@ -32,6 +36,8 @@ func TestCompileCELExpression(t *testing.T) {
 		name          string
 		expression    string
 		expectedError string
+
+		authorizeWithSelectorsEnabled bool
 	}{
 		{
 			name:       "SubjectAccessReviewSpec user comparison",
@@ -58,25 +64,46 @@ func TestCompileCELExpression(t *testing.T) {
 			expectedError: "undeclared reference",
 		},
 		{
-			name:       "fieldSelector rawSelector",
-			expression: "request.resourceAttributes.fieldSelector.rawSelector == 'foo'",
+			name:                          "fieldSelector not enabled",
+			expression:                    "request.resourceAttributes.fieldSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: false,
+			expectedError:                 `undefined field 'fieldSelector'`,
 		},
 		{
-			name:       "fieldSelector requirement",
-			expression: "request.resourceAttributes.fieldSelector.requirements.exists(r, r.key == 'foo' && r.operator == 'In' && ('bar' in r.values))",
+			name:                          "fieldSelector rawSelector",
+			expression:                    "request.resourceAttributes.fieldSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: true,
 		},
 		{
-			name:       "labelSelector rawSelector",
-			expression: "request.resourceAttributes.labelSelector.rawSelector == 'foo'",
+			name:                          "fieldSelector requirement",
+			expression:                    "request.resourceAttributes.fieldSelector.requirements.exists(r, r.key == 'foo' && r.operator == 'In' && ('bar' in r.values))",
+			authorizeWithSelectorsEnabled: true,
 		},
 		{
-			name:       "labelSelector requirement",
-			expression: "request.resourceAttributes.labelSelector.requirements.exists(r, r.key == 'foo' && r.operator == 'In' && ('bar' in r.values))",
+			name:                          "labelSelector not enabled",
+			expression:                    "request.resourceAttributes.labelSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: false,
+			expectedError:                 `undefined field 'labelSelector'`,
+		},
+		{
+			name:                          "labelSelector rawSelector",
+			expression:                    "request.resourceAttributes.labelSelector.rawSelector == 'foo'",
+			authorizeWithSelectorsEnabled: true,
+		},
+		{
+			name:                          "labelSelector requirement",
+			expression:                    "request.resourceAttributes.labelSelector.requirements.exists(r, r.key == 'foo' && r.operator == 'In' && ('bar' in r.values))",
+			authorizeWithSelectorsEnabled: true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.authorizeWithSelectorsEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, false)
+			}
+
 			// create new compiler because it depends on the feature gate
 			compiler := NewDefaultCompiler()
 

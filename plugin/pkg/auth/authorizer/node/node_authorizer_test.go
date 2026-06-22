@@ -34,8 +34,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -74,6 +76,19 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	nodeunregistered := &user.DefaultInfo{Name: "system:node:nodeunregistered", Groups: []string{"system:nodes"}}
 
+	selectorAuthzDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MustParse("1.33"))
+		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
+			genericfeatures.AuthorizeWithSelectors: false,
+		})
+		return f
+	}
+
+	selectorAuthzEnabled := func(t testing.TB) featuregate.FeatureGate {
+		return utilfeature.DefaultFeatureGate
+	}
+
 	serviceAccountTokenForCredentialProvidersDisabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
@@ -92,7 +107,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	podCertificateProjectionEnabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
-			features.PodCertificateRequest: true,
+			genericfeatures.AuthorizeWithSelectors: true,
+			features.PodCertificateRequest:         true,
 		})
 		return f
 	}
@@ -101,6 +117,14 @@ func TestNodeAuthorizer(t *testing.T) {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, false)
 		return f
+	}
+
+	featureVariants := []struct {
+		suffix   string
+		features func(t testing.TB) featuregate.FeatureGate
+	}{
+		{suffix: "selector_disabled", features: selectorAuthzDisabled},
+		{suffix: "selector_enabled", features: selectorAuthzEnabled},
 	}
 
 	tests := []struct {
@@ -131,14 +155,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:   "disallowed list many secrets",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			name:         "disallowed list many secrets",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "No Object name found,",
 		},
 		{
-			name:   "disallowed watch many secrets",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			name:         "disallowed watch many secrets",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "No Object name found,",
 		},
 		{
 			name:         "disallowed list secrets from all namespaces with name",
@@ -527,7 +553,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "disallowed unfiltered list ResourceSlices",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch/deletecollection resourceslices with nodeName field selector",
 		},
 		{
@@ -539,7 +565,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "disallowed unfiltered watch ResourceSlices",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch/deletecollection resourceslices with nodeName field selector",
 		},
 		{
@@ -579,7 +605,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "get unrelated pod",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", APIGroup: "", Name: "pod0-node1", Namespace: "ns0"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "no relationship found between node 'node0' and this object",
 		},
 		// list pods
@@ -602,7 +628,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "list unrelated pods",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: ""},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch pods with spec.nodeName field selector",
 		},
 		// watch pods
@@ -625,7 +651,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "watch unrelated pods",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: ""},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch pods with spec.nodeName field selector",
 		},
 		// create, delete pods
@@ -708,7 +734,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "get unrelated node",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node1"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		// list nodes
@@ -721,14 +747,14 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "list single unrelated node",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: "", Name: "node1"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		{
 			name:         "list all nodes",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: ""},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read all nodes, only its own Node object",
 		},
 		// watch nodes
@@ -741,14 +767,14 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:         "watch single unrelated node",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: "", Name: "node1"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		{
 			name:         "watch all nodes",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: ""},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read all nodes, only its own Node object",
 		},
 		// create nodes
@@ -803,16 +829,15 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	for _, tc := range tests {
 		if tc.features == nil {
-			t.Run(tc.name, func(t *testing.T) {
-				authz.features = utilfeature.DefaultFeatureGate
-				decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
-				if decision != tc.expect {
-					t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
-				}
-				if tc.expectReason != "" && reason != tc.expectReason {
-					t.Errorf("expected reason %q, got %q", tc.expectReason, reason)
-				}
-			})
+			for _, variant := range featureVariants {
+				t.Run(tc.name+"_"+variant.suffix, func(t *testing.T) {
+					authz.features = variant.features(t)
+					decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
+					if decision != tc.expect {
+						t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
+					}
+				})
+			}
 		} else {
 			t.Run(tc.name, func(t *testing.T) {
 				authz.features = tc.features(t)
