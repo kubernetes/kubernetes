@@ -508,7 +508,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.Unschedulable,
+				fwk.Wait,
 				fwk.Success,
 			},
 		},
@@ -524,7 +524,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Unschedulable,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.UnschedulableAndUnresolvable,
+				fwk.Unschedulable,
 			},
 		},
 		{
@@ -539,8 +539,8 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Unschedulable,
 			},
 			expectedStatuses: []fwk.Code{
+				fwk.Wait,
 				fwk.Unschedulable,
-				fwk.UnschedulableAndUnresolvable,
 			},
 		},
 		{
@@ -568,7 +568,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.Unschedulable,
+				fwk.Wait,
 				fwk.Success,
 				fwk.Success,
 			},
@@ -587,8 +587,8 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.Unschedulable,
-				fwk.Unschedulable,
+				fwk.Wait,
+				fwk.Wait,
 				fwk.Success,
 			},
 		},
@@ -606,9 +606,9 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
+				fwk.Wait,
 				fwk.Unschedulable,
-				fwk.UnschedulableAndUnresolvable,
-				fwk.UnschedulableAndUnresolvable,
+				fwk.Unschedulable,
 			},
 		},
 		{
@@ -623,7 +623,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.Unschedulable,
+				fwk.Wait,
 				fwk.Success,
 			},
 			initialScheduledCount: 1,
@@ -653,7 +653,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Unschedulable,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.UnschedulableAndUnresolvable,
+				fwk.Unschedulable,
 			},
 			initialScheduledCount: 1,
 		},
@@ -668,7 +668,7 @@ func TestPlacementFeasible(t *testing.T) {
 				fwk.Success,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.UnschedulableAndUnresolvable,
+				fwk.Unschedulable,
 			},
 			initialScheduledCount: 1,
 		},

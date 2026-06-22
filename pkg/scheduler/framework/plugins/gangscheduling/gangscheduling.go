@@ -270,7 +270,7 @@ func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *pla
 
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
-// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns UnschedulableAndUnresolvable which will terminate the pod group scheduling cycle early.
+// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
 	pg, err := pl.podGroupLister.PodGroups(podGroupInfo.GetNamespace()).Get(podGroupInfo.GetName())
 	if err != nil {
@@ -302,12 +302,12 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 
 	if remaining+scheduled < minCount {
 		// minCount can't be satisfied because there are not enough remaining pods.
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
 	}
 
 	if scheduled < minCount {
 		// minCount might be satisfied once more remaining pods are evaluated.
-		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
 	}
 
 	// minCount is satisfied.

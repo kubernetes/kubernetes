@@ -935,39 +935,39 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 			expectedCalled: []bool{true, true},
 		},
 		{
-			name: "First plugin returns Unschedulable, continues",
+			name: "First plugin returns Wait, continues",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Unschedulable, breaks",
 			plugins: []*mockPlacementFeasiblePlugin{
 				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
 				{name: "p2", status: nil},
 			},
 			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p1"),
-			expectedCalled: []bool{true, true},
-		},
-		{
-			name: "First plugin returns UnschedulableAndUnresolvable, breaks",
-			plugins: []*mockPlacementFeasiblePlugin{
-				{name: "p1", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
-				{name: "p2", status: nil},
-			},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p1"),
 			expectedCalled: []bool{true, false},
 		},
 		{
-			name: "First plugin returns Unschedulable, second returns UnschedulableAndUnresolvable, returns unresolvable",
+			name: "First plugin returns Wait, second returns Unschedulable, returns Unschedulable",
 			plugins: []*mockPlacementFeasiblePlugin{
-				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
-				{name: "p2", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait")},
+				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
 			},
-			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p2"),
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p2"),
 			expectedCalled: []bool{true, true},
 		},
 		{
-			name: "First plugin returns Unschedulable, second returns Unschedulable, returns last unschedulable",
+			name: "First plugin returns Wait, second returns Wait, returns last Wait",
 			plugins: []*mockPlacementFeasiblePlugin{
-				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable1")},
-				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable2")},
+				{name: "p1", status: fwk.NewStatus(fwk.Wait, "wait1")},
+				{name: "p2", status: fwk.NewStatus(fwk.Wait, "wait2")},
 			},
-			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable2").WithPlugin("p2"),
+			expectedStatus: fwk.NewStatus(fwk.Wait, "wait2").WithPlugin("p2"),
 			expectedCalled: []bool{true, true},
 		},
 		{
