@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -48,7 +49,8 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	logger = klog.LoggerWithValues(logger, "podGroup", klog.KObj(podGroupInfo))
 	ctx = klog.NewContext(ctx, logger)
 
-	schedFwk, err := sched.frameworkForPodGroup(podGroupInfo)
+	err := sched.validatePodGroup(podGroupInfo)
+
 	if err != nil {
 		for _, podInfo := range podGroupInfo.QueuedPodInfos {
 			podFwk, podFwkErr := sched.frameworkForPod(podInfo.Pod)
@@ -67,6 +69,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 		}
 		return
 	}
+	schedFwk := sched.frameworkForPodGroup(podGroupInfo)
 	sched.skipPodGroupPodSchedule(ctx, schedFwk, podGroupInfo)
 	// skipPodGroupPodSchedule could remove some pods from the pod group.
 	// Pod group constraints will be re-evaluated on a PlacementFeasible phase.
@@ -80,21 +83,40 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
 }
 
-// frameworkForPodGroup obtains the concrete scheduler framework for the entire pod group.
-func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGroupInfo) (framework.Framework, error) {
-	schedulerName := ""
+func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupInfo) error {
+	if len(podGroupInfo.QueuedPodInfos) == 0 {
+		return fmt.Errorf("pod group has no pods to schedule")
+	}
+
+	schedulerName := podGroupInfo.QueuedPodInfos[0].Pod.Spec.SchedulerName
+
+	pg, err := sched.podGroupLister.PodGroups(podGroupInfo.Namespace).Get(podGroupInfo.Name)
+	if err != nil {
+		return fmt.Errorf("pod group cannot be retrieved: %w", err)
+	}
+	podGroupPriority := util.PodGroupPriority(pg)
+
 	for _, pInfo := range podGroupInfo.QueuedPodInfos {
-		if schedulerName == "" {
-			schedulerName = pInfo.Pod.Spec.SchedulerName
-		} else if pInfo.Pod.Spec.SchedulerName != schedulerName {
-			return nil, fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pInfo.Pod.Spec.SchedulerName, schedulerName)
+		if pInfo.Pod.Spec.SchedulerName != schedulerName {
+			return fmt.Errorf("all pods in a single pod group should have the same .spec.schedulerName set, got: %q and %q", pInfo.Pod.Spec.SchedulerName, schedulerName)
+		}
+		podPriority := corev1helpers.PodPriority(pInfo.Pod)
+		if podPriority != podGroupPriority {
+			return fmt.Errorf("all pods in a single pod group should have the same priority as the pod group's priority, got %d and %d", podPriority, podGroupPriority)
 		}
 	}
-	fwk, ok := sched.Profiles[schedulerName]
-	if !ok {
-		return nil, fmt.Errorf("profile not found for scheduler name %q", schedulerName)
+
+	if _, ok := sched.Profiles[schedulerName]; !ok {
+		return fmt.Errorf("profile not found for scheduler name %q", schedulerName)
 	}
-	return fwk, nil
+
+	return nil
+}
+
+// frameworkForPodGroup obtains the concrete scheduler framework for the entire pod group.
+// Assumes [Scheduler.validatePodGroup] has been called before.
+func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGroupInfo) framework.Framework {
+	return sched.Profiles[podGroupInfo.QueuedPodInfos[0].Pod.Spec.SchedulerName]
 }
 
 // skipPodGroupPodSchedule skips the scheduling of particular pods from the group when they should no longer be considered.

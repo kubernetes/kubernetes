@@ -138,6 +138,8 @@ type Step struct {
 	UpdatePodGroup *schedulingapi.PodGroup
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
+	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
+	CreatePodsInOrder []*v1.Pod
 	// CreateWorkloads is use to create workloads in the cluster.
 	CreateWorkloads []*schedulingapi.Workload
 	// DeletePods is use to delete pods from the cluster.
@@ -219,13 +221,27 @@ func createNodes(testCtx *testutils.TestContext, nodes []*v1.Node) error {
 	return nil
 }
 
-func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod) error {
+func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, preserveOrder bool) error {
 	cs := testCtx.ClientSet
 	for _, pod := range pods {
 		p := pod.DeepCopy()
 		p.Namespace = ns
 		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("failed to create pod %s: %w", p.Name, err)
+		}
+		if preserveOrder {
+			podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
+			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+				if ok {
+					return true, nil
+				}
+				// pod may have gotten queued and scheduled between the polls
+				return podScheduledFn(ctx)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to ensure queueing order of pod %s: %w", p.Name, err)
+			}
 		}
 	}
 	return nil
@@ -511,7 +527,9 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 		case step.CreateNodes != nil:
 			err = createNodes(testCtx, step.CreateNodes)
 		case step.CreatePods != nil:
-			err = createPods(testCtx, ns, step.CreatePods)
+			err = createPods(testCtx, ns, step.CreatePods, false)
+		case step.CreatePodsInOrder != nil:
+			err = createPods(testCtx, ns, step.CreatePodsInOrder, true)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
 		case step.UpdatePodGroup != nil:

@@ -64,11 +64,11 @@ func TestPodGroupScheduling(t *testing.T) {
 	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").Priority(100).BasicPolicy().Obj()
 	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").TemplateRef("t-mutable", "workload").Priority(100).MinCount(5).Obj()
 
-	mutP1 := st.MakePod().Name("mut-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(105).Obj()
-	mutP2 := st.MakePod().Name("mut-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(104).Obj()
-	mutP3 := st.MakePod().Name("mut-p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(103).Obj()
-	mutP4 := st.MakePod().Name("mut-p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(102).Obj()
-	mutP5 := st.MakePod().Name("mut-p5").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(101).Obj()
+	mutP1 := st.MakePod().Name("mut-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP2 := st.MakePod().Name("mut-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP3 := st.MakePod().Name("mut-p3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP4 := st.MakePod().Name("mut-p4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
+	mutP5 := st.MakePod().Name("mut-p5").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
 
 	p1 := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("pg1").Priority(100).Obj()
@@ -533,8 +533,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: podGroupWithMinCount5,
 				},
 				{
-					Name:       "Create 4 pods belonging to the gang (quorum is 5)",
-					CreatePods: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
+					Name:              "Create 4 pods belonging to the gang (quorum is 5)",
+					CreatePodsInOrder: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
 				},
 				{
 					Name:                               "Verify gang pods are gated at PreEnqueue",
@@ -558,8 +558,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: podGroupWithMinCount5,
 				},
 				{
-					Name:       "Create 5 pods belonging to the gang",
-					CreatePods: []*v1.Pod{mutP1, mutP2, mutP3, mutP4, mutP5},
+					Name:              "Create 5 pods belonging to the gang",
+					CreatePodsInOrder: []*v1.Pod{mutP1, mutP2, mutP3, mutP4, mutP5},
 				},
 				{
 					Name:                     "Verify gang pods are unschedulable",
@@ -587,8 +587,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: podGroupWithMinCount5,
 				},
 				{
-					Name:       "Create 4 pods belonging to the gang (quorum is 5)",
-					CreatePods: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
+					Name:              "Create 4 pods belonging to the gang (quorum is 5)",
+					CreatePodsInOrder: []*v1.Pod{mutP1, mutP2, mutP3, mutP4},
 				},
 				{
 					Name:                               "Verify gang pods are gated at PreEnqueue",
