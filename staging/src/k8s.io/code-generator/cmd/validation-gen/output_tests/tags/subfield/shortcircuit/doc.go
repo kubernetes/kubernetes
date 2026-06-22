@@ -119,6 +119,13 @@ type ParentWithOptional struct {
 	Field TargetWithOptional `json:"field"`
 }
 
+type ParentWithSubfieldRequiredAndChildOptional struct {
+	TypeMeta int `json:"typeMeta"`
+	// +k8s:subfield(value)=+k8s:required
+	// +k8s:subfield(value)=+k8s:validateFalse="subfield ParentWithSubfieldRequiredAndChildOptional.Field.Value"
+	Field TargetWithOptional `json:"field"`
+}
+
 type TargetWithForbidden struct {
 	// +k8s:forbidden
 	Value *string `json:"value"`

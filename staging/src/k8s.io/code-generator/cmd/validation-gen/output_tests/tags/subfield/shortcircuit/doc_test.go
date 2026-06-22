@@ -237,6 +237,23 @@ func TestMultipleShortCircuit(t *testing.T) {
 			}.MarkShortCircuit(),
 		},
 		{
+			name: "immutable subfield changed to nil on update, subfield immutable runs before inherited required",
+			value: &ParentWithMultipleShortCircuit{
+				Field: &TargetWithRequired{
+					Value: nil,
+				},
+			},
+			oldValue: &ParentWithMultipleShortCircuit{
+				Field: &TargetWithRequired{
+					Value: new("old"),
+				},
+			},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Required(field.NewPath("field", "value"), ""),
+			}.MarkShortCircuit(),
+		},
+		{
 			name: "field is not nil, subfield validation runs on create",
 			value: &ParentWithMultipleShortCircuit{
 				Field: &TargetWithRequired{
@@ -289,6 +306,30 @@ func TestOtherShortCircuits(t *testing.T) {
 			},
 			expectErrors: field.ErrorList{
 				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithOptional.Field.Value").WithOrigin("validateFalse"),
+			},
+		},
+
+		// +k8s:required on subfield, +k8s:optional on child
+		{
+			name: "subfield required but value is nil, fails required validation and short circuits (optional child does not prevent it)",
+			value: &ParentWithSubfieldRequiredAndChildOptional{
+				Field: TargetWithOptional{
+					Value: nil,
+				},
+			},
+			expectErrors: field.ErrorList{
+				field.Required(field.NewPath("field", "value"), ""),
+			}.MarkShortCircuit(),
+		},
+		{
+			name: "subfield required and value is provided, runs non-short-circuit validation",
+			value: &ParentWithSubfieldRequiredAndChildOptional{
+				Field: TargetWithOptional{
+					Value: new("val"),
+				},
+			},
+			expectErrors: field.ErrorList{
+				field.Invalid(field.NewPath("field", "value"), nil, "forced failure: subfield ParentWithSubfieldRequiredAndChildOptional.Field.Value").WithOrigin("validateFalse"),
 			},
 		},
 

@@ -248,6 +248,21 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type ParentWithSubfieldRequiredAndChildOptional
+	scheme.AddValidationFunc(
+		(*ParentWithSubfieldRequiredAndChildOptional)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ParentWithSubfieldRequiredAndChildOptional(
+					ctx, op, nil, /* fldPath */
+					obj.(*ParentWithSubfieldRequiredAndChildOptional),
+					safe.Cast[*ParentWithSubfieldRequiredAndChildOptional](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ParentWithUpdate
 	scheme.AddValidationFunc(
 		(*ParentWithUpdate)(nil),
@@ -593,12 +608,12 @@ func Validate_ParentWithMultipleShortCircuit(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqualPtr, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqualPtr, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
 					earlyReturn = true
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqualPtr, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
-					errs = append(errs, e...)
+					func(o *TargetWithRequired) *string { return o.Value }, validate.DirectEqualPtr, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
@@ -925,6 +940,62 @@ func Validate_ParentWithRequired(
 		}
 		oldVal := safe.Field(oldObj,
 			func(oldObj *ParentWithRequired) *TargetWithRequired {
+				return &oldObj.Field
+			})
+		errs = append(errs, fn(fldPath.Child("field"), &obj.Field, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_ParentWithSubfieldRequiredAndChildOptional validates an instance of ParentWithSubfieldRequiredAndChildOptional according
+// to declarative validation rules in the API schema.
+func Validate_ParentWithSubfieldRequiredAndChildOptional(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ParentWithSubfieldRequiredAndChildOptional) (errs field.ErrorList) {
+
+	// field ParentWithSubfieldRequiredAndChildOptional.TypeMeta has no validation
+
+	{ // field ParentWithSubfieldRequiredAndChildOptional.Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *TargetWithOptional,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "value"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqualPtr, validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqualPtr, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+					func(o *TargetWithOptional) *string { return o.Value }, validate.DirectEqualPtr,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithSubfieldRequiredAndChildOptional.Field.Value")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			// call the type's validation function
+			errs = append(errs, Validate_TargetWithOptional(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ParentWithSubfieldRequiredAndChildOptional) *TargetWithOptional {
 				return &oldObj.Field
 			})
 		errs = append(errs, fn(fldPath.Child("field"), &obj.Field, oldVal, oldObj != nil)...)

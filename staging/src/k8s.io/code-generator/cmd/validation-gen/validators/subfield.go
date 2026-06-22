@@ -122,9 +122,13 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 	// rest of the wrapping is independent and runs eagerly.
 	result := Validations{}
 	result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
-		// Inherited short-circuits run first so a failing required/immutable
-		// check on the parent member skips the subfield's own validations.
+		// Subfield's own validations (which contain its short-circuits) are added first,
+		// and inherited parent member short-circuits are added second. The cohort-based
+		// partitioner (sortIntoCohorts) will then sort them so that all short-circuits
+		// run first, preserving the relative addition order (subfield short-circuits
+		// first, then inherited short-circuits). Finally, non-short-circuits will run.
 		var combined Validations
+		combined.Add(tagValidations)
 		if !isFieldOpaque(context) {
 			fieldValidations, err := stv.extractMemberShortCircuits(subContext)
 			if err != nil {
@@ -132,7 +136,6 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 			}
 			combined.Add(fieldValidations)
 		}
-		combined.Add(tagValidations)
 
 		mapped := WrapFunctions(combined, func(fn FunctionGen, scope DeferredScope) FunctionGen {
 			// ParentContext functions (e.g. Union) emit without a cohort.
