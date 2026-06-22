@@ -684,6 +684,135 @@ func makeAllocatedClaim(name, namespace, driver, pool, device string) *resourcev
 	}
 }
 
+func makeAdminAccessClaim(name, namespace, driver, pool, device string) *resourcev1.ResourceClaim {
+	claim := makeAllocatedClaim(name, namespace, driver, pool, device)
+	adminAccess := true
+	claim.Status.Allocation.Devices.Results[0].AdminAccess = &adminAccess
+	return claim
+}
+
+// makeSliceWithTaintedDevices taints the first taintedCount devices with effect.
+func makeSliceWithTaintedDevices(name, driver, pool, node string, deviceCount, taintedCount int, effect resourcev1.DeviceTaintEffect) *resourcev1.ResourceSlice {
+	slice := makeSlice(name, driver, pool, node, deviceCount)
+	for i := 0; i < taintedCount && i < deviceCount; i++ {
+		slice.Spec.Devices[i].Taints = []resourcev1.DeviceTaint{{
+			Key:    "example.com/maintenance",
+			Effect: effect,
+		}}
+	}
+	return slice
+}
+
+func makeRequest(driver string) *resourcev1alpha3.ResourcePoolStatusRequest {
+	return &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
+		Spec:       resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: driver},
+	}
+}
+
+// runCalculatePoolStatus seeds the informer stores and runs the computation.
+func runCalculatePoolStatus(t *testing.T, request *resourcev1alpha3.ResourcePoolStatusRequest, slices []*resourcev1.ResourceSlice, claims []*resourcev1.ResourceClaim) resourcev1alpha3.ResourcePoolStatusRequestStatus {
+	t.Helper()
+	_, ctx := ktesting.NewTestContext(t)
+	fakeClient := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	controller, err := NewController(ctx, fakeClient,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create controller: %v", err)
+	}
+	for _, slice := range slices {
+		if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(slice); err != nil {
+			t.Fatalf("Failed to add slice: %v", err)
+		}
+	}
+	for _, claim := range claims {
+		if err := informerFactory.Resource().V1().ResourceClaims().Informer().GetStore().Add(claim); err != nil {
+			t.Fatalf("Failed to add claim: %v", err)
+		}
+	}
+	return controller.calculatePoolStatus(ctx, request)
+}
+
+func requireSinglePool(t *testing.T, status resourcev1alpha3.ResourcePoolStatusRequestStatus) resourcev1alpha3.PoolStatus {
+	t.Helper()
+	if len(status.Pools) != 1 {
+		t.Fatalf("expected 1 pool, got %d", len(status.Pools))
+	}
+	return status.Pools[0]
+}
+
+// derefInt32 returns -1 for nil so an unexpectedly unset count fails loudly.
+func derefInt32(p *int32) int32 {
+	if p == nil {
+		return -1
+	}
+	return *p
+}
+
+// Three claims reference the same physical device; it must count once.
+func TestCalculatePoolStatus_CapAtOnePerDevice(t *testing.T) {
+	driver := "test.example.com"
+	slices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
+	claims := []*resourcev1.ResourceClaim{
+		makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+		makeAllocatedClaim("claim-2", "default", driver, "pool-1", "device-0"),
+		makeAllocatedClaim("claim-3", "default", driver, "pool-1", "device-0"),
+	}
+	pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, claims))
+	if got := derefInt32(pool.AllocatedDevices); got != 1 {
+		t.Errorf("AllocatedDevices = %d, want 1 (device counted once despite 3 claims)", got)
+	}
+	if got := derefInt32(pool.AvailableDevices); got != 3 {
+		t.Errorf("AvailableDevices = %d, want 3", got)
+	}
+}
+
+// AdminAccess allocations are observers and must not move any tally.
+func TestCalculatePoolStatus_SkipAdminAccess(t *testing.T) {
+	driver := "test.example.com"
+	slices := []*resourcev1.ResourceSlice{makeSlice("slice-1", driver, "pool-1", "node-1", 4)}
+	claims := []*resourcev1.ResourceClaim{
+		makeAllocatedClaim("claim-1", "default", driver, "pool-1", "device-0"),
+		makeAdminAccessClaim("admin-1", "default", driver, "pool-1", "device-1"),
+	}
+	pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, claims))
+	if got := derefInt32(pool.AllocatedDevices); got != 1 {
+		t.Errorf("AllocatedDevices = %d, want 1 (AdminAccess claim excluded)", got)
+	}
+	if got := derefInt32(pool.AvailableDevices); got != 3 {
+		t.Errorf("AvailableDevices = %d, want 3", got)
+	}
+}
+
+// Devices with a NoSchedule/NoExecute taint count as unavailable.
+func TestCalculatePoolStatus_UnavailableFromTaints(t *testing.T) {
+	driver := "test.example.com"
+	for _, effect := range []resourcev1.DeviceTaintEffect{
+		resourcev1.DeviceTaintEffectNoSchedule,
+		resourcev1.DeviceTaintEffectNoExecute,
+	} {
+		t.Run(string(effect), func(t *testing.T) {
+			slices := []*resourcev1.ResourceSlice{
+				makeSliceWithTaintedDevices("slice-1", driver, "pool-1", "node-1", 5, 2, effect),
+			}
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), slices, nil))
+			if got := derefInt32(pool.TotalDevices); got != 5 {
+				t.Errorf("TotalDevices = %d, want 5", got)
+			}
+			if got := derefInt32(pool.UnavailableDevices); got != 2 {
+				t.Errorf("UnavailableDevices = %d, want 2", got)
+			}
+			if got := derefInt32(pool.AvailableDevices); got != 3 {
+				t.Errorf("AvailableDevices = %d, want 3 (5 total - 0 alloc - 2 unavailable)", got)
+			}
+		})
+	}
+}
+
 func TestIsOlderThan(t *testing.T) {
 	testCases := []struct {
 		name     string

@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -263,6 +264,18 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 	return nil
 }
 
+// hasUnavailableTaint reports whether the device carries a taint that makes it
+// unschedulable (NoSchedule or NoExecute), and so should count as unavailable.
+func hasUnavailableTaint(device *resourcev1.Device) bool {
+	for _, taint := range device.Taints {
+		switch taint.Effect {
+		case resourcev1.DeviceTaintEffectNoSchedule, resourcev1.DeviceTaintEffectNoExecute:
+			return true
+		}
+	}
+	return false
+}
+
 // calculatePoolStatus computes the pool status on-demand by reading directly
 // from the shared informer listers. No caches are maintained between requests.
 func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev1alpha3.ResourcePoolStatusRequest) resourcev1alpha3.ResourcePoolStatusRequestStatus {
@@ -284,6 +297,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		nodeName           string
 		nodeNameMixed      bool // true when slices have different NodeNames
 		totalDevices       int32
+		unavailableDevices int32 // devices carrying a NoSchedule/NoExecute taint
 		sliceCount         int32
 		expectedSliceCount int64
 		generation         int64
@@ -330,6 +344,12 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		}
 
 		deviceCount := int32(len(slice.Spec.Devices))
+		unavailCount := int32(0)
+		for i := range slice.Spec.Devices {
+			if hasUnavailableTaint(&slice.Spec.Devices[i]) {
+				unavailCount++
+			}
+		}
 		info, exists := poolData[key]
 		if !exists {
 			var nodeName string
@@ -341,12 +361,14 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				poolName:           slicePoolName,
 				nodeName:           nodeName,
 				totalDevices:       deviceCount,
+				unavailableDevices: unavailCount,
 				sliceCount:         1,
 				expectedSliceCount: slice.Spec.Pool.ResourceSliceCount,
 				generation:         maxGeneration[key],
 			}
 		} else {
 			info.totalDevices += deviceCount
+			info.unavailableDevices += unavailCount
 			info.sliceCount++
 			// Check NodeName consistency across slices
 			sliceNodeName := ""
@@ -359,8 +381,12 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		}
 	}
 
-	// Step 2: Count allocations from ResourceClaims
-	allocationData := make(map[string]int32)
+	// Step 2: Count allocated devices from ResourceClaims.
+	// Keyed by pool ("driver/pool") then device name so each physical device
+	// counts at most once even when shared by multiple claims
+	// (allowMultipleAllocations). AdminAccess results are observers, not
+	// consumers, and are skipped.
+	allocatedDevices := make(map[string]map[string]struct{})
 
 	claims, err := c.claimLister.List(labels.Everything())
 	if err != nil {
@@ -373,8 +399,16 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			continue
 		}
 		for _, result := range claim.Status.Allocation.Devices.Results {
+			if result.AdminAccess != nil && *result.AdminAccess {
+				continue
+			}
 			key := result.Driver + "/" + result.Pool
-			allocationData[key]++
+			devices, ok := allocatedDevices[key]
+			if !ok {
+				devices = make(map[string]struct{})
+				allocatedDevices[key] = devices
+			}
+			devices[result.Device] = struct{}{}
 		}
 	}
 
@@ -392,8 +426,9 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		}
 
 		if int64(info.sliceCount) < info.expectedSliceCount {
-			// Incomplete pool: set validation error, leave device counts and slice count nil
-			errMsg := fmt.Sprintf("pool %s/%s is incomplete: observed %d/%d slices at generation %d",
+			// Incomplete pool: set validation error, leave device counts and slice count nil.
+			// PoolIncomplete: is a stable machine-readable prefix.
+			errMsg := fmt.Sprintf("PoolIncomplete: pool %s/%s is incomplete: observed %d/%d slices at generation %d",
 				info.driver, info.poolName, info.sliceCount, info.expectedSliceCount, info.generation)
 			// Truncate to 256 bytes to stay within the API field's +k8s:maxBytes=256 limit.
 			if len(errMsg) > 256 {
@@ -402,11 +437,8 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			pool.ValidationError = &errMsg
 		} else {
 			// Complete pool: populate device counts and slice count
-			allocatedDevices := allocationData[key]
-			// UnavailableDevices is currently always 0 in Alpha because the controller
-			// does not yet inspect device conditions/taints. This will be computed from
-			// real data when device health tracking is wired in.
-			unavailDevices := int32(0)
+			allocatedDevices := int32(len(allocatedDevices[key]))
+			unavailDevices := info.unavailableDevices
 			availableDevices := max(0, info.totalDevices-allocatedDevices-unavailDevices)
 
 			totalDevices := info.totalDevices
