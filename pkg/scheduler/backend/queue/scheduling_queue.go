@@ -1283,7 +1283,9 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	} else if p.isPodGroupMember(newPod) {
 		pgInfoLookup := entityLookup.(*framework.QueuedPodGroupInfo)
 		if p.pendingPodGroupPods.has(pgInfoLookup) {
-			if updated := p.pendingPodGroupPods.update(pgInfoLookup, newPod); updated {
+			if pInfo := p.pendingPodGroupPods.update(pgInfoLookup, newPod); pInfo != nil {
+				p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+				pInfo.PodSignature = p.signPod(ctx, newPod)
 				return
 			}
 		}

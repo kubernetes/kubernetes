@@ -6611,6 +6611,7 @@ func TestUpdatePodGroupMember(t *testing.T) {
 	p1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Label("allow", "").PodGroupName(pgName).Obj()
 	p2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Label("allow", "").PodGroupName(pgName).Obj()
 	updatedP2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Label("allow", "").Label("update", "true").PodGroupName(pgName).Obj()
+	nominatedP2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Label("allow", "").Label("update", "true").NominatedNodeName("node1").PodGroupName(pgName).Obj()
 	gatedP1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName(pgName).Obj()
 	ungatedP1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Label("allow", "").PodGroupName(pgName).Obj()
 	updatedGatedP1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Label("updated", "true").PodGroupName(pgName).Obj()
@@ -6631,6 +6632,7 @@ func TestUpdatePodGroupMember(t *testing.T) {
 		expectedPodsInPending   int
 		expectedGated           bool
 		expectedGroupSize       int
+		expectedNominatedPods   map[types.UID]string
 	}{
 		{
 			name:              "update pod in activeQ, keeps pod group in activeQ",
@@ -6708,6 +6710,54 @@ func TestUpdatePodGroupMember(t *testing.T) {
 			expectedGated:     false,
 			expectedGroupSize: 1,
 		},
+		{
+			name:              "update pod to nominated in activeQ, keeps pod group in activeQ",
+			initialPods:       []*v1.Pod{p1, p2},
+			initialState:      stateActive,
+			oldPod:            p2,
+			newPod:            nominatedP2,
+			expectedInActiveQ: true,
+			expectedGroupSize: 2,
+			expectedNominatedPods: map[types.UID]string{
+				"pod2": "node1",
+			},
+		},
+		{
+			name:               "update pod to nominated in backoffQ, keeps pod group in backoffQ",
+			initialPods:        []*v1.Pod{p1, p2},
+			initialState:       stateBackoff,
+			oldPod:             p2,
+			newPod:             nominatedP2,
+			expectedInBackoffQ: true,
+			expectedGroupSize:  2,
+			expectedNominatedPods: map[types.UID]string{
+				"pod2": "node1",
+			},
+		},
+		{
+			name:              "update pod to nominated in unschedulableEntities moves it to activeQ (ungated pod group)",
+			initialPods:       []*v1.Pod{p1, p2},
+			initialState:      stateUnschedulable,
+			oldPod:            p2,
+			newPod:            nominatedP2,
+			expectedInActiveQ: true,
+			expectedGroupSize: 2,
+			expectedNominatedPods: map[types.UID]string{
+				"pod2": "node1",
+			},
+		},
+		{
+			name:                  "update pod to nominated in pendingPodGroupPods (group in flight), updates pod in pending buffer",
+			initialPods:           []*v1.Pod{p1},
+			initialState:          statePopped,
+			pendingPods:           []*v1.Pod{p2},
+			oldPod:                p2,
+			newPod:                nominatedP2,
+			expectedPodsInPending: 1,
+			expectedNominatedPods: map[types.UID]string{
+				"pod2": "node1",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -6725,7 +6775,7 @@ func TestUpdatePodGroupMember(t *testing.T) {
 					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
 				},
 			}
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.newPod}, WithPreEnqueuePluginMap(preEnqueueMap))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 			// Add pending pods
@@ -6805,6 +6855,9 @@ func TestUpdatePodGroupMember(t *testing.T) {
 				if !inPending {
 					t.Errorf("Updated pod %s was not found in pendingPodGroupPods map", tt.newPod.Name)
 				}
+			}
+			if diff := cmp.Diff(tt.expectedNominatedPods, q.nominatedPodToNode, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Unexpected nominated pods (-want +got):\n%s", diff)
 			}
 		})
 	}
