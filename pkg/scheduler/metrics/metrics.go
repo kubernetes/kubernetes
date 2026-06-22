@@ -518,8 +518,8 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_scheduling_attempt_duration_seconds",
-			Help:           "Pod group scheduling attempt latency in seconds (scheduling algorithm + binding)",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15), // TBD: Correct buckets
+			Help:           "Pod group scheduling attempt latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"result", "profile"})
 	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogram(
@@ -527,7 +527,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_scheduling_algorithm_duration_seconds",
 			Help:           "Pod group scheduling algorithm latency in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15), // TBD: Correct buckets
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		})
 

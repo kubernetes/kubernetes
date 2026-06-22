@@ -6479,7 +6479,7 @@
     endpoint: /metrics
 - name: podgroup_scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Pod group scheduling attempt latency in seconds
   type: Histogram
   stabilityLevel: ALPHA
   labels:
