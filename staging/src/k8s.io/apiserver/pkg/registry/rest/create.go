@@ -148,7 +148,7 @@ func ValidateCreate(ctx context.Context, obj runtime.Object, strategy RESTCreate
 	if len(errs) == 0 {
 		objectMeta, err := meta.Accessor(obj)
 		if err != nil {
-			return append(errs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get object metadata: %v", err)))
+			return append(errs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get object metadata: %w", err)))
 		}
 
 		// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
