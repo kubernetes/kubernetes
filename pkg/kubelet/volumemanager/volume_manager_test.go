@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -47,6 +48,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
@@ -712,48 +714,12 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 			}
 			kubeClient := fake.NewClientset(objects...)
 
-			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
-
-			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
-			go manager.Run(ctx, sourcesReady)
+			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node).(*volumeManager)
 
 			podManager.SetPods(pods)
 
 			if test.podMode != "" {
-				for i := 0; i < test.numPods; i++ {
-					volumeName := v1.UniqueVolumeName(node.Status.VolumesAttached[i].Name)
-					go simulateVolumeInUseUpdate(volumeName, ctx.Done(), manager)
-				}
-
-				volumeMarkTimeout := 10*time.Second + time.Duration(test.numPods/10)*5*time.Second
-				err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, volumeMarkTimeout, true, func(context.Context) (bool, error) {
-					inUseVolumes := manager.GetVolumesInUse()
-					return len(inUseVolumes) == test.numPods, nil
-				})
-
-				require.NoError(t, err, "Timeout waiting for all %d volumes to be marked as in-use", test.numPods)
-
-				type attachResult struct {
-					podName string
-					err     error
-				}
-				resultChan := make(chan attachResult, test.numPods)
-
-				for _, pod := range pods {
-					go func() {
-						err := manager.WaitForAttachAndMount(ctx, pod)
-						resultChan <- attachResult{
-							podName: pod.Name,
-							err:     err,
-						}
-					}()
-				}
-
-				for i := 0; i < test.numPods; i++ {
-					result := <-resultChan
-					require.NoError(t, result.err,
-						"Failed to wait for attach and mount for pod %s", result.podName)
-				}
+				markPodsAsMounted(t, ctx, manager, pods, pvs)
 			}
 
 			unmountCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -890,4 +856,28 @@ func createMultiplePodsWithVolumes(numPods int, pvMode v1.PersistentVolumeMode) 
 	}
 
 	return node, pods, pvs, claims
+}
+
+func markPodsAsMounted(t *testing.T, ctx context.Context, manager *volumeManager, pods []*v1.Pod, pvs []*v1.PersistentVolume) {
+	t.Helper()
+
+	logger := klog.FromContext(ctx)
+	for i, pod := range pods {
+		podName := util.GetUniquePodName(pod)
+		volumeSpec := volume.NewSpecFromPersistentVolume(pvs[i], false)
+		volumeName, err := manager.desiredStateOfWorld.AddPodToVolume(logger, podName, pod, volumeSpec, volumeSpec.Name(), "", nil)
+		require.NoError(t, err, "Failed to add pod %s to desired state of world", pod.Name)
+
+		err = manager.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, testHostname, pvs[i].Spec.RBD.RBDImage)
+		require.NoError(t, err, "Failed to mark volume %s as attached", volumeName)
+
+		err = manager.actualStateOfWorld.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+			PodName:          podName,
+			PodUID:           pod.UID,
+			VolumeName:       volumeName,
+			VolumeSpec:       volumeSpec,
+			VolumeMountState: operationexecutor.VolumeMounted,
+		})
+		require.NoError(t, err, "Failed to mark volume %s as mounted for pod %s", volumeName, pod.Name)
+	}
 }
