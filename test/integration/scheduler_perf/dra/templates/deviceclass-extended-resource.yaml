@@ -6,4 +6,4 @@ spec:
   selectors:
   - cel:
       expression: device.driver == "test-driver.cdi.k8s.io"
-  extendedResourceName: example.com/gpu-{{.Index}}
+  {{if eq .class "example.com/gpu"}}extendedResourceName: example.com/gpu-{{.Index}}{{end}}
