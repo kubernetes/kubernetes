@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/ptr"
 )
 
 func TestPodTopologyLabels(t *testing.T) {
@@ -1778,6 +1777,9 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 				Name:  "c",
 				Image: "pause",
 			}},
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
+			},
 		},
 	}
 	pod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
@@ -1787,7 +1789,7 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 
 	// Simulate DRA controller writing resourceClaimStatuses.
 	pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
-		{Name: "gpu", ResourceClaimName: ptr.To("dra-pod-gpu")},
+		{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
 	}
 	pod, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 	if err != nil {

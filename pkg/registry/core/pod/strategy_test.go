@@ -4290,7 +4290,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
 				Status: api.PodStatus{
 					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+						{Name: "my-claim", ResourceClaimName: new("pod-my-claim")},
 					},
 				},
 			},
@@ -4302,7 +4302,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
 					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+						{Name: "my-claim", ResourceClaimName: new("pod-my-claim")},
 					},
 				},
 			},
@@ -4316,7 +4316,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
 					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+						{Name: "my-claim", ResourceClaimName: new("pod-my-claim")},
 					},
 				},
 			},
@@ -4338,7 +4338,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
 				Status: api.PodStatus{
 					ResourceClaimStatuses: []api.PodResourceClaimStatus{
-						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+						{Name: "my-claim", ResourceClaimName: new("pod-my-claim")},
 					},
 				},
 			},
