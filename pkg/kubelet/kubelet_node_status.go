@@ -35,6 +35,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	coreinformersv1 "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -796,4 +799,57 @@ func nodeConditionsHaveChanged(originalConditions []v1.NodeCondition, conditions
 		}
 	}
 	return false
+}
+
+func (kl *Kubelet) isResizePreemptionDisabled() bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		return false
+	}
+	if node, err := kl.GetNode(context.TODO()); err == nil {
+		return util.IsNodeResizePreemptionDisabled(node)
+	}
+	return false
+}
+
+func (kl *Kubelet) registerNodePreemptionPolicyHandler(ctx context.Context, nodeInformer coreinformersv1.NodeInformer) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		return
+	}
+	if nodeInformer == nil {
+		return
+	}
+	logger := klog.FromContext(ctx)
+	if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			oldNode, ok1 := oldObj.(*v1.Node)
+			newNode, ok2 := newObj.(*v1.Node)
+			if !ok1 || !ok2 {
+				return
+			}
+			oldDisable := util.IsNodeResizePreemptionDisabled(oldNode)
+			newDisable := util.IsNodeResizePreemptionDisabled(newNode)
+
+			if oldDisable != newDisable {
+				logger.V(3).Info("Node preemption policy changed, updating deferred pods", "oldPolicy", oldDisable, "newPolicy", newDisable)
+				pods := kl.podManager.GetPods()
+				for _, pod := range pods {
+					if kl.statusManager.IsPodResizeDeferred(pod.UID) {
+						var changed bool
+						if newDisable {
+							// Preemption is now disabled for resize.
+							changed = kl.statusManager.SetPodResizePreemptionCondition(pod.UID)
+						} else {
+							// Preemption is now enabled for resize.
+							changed = kl.statusManager.ClearPodResizePreemptionCondition(pod.UID)
+						}
+						if changed {
+							kl.syncPodNow(ctx, pod)
+						}
+					}
+				}
+			}
+		},
+	}); err != nil {
+		logger.Error(err, "Failed to register event handler for node preemption policy")
+	}
 }

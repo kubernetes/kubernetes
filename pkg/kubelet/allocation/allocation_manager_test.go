@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -794,7 +796,7 @@ func TestRetryPendingResizes(t *testing.T) {
 					allocationManager.(*manager).statusManager.SetPodResizeInProgressCondition(originalPod.UID, "", originalInProgressMsg, 0)
 				}
 				if tt.originalPending {
-					allocationManager.(*manager).statusManager.SetPodResizePendingCondition(originalPod.UID, v1.PodReasonDeferred, originalPendingMsg, 0)
+					allocationManager.(*manager).statusManager.SetPodResizePendingCondition(originalPod.UID, v1.PodReasonDeferred, originalPendingMsg, false, 0)
 				}
 
 				allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -2290,9 +2292,9 @@ func TestSortPendingResizes(t *testing.T) {
 
 	testPods[2].Spec.Priority = ptr.To(int32(100))
 	testPods[3].Status.QOSClass = v1.PodQOSGuaranteed
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message", 1)
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message", false, 1)
 	time.Sleep(5 * time.Millisecond)
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[5].UID, v1.PodReasonDeferred, "some-message", 1)
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[5].UID, v1.PodReasonDeferred, "some-message", false, 1)
 
 	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		pods := make(map[types.UID]*v1.Pod)
@@ -2406,7 +2408,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			am := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{original}, nil)
 			require.NoError(t, am.SetAllocatedResources(logger, original))
 			if tc.hasPendingCondition {
-				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", 1)
+				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", false, 1)
 			}
 
 			am.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -2426,6 +2428,172 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			require.Len(t, fakeRecorder.Events, 1)
 			event := <-fakeRecorder.Events
 			require.Equal(t, tc.expectedEvent, event)
+		})
+	}
+}
+
+func TestDeferredPodResizeStatusConditionsWithNodePreemptionPolicy(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	cpu2000m := resource.MustParse("2")
+	mem1000M := resource.MustParse("1Gi")
+
+	tests := []struct {
+		name                     string
+		featureGateEnabled       bool
+		nodePreemptionPolicy     *v1.NodePodPreemptionPolicy
+		expectedResizeConditions []*v1.PodCondition
+	}{
+		{
+			name:               "Feature Gate Enabled, Preemption Disabled on Node -> expect PreemptionDisabled condition",
+			featureGateEnabled: true,
+			nodePreemptionPolicy: &v1.NodePodPreemptionPolicy{
+				DisableResizePreemption: []string{"test-preemption-policy"},
+			},
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+				{
+					Type:   v1.PodResizePreemptionDisabled,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonPreemptionDisabledByNodePolicy,
+				},
+			},
+		},
+		{
+			name:                 "Feature Gate Enabled, Preemption NOT Disabled on Node -> expect NO PreemptionDisabled condition",
+			featureGateEnabled:   true,
+			nodePreemptionPolicy: &v1.NodePodPreemptionPolicy{},
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+		{
+			name:               "Feature Gate Disabled, Preemption Disabled on Node -> expect NO PreemptionDisabled condition",
+			featureGateEnabled: false,
+			nodePreemptionPolicy: &v1.NodePodPreemptionPolicy{
+				DisableResizePreemption: []string{"test-preemption-policy"},
+			},
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.featureGateEnabled)
+
+			podOriginal := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "test-pod-uid",
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "i1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               "c1",
+							AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m},
+							Resources:          &v1.ResourceRequirements{},
+						},
+					},
+				},
+			}
+
+			resizedPod := podOriginal.DeepCopy()
+			resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu2000m}
+
+			statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+			statusManager.SetPodStatus(logger, podOriginal, podOriginal.Status)
+
+			// Mock getNode returns capacity less than request to force deferring the pod
+			getNode := func(ctx context.Context) (*v1.Node, error) {
+				return &v1.Node{
+					Spec: v1.NodeSpec{
+						PodPreemptionPolicy: tc.nodePreemptionPolicy,
+					},
+					Status: v1.NodeStatus{
+						Capacity: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1.5"),
+							v1.ResourceMemory: mem1000M,
+						},
+						Allocatable: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1.5"),
+							v1.ResourceMemory: mem1000M,
+							v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+						},
+					},
+				}, nil
+			}
+
+			// We need to return active pods containing our test pod.
+			allocatedPods := []*v1.Pod{podOriginal}
+
+			am := NewInMemoryManager(
+				logger,
+				statusManager,
+				func(context.Context, *v1.Pod) {},
+				func() []*v1.Pod { return allocatedPods },
+				func(types.UID) (*v1.Pod, bool) { return resizedPod, true },
+				func() bool {
+					node, _ := getNode(context.Background())
+					return kubeletutil.IsNodeResizePreemptionDisabled(node)
+				},
+				config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+				record.NewFakeRecorder(20),
+			)
+
+			// Populate allocated resources in am's state memory
+			require.NoError(t, am.SetAllocatedResources(logger, podOriginal))
+
+			// Add a predicate handler to enforce resource limits
+			cm := cm.NewFakeContainerManager()
+			predicateHandler := lifecycle.NewPredicateAdmitHandler(func(context.Context, bool) (*v1.Node, error) {
+				return getNode(context.Background())
+			}, lifecycle.NewAdmissionFailureHandlerStub(), cm.UpdatePluginResources)
+			am.(*manager).AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{predicateHandler})
+
+			// Attempt resize - since capacity is 1.5, requesting 2.0 cpu will fail and defer the pod.
+			allocated, err := am.(*manager).handlePodResourcesResize(tCtx, resizedPod)
+			require.NoError(t, err)
+			require.False(t, allocated)
+
+			// Verify status conditions
+			require.True(t, statusManager.IsPodResizeDeferred(resizedPod.UID))
+			conditions := statusManager.GetPodResizeConditions(resizedPod.UID)
+
+			if diff := cmp.Diff(tc.expectedResizeConditions, conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime", "Message")); diff != "" {
+				t.Fatalf("unexpected resize conditions (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -2459,6 +2627,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			}
 			return nil, false
 		},
+		func() bool { return false },
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
 		record.NewFakeRecorder(20),
 	)

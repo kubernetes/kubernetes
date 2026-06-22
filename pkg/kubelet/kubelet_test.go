@@ -345,6 +345,7 @@ func newTestKubeletWithImageList(
 		func(ctx context.Context, pod *v1.Pod) { kubelet.HandlePodSyncs(ctx, []*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
+		kubelet.isResizePreemptionDisabled,
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
 		kubelet.recorder,
 	)
