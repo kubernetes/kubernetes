@@ -217,12 +217,14 @@ type KubeProxyConfiguration struct {
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration
 
-	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
-	// alternatively, the single string 'primary'. If set to a list of CIDRs,
-	// connections to NodePort services will only be accepted on node IPs in one of
-	// the indicated ranges. If set to 'primary', NodePort services will only be
-	// accepted on the node's primary IPv4 and/or IPv6 address according to the Node
-	// object. If unset, NodePort connections will be accepted on all local IPs.
+	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs,
+	// optionally combined with the keywords 'primary', 'localhost', and 'all'.
+	// Connections to NodePort services will only be accepted on node IPs in one
+	// of the indicated ranges. 'primary' resolves to the node's primary IPv4
+	// and/or IPv6 address according to the Node object, 'localhost' to the node's
+	// loopback addresses, and 'all' to all addresses. Keywords may be combined
+	// with each other and with literal CIDRs. If unset, NodePort connections will
+	// be accepted on all local IPs.
 	NodePortAddresses []string
 
 	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
@@ -299,6 +301,14 @@ func (m *LocalMode) Type() string {
 	return "LocalMode"
 }
 
-// NodePortAddressesPrimary is a special value for NodePortAddresses indicating that it
-// should only use the primary node IPs.
-const NodePortAddressesPrimary string = "primary"
+// NodePortAddresses keywords are special values for NodePortAddresses that are
+// resolved to concrete CIDRs based on the node's IP families. They may be combined
+// with each other and with literal CIDRs.
+const (
+	// NodePortAddressesPrimary resolves to the node's primary IPs.
+	NodePortAddressesPrimary string = "primary"
+	// NodePortAddressesLocalhost resolves to the loopback CIDRs of the node's IP families.
+	NodePortAddressesLocalhost string = "localhost"
+	// NodePortAddressesAll resolves to the zero CIDRs of the node's IP families.
+	NodePortAddressesAll string = "all"
+)

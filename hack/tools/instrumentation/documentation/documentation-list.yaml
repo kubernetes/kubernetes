@@ -5011,6 +5011,36 @@
   componentEndpoints:
   - component: kube-proxy
     endpoint: /metrics
+- name: nftables_localhost_nodeport_listener_creation_failures_total
+  subsystem: kubeproxy
+  help: Number of localhost NodePort userspace proxy listener creation failures.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: nftables_localhost_nodeport_listeners
+  subsystem: kubeproxy
+  help: Number of active localhost NodePort userspace proxy listeners.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: kubeproxy_nftables_localhost_nodeport_rejected_packets_total
+  help: Number of packets rejected on localhost NodePorts with a protocol not supported
+    by the userspace proxy (only TCP is supported).
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
 - name: proxy_healthz_total
   subsystem: kubeproxy
   help: Cumulative proxy healthz HTTP status

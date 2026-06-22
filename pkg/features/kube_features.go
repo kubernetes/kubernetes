@@ -477,6 +477,14 @@ const (
 	// Allow use of IPVS mode in kube-proxy
 	KubeProxyIPVS featuregate.Feature = "KubeProxyIPVS"
 
+	// owner: @austinabro321
+	// kep: https://kep.k8s.io/6032
+	//
+	// Enables a userspace TCP proxy in the nftables kube-proxy backend that
+	// serves localhost NodePort services on IPv4 and IPv6, which nftables
+	// cannot do in kernel space (no route_localnet equivalent).
+	KubeProxyNFTablesLocalhostNodePorts featuregate.Feature = "KubeProxyNFTablesLocalhostNodePorts"
+
 	// owner: @marquiz
 	// kep: http://kep.k8s.io/4033
 	//
@@ -1487,6 +1495,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated},
 	},
 
+	KubeProxyNFTablesLocalhostNodePorts: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeletCgroupDriverFromCRI: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2354,6 +2366,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	JobManagedBy: {},
 
 	KubeProxyIPVS: {},
+
+	KubeProxyNFTablesLocalhostNodePorts: {},
 
 	KubeletCgroupDriverFromCRI: {},
 

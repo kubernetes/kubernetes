@@ -31,6 +31,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -41,6 +43,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	e2eregistry "k8s.io/kubernetes/test/e2e/framework/registry"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -394,5 +397,236 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			}
 			framework.ExpectNoError(err)
 		}
+	})
+
+	loopbackURL := func(port int32, path string) string {
+		if framework.TestContext.ClusterIsIPv6() {
+			return fmt.Sprintf("http://[::1]:%d%s", port, path)
+		}
+		return fmt.Sprintf("http://127.0.0.1:%d%s", port, path)
+	}
+
+	framework.It("should proxy localhost NodePort traffic to backends across nodes", feature.LocalhostNodePorts, func(ctx context.Context) {
+		cs := fr.ClientSet
+		ns := fr.Namespace.Name
+
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) < 2 {
+			e2eskipper.Skipf("Test requires >= 2 Ready nodes, but there are only %v nodes", len(nodes.Items))
+		}
+		clientNodeName := nodes.Items[0].Name
+		remoteNodeName := nodes.Items[1].Name
+
+		hostExecPodName := "host-exec-pod"
+		hostExecPod := e2epod.NewExecPodSpec(ns, hostExecPodName, true)
+		e2epod.SetNodeSelection(&hostExecPod.Spec, e2epod.NodeSelection{Name: clientNodeName})
+		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
+
+		ginkgo.By("creating one backend pod on the client node and one on a different node")
+		label := map[string]string{"app": "agnhost-localhost-nodeport"}
+		httpPort := []v1.ContainerPort{{ContainerPort: 8080, Protocol: v1.ProtocolTCP}}
+		backendNames := sets.New[string]()
+		for _, bp := range []struct {
+			name string
+			node string
+		}{
+			{"agnhost-localhost-nodeport-local", clientNodeName},
+			{"agnhost-localhost-nodeport-remote", remoteNodeName},
+		} {
+			backendNames.Insert(bp.name)
+			pod := e2epod.NewAgnhostPod(ns, bp.name, nil, nil, httpPort, "netexec")
+			pod.Labels = label
+			e2epod.SetNodeSelection(&pod.Spec, e2epod.NodeSelection{Name: bp.node})
+			e2epod.NewPodClient(fr).CreateSync(ctx, pod)
+		}
+
+		ginkgo.By("creating NodePort service")
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "agnhost-localhost-nodeport"},
+			Spec: v1.ServiceSpec{
+				Type:     v1.ServiceTypeNodePort,
+				Selector: label,
+				Ports: []v1.ServicePort{{
+					Protocol:   v1.ProtocolTCP,
+					Port:       9000,
+					TargetPort: intstr.FromInt32(8080),
+				}},
+			},
+		}
+		svc, err = cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("waiting for endpoints")
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 2))
+
+		ginkgo.By("curling localhost NodePort from the node's netns until both backends have responded")
+		nodePort := svc.Spec.Ports[0].NodePort
+		cmd := fmt.Sprintf("curl --silent --max-time 5 %s", loopbackURL(nodePort, "/hostname"))
+		seen := sets.New[string]()
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 60*time.Second, true, func(_ context.Context) (bool, error) {
+			out, err := e2epodoutput.RunHostCmd(ns, hostExecPodName, cmd)
+			if err != nil {
+				return false, nil
+			}
+			hostname := strings.TrimSpace(out)
+			if hostname == "" {
+				return false, nil
+			}
+			if !backendNames.Has(hostname) {
+				return false, fmt.Errorf("response %q is not one of the backend pods %v", hostname, backendNames.UnsortedList())
+			}
+			seen.Insert(hostname)
+			return seen.Equal(backendNames), nil
+		}); err != nil {
+			framework.Failf("expected localhost NodePort %d to reach both backends %v, only saw %v: %v", nodePort, backendNames.UnsortedList(), seen.UnsortedList(), err)
+		}
+	})
+
+	framework.It("should honor sessionAffinity=ClientIP for localhost NodePort", feature.LocalhostNodePorts, func(ctx context.Context) {
+		cs := fr.ClientSet
+		ns := fr.Namespace.Name
+
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) < 1 {
+			e2eskipper.Skipf("Test requires >= 1 Ready nodes, but there are only %v nodes", len(nodes.Items))
+		}
+		nodeName := nodes.Items[0].Name
+
+		hostExecPodName := "host-exec-pod"
+		hostExecPod := e2epod.NewExecPodSpec(ns, hostExecPodName, true)
+		e2epod.SetNodeSelection(&hostExecPod.Spec, e2epod.NodeSelection{Name: nodeName})
+		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
+
+		ginkgo.By("creating 3 backend pods pinned to the same node")
+		label := map[string]string{"app": "agnhost-sticky-localhost"}
+		httpPort := []v1.ContainerPort{{ContainerPort: 8080, Protocol: v1.ProtocolTCP}}
+		backendNames := sets.New[string]()
+		for i := range 3 {
+			name := fmt.Sprintf("agnhost-sticky-localhost-%d", i)
+			backendNames.Insert(name)
+			pod := e2epod.NewAgnhostPod(ns, name, nil, nil, httpPort, "netexec")
+			pod.Labels = label
+			e2epod.SetNodeSelection(&pod.Spec, e2epod.NodeSelection{Name: nodeName})
+			e2epod.NewPodClient(fr).CreateSync(ctx, pod)
+		}
+
+		ginkgo.By("creating NodePort service with sessionAffinity=ClientIP")
+		timeoutSeconds := int32(10800)
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "agnhost-sticky-localhost"},
+			Spec: v1.ServiceSpec{
+				Type:            v1.ServiceTypeNodePort,
+				Selector:        label,
+				SessionAffinity: v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: &v1.SessionAffinityConfig{
+					ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &timeoutSeconds},
+				},
+				Ports: []v1.ServicePort{{
+					Protocol:   v1.ProtocolTCP,
+					Port:       9000,
+					TargetPort: intstr.FromInt32(8080),
+				}},
+			},
+		}
+		svc, err = cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("waiting for all 3 endpoints to be ready")
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 3))
+
+		ginkgo.By("curling localhost NodePort 10 times; all must hit the same pod")
+		nodePort := svc.Spec.Ports[0].NodePort
+		cmd := fmt.Sprintf("curl --silent --max-time 5 %s", loopbackURL(nodePort, "/hostname"))
+
+		// Retry the first curl until the listener is reachable, then pin.
+		var first string
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(_ context.Context) (bool, error) {
+			out, err := e2epodoutput.RunHostCmd(ns, hostExecPodName, cmd)
+			if err != nil {
+				return false, nil
+			}
+			first = strings.TrimSpace(out)
+			return first != "", nil
+		}); err != nil {
+			framework.Failf("initial curl to localhost:%d failed: %v", nodePort, err)
+		}
+		if !backendNames.Has(first) {
+			framework.Failf("first response %q is not one of the backend pods %v", first, backendNames.UnsortedList())
+		}
+
+		for i := range 9 {
+			out, err := e2epodoutput.RunHostCmd(ns, hostExecPodName, cmd)
+			framework.ExpectNoError(err, "curl %d failed", i+2)
+			got := strings.TrimSpace(out)
+			gomega.Expect(got).To(gomega.Equal(first),
+				"sessionAffinity=ClientIP must pin localhost traffic to a single backend (request %d got %q, first was %q)", i+2, got, first)
+		}
+	})
+
+	framework.It("should let a node pull an image from a registry exposed via localhost NodePort", feature.LocalhostNodePorts, func(ctx context.Context) {
+		cs := fr.ClientSet
+		ns := fr.Namespace.Name
+
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) < 2 {
+			e2eskipper.Skipf("Test requires >= 2 Ready nodes, but there are only %v nodes", len(nodes.Items))
+		}
+		clientNodeName := nodes.Items[0].Name
+		registryNodeName := nodes.Items[1].Name
+
+		ginkgo.By("running a private fake registry on a different node, behind a NodePort service")
+		label := map[string]string{"app": "localhost-nodeport-registry"}
+		registryPorts := []v1.ContainerPort{{ContainerPort: 5000, Protocol: v1.ProtocolTCP}}
+		registryPod := e2epod.NewAgnhostPod(ns, "localhost-nodeport-registry", nil, nil, registryPorts, "fake-registry-server", "--private")
+		registryPod.Labels = label
+		e2epod.SetNodeSelection(&registryPod.Spec, e2epod.NodeSelection{Name: registryNodeName})
+		e2epod.NewPodClient(fr).CreateSync(ctx, registryPod)
+
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "localhost-nodeport-registry"},
+			Spec: v1.ServiceSpec{
+				Type:     v1.ServiceTypeNodePort,
+				Selector: label,
+				Ports: []v1.ServicePort{{
+					Protocol:   v1.ProtocolTCP,
+					Port:       5000,
+					TargetPort: intstr.FromInt32(5000),
+				}},
+			},
+		}
+		svc, err = cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("waiting for the registry endpoint")
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 1))
+
+		nodePort := svc.Spec.Ports[0].NodePort
+		registryAddress := fmt.Sprintf("localhost:%d", nodePort)
+
+		ginkgo.By("creating the image pull secret for the localhost registry")
+		secret := e2eregistry.User1DockerSecret(registryAddress)
+		secret.Name = "localhost-nodeport-registry-creds-" + string(uuid.NewUUID())
+		_, err = cs.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("pulling an image through the localhost NodePort and running it")
+		pullPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "localhost-nodeport-registry-client"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:            "client",
+					Image:           registryAddress + "/pause:testing",
+					ImagePullPolicy: v1.PullAlways,
+				}},
+				ImagePullSecrets: []v1.LocalObjectReference{{Name: secret.Name}},
+				RestartPolicy:    v1.RestartPolicyNever,
+			},
+		}
+		e2epod.SetNodeSelection(&pullPod.Spec, e2epod.NodeSelection{Name: clientNodeName})
+		pullPod = e2epod.NewPodClient(fr).Create(ctx, pullPod)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pullPod))
 	})
 })
