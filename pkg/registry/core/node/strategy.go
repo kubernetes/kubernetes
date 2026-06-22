@@ -116,6 +116,10 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
 		node.Status.DeclaredFeatures = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && !nodePodPreemptionPolicyInUse(oldNode) {
+		node.Spec.PodPreemptionPolicy = nil
+	}
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -146,8 +150,10 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateNode(obj.(*api.Node))
-	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
+	newNode := obj.(*api.Node)
+	oldNode := old.(*api.Node)
+	opts := validation.ValidationOptionsForNode(newNode, oldNode)
+	return append(validation.ValidateNodeWithOptions(newNode, opts), validation.ValidateNodeUpdate(newNode, oldNode)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -199,7 +205,9 @@ func nodeStatusConfigInUse(node *api.Node) bool {
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
+	newNode := obj.(*api.Node)
+	oldNode := old.(*api.Node)
+	return validation.ValidateNodeUpdate(newNode, oldNode)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -325,4 +333,9 @@ func supplementalGroupsPolicyInUse(node *api.Node) bool {
 // nodeDeclaredFeaturesInUse returns true if the node.status has DeclaredFeatures
 func nodeDeclaredFeaturesInUse(node *api.Node) bool {
 	return node != nil && node.Status.DeclaredFeatures != nil
+}
+
+// nodePodPreemptionPolicyInUse returns true if the node.spec has PodPreemptionPolicy
+func nodePodPreemptionPolicyInUse(node *api.Node) bool {
+	return node != nil && node.Spec.PodPreemptionPolicy != nil && len(node.Spec.PodPreemptionPolicy.DisableResizePreemption) != 0
 }
