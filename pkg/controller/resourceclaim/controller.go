@@ -1147,14 +1147,14 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 				},
 				Spec: template.Spec.Spec,
 			}
-			metricLabel := getAdminAccessMetricLabel(claim)
+			getMetricLabels := getClaimCreateMetricLabels(claim)
 			claimName := claim.Name
 			claim, err = ec.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			if err != nil {
-				resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
+				resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("failure")...).Inc()
 				return fmt.Errorf("create ResourceClaim %s: %w", claimName, err)
 			}
-			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("success")...).Inc()
 			logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 			ec.claimCache.Mutation(claim)
 		}
@@ -1389,14 +1389,14 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 			},
 			Spec: template.Spec.Spec,
 		}
-		metricLabel := getAdminAccessMetricLabel(claim)
+		getMetricLabels := getClaimCreateMetricLabels(claim)
 		claimName := claim.Name
 		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(podGroup.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
-			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("failure")...).Inc()
 			return fmt.Errorf("create ResourceClaim %s: %w", claimName, err)
 		}
-		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
+		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(getMetricLabels("success")...).Inc()
 		logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "podgroup", klog.KObj(podGroup))
 		ec.claimCache.Mutation(claim)
 	}
@@ -1873,6 +1873,15 @@ func claimPodGroupOwnerIndexFunc(obj any) ([]string, error) {
 		return nil, nil
 	}
 	return []string{claim.Namespace + "/" + string(controller.UID)}, nil
+}
+
+// getClaimCreateMetricLabels returns the labels for the
+// [resourceclaimmetrics.ResourceClaimCreate] metric.
+func getClaimCreateMetricLabels(claim *resourceapi.ResourceClaim) func(string) []string {
+	return func(status string) []string {
+		adminAccess := getAdminAccessMetricLabel(claim)
+		return []string{status, adminAccess}
+	}
 }
 
 func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
