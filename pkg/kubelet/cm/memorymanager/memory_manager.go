@@ -159,17 +159,12 @@ func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.
 		}
 
 	case policyTypeBestEffort:
-		if runtime.GOOS == "windows" {
-			systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
-			if err != nil {
-				return nil, err
-			}
-			policy, err = NewPolicyBestEffort(logger, machineInfo, systemReserved, affinity)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("policy %q is not available for platform %q", policyTypeBestEffort, runtime.GOOS)
+		// BestEffort is Windows-only; newBestEffortPolicy has per-platform builds
+		// (it constructs on Windows and returns a "not available" error elsewhere).
+		var err error
+		policy, err = newBestEffortPolicy(logger, machineInfo, nodeAllocatableReservation, reservedMemory, affinity)
+		if err != nil {
+			return nil, err
 		}
 
 	default:
