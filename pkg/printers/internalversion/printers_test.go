@@ -43,6 +43,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -8630,24 +8631,24 @@ func TestPrintEvictionRequest(t *testing.T) {
 	now := time.Now().UTC().AddDate(0, 0, -3)
 	twoDaysAgo := now.AddDate(0, 0, -2)
 
-	eviction := coordination.EvictionRequest{
+	eviction := lifecycle.EvictionRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "pod-1-pod1",
 			Namespace:         "ns1",
 			CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 		},
-		Spec: coordination.EvictionRequestSpec{
-			Target: coordination.EvictionRequestTarget{
-				Pod: &coordination.EvictionRequestPodReference{
+		Spec: lifecycle.EvictionRequestSpec{
+			Target: lifecycle.EvictionRequestTarget{
+				Pod: &lifecycle.EvictionRequestPodReference{
 					Name: "pod1",
 					UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
 				},
 			},
 			RequesterName: "drain.foo.com/bar",
-			Intent:        coordination.EvictionRequestIntentEviction,
+			Intent:        lifecycle.EvictionRequestIntentEviction,
 		},
-		Status: coordination.EvictionRequestStatus{
-			ObservedGeneration: ptr.To[int64](1),
+		Status: lifecycle.EvictionRequestStatus{
+			ObservedGeneration: new(int64(1)),
 			Conditions:         []metav1.Condition{},
 		},
 	}
@@ -8679,28 +8680,28 @@ func TestPrintEvictionRequestList(t *testing.T) {
 	now := time.Now().UTC().AddDate(0, 0, -3)
 	dayAgo := now.AddDate(0, 0, -1)
 	twoDaysAgo := now.AddDate(0, 0, -2)
-	evictionRequestList := coordination.EvictionRequestList{
-		Items: []coordination.EvictionRequest{
+	evictionRequestList := lifecycle.EvictionRequestList{
+		Items: []lifecycle.EvictionRequest{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1-pod1",
 					Namespace:         "ns1",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
 							Name: "pod1",
 							UID:  "bc134542-aa19-4361-8fe2-cf18f78848c0",
 						},
 					},
 					RequesterName: "drain.foo.com/bar",
-					Intent:        coordination.EvictionRequestIntentEviction,
+					Intent:        lifecycle.EvictionRequestIntentEviction,
 				},
-				Status: coordination.EvictionRequestStatus{
-					ObservedGeneration: ptr.To[int64](1),
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(coordination.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(lifecycle.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
 					},
 				},
 			},
@@ -8711,20 +8712,20 @@ func TestPrintEvictionRequestList(t *testing.T) {
 					Namespace:         "ns2",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
 							Name: "pod2",
 							UID:  "5e153f5b-e420-41b4-9040-8f3b51cf2162",
 						},
 					},
 					RequesterName: "drain.foo.com/bar",
-					Intent:        coordination.EvictionRequestIntentEviction,
+					Intent:        lifecycle.EvictionRequestIntentEviction,
 				},
-				Status: coordination.EvictionRequestStatus{
-					ObservedGeneration: ptr.To[int64](1),
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
 					},
 				},
 			},
@@ -8734,20 +8735,20 @@ func TestPrintEvictionRequestList(t *testing.T) {
 					Namespace:         "ns3",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
 							Name: "pod3",
 							UID:  "68018c4c-bcca-4465-964a-66d8a1626686",
 						},
 					},
 					RequesterName: "drain.foo.com/bar",
-					Intent:        coordination.EvictionRequestIntentWithdrawn,
+					Intent:        lifecycle.EvictionRequestIntentWithdrawn,
 				},
-				Status: coordination.EvictionRequestStatus{
-					ObservedGeneration: ptr.To[int64](1),
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
 					},
 				},
 			},
@@ -8757,20 +8758,20 @@ func TestPrintEvictionRequestList(t *testing.T) {
 					Namespace:         "ns4",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
 							Name: "pod4",
 							UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
 						},
 					},
 					RequesterName: "drain.foo.com/bar",
-					Intent:        coordination.EvictionRequestIntentEviction,
+					Intent:        lifecycle.EvictionRequestIntentEviction,
 				},
-				Status: coordination.EvictionRequestStatus{
-					ObservedGeneration: ptr.To[int64](1),
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
 					},
 				},
 			},
@@ -8780,21 +8781,21 @@ func TestPrintEvictionRequestList(t *testing.T) {
 					Namespace:         "ns5",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
 							Name: "pod5",
 							UID:  "9f4a1620-0e97-4246-b304-5969b2104377",
 						},
 					},
 					RequesterName: "drain.foo.com/bar",
-					Intent:        coordination.EvictionRequestIntentEviction,
+					Intent:        lifecycle.EvictionRequestIntentEviction,
 				},
-				Status: coordination.EvictionRequestStatus{
-					ObservedGeneration: ptr.To[int64](1),
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
 					},
 				},
 			},
@@ -8804,15 +8805,15 @@ func TestPrintEvictionRequestList(t *testing.T) {
 					Namespace:         "ns6",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionRequestSpec{
-					Target: coordination.EvictionRequestTarget{
-						Pod: &coordination.EvictionRequestPodReference{
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
 							Name: "pod6",
 							UID:  "e968f679-523b-4e63-9417-0cd9ae13a0b2",
 						},
 					},
 					RequesterName: "drain.foo.com/bar",
-					Intent:        coordination.EvictionRequestIntentEviction,
+					Intent:        lifecycle.EvictionRequestIntentEviction,
 				},
 			},
 		},
@@ -8847,34 +8848,34 @@ func TestPrintEviction(t *testing.T) {
 	dayAgo := now.AddDate(0, 0, -1)
 	twoDaysAgo := now.AddDate(0, 0, -2)
 
-	eviction := coordination.Eviction{
+	eviction := lifecycle.Eviction{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "pod-1-pod1",
 			Namespace:         "ns1",
 			CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 		},
-		Spec: coordination.EvictionSpec{
-			Target: coordination.EvictionTarget{
-				Pod: &coordination.EvictionPodReference{
+		Spec: lifecycle.EvictionSpec{
+			Target: lifecycle.EvictionTarget{
+				Pod: &lifecycle.EvictionPodReference{
 					Name: "pod1",
 					UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
 				},
 			},
 		},
-		Status: coordination.EvictionStatus{
-			ObservedGeneration: ptr.To[int64](1),
-			TargetResponders: []coordination.TargetResponder{
-				{Name: "responder1", State: coordination.ResponderStateCompleted},
-				{Name: "responder2", State: coordination.ResponderStateActive},
+		Status: lifecycle.EvictionStatus{
+			ObservedGeneration: new(int64(1)),
+			TargetResponders: []lifecycle.TargetResponder{
+				{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+				{Name: "responder2", State: lifecycle.ResponderStateActive},
 			},
-			Responders: []coordination.ResponderStatus{
-				{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "completed message"},
-				{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "migrating pod1 message"},
+			Responders: []lifecycle.ResponderStatus{
+				{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed message")},
+				{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("migrating pod1 message")},
 			},
-			Requesters: []coordination.Requester{
+			Requesters: []lifecycle.Requester{
 				{
 					Name:   "drain.foo.com/bar",
-					Intent: coordination.RequesterIntentEviction,
+					Intent: lifecycle.RequesterIntentEviction,
 				},
 			},
 			Conditions: []metav1.Condition{},
@@ -8918,38 +8919,38 @@ func TestPrintEvictionList(t *testing.T) {
 	daysLater := now.AddDate(0, 0, 5).Add(time.Minute)
 	dayAgo := now.AddDate(0, 0, -1)
 	twoDaysAgo := now.AddDate(0, 0, -2)
-	evictionList := coordination.EvictionList{
-		Items: []coordination.Eviction{
+	evictionList := lifecycle.EvictionList{
+		Items: []lifecycle.Eviction{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "pod-1-pod1",
 					Namespace:         "ns1",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod1",
 							UID:  "bc134542-aa19-4361-8fe2-cf18f78848c0",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder1", State: coordination.ResponderStateCompleted},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "migrated1"},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("migrated1")},
 					},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(coordination.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(lifecycle.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
 					},
 				},
 			},
@@ -8960,29 +8961,29 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns2",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod2",
 							UID:  "5e153f5b-e420-41b4-9040-8f3b51cf2162",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder1", State: coordination.ResponderStateInterrupted},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateInterrupted},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: nil, Message: "running for a long time"}},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: nil, Message: new("running for a long time")}},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
 					},
 				},
 			},
@@ -8992,29 +8993,29 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns3",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod3",
 							UID:  "a4ea9433-da6a-4bfc-9033-296488ba12be",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder1", State: coordination.ResponderStateCompleted},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "completed message"}},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed message")}},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
 					},
 				},
 			},
@@ -9024,32 +9025,32 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns4",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod4",
 							UID:  "68018c4c-bcca-4465-964a-66d8a1626686",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentWithdrawn,
+							Intent: lifecycle.RequesterIntentWithdrawn,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder3", State: coordination.ResponderStateCanceled},
-						{Name: "responder4", State: coordination.ResponderStateInactive},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateCanceled},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "running3"},
-						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running3")},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
 					},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
 					},
 				},
 			},
@@ -9059,32 +9060,32 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns5",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod5",
 							UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder1", State: coordination.ResponderStateCompleted},
-						{Name: "responder2", State: coordination.ResponderStateActive},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+						{Name: "responder2", State: lifecycle.ResponderStateActive},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "completed2"},
-						{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "running2"},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed2")},
+						{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running2")},
 					},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
 					},
 				},
 			},
@@ -9095,32 +9096,32 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns6",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod6",
 							UID:  "aac2a982-2176-4770-8c8c-bcdf51b24fde",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder1", State: coordination.ResponderStateCompleted},
-						{Name: "responder2", State: coordination.ResponderStateActive},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+						{Name: "responder2", State: lifecycle.ResponderStateActive},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: "completed2"},
-						{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "running2"},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed2")},
+						{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running2")},
 					},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
 					},
 				},
 			},
@@ -9130,37 +9131,37 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns7",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod7",
 							UID:  "707ba618-ffd6-4797-b503-17af1c7f4d98",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "rescheduler.bar.com",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder3", State: coordination.ResponderStateActive},
-						{Name: "responder4", State: coordination.ResponderStateInactive},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateActive},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: "running3"},
-						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running3")},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
 					},
 
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
 					},
 				},
 			},
@@ -9170,32 +9171,32 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns8",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod8",
 							UID:  "30741366-8d1f-4385-84ff-0f2e7ba0305f",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder3", State: coordination.ResponderStateInactive},
-						{Name: "responder4", State: coordination.ResponderStateInactive},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateInactive},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
-						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
 					},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "WaitingForResponder", Message: "Waiting for an responder."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "WaitingForResponder", Message: "Waiting for an responder."},
 					},
 				},
 			},
@@ -9205,33 +9206,33 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns9",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod9",
 							UID:  "9f4a1620-0e97-4246-b304-5969b2104377",
 						},
 					},
 				},
-				Status: coordination.EvictionStatus{
-					ObservedGeneration: ptr.To[int64](1),
-					Requesters: []coordination.Requester{
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
 						{
 							Name:   "drain.foo.com/bar",
-							Intent: coordination.RequesterIntentEviction,
+							Intent: lifecycle.RequesterIntentEviction,
 						},
 					},
-					TargetResponders: []coordination.TargetResponder{
-						{Name: "responder3", State: coordination.ResponderStateInactive},
-						{Name: "responder4", State: coordination.ResponderStateInactive},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateInactive},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
 					},
-					Responders: []coordination.ResponderStatus{
-						{Name: "responder3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
-						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: ""},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
 					},
 					Conditions: []metav1.Condition{
-						{Type: string(coordination.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
-						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
 					},
 				},
 			},
@@ -9241,9 +9242,9 @@ func TestPrintEvictionList(t *testing.T) {
 					Namespace:         "ns10",
 					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
 				},
-				Spec: coordination.EvictionSpec{
-					Target: coordination.EvictionTarget{
-						Pod: &coordination.EvictionPodReference{
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
 							Name: "pod10",
 							UID:  "e968f679-523b-4e63-9417-0cd9ae13a0b2",
 						},

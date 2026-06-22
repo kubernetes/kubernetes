@@ -33,11 +33,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -775,11 +776,11 @@ func AddHandlers(h printers.PrintHandler) {
 
 	evictionRequestColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
-		{Name: "Target Type", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
-		{Name: "Status", Type: "string", Description: coordinationv1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
-		{Name: "Requester", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["requesterName"]},
-		{Name: "Intent", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["intent"]},
+		{Name: "Target", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: lifecyclev1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Requester", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["requesterName"]},
+		{Name: "Intent", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["intent"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequest)
@@ -787,16 +788,16 @@ func AddHandlers(h printers.PrintHandler) {
 
 	evictionColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
-		{Name: "Target Type", Type: "string", Description: coordinationv1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
-		{Name: "Status", Type: "string", Description: coordinationv1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
-		{Name: "Active Responder", Type: "string", Description: coordinationv1alpha1.TargetResponder{}.SwaggerDoc()["state"]},
-		{Name: "Responder Status", Type: "string", Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()[""]},
-		{Name: "Responder Expected Finish", Type: "string", Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["expectedCompletionTime"]},
-		{Name: "Requesters", Type: "string", Description: coordinationv1alpha1.EvictionStatus{}.SwaggerDoc()["requesters"]},
+		{Name: "Target", Type: "string", Description: lifecyclev1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: lifecyclev1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: lifecyclev1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Active Responder", Type: "string", Description: lifecyclev1alpha1.TargetResponder{}.SwaggerDoc()["state"]},
+		{Name: "Responder Status", Type: "string", Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()[""]},
+		{Name: "Responder Expected Finish", Type: "string", Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()["expectedCompletionTime"]},
+		{Name: "Requesters", Type: "string", Description: lifecyclev1alpha1.EvictionStatus{}.SwaggerDoc()["requesters"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "Responder Heartbeat", Type: "string", Priority: 1, Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["heartbeatTime"]},
-		{Name: "Responder Status Message", Type: "string", Priority: 1, Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["message"]},
+		{Name: "Responder Heartbeat", Type: "string", Priority: 1, Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()["heartbeatTime"]},
+		{Name: "Responder Status Message", Type: "string", Priority: 1, Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()["message"]},
 	}
 	_ = h.TableHandler(evictionColumnDefinitions, printEviction)
 	_ = h.TableHandler(evictionColumnDefinitions, printEvictionList)
@@ -3562,7 +3563,7 @@ func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateO
 	}
 	return rows, nil
 }
-func printEvictionRequest(obj *coordination.EvictionRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printEvictionRequest(obj *lifecycle.EvictionRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -3588,7 +3589,7 @@ func printEvictionRequest(obj *coordination.EvictionRequest, options printers.Ge
 	row.Cells = append(row.Cells, wideCells...)
 	return []metav1.TableRow{row}, nil
 }
-func printEvictionRequestList(list *coordination.EvictionRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printEvictionRequestList(list *lifecycle.EvictionRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEvictionRequest(&list.Items[i], options)
@@ -3600,7 +3601,7 @@ func printEvictionRequestList(list *coordination.EvictionRequestList, options pr
 	return rows, nil
 }
 
-func printEviction(obj *coordination.Eviction, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printEviction(obj *lifecycle.Eviction, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -3623,14 +3624,14 @@ func printEviction(obj *coordination.Eviction, options printers.GenerateOptions)
 	// resolve responder progress and find an active responder
 	totalResponders := len(obj.Status.TargetResponders)
 	processedOrActiveResponders := 0
-	var lastActiveResponder, lastProcessedResponder *coordination.TargetResponder
+	var lastActiveResponder, lastProcessedResponder *lifecycle.TargetResponder
 	for _, targetResponder := range obj.Status.TargetResponders {
 		switch targetResponder.State {
-		case coordination.ResponderStateCanceled, coordination.ResponderStateInterrupted, coordination.ResponderStateCompleted:
+		case lifecycle.ResponderStateCanceled, lifecycle.ResponderStateInterrupted, lifecycle.ResponderStateCompleted:
 			processedOrActiveResponders++
 			lastProcessedResponder = &targetResponder
 
-		case coordination.ResponderStateActive:
+		case lifecycle.ResponderStateActive:
 			processedOrActiveResponders++
 			lastActiveResponder = &targetResponder
 		}
@@ -3659,7 +3660,7 @@ func printEviction(obj *coordination.Eviction, options printers.GenerateOptions)
 
 			responderStatus = string(lastActiveResponder.State)
 			switch lastActiveResponder.State {
-			case coordination.ResponderStateActive:
+			case lifecycle.ResponderStateActive:
 				if responder.StartTime != nil {
 					responderStatus = fmt.Sprintf("Started (%s ago)", translateTimestampSince(*responder.StartTime))
 					if responder.ExpectedCompletionTime != nil {
@@ -3671,9 +3672,9 @@ func printEviction(obj *coordination.Eviction, options printers.GenerateOptions)
 						}
 					}
 				}
-			case coordination.ResponderStateCanceled, coordination.ResponderStateInterrupted:
+			case lifecycle.ResponderStateCanceled, lifecycle.ResponderStateInterrupted:
 				activeResponderExpectedCompletionTime = "-"
-			case coordination.ResponderStateCompleted:
+			case lifecycle.ResponderStateCompleted:
 				if responder.CompletionTime != nil {
 					responderStatus = fmt.Sprintf("%s (%s ago)", lastActiveResponder.State, translateTimestampSince(*responder.CompletionTime))
 				}
@@ -3699,7 +3700,7 @@ func printEviction(obj *coordination.Eviction, options printers.GenerateOptions)
 	// resolve requesters
 	var requesters []string
 	for _, requester := range obj.Status.Requesters {
-		if requester.Intent != coordination.RequesterIntentWithdrawn {
+		if requester.Intent != lifecycle.RequesterIntentWithdrawn {
 			requesters = append(requesters, requester.Name)
 		}
 	}
@@ -3717,7 +3718,7 @@ func printEviction(obj *coordination.Eviction, options printers.GenerateOptions)
 	return []metav1.TableRow{row}, nil
 }
 
-func printEvictionList(list *coordination.EvictionList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printEvictionList(list *lifecycle.EvictionList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEviction(&list.Items[i], options)
@@ -3734,8 +3735,8 @@ func resolveEvictionStatusConditions(observedGeneration *int64, conditions []met
 	if ptr.Deref(observedGeneration, 0) > 0 {
 		evictionStatus = "Progressing"
 	}
-	evicted := meta.FindStatusCondition(conditions, string(coordination.EvictionConditionTargetEvicted))
-	failed := meta.FindStatusCondition(conditions, string(coordination.EvictionConditionFailed))
+	evicted := meta.FindStatusCondition(conditions, string(lifecycle.EvictionConditionTargetEvicted))
+	failed := meta.FindStatusCondition(conditions, string(lifecycle.EvictionConditionFailed))
 	isFailed := failed != nil && failed.Status == metav1.ConditionTrue
 	if isFailed {
 		evictionStatus = fmt.Sprintf("%s (%s)", failed.Type, failed.Reason)

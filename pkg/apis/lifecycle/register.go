@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package coordination
+package lifecycle
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,7 +22,7 @@ import (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "coordination.k8s.io"
+const GroupName = "lifecycle.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -46,12 +46,11 @@ var (
 
 // Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Lease{},
-		&LeaseList{},
-		&LeaseCandidate{},
-		&LeaseCandidateList{},
+		&Eviction{},
+		&EvictionList{},
+		&EvictionRequest{},
+		&EvictionRequestList{},
 	)
 	return nil
 }

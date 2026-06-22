@@ -54,6 +54,7 @@ const (
 	coordinationGroup            = "coordination.k8s.io"
 	discoveryGroup               = "discovery.k8s.io"
 	extensionsGroup              = "extensions"
+	lifecycleGroup               = "lifecycle.k8s.io"
 	policyGroup                  = "policy"
 	rbacGroup                    = "rbac.authorization.k8s.io"
 	resourceGroup                = "resource.k8s.io"
@@ -150,7 +151,7 @@ func viewRules() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(coordinationGroup).Resources("evictionrequests", "evictions").RuleOrDie())
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(lifecycleGroup).Resources("evictionrequests", "evictions").RuleOrDie())
 	}
 	return rules
 }
@@ -197,7 +198,7 @@ func editRules() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(coordinationGroup).Resources("evictionrequests", "evictions").RuleOrDie())
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(lifecycleGroup).Resources("evictionrequests", "evictions").RuleOrDie())
 	}
 	return rules
 }

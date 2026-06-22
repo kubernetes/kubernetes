@@ -18,27 +18,19 @@ package rest
 
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
-	"k8s.io/kubernetes/pkg/features"
-	evictionstorage "k8s.io/kubernetes/pkg/registry/coordination/eviction/storage"
-	evictionrequeststorage "k8s.io/kubernetes/pkg/registry/coordination/evictionrequest/storage"
 	leasestorage "k8s.io/kubernetes/pkg/registry/coordination/lease/storage"
 	leasecandidatestorage "k8s.io/kubernetes/pkg/registry/coordination/leasecandidate/storage"
-	"k8s.io/utils/clock"
 )
 
-type RESTStorageProvider struct {
-}
+type RESTStorageProvider struct{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(coordination.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
@@ -61,12 +53,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1alpha2.SchemeGroupVersion.Version] = storageMap
-	}
-
-	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-		return genericapiserver.APIGroupInfo{}, err
-	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[coordinationv1alpha1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil
@@ -111,37 +97,6 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		}
 		storage[resource] = leaseCandidateStorage
 	}
-	return storage, nil
-}
-
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
-	storage := map[string]rest.Storage{}
-
-	if resource := "evictions"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-			evictionStorage, evictionStatusStorage, err := evictionstorage.NewREST(restOptionsGetter, clock.RealClock{})
-			if err != nil {
-				return storage, err
-			}
-			storage[resource] = evictionStorage
-			storage[resource+"/status"] = evictionStatusStorage
-		} else {
-			klog.Warning("Eviction storage is disabled because the EvictionRequestAPI feature gate is disabled")
-		}
-	}
-	if resource := "evictionrequests"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-			evictionRequestStorage, evictionRequestStatusStorage, err := evictionrequeststorage.NewREST(restOptionsGetter)
-			if err != nil {
-				return storage, err
-			}
-			storage[resource] = evictionRequestStorage
-			storage[resource+"/status"] = evictionRequestStatusStorage
-		} else {
-			klog.Warning("EvictionRequest storage is disabled because the EvictionRequestAPI feature gate is disabled")
-		}
-	}
-
 	return storage, nil
 }
 

@@ -272,7 +272,7 @@ items:
     - patch
     - update
   - apiGroups:
-    - coordination.k8s.io
+    - lifecycle.k8s.io
     resources:
     - evictionrequests
     - evictions
@@ -447,7 +447,7 @@ items:
     - list
     - watch
   - apiGroups:
-    - coordination.k8s.io
+    - lifecycle.k8s.io
     resources:
     - evictionrequests
     - evictions

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the coordination API group, making it available as
+// Package install installs the lifecycle API group, making it available as
 // an option to all of the API encoding/decoding machinery.
 package install
 
@@ -22,10 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/coordination"
-	v1 "k8s.io/kubernetes/pkg/apis/coordination/v1"
-	"k8s.io/kubernetes/pkg/apis/coordination/v1alpha2"
-	"k8s.io/kubernetes/pkg/apis/coordination/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
+	"k8s.io/kubernetes/pkg/apis/lifecycle/v1alpha1"
 )
 
 func init() {
@@ -34,9 +32,7 @@ func init() {
 
 // Install registers the API group and adds types to a scheme
 func Install(scheme *runtime.Scheme) {
-	utilruntime.Must(coordination.AddToScheme(scheme))
-	utilruntime.Must(v1alpha2.AddToScheme(scheme))
-	utilruntime.Must(v1beta1.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha2.SchemeGroupVersion))
+	utilruntime.Must(lifecycle.AddToScheme(scheme))
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
 }

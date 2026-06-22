@@ -43,7 +43,6 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +56,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -112,7 +112,6 @@ var groups = []runtime.SchemeBuilder{
 	coordinationv1.SchemeBuilder,
 	coordinationv1beta1.SchemeBuilder,
 	coordinationv1alpha2.SchemeBuilder,
-	coordinationv1alpha1.SchemeBuilder,
 	corev1.SchemeBuilder,
 	discoveryv1.SchemeBuilder,
 	discoveryv1beta1.SchemeBuilder,
@@ -124,6 +123,7 @@ var groups = []runtime.SchemeBuilder{
 	flowcontrolv1beta3.SchemeBuilder,
 	flowcontrolv1.SchemeBuilder,
 	imagepolicyv1alpha1.SchemeBuilder,
+	lifecyclev1alpha1.SchemeBuilder,
 	networkingv1.SchemeBuilder,
 	networkingv1beta1.SchemeBuilder,
 	nodev1.SchemeBuilder,
