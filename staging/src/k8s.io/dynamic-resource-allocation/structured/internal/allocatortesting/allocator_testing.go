@@ -939,6 +939,7 @@ func TestAllocator(t *testing.T,
 	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
 	versionAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "driverVersion")
 	intAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "numa")
+	numaNodeAttribute := resourceapi.FullyQualifiedName("resource.kubernetes.io/numaNode")
 	taintKey := "taint-key"
 	taintValue := "taint-value"
 	taintValue2 := "taint-value-2"
@@ -6093,6 +6094,59 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
+		},
+		// KEP-6072: standardized numaNode attribute, list form. Two devices whose
+		// numaNode lists share an element (physical node + same-socket equidistant
+		// nodes) are co-placed by matchAttribute set intersection.
+		"numanode-matchattribute-overlapping-lists-are-co-placed": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &numaNodeAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{4}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{4, 5, 6, 7}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// KEP-6072: numaNode lists with no common element (different NUMA domains)
+		// cannot satisfy matchAttribute, so no allocation is made.
+		"numanode-matchattribute-disjoint-lists-are-not-allocated": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &numaNodeAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{0}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{4, 5, 6, 7}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
 		},
 		"list-attributes-match-constaint-list-of-bool-values-with-common-elements": {
 			features: Features{
