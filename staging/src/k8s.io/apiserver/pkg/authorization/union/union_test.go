@@ -809,6 +809,21 @@ func TestUnionEvaluateConditions(t *testing.T) {
 			wantFinalDecision:     `Allow(err="eval error")`,
 			wantFinalErr:          true,
 		},
+		// === Impossible evaluations ===
+		{
+			name: "evaluate error propagated",
+			authz1: &evalTestAuthz{
+				conditionEffect: effectDeny,
+				evalDecision:    authorizer.DecisionAllow,
+			},
+			authz2:                noOpinion(),
+			authz3:                noOpinion(),
+			authz4:                noOpinion(),
+			authz5:                noOpinion(),
+			wantAuthorizeDecision: `Union[Union[Union[ConditionsMap(denies=1), NoOpinion], NoOpinion], NoOpinion, NoOpinion]`,
+			wantFinalDecision:     `Deny(reason="failed closed", err="evaluated to decision Allow, but only [Deny NoOpinion] were possible")`,
+			wantFinalErr:          true,
+		},
 	}
 
 	for _, tt := range tests {

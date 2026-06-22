@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
@@ -156,6 +157,10 @@ func (authzHandler unionAuthzHandler) EvaluateConditions(ctx context.Context, un
 		// ConditionsMap or Union types are evaluated by their authorizer
 		case unevaluatedSubDecision.IsConditionsMap(), unevaluatedSubDecision.IsUnion():
 			decision, reason, err = authzHandler.evaluateConditions(ctx, currentAuthorizerName, unevaluatedSubDecision, data)
+			// Guard against impossible evaluations.
+			if !unevaluatedSubDecision.PossibleDecisions().Has(decision) {
+				decision, reason, err = unevaluatedDecision.FailureDecision(), "failed closed", fmt.Errorf("evaluated to decision %s, but only %v were possible", decision, sets.List(unevaluatedSubDecision.PossibleDecisions()))
+			}
 		default:
 			return unevaluatedDecision.FailureDecision(), "failed closed", fmt.Errorf("saw unrecognized subDecision in union authorizer EvaluateConditions: %s", unevaluatedSubDecision)
 		}
