@@ -58,7 +58,7 @@ func TestCleanerController(t *testing.T) {
 		kubeapiservertesting.NewDefaultTestServerOptions(),
 		[]string{
 			"--authorization-mode=Node,RBAC",
-			"--feature-gates=PodCertificateRequest=true",
+			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
 			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
@@ -193,7 +193,7 @@ func TestNodeRestriction(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
-			"--feature-gates=PodCertificateRequest=true",
+			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
 			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
@@ -406,7 +406,7 @@ func TestNodeAuthorization(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
-			"--feature-gates=PodCertificateRequest=true",
+			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
 			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
@@ -598,7 +598,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
-			"--feature-gates=PodCertificateRequest=true",
+			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
 			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),

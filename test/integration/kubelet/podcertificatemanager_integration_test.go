@@ -56,7 +56,7 @@ func TestPodCertificateManager(t *testing.T) {
 		kubeapiservertesting.NewDefaultTestServerOptions(),
 		[]string{
 			"--authorization-mode=Node,RBAC",
-			"--feature-gates=PodCertificateRequest=true",
+			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
 			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
