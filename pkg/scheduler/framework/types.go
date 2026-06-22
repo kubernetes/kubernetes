@@ -34,6 +34,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -801,6 +802,11 @@ func (pqi *QueuedPodInfo) SetFlushTimestamp(t time.Time) {
 	pqi.FlushTimestamp = t
 }
 
+const (
+	PodGroupKeyType          = "podgroup"
+	CompositePodGroupKeyType = "compositepodgroup"
+)
+
 // QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
 // the pod group's status in the scheduling queue and stores all queued pods from that pod group.
 type QueuedPodGroupInfo struct {
@@ -809,10 +815,25 @@ type QueuedPodGroupInfo struct {
 	// QueuedPodInfos are the pod group's pods that are currently queued.
 	// The order of the pods is deterministic and based on the priority and timestamp.
 	QueuedPodInfos []*QueuedPodInfo
+
+	// PodGroup stores the representation of the pod group.
+	PodGroup *schedulingapi.PodGroup
+
+	// CompositePodGroup stores the representation of the composite pod group.
+	CompositePodGroup *schedulingapi.CompositePodGroup
+
+	// Children stores the child (composite) pod groups of the composite pod group.
+	Children sets.Set[*QueuedPodGroupInfo]
+
+	// Parent stores the parent composite pod group.
+	Parent *QueuedPodGroupInfo
 }
 
 func (pgqi *QueuedPodGroupInfo) Type() string {
-	return "podgroup"
+	if pgqi.CompositePodGroup != nil {
+		return CompositePodGroupKeyType
+	}
+	return PodGroupKeyType
 }
 
 // AddPod adds a pod to the queued pod group info.

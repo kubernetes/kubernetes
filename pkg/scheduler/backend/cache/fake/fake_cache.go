@@ -18,6 +18,7 @@ package fake
 
 import (
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/klog/v2"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 )
@@ -72,4 +73,12 @@ func (c *Cache) UpdateSnapshot(logger klog.Logger, nodeSnapshot *internalcache.S
 		return c.UpdateSnapshotFunc(nodeSnapshot)
 	}
 	return c.Cache.UpdateSnapshot(logger, nodeSnapshot)
+}
+
+// ExtractHierarchy allows to mock this method for testing.
+func (c *Cache) ExtractHierarchy(namespace string, name string, isCPG bool) (rootName string, rootIsCPG bool, pgs []*schedulingapi.PodGroup, cpgs []*schedulingapi.CompositePodGroup) {
+	if c.Cache == nil {
+		return "", false, nil, nil
+	}
+	return c.Cache.ExtractHierarchy(namespace, name, isCPG)
 }

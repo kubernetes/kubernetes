@@ -423,11 +423,9 @@ func (b *Builder) PodGroup(workload *schedulingv1alpha3.Workload, template sched
 			Name:      fmt.Sprintf("%s-%s-%d", workload.Name, template.Name, b.podGroupCounter),
 		},
 		Spec: schedulingv1alpha3.PodGroupSpec{
-			PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
-				Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
-					WorkloadName:         workload.Name,
-					PodGroupTemplateName: template.Name,
-				},
+			WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+				WorkloadName: workload.Name,
+				TemplateName: template.Name,
 			},
 			SchedulingPolicy: template.SchedulingPolicy,
 			ResourceClaims:   template.ResourceClaims,

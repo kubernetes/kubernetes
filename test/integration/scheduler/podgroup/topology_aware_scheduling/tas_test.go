@@ -32,11 +32,11 @@ import (
 )
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).TemplateRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Obj()
+	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Obj()
 }
 
 func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).TemplateRef("t1", "workload").BasicPolicy().TopologyKey(topologyKey).Obj()
+	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").BasicPolicy().TopologyKey(topologyKey).Obj()
 }
 
 func makeNode(nodeName, rackLabel, zoneLabel string) *v1.Node {

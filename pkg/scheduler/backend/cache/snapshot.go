@@ -122,7 +122,7 @@ func createPodGroupStates(pods []*v1.Pod) map[podGroupKey]*podGroupStateSnapshot
 		if pod.Spec.SchedulingGroup == nil {
 			continue
 		}
-		key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+		key := newPodGroupKey(podGroupType, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 		pgs, ok := podGroupStates[key]
 		if !ok {
 			pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
@@ -286,11 +286,24 @@ type podGroupStateSnapshotLister struct {
 }
 
 // Get returns the pod group state from the snapshot for the given pod group.
-func (l *podGroupStateSnapshotLister) Get(namespace string, podGroupName string) (fwk.PodGroupState, error) {
-	key := newPodGroupKey(namespace, podGroupName)
+func (l *podGroupStateSnapshotLister) Get(groupType string, namespace string, podGroupName string) (fwk.PodGroupState, error) {
+	if groupType == "" {
+		key := newPodGroupKey(compositePodGroupType, namespace, podGroupName)
+		state, ok := l.podGroupStates[key]
+		if !ok {
+			key = newPodGroupKey(podGroupType, namespace, podGroupName)
+			state, ok = l.podGroupStates[key]
+			if !ok {
+				return nil, fmt.Errorf("pod group state not found for pod group %s/%s", namespace, podGroupName)
+			}
+		}
+		return state, nil
+	}
+
+	key := newPodGroupKey(groupType, namespace, podGroupName)
 	state, ok := l.podGroupStates[key]
 	if !ok {
-		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
+		return nil, fmt.Errorf("pod group state not found for pod group %s/%s with type %s", namespace, podGroupName, groupType)
 	}
 	return state, nil
 }
@@ -358,7 +371,7 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
 		return nil
 	}
-	pgKey := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	pgKey := newPodGroupKey(podGroupType, pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	if pgs, ok := s.podGroupStates[pgKey]; ok {
 		pgs.assumePod(pod)
 	}
@@ -396,7 +409,7 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
 		return nil
 	}
-	pgKey := newPodGroupKey(assumedPod.Namespace, *assumedPod.Spec.SchedulingGroup.PodGroupName)
+	pgKey := newPodGroupKey(podGroupType, assumedPod.Namespace, *assumedPod.Spec.SchedulingGroup.PodGroupName)
 	if pgs, ok := s.podGroupStates[pgKey]; ok {
 		pgs.forgetPod(assumedPod.UID)
 	}

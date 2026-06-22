@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -432,6 +433,136 @@ func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
 	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
+func (sched *Scheduler) addPodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	pg, ok := obj.(*v1alpha3.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", obj)
+		return
+	}
+
+	logger.V(3).Info("Add event for pod group", "podGroup", klog.KObj(pg))
+	sched.Cache.AddPodGroup(pg)
+	rootName, rootIsCPG, pgs, cpgs := sched.Cache.ExtractHierarchy(pg.Namespace, pg.Name, false)
+	sched.SchedulingQueue.AddPodGroup(pg, rootName, rootIsCPG, pgs, cpgs)
+}
+
+func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	oldPG, ok := oldObj.(*v1alpha3.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1alpha3.PodGroup", "oldObj", oldObj)
+		return
+	}
+	newPG, ok := newObj.(*v1alpha3.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha3.PodGroup", "newObj", newObj)
+		return
+	}
+
+	if oldPG.ResourceVersion == newPG.ResourceVersion {
+		return
+	}
+
+	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
+	rootName, rootIsCPG, pgs, cpgs := sched.Cache.ExtractHierarchy(newPG.Namespace, newPG.Name, false)
+	sched.SchedulingQueue.UpdatePodGroup(oldPG, newPG, rootName, rootIsCPG, pgs, cpgs)
+}
+
+func (sched *Scheduler) deletePodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Delete}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+
+	logger := sched.logger
+	var pg *v1alpha3.PodGroup
+	switch t := obj.(type) {
+	case *v1alpha3.PodGroup:
+		pg = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		pg, ok = t.Obj.(*v1alpha3.PodGroup)
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", t.Obj)
+			return
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", t)
+		return
+	}
+
+	logger.V(3).Info("Delete event for pod group", "podGroup", klog.KObj(pg))
+	sched.Cache.RemovePodGroup(pg)
+	sched.SchedulingQueue.RemovePodGroup(pg)
+}
+
+func (sched *Scheduler) addCompositePodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Add}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	cpg, ok := obj.(*v1alpha3.CompositePodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", obj)
+		return
+	}
+
+	logger.V(3).Info("Add event for composite pod group", "compositePodGroup", klog.KObj(cpg))
+	sched.Cache.AddCompositePodGroup(cpg)
+	rootName, _, pgs, cpgs := sched.Cache.ExtractHierarchy(cpg.Namespace, cpg.Name, true)
+	sched.SchedulingQueue.AddCompositePodGroup(cpg, rootName, pgs, cpgs)
+}
+
+func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	oldCPG, ok := oldObj.(*v1alpha3.CompositePodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1alpha3.CompositePodGroup", "oldObj", oldObj)
+		return
+	}
+	newCPG, ok := newObj.(*v1alpha3.CompositePodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha3.CompositePodGroup", "newObj", newObj)
+		return
+	}
+
+	if oldCPG.ResourceVersion == newCPG.ResourceVersion {
+		return
+	}
+
+	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
+}
+
+func (sched *Scheduler) deleteCompositePodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Delete}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+
+	logger := sched.logger
+	var cpg *v1alpha3.CompositePodGroup
+	switch t := obj.(type) {
+	case *v1alpha3.CompositePodGroup:
+		cpg = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		cpg, ok = t.Obj.(*v1alpha3.CompositePodGroup)
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t.Obj)
+			return
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t)
+		return
+	}
+
+	logger.V(3).Info("Delete event for composite pod group", "compositePodGroup", klog.KObj(cpg))
+	sched.Cache.RemoveCompositePodGroup(cpg)
+	sched.SchedulingQueue.RemoveCompositePodGroup(cpg)
+}
+
 const (
 	// syncedPollPeriod controls how often you look at the status of your sync funcs
 	syncedPollPeriod = 100 * time.Millisecond
@@ -488,6 +619,28 @@ func addAllEventHandlers(
 		return err
 	}
 	handlers = append(handlers, handlerRegistration)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().PodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.addPodGroup,
+			UpdateFunc: sched.updatePodGroup,
+			DeleteFunc: sched.deletePodGroup,
+		}); err != nil {
+			return err
+		}
+		handlers = append(handlers, handlerRegistration)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.addCompositePodGroup,
+			UpdateFunc: sched.updateCompositePodGroup,
+			DeleteFunc: sched.deleteCompositePodGroup,
+		}); err != nil {
+			return err
+		}
+		handlers = append(handlers, handlerRegistration)
+	}
 
 	buildEvtResHandler := func(at fwk.ActionType, resource fwk.EventResource) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
@@ -622,14 +775,9 @@ func addAllEventHandlers(
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.PodGroup:
-			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().PodGroups().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.PodGroup),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
+			// Do nothing
+		case fwk.CompositePodGroup:
+			// Do nothing
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {
