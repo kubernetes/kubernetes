@@ -30,6 +30,7 @@ var PodConditionsByKubelet = []v1.PodConditionType{
 	v1.ContainersReady,
 	v1.PodResizeInProgress,
 	v1.PodResizePending,
+	v1.PodRejected,
 }
 
 // PodConditionByKubelet returns if the pod condition type is owned by kubelet

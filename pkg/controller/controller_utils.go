@@ -1450,3 +1450,12 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		return nil
 	})
 }
+
+func PodIsRejectedFinished(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if pod.Status.Phase == v1.PodFailed && condition.Type == v1.PodRejected && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
