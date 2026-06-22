@@ -162,6 +162,10 @@ func SetDefaults_Service(obj *v1.Service) {
 
 }
 func SetDefaults_Pod(obj *v1.Pod) {
+	// Enforced on Pod but not on PodSpec. For historical reasons, PodTemplate is not defaulted this way.
+	if obj.Spec.TerminationGracePeriodSeconds != nil && *obj.Spec.TerminationGracePeriodSeconds < 0 {
+		obj.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
+	}
 
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements

@@ -3430,3 +3430,25 @@ func TestSetDefaultPodStatusPodIPs(t *testing.T) {
 		})
 	}
 }
+
+func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
+	tests := []struct {
+		name     string
+		grace    *int64
+		expected *int64
+	}{
+		{name: "negative clamped to 1", grace: ptr.To[int64](-1), expected: ptr.To[int64](1)},
+		{name: "zero preserved", grace: ptr.To[int64](0), expected: ptr.To[int64](0)},
+		{name: "positive preserved", grace: ptr.To[int64](42), expected: ptr.To[int64](42)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{TerminationGracePeriodSeconds: tc.grace}}
+			obj2 := roundTrip(t, runtime.Object(pod))
+			pod2 := obj2.(*v1.Pod)
+			if !reflect.DeepEqual(pod2.Spec.TerminationGracePeriodSeconds, tc.expected) {
+				t.Errorf("expected %v, got %v", *tc.expected, *pod2.Spec.TerminationGracePeriodSeconds)
+			}
+		})
+	}
+}

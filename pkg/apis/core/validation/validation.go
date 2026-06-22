@@ -4533,6 +4533,10 @@ func validatePodMetadataAndSpec(pod *core.Pod, opts PodValidationOptions) field.
 		}
 	}
 
+	if pod.Spec.TerminationGracePeriodSeconds != nil {
+		allErrs = append(allErrs, ValidateNonnegativeField(*pod.Spec.TerminationGracePeriodSeconds, specPath.Child("terminationGracePeriodSeconds"))...)
+	}
+
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 	// validateContainersOnlyForPod() is checked for ephemeral containers by validateEphemeralContainers()
