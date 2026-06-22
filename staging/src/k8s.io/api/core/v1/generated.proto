@@ -2821,6 +2821,21 @@ message NodeList {
   repeated Node items = 2;
 }
 
+// NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.
+message NodePodPreemptionPolicy {
+  // DisableResizePreemption lists the owners (e.g., autoscalers, operators, administrators)
+  // that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
+  // If this list is non-empty, resize-induced preemption is disabled on this node.
+  // This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+  // +listType=set
+  // +k8s:listType=set
+  // +optional
+  // +k8s:maxItems=20
+  // +k8s:optional
+  // +k8s:eachVal=+k8s:format=k8s-label-key
+  repeated string disableResizePreemption = 1;
+}
+
 // NodeProxyOptions is the query options to a Node's proxy call.
 message NodeProxyOptions {
   // Path is the URL path to use for the current proxy request to node.
@@ -2936,6 +2951,14 @@ message NodeSpec {
   // see: https://issues.k8s.io/61966
   // +optional
   optional string externalID = 2;
+
+  // PodPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
+  // This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+  // +featureGate=InPlacePodVerticalScalingSchedulerPreemption
+  // +optional
+  // +k8s:optional
+  // +k8s:ifDisabled(InPlacePodVerticalScalingSchedulerPreemption)=+k8s:forbidden
+  optional NodePodPreemptionPolicy podPreemptionPolicy = 8;
 }
 
 // NodeStatus is information about the current status of a node.

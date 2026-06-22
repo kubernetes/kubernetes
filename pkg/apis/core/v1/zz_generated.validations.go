@@ -511,6 +511,54 @@ func Validate_Node(
 	return errs
 }
 
+// Validate_NodePodPreemptionPolicy validates an instance of NodePodPreemptionPolicy according
+// to declarative validation rules in the API schema.
+func Validate_NodePodPreemptionPolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.NodePodPreemptionPolicy) (errs field.ErrorList) {
+
+	{ // field corev1.NodePodPreemptionPolicy.DisableResizePreemption
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 20).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.LabelKey); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// lists with set semantics require unique values
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodePodPreemptionPolicy) []string {
+				return oldObj.DisableResizePreemption
+			})
+		errs = append(errs, fn(fldPath.Child("disableResizePreemption"), obj.DisableResizePreemption, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_NodeSpec validates an instance of NodeSpec according
 // to declarative validation rules in the API schema.
 func Validate_NodeSpec(
@@ -556,6 +604,44 @@ func Validate_NodeSpec(
 	// field corev1.NodeSpec.Taints has no validation
 	// field corev1.NodeSpec.ConfigSource has no validation
 	// field corev1.NodeSpec.DoNotUseExternalID has no validation
+
+	{ // field corev1.NodeSpec.PodPreemptionPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.NodePodPreemptionPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "InPlacePodVerticalScalingSchedulerPreemption", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "InPlacePodVerticalScalingSchedulerPreemption", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_NodePodPreemptionPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeSpec) *corev1.NodePodPreemptionPolicy {
+				return oldObj.PodPreemptionPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("podPreemptionPolicy"), obj.PodPreemptionPolicy, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
