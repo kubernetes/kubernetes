@@ -141,6 +141,32 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "Invalid", []string{"True"}).MarkFromImperative(),
 					},
 				},
+				{
+					Name: "invalid status value: Unknown",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakStatus("Unknown"),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						// handwritten validation requires "True"
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "Unknown", []string{"True"}).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid status value: False",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakStatus("False"),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						// handwritten validation requires "True"
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "False", []string{"True"}).MarkFromImperative(),
+					},
+				},
 			}
 
 			for _, tc := range testCases {

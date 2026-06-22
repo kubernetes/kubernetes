@@ -82,6 +82,13 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 		},
 		{
+			Name: "valid status value: Unknown",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakStatus("Unknown")),
+			},
+			ExpectedErrs: nil,
+		},
+		{
 			Name: "invalid negative observedGeneration",
 			Conditions: []metav1.Condition{
 				MkCondition(TweakObservedGeneration(-1)),
