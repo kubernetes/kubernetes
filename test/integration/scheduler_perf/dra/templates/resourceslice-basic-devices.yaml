@@ -1,0 +1,27 @@
+{{$numDevices := or .numDevices 10}}
+
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeName: scheduler-perf-dra-{{.Index}}
+  devices:{{range ($numDevices | Int)}}
+  - name: basic-device-{{.}}
+    attributes:
+      model:
+        string: A100
+      family:
+        string: GPU
+      driverVersion:
+        version: "1.2.3"
+      resource.k8s.io/pciRoot:
+        string: "{{.}}"
+    capacity:
+      memory:
+        value: 1Gi{{end}}

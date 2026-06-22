@@ -108,9 +108,6 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runStartCollectingProfileOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingProfileOp:
 		return e.runStopCollectingProfileOp(tCtx, opIndex, concreteOp)
-	case *createResourceDriverOp:
-		concreteOp.run(tCtx, e.scheduler.Profiles["default-scheduler"].SharedDRAManager())
-		return nil
 	default:
 		return e.runDefaultOp(tCtx, opIndex, concreteOp)
 	}

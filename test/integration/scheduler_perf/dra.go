@@ -20,16 +20,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
-	"path/filepath"
 	"reflect"
 	"sync"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,12 +37,10 @@ import (
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/utils/ptr"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -124,127 +119,6 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 	if createErr != nil {
 		tCtx.Fatal(createErr.Error())
 	}
-}
-
-// createResourceDriverOp defines an op where resource claims are created.
-type createResourceDriverOp struct {
-	// Must be createResourceDriverOpcode.
-	Opcode operationCode
-	// Name of the driver, used to reference it in a resource class.
-	DriverName string
-	// Number of claims to allow per node. Parameterizable through MaxClaimsPerNodeParam.
-	MaxClaimsPerNode int
-	// Template parameter for MaxClaimsPerNode.
-	MaxClaimsPerNodeParam string
-	// Nodes matching this glob pattern have resources managed by the driver.
-	Nodes string
-}
-
-var _ realOp = &createResourceDriverOp{}
-
-func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
-	if !isValidCount(allowParameterization, op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam) {
-		return fmt.Errorf("invalid MaxClaimsPerNode=%d / MaxClaimsPerNodeParam=%q", op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam)
-	}
-	if op.DriverName == "" {
-		return fmt.Errorf("DriverName must be set")
-	}
-	if op.Nodes == "" {
-		return fmt.Errorf("Nodes must be set")
-	}
-	return nil
-}
-
-func (op *createResourceDriverOp) collectsMetrics() bool {
-	return false
-}
-func (op *createResourceDriverOp) patchParams(w *Workload) (realOp, error) {
-	if op.MaxClaimsPerNodeParam != "" {
-		var err error
-		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return op, op.isValid(false)
-}
-
-func (op *createResourceDriverOp) run(tCtx ktesting.TContext, draManager framework.SharedDRAManager) {
-	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
-
-	var driverNodes []string
-
-	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
-	if err != nil {
-		tCtx.Fatalf("list nodes: %v", err)
-	}
-	for _, node := range nodes.Items {
-		match, err := filepath.Match(op.Nodes, node.Name)
-		if err != nil {
-			tCtx.Fatalf("matching glob pattern %q against node name %q: %v", op.Nodes, node.Name, err)
-		}
-		if match {
-			driverNodes = append(driverNodes, node.Name)
-		}
-	}
-
-	numSlices := 0
-	for _, nodeName := range driverNodes {
-		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-		_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create node resource slice")
-		numSlices++
-	}
-
-	tCtx.Eventually(func(tCtx ktesting.TContext) int {
-		slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
-		tCtx.ExpectNoError(err, "list ResourceSlices")
-		return len(slices)
-	}).Should(gomega.Equal(numSlices), "informer has received all ResourceSlices")
-
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		err := tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx,
-			metav1.DeleteOptions{},
-			metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
-		)
-		tCtx.ExpectNoError(err, "delete node resource slices")
-	})
-}
-
-func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.ResourceSlice {
-	slice := &resourceapi.ResourceSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nodeName,
-		},
-
-		Spec: resourceapi.ResourceSliceSpec{
-			Driver:   driverName,
-			NodeName: &nodeName,
-			Pool: resourceapi.ResourcePool{
-				Name:               nodeName,
-				ResourceSliceCount: 1,
-			},
-		},
-	}
-
-	for i := range capacity {
-		slice.Spec.Devices = append(slice.Spec.Devices,
-			resourceapi.Device{
-				Name: fmt.Sprintf("instance-%d", i),
-				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					"model":                {StringValue: ptr.To("A100")},
-					"family":               {StringValue: ptr.To("GPU")},
-					"driverVersion":        {VersionValue: ptr.To("1.2.3")},
-					"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
-				},
-				Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-					"memory": {Value: resource.MustParse("1Gi")},
-				},
-			},
-		)
-	}
-
-	return slice
 }
 
 // allocResourceClaimsOp defines an op where resource claims with structured

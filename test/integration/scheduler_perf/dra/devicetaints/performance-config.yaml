@@ -31,10 +31,11 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numDevices: 10
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
   - opcode: createAny
@@ -62,4 +63,3 @@
       nodesWithoutDRA: 1
       initPods: 0
       measurePods: 10
-      maxClaimsPerNode: 10

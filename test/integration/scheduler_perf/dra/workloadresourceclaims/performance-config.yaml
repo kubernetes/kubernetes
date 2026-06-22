@@ -30,9 +30,6 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
   - opcode: createAny
     templatePath: ../templates/resourceslice-podgroup.yaml
     countParam: $podGroups
@@ -91,9 +88,6 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
   - opcode: createAny
     templatePath: ../templates/resourceslice-podgroup.yaml
     countParam: $podGroups
