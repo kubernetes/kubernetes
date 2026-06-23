@@ -308,6 +308,10 @@ func (ar *algorithmResult) GetNodeName() string {
 	return ar.scheduleResult.SuggestedHost
 }
 
+func (ar *algorithmResult) GetCycleState() fwk.CycleState {
+	return ar.podCtx.state
+}
+
 // podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
 // and any information needed to act on these results.
 type podGroupAlgorithmResult struct {
