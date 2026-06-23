@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
@@ -850,6 +851,7 @@ func getTemplateFuncs() template.FuncMap {
 		"DivideFloat":   divideFloat,
 		"DivideInt":     divideInt,
 		"Int":           toInt,
+		"JSON":          toJSON,
 		"Mod":           mod,
 		"MultiplyFloat": multiplyFloat,
 		"MultiplyInt":   multiplyInt,
@@ -910,6 +912,16 @@ func toInt(val any) int {
 		}
 	}
 	panic(fmt.Sprintf("cannot cast %v to int", val))
+}
+
+func toJSON(val any) string {
+	var buffer strings.Builder
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(val); err != nil {
+		panic(fmt.Sprintf("cannot JSON-encode %v: %v", val, err))
+	}
+	return strings.TrimSpace(buffer.String())
 }
 
 func addInt(numbers ...any) int {
