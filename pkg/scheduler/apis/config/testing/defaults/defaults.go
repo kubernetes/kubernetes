@@ -30,8 +30,8 @@ var PluginsV1 = &config.Plugins{
 		Enabled: []config.Plugin{
 			{Name: names.SchedulingGates},
 			{Name: names.PrioritySort},
-			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
+			{Name: names.NodeUnschedulable},
 			{Name: names.TaintToleration, Weight: 3},
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodePorts},
@@ -68,8 +68,8 @@ var ExpandedPluginsV1 = &config.Plugins{
 	},
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
-			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
+			{Name: names.NodeUnschedulable},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
@@ -86,8 +86,8 @@ var ExpandedPluginsV1 = &config.Plugins{
 	},
 	Filter: config.PluginSet{
 		Enabled: []config.Plugin{
-			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
+			{Name: names.NodeUnschedulable},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},

@@ -364,8 +364,8 @@ func TestSchedulerDefaults(t *testing.T) {
 								Enabled: []configv1.Plugin{
 									{Name: names.SchedulingGates},
 									{Name: names.PrioritySort},
-									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
+									{Name: names.NodeUnschedulable},
 									{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 									{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 									{Name: names.NodePorts},
