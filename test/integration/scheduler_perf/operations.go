@@ -21,11 +21,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"maps"
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
