@@ -186,6 +186,41 @@ featureGates:
 			// Compare the expected config with the merged config
 			gomega.Expect(initialConfig).To(gomega.BeComparableTo(mergedConfig), "Merged kubelet config does not match the expected configuration.")
 		})
+		ginkgo.It("should dump the effective KubeletConfiguration to the kubelet log at startup", func(ctx context.Context) {
+			configDir := framework.TestContext.KubeletConfigDropinDir
+
+			// Set a distinctive, non-default value via a drop-in config. The startup log
+			// dumps the *effective* (post-merge) KubeletConfiguration, so this value must
+			// appear in the log.
+			contents := []byte(`apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+eventBurst: 101`)
+
+			dropinConfigPath := filepath.Join(configDir, "10-kubelet.conf")
+			framework.ExpectNoError(os.WriteFile(dropinConfigPath, contents, 0755))
+
+			ginkgo.By("Restarting the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
+
+			ginkgo.By("Verifying the effective KubeletConfiguration is dumped to the kubelet log")
+			// The startup dump is logged once shortly after the kubelet starts. Poll the
+			// kubelet log to avoid flaking on the log not being flushed yet.
+			gomega.Eventually(ctx, func() (string, error) {
+				kubeletLog, err := os.ReadFile(framework.TestContext.ReportDir + "/kubelet.log")
+				if err != nil {
+					return "", err
+				}
+				return string(kubeletLog), nil
+			}).WithPolling(5*time.Second).WithTimeout(time.Minute).Should(gomega.And(
+				// Greppable startup header emitted by the effective-config dump.
+				gomega.ContainSubstring("Effective KubeletConfiguration"),
+				// Marker that the dumped value is the serialized KubeletConfiguration.
+				gomega.ContainSubstring("kind: KubeletConfiguration"),
+				// The effective, post-merge value set via the drop-in config above.
+				gomega.ContainSubstring("eventBurst: 101"),
+			), "kubelet log should contain the effective KubeletConfiguration with merged values")
+		})
 	})
 
 })
