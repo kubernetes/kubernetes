@@ -784,12 +784,19 @@ func TestRetryPendingResizes(t *testing.T) {
 				}
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod1, testPod2, testPod3}, nil)
 
+				for _, p := range []*v1.Pod{testPod1, testPod2, testPod3} {
+					require.NoError(t, allocationManager.SetAllocatedResources(logger, p))
+				}
 				if !tt.newResourcesAllocated {
 					require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
 				} else {
 					require.NoError(t, allocationManager.SetAllocatedResources(logger, newPod))
 				}
-				t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
+				t.Cleanup(func() {
+					for _, p := range []*v1.Pod{testPod1, testPod2, testPod3} {
+						allocationManager.RemovePod(logger, p.UID)
+					}
+				})
 
 				if tt.originalInProgress {
 					allocationManager.(*manager).statusManager.SetPodResizeInProgressCondition(originalPod.UID, "", originalInProgressMsg, 0)
@@ -3510,4 +3517,178 @@ func verifyResizeConditions(t *testing.T, expected, actual []*v1.PodCondition) {
 		actual[i].Message = expected[i].Message
 	}
 	assert.Equal(t, expected, actual)
+}
+
+// TestNonAllocatedPodsExcludedFromCapacity_Resize verifies that a pending pod
+// without an allocation does not block resize of an already-running pod.
+func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
+	allocationManager, runningPod, pendingPod, logger := setupNonAllocatedCapacityTest(t)
+
+	cpu1500m := resource.MustParse("1500m")
+	mem1000M := resource.MustParse("1Gi")
+
+	resizedPod := runningPod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M}
+
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		if uid == runningPod.UID {
+			return resizedPod, true
+		}
+		if uid == pendingPod.UID {
+			return pendingPod, true
+		}
+		return nil, false
+	}
+
+	allocationManager.PushPendingResize(logger, runningPod.UID)
+	allocationManager.RetryPendingResizes(context.TODO(), TriggerReasonPodUpdated)
+
+	// If pendingPod was incorrectly included in capacity calculations, this
+	// resize would be deferred (1500m + 10000m > 4000m allocatable).
+	resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(runningPod.UID)
+	require.Len(t, resizeStatus, 1)
+	assert.Equal(t, v1.PodResizeInProgress, resizeStatus[0].Type)
+	assert.Equal(t, v1.ConditionTrue, resizeStatus[0].Status)
+
+	alloc, found := allocationManager.GetContainerResourceAllocation(runningPod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, cpu1500m, *alloc.Requests.Cpu())
+
+	_, foundPending := allocationManager.GetContainerResourceAllocation(pendingPod.UID, "c1")
+	assert.False(t, foundPending)
+}
+
+// TestNonAllocatedPodsExcludedFromCapacity_AddPod verifies that a pending pod
+// without an allocation does not block admission of a new pod.
+func TestNonAllocatedPodsExcludedFromCapacity_AddPod(t *testing.T) {
+	allocationManager, runningPod, pendingPod, _ := setupNonAllocatedCapacityTest(t)
+
+	cpu500m := resource.MustParse("500m")
+	mem1000M := resource.MustParse("1Gi")
+
+	newPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "new-pod",
+			Name:      "new-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	// If pendingPod was incorrectly included in capacity calculations,
+	// AddPod would fail (500m + 1000m + 10000m > 4000m allocatable).
+	ok, reason, message := allocationManager.AddPod(context.TODO(), []*v1.Pod{runningPod, pendingPod}, newPod)
+	assert.True(t, ok, "AddPod should succeed: reason=%s message=%s", reason, message)
+
+	newAlloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, cpu500m, *newAlloc.Requests.Cpu())
+
+	_, foundPending := allocationManager.GetContainerResourceAllocation(pendingPod.UID, "c1")
+	assert.False(t, foundPending)
+}
+
+// setupNonAllocatedCapacityTest creates a common test environment with:
+//   - A running pod allocated 1000m CPU and 1Gi memory
+//   - A pending pod requesting resources way beyond node capacity (not allocated)
+//   - An allocation manager with 4 CPU and 4Gi memory allocatable
+//
+// This setup is used to verify that the non-allocated pending pod is excluded
+// from capacity calculations and doesn't block legitimate operations.
+func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klog.Logger) {
+	t.Helper()
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	cpu1000m := resource.MustParse("1")
+	cpu10000m := resource.MustParse("10")
+	mem1000M := resource.MustParse("1Gi")
+	mem10000M := resource.MustParse("10Gi")
+
+	runningPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "running-pod",
+			Name:      "running-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	pendingPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pending-pod",
+			Name:      "pending-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test-image",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu10000m, v1.ResourceMemory: mem10000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID:        runningPod.UID,
+		Name:      runningPod.Name,
+		Namespace: runningPod.Namespace,
+	}
+	podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(runningPod.Spec.Containers))
+	for i, c := range runningPod.Spec.Containers {
+		setContainerStatus(podStatus, &c, i)
+	}
+
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{runningPod, pendingPod}, nil)
+	require.NoError(t, allocationManager.SetAllocatedResources(logger, runningPod))
+	t.Cleanup(func() {
+		allocationManager.RemovePod(logger, runningPod.UID)
+		allocationManager.RemovePod(logger, pendingPod.UID)
+	})
+
+	return allocationManager, runningPod, pendingPod, logger
 }
