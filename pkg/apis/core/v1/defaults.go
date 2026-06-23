@@ -162,6 +162,7 @@ func SetDefaults_Service(obj *v1.Service) {
 
 }
 func SetDefaults_Pod(obj *v1.Pod) {
+
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
 	// because we only want this defaulting semantic to take place on a v1.Pod and not a v1.PodTemplate
@@ -208,6 +209,24 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
 }
+func SetDefaults_PodStatus(obj *v1.PodStatus) {
+	// Keep the singular PodIP and the PodIPs list in sync.
+	hasIP := len(obj.PodIP) > 0
+	hasIPs := len(obj.PodIPs) > 0
+	switch {
+	case hasIP && !hasIPs:
+		// default the list from the singular field
+		obj.PodIPs = []v1.PodIP{{IP: obj.PodIP}}
+	case !hasIP && hasIPs:
+		// default the singular field from the list
+		obj.PodIP = obj.PodIPs[0].IP
+	case hasIP && hasIPs && obj.PodIPs[0].IP != obj.PodIP:
+		// when both are specified and mismatch, PodIP is authoritative for
+		// compatibility with older kubelets
+		obj.PodIPs = []v1.PodIP{{IP: obj.PodIP}}
+	}
+}
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445
