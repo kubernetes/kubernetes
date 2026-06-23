@@ -240,35 +240,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: error_total
-  subsystem: apiserver_audit
-  help: Counter of audit events that failed to be audited properly. Plugin identifies
-    the plugin affected by the error.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - plugin
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: event_total
-  subsystem: apiserver_audit
-  help: Counter of audit events generated and sent to the audit backend.
-  type: Counter
-  stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: level_total
-  subsystem: apiserver_audit
-  help: Counter of policy levels for audit events (1 per request).
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - level
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: requests_rejected_total
   subsystem: apiserver_audit
   help: Counter of apiserver requests rejected due to an error in audit logging backend.
@@ -7022,6 +6993,35 @@
   labels:
   - group
   - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: error_total
+  subsystem: apiserver_audit
+  help: Counter of audit events that failed to be audited properly. Plugin identifies
+    the plugin affected by the error.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - plugin
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: event_total
+  subsystem: apiserver_audit
+  help: Counter of audit events generated and sent to the audit backend.
+  type: Counter
+  stabilityLevel: BETA
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: level_total
+  subsystem: apiserver_audit
+  help: Counter of policy levels for audit events (1 per request).
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - level
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
