@@ -43134,7 +43134,7 @@ func schema_k8sio_api_node_v1_RuntimeClass(ref common.ReferenceCallback) common.
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
@@ -43323,7 +43323,7 @@ func schema_k8sio_api_node_v1alpha1_RuntimeClass(ref common.ReferenceCallback) c
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
@@ -43535,7 +43535,7 @@ func schema_k8sio_api_node_v1beta1_RuntimeClass(ref common.ReferenceCallback) co
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
