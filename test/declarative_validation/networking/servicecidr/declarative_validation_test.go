@@ -74,8 +74,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidServiceCIDR() networking.ServiceCIDR {
-	return networking.ServiceCIDR{
+func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
+	cidr := networking.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-obj",
 		},
@@ -83,4 +83,8 @@ func mkValidServiceCIDR() networking.ServiceCIDR {
 			CIDRs: []string{"10.0.0.0/24"},
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(&cidr)
+	}
+	return cidr
 }

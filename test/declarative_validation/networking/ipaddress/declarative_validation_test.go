@@ -164,21 +164,20 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 				},
 			}
 
+			ctx := genericapirequest.WithRequestInfo(
+				genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
+					APIGroup:          "networking.k8s.io",
+					APIVersion:        apiVersion,
+					Resource:          "ipaddresses",
+					Name:              "192.168.1.1",
+					IsResourceRequest: true,
+					Verb:              "update",
+				},
+			)
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "ipaddresses",
-							Name:              "valid-obj",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
-
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
@@ -189,8 +188,8 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 					)
 				})
 			}
-			updateObj := mkValidIPAddress()
-			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+			obj := mkValidIPAddress()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
