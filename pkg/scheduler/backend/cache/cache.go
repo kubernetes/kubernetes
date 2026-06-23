@@ -409,6 +409,21 @@ func (cache *cacheImpl) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	return cache.addPod(logger, pod, true)
 }
 
+// validateAssumedPod checks that the given pod is currently assumed.
+// Assumes that lock is already acquired.
+func (cache *cacheImpl) validateAssumedPod(pod *v1.Pod, key string, currState *podState) error {
+	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
+		return fmt.Errorf("pod %v(%v) was assumed on %v but assigned to %v", key, klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
+	}
+	if !cache.assumedPods.Has(key) {
+		return fmt.Errorf("pod %v(%v) is not assumed, so it cannot be removed or forgotten", key, klog.KObj(pod))
+	}
+	return nil
+}
+
+// ForgetPod forgets an assumed pod from the cache. It should be called when the pod
+// still exists, as an undo operation for AssumePod.
+// If the pod is a pod group member, it is moved from assumed to unscheduled pods of that pod group state in cache.
 func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
@@ -423,14 +438,34 @@ func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		// Pod does not exist in the cache anymore.
 		return nil
 	}
-	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
-		return fmt.Errorf("pod %v(%v) was assumed on %v but assigned to %v", key, klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
+	if err := cache.validateAssumedPod(pod, key, currState); err != nil {
+		return err
 	}
-	// Only assumed pod can be forgotten.
-	if cache.assumedPods.Has(key) {
-		return cache.removePod(logger, pod, true)
+	return cache.removePod(logger, pod, true)
+}
+
+// RemoveAssumedPod removes an assumed pod from the cache. It should be called when the assumed
+// pod was removed from the cluster to correctly clean up internal state.
+// It differs from ForgetPod in how it handles pod group members, as it removes the pod from
+// the pod group state in the cache.
+func (cache *cacheImpl) RemoveAssumedPod(logger klog.Logger, pod *v1.Pod) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("pod %v(%v) wasn't assumed so cannot be forgotten", key, klog.KObj(pod))
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	currState, ok := cache.podStates[key]
+	if !ok {
+		// Pod does not exist in the cache anymore.
+		return nil
+	}
+	if err := cache.validateAssumedPod(pod, key, currState); err != nil {
+		return err
+	}
+	return cache.removePod(logger, pod, false)
 }
 
 // Assumes that lock is already acquired.

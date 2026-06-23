@@ -262,8 +262,8 @@ func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
 	if !fwk.RejectWaitingPod(pod.UID) {
 		// 2. If the pod is no longer waiting (e.g., it's in PreBind or Bind), we can't quickly reject it.
 		//    We must explicitly remove it from the cache here to free up its assumed resources.
-		if err := sched.Cache.ForgetPod(logger, pod); err != nil {
-			utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache ForgetPod failed", "pod", klog.KObj(pod))
+		if err := sched.Cache.RemoveAssumedPod(logger, pod); err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache RemoveAssumedPod failed", "pod", klog.KObj(pod))
 		}
 	}
 
@@ -340,7 +340,6 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
-	sched.Cache.RemovePodGroupMember(pod)
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
@@ -349,7 +348,11 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// Assumed pod is deleted. We should handle that differently,
 		// because we can't delete such pod from any structure directly.
 		sched.handleAssumedPodDeletion(pod)
-	} else if pod.Status.NominatedNodeName != "" {
+		return
+	}
+	// If the pod is not assumed, we must clean pod group state explicitly here.
+	sched.Cache.RemovePodGroupMember(pod)
+	if pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
 		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
