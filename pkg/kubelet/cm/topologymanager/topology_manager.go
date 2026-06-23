@@ -111,16 +111,16 @@ type HintProvider interface {
 	// this function for each hint provider, and merges the hints to produce
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
+	GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
 	// GetPodTopologyHints returns a map of resource names to a list of possible
 	// concrete resource allocations per Pod in terms of NUMA locality hints.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint
+	GetPodTopologyHints(logger klog.Logger, pod *v1.Pod) map[string][]TopologyHint
 	// AllocatePod is called to trigger the allocation of resources to a pod.
-	AllocatePod(pod *v1.Pod) error
+	AllocatePod(logger klog.Logger, pod *v1.Pod) error
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity

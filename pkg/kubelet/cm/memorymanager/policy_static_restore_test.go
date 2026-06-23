@@ -98,7 +98,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			machineInfo := returnMachineInfo()
 			nodeAllocatableReservation := v1.ResourceList{
 				v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
@@ -137,7 +137,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 
 			// Allocate resources
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(logger, pod)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -145,7 +145,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				// Add containers (allocates exclusive resources from the pod pool)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(pod, container)
+					err = mgr.Allocate(ctx, pod, container)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}
