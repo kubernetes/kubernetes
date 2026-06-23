@@ -29,6 +29,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/resource"
 	ephemeral "k8s.io/component-helpers/storage/ephemeral"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
@@ -66,9 +67,10 @@ type CSILimits struct {
 	csiDriverLister storagelisters.CSIDriverLister
 	vaIndexer       cache.Indexer
 
-	randomVolumeIDPrefix     string
-	enableVolumeLimitScaling bool
-	translator               InTreeToCSITranslator
+	randomVolumeIDPrefix                               string
+	enableVolumeLimitScaling                           bool
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	translator                                         InTreeToCSITranslator
 }
 
 var _ fwk.PreFilterPlugin = &CSILimits{}
@@ -237,6 +239,9 @@ func (pl *CSILimits) isSchedulableAfterCSINodeUpdated(logger klog.Logger, pod *v
 //
 // If the pod haven't those types of volumes, we'll skip the Filter phase
 func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]
@@ -255,6 +260,9 @@ func (pl *CSILimits) PreFilterExtensions() fwk.PreFilterExtensions {
 
 // Filter invoked at the filter extension point.
 func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
@@ -622,9 +630,10 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 		vaLister:                 vaLister,
 		csiDriverLister:          csiDriverLister,
 		enableVolumeLimitScaling: fts.EnableVolumeLimitScaling,
-		randomVolumeIDPrefix:     rand.String(32),
-		translator:               csiTranslator,
-		vaIndexer:                vaInformer.GetIndexer(),
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		randomVolumeIDPrefix: rand.String(32),
+		translator:           csiTranslator,
+		vaIndexer:            vaInformer.GetIndexer(),
 	}, nil
 }
 

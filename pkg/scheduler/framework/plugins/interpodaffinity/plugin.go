@@ -45,10 +45,11 @@ var _ fwk.SignPlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer fwk.Parallelizer
-	args         config.InterPodAffinityArgs
-	sharedLister fwk.SharedLister
-	nsLister     listersv1.NamespaceLister
+	parallelizer                                       fwk.Parallelizer
+	args                                               config.InterPodAffinityArgs
+	sharedLister                                       fwk.SharedLister
+	nsLister                                           listersv1.NamespaceLister
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -111,6 +112,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		args:         args,
 		sharedLister: h.SnapshotSharedLister(),
 		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 
 	return pl, nil
