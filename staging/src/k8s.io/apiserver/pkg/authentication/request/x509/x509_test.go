@@ -1284,7 +1284,7 @@ func TestCertificateIdentifier(t *testing.T) {
 	}
 }
 
-func TestClientCertificateExpirationSecondsIsBeta(t *testing.T) {
+func TestClientCertificateExpirationSeconds(t *testing.T) {
 	clientCertificateExpirationHistogram.Reset()
 	defer clientCertificateExpirationHistogram.Reset()
 
