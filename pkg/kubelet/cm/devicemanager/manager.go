@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -96,6 +97,8 @@ type ManagerImpl struct {
 
 	// List of NUMA Nodes available on the underlying machine
 	numaNodes []int
+	// Distances between all NUMA nodes reported by cadvisor, keyed by NUMA node ID.
+	numaDistances map[int][]uint64
 
 	// Store of Topology Affinities that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
@@ -146,8 +149,18 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 	logger.V(2).Info("Creating Device Plugin manager", "path", socketPath)
 
 	var numaNodes []int
+	if topologyAffinityStore != nil {
+		numaNodes = append(numaNodes, topologyAffinityStore.GetNUMANodeIDs()...)
+	}
+	if len(numaNodes) == 0 {
+		for _, node := range topology {
+			numaNodes = append(numaNodes, node.Id)
+		}
+	}
+
+	numaDistances := make(map[int][]uint64, len(topology))
 	for _, node := range topology {
-		numaNodes = append(numaNodes, node.Id)
+		numaDistances[node.Id] = node.Distances
 	}
 
 	manager := &ManagerImpl{
@@ -159,6 +172,7 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 		allocatedDevices:      make(map[string]sets.Set[string]),
 		podDevices:            newPodDevices(),
 		numaNodes:             numaNodes,
+		numaDistances:         numaDistances,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
 		update:                make(chan resourceupdates.Update, 100),
@@ -187,6 +201,54 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 
 func (m *ManagerImpl) Updates() <-chan resourceupdates.Update {
 	return m.update
+}
+
+func (m *ManagerImpl) projectToEffectiveNUMANodes(rawNUMANodes []int) []int {
+	if len(rawNUMANodes) == 0 {
+		return nil
+	}
+	if len(m.numaNodes) == 0 {
+		return rawNUMANodes
+	}
+
+	effectiveNUMANodes := sets.New[int](m.numaNodes...)
+	projected := sets.New[int]()
+	for _, nodeID := range rawNUMANodes {
+		if effectiveNUMANodes.Has(nodeID) {
+			projected.Insert(nodeID)
+			continue
+		}
+
+		distances, ok := m.numaDistances[nodeID]
+		if !ok || len(distances) == 0 {
+			projected.Insert(m.numaNodes...)
+			continue
+		}
+
+		minDistance := uint64(math.MaxUint64)
+		closestNodes := make([]int, 0, len(m.numaNodes))
+		for _, effectiveNodeID := range m.numaNodes {
+			if effectiveNodeID < 0 || effectiveNodeID >= len(distances) {
+				continue
+			}
+			distance := distances[effectiveNodeID]
+			if distance < minDistance {
+				minDistance = distance
+				closestNodes = []int{effectiveNodeID}
+				continue
+			}
+			if distance == minDistance {
+				closestNodes = append(closestNodes, effectiveNodeID)
+			}
+		}
+		if len(closestNodes) == 0 {
+			projected.Insert(m.numaNodes...)
+			continue
+		}
+		projected.Insert(closestNodes...)
+	}
+
+	return sets.List(projected)
 }
 
 // CleanupPluginDirectory is to remove all existing unix sockets

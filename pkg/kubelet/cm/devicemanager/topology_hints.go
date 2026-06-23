@@ -253,11 +253,11 @@ func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {
 	if topology == nil {
 		return nil
 	}
-	var ids []int
+	rawIDs := make([]int, 0, len(topology.Nodes))
 	for _, n := range topology.Nodes {
-		ids = append(ids, int(n.ID))
+		rawIDs = append(rawIDs, int(n.ID))
 	}
-	return ids
+	return m.projectToEffectiveNUMANodes(rawIDs)
 }
 
 func (m *ManagerImpl) getPodDeviceRequest(pod *v1.Pod) map[string]int {

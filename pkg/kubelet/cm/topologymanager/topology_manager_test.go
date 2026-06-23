@@ -19,11 +19,15 @@ package topologymanager
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
@@ -201,6 +205,35 @@ func TestManagerScope(t *testing.T) {
 				t.Errorf("Unexpected scope name. Have: %q wants %q", rawMgr.scope, tc.expectedScope)
 			}
 		}
+	}
+}
+
+func TestNewManagerRestrictToCPUNUMANodes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.TopologyManagerPolicyAlphaOptions, true)
+
+	topology := []cadvisorapi.Node{
+		{Id: 0, Cores: []cadvisorapi.Core{{}}},
+		{Id: 1, Cores: []cadvisorapi.Core{{}}},
+		{Id: 2},
+		{Id: 3},
+		{Id: 4},
+		{Id: 5},
+		{Id: 6},
+		{Id: 7},
+		{Id: 8},
+	}
+
+	mgr, err := NewManager(topology, PolicyBestEffort, ContainerTopologyScope, map[string]string{
+		RestrictToCPUNUMANodes: "true",
+	})
+	if err != nil {
+		t.Fatalf("NewManager() returned unexpected error: %v", err)
+	}
+
+	got := mgr.GetNUMANodeIDs()
+	expected := []int{0, 1}
+	if !reflect.DeepEqual(got, expected) {
+		t.Fatalf("expected NUMA node IDs %v, got %v", expected, got)
 	}
 }
 

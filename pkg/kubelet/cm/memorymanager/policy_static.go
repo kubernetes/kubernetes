@@ -886,11 +886,10 @@ func getContainerRequestedResources(logger logr.Logger, pod *v1.Pod, container *
 }
 
 func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
-	var numaNodes []int
-	for n := range machineState {
-		numaNodes = append(numaNodes, n)
+	numaNodes := p.getNUMANodesForTopologyHints(machineState)
+	if len(numaNodes) == 0 {
+		return nil
 	}
-	sort.Ints(numaNodes)
 
 	// Initialize minAffinitySize to include all NUMA Cells.
 	minAffinitySize := len(numaNodes)
@@ -978,6 +977,37 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 	}
 
 	return hints
+}
+
+func (p *staticPolicy) getNUMANodesForTopologyHints(machineState state.NUMANodeMap) []int {
+	var topologyNUMANodes []int
+	for nodeID := range machineState {
+		topologyNUMANodes = append(topologyNUMANodes, nodeID)
+	}
+	sort.Ints(topologyNUMANodes)
+
+	if p.affinity == nil {
+		return topologyNUMANodes
+	}
+
+	hintNUMANodes := p.affinity.GetNUMANodeIDs()
+	if hintNUMANodes == nil {
+		return topologyNUMANodes
+	}
+
+	hintNodeSet := map[int]struct{}{}
+	for _, nodeID := range hintNUMANodes {
+		hintNodeSet[nodeID] = struct{}{}
+	}
+
+	var filteredNUMANodes []int
+	for _, nodeID := range topologyNUMANodes {
+		if _, ok := hintNodeSet[nodeID]; ok {
+			filteredNUMANodes = append(filteredNUMANodes, nodeID)
+		}
+	}
+
+	return filteredNUMANodes
 }
 
 func (p *staticPolicy) isHintPreferred(maskBits []int, minAffinitySize int) bool {
