@@ -34,7 +34,7 @@ import (
 // build-time test failure: if libcadvisor removes or renames a flag without
 // updating cadvisorflags, this fails here instead.
 func TestPinnedCadvisorFlagsResolve(t *testing.T) {
-	names := append(append([]string{}, cadvisorflags.Kept()...), cadvisorflags.Deprecated()...)
+	names := cadvisorflags.Kept()
 	if len(names) == 0 {
 		t.Fatal("cadvisorflags exposes no pinned flag names; expected at least housekeeping_interval")
 	}
@@ -46,8 +46,8 @@ func TestPinnedCadvisorFlagsResolve(t *testing.T) {
 }
 
 // TestAddCadvisorFlagsDoesNotPanic exercises the real startup path end-to-end:
-// register()/registerDeprecated() panic if any pinned flag is missing, so a
-// clean run proves addCadvisorFlags will not panic the kubelet at startup.
+// register() panics if the pinned flag is missing, so a clean run proves
+// addCadvisorFlags will not panic the kubelet at startup.
 func TestAddCadvisorFlagsDoesNotPanic(t *testing.T) {
 	addCadvisorFlags(pflag.NewFlagSet("test", pflag.ContinueOnError))
 }
