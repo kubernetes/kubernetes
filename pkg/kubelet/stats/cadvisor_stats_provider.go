@@ -550,7 +550,7 @@ func isContainerTerminated(info *cadvisorapi.ContainerInfo) bool {
 			}
 		}
 	}
-	if cstat.CpuInst == nil {
+	if cstat.CpuInst == nil || !info.Spec.HasMemory {
 		return true
 	}
 	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0
