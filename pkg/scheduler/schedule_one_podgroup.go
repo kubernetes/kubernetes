@@ -256,8 +256,8 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, pgSchedulingFunc)
 		if status.IsSuccess() {
 			for i := range result.podResults {
-				pod := result.podResults[i].pod
-				namespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+				podInfo := result.podResults[i].podInfo
+				namespacedName := types.NamespacedName{Namespace: podInfo.Pod.Namespace, Name: podInfo.Pod.Name}
 				if nodeNameInfo, ok := pgPostFilterResult.NominatingInfos[namespacedName]; ok {
 					result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
 					result.waitingOnPreemption = true
@@ -277,8 +277,8 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.
 type algorithmResult struct {
-	// pod is the pod the result applies to.
-	pod *v1.Pod
+	// podInfo is the pod info for the pod the result applies to.
+	podInfo *framework.PodInfo
 	// scheduleResult is a scheduling algorithm result.
 	scheduleResult ScheduleResult
 	// podCtx is a specific pod scheduling context used for the scheduling algorithm.
@@ -304,11 +304,19 @@ const (
 )
 
 func (ar *algorithmResult) GetPod() *v1.Pod {
-	return ar.pod
+	return ar.podInfo.Pod
+}
+
+func (ar *algorithmResult) GetPodInfo() fwk.PodInfo {
+	return ar.podInfo
 }
 
 func (ar *algorithmResult) GetNodeName() string {
 	return ar.scheduleResult.SuggestedHost
+}
+
+func (ar *algorithmResult) GetCycleState() fwk.CycleState {
+	return ar.podCtx.state
 }
 
 // podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
@@ -453,7 +461,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 		} else {
 			// In case of pod being just unschedulable or having an error, just return now.
 			return algorithmResult{
-				pod:                pod,
+				podInfo:            podInfo.PodInfo,
 				scheduleResult:     scheduleResult,
 				podCtx:             podCtx,
 				schedulingDuration: time.Since(start),
@@ -464,7 +472,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
 	if !assumeStatus.IsSuccess() {
 		return algorithmResult{
-			pod:                pod,
+			podInfo:            podInfo.PodInfo,
 			scheduleResult:     ScheduleResult{nominatingInfo: clearNominatedNode},
 			podCtx:             podCtx,
 			schedulingDuration: time.Since(start),
@@ -480,7 +488,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 	}
 
 	return algorithmResult{
-		pod:                pod,
+		podInfo:            podInfo.PodInfo,
 		scheduleResult:     scheduleResult,
 		podCtx:             podCtx,
 		schedulingDuration: time.Since(start),
@@ -503,9 +511,9 @@ func completePodGroupAlgorithmResult(ctx context.Context, podGroupInfo *framewor
 		placementCycleState := framework.NewCycleState()
 		placementCycleState.SetPodGroupSchedulingCycle(podGroupState)
 		newResults[i] = algorithmResult{
-			pod:    pInfo.Pod,
-			podCtx: initPodSchedulingContext(ctx, pInfo.Pod, placementCycleState, postFilterMode),
-			status: podGroupResult.status.Clone(),
+			podInfo: pInfo.PodInfo,
+			podCtx:  initPodSchedulingContext(ctx, pInfo.Pod, placementCycleState, postFilterMode),
+			status:  podGroupResult.status.Clone(),
 		}
 	}
 	podGroupResult.podResults = newResults

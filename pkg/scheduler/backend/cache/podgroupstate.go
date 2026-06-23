@@ -449,3 +449,8 @@ func (s *podGroupStateSnapshot) AllPodsCount() int {
 func (s *podGroupStateSnapshot) ScheduledPodsCount() int {
 	return s.podGroupStateData.scheduledPodsCount()
 }
+
+// Clone returns a pod group state snapshot with cloned podGroupStateData.
+func (s *podGroupStateSnapshot) Clone() *podGroupStateSnapshot {
+	return &podGroupStateSnapshot{podGroupStateData: s.podGroupStateData.clone()}
+}

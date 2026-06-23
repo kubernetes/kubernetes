@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/klog/v2"
 )
 
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
@@ -72,6 +73,14 @@ type MutableSnapshotSharedLister interface {
 	StartMutations() error
 	// EndMutations ends the mutation session and restores the snapshot state to the one before StartMutations.
 	EndMutations() error
+	// AddPod adds a given pod to the snapshot.
+	// AddPod should be called only if the mutation was started via StartMutations.
+	// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+	AddPod(podInfo PodInfo, nodeName string) error
+	// RemovePod removes a given pod from the snapshot.
+	// RemovePod should be called only if the mutation was started via StartMutations.
+	// The state will be reverted when EndMutations is called.
+	RemovePod(logger klog.Logger, pod *v1.Pod, nodeName string) error
 }
 
 // PodGroupStateLister provides read access to pod group states.

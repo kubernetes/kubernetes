@@ -2333,16 +2333,24 @@ func testFitSignPod(tCtx ktesting.TContext) {
 }
 
 type podAssignment struct {
-	pod      *v1.Pod
+	podInfo  *framework.PodInfo
 	nodeName string
 }
 
 func (pa *podAssignment) GetPod() *v1.Pod {
-	return pa.pod
+	return pa.podInfo.GetPod()
 }
 
 func (pa *podAssignment) GetNodeName() string {
 	return pa.nodeName
+}
+
+func (pa *podAssignment) GetCycleState() fwk.CycleState {
+	return nil
+}
+
+func (pa *podAssignment) GetPodInfo() fwk.PodInfo {
+	return pa.podInfo
 }
 
 func TestScorePlacement_Resources(t *testing.T) {
@@ -2567,8 +2575,9 @@ func TestScorePlacement_Resources(t *testing.T) {
 			proposedAssignments := make([]fwk.ProposedAssignment, 0, len(tc.podGroupPods))
 			for _, pod := range tc.podGroupPods {
 				if nodeName, ok := tc.podGroupAssignments[pod.UID]; ok {
+					podInfo, _ := framework.NewPodInfo(pod)
 					proposedAssignments = append(proposedAssignments, &podAssignment{
-						pod:      pod,
+						podInfo:  podInfo,
 						nodeName: nodeName,
 					})
 				}

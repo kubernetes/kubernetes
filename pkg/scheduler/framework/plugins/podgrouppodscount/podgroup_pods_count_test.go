@@ -43,7 +43,7 @@ func init() {
 
 type mockProposedAssignment struct {
 	nodeName string
-	pod      *v1.Pod
+	podInfo  *framework.PodInfo
 }
 
 var _ fwk.ProposedAssignment = &mockProposedAssignment{}
@@ -53,7 +53,15 @@ func (pa *mockProposedAssignment) GetNodeName() string {
 }
 
 func (pa *mockProposedAssignment) GetPod() *v1.Pod {
-	return pa.pod
+	return pa.podInfo.GetPod()
+}
+
+func (pa *mockProposedAssignment) GetPodInfo() fwk.PodInfo {
+	return pa.podInfo
+}
+
+func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
+	return nil
 }
 
 func TestScorePlacement(t *testing.T) {
@@ -67,14 +75,16 @@ func TestScorePlacement(t *testing.T) {
 		return createPod(podName, podGroupName, "")
 	}
 
+	podInfo1, _ := framework.NewPodInfo(createPodWithoutNode("proposed-pod-1", podGroupName))
+	podInfo2, _ := framework.NewPodInfo(createPodWithoutNode("proposed-pod-2", podGroupName))
 	proposedAssignments := []fwk.ProposedAssignment{
 		&mockProposedAssignment{
 			nodeName: "node1",
-			pod:      createPodWithoutNode("proposed-pod-1", podGroupName),
+			podInfo:  podInfo1,
 		},
 		&mockProposedAssignment{
 			nodeName: "node2",
-			pod:      createPodWithoutNode("proposed-pod-2", podGroupName),
+			podInfo:  podInfo2,
 		},
 	}
 

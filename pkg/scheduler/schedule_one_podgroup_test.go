@@ -2285,7 +2285,10 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 		st.MakeNode().Name("node1").Obj(),
 		st.MakeNode().Name("node2").Obj(),
 	}
-	podGroupPod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").Obj()
+	podGroupPodInfo, err := framework.NewPodInfo(st.MakePod().Name("foo").UID("foo").PodGroupName("pg").Obj())
+	if err != nil {
+		t.Fatalf("Failed to create pod info: %v", err)
+	}
 
 	tests := map[string]struct {
 		placementPlugin           fakePlacementPlugin
@@ -2306,7 +2309,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			expectedResult: podGroupAlgorithmResult{
 				podResults: []algorithmResult{
 					{
-						pod: podGroupPod,
+						podInfo: podGroupPodInfo,
 						scheduleResult: ScheduleResult{
 							SuggestedHost:  nodes[0].Name,
 							EvaluatedNodes: 1,
@@ -2331,7 +2334,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			expectedResult: podGroupAlgorithmResult{
 				podResults: []algorithmResult{
 					{
-						pod: podGroupPod,
+						podInfo: podGroupPodInfo,
 						scheduleResult: ScheduleResult{
 							SuggestedHost:  nodes[1].Name,
 							EvaluatedNodes: 1,
@@ -2368,7 +2371,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			expectedResult: podGroupAlgorithmResult{
 				podResults: []algorithmResult{
 					{
-						pod: podGroupPod,
+						podInfo: podGroupPodInfo,
 						scheduleResult: ScheduleResult{
 							EvaluatedNodes: 0,
 							FeasibleNodes:  0,
@@ -2402,7 +2405,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			expectedResult: podGroupAlgorithmResult{
 				podResults: []algorithmResult{
 					{
-						pod: podGroupPod,
+						podInfo: podGroupPodInfo,
 						scheduleResult: ScheduleResult{
 							SuggestedHost:  "node1",
 							EvaluatedNodes: 1,
@@ -2430,7 +2433,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			expectedResult: podGroupAlgorithmResult{
 				podResults: []algorithmResult{
 					{
-						pod: podGroupPod,
+						podInfo: podGroupPodInfo,
 						scheduleResult: ScheduleResult{
 							SuggestedHost:  nodes[0].Name,
 							EvaluatedNodes: 1,
@@ -2462,7 +2465,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			expectedResult: podGroupAlgorithmResult{
 				podResults: []algorithmResult{
 					{
-						pod: podGroupPod,
+						podInfo: podGroupPodInfo,
 						scheduleResult: ScheduleResult{
 							SuggestedHost:  nodes[0].Name,
 							EvaluatedNodes: 1,
@@ -2565,11 +2568,11 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			pgInfo := &framework.QueuedPodGroupInfo{
 				QueuedPodInfos: []*framework.QueuedPodInfo{
 					{
-						PodInfo: &framework.PodInfo{Pod: podGroupPod},
+						PodInfo: podGroupPodInfo,
 					},
 				},
 				PodGroupInfo: &framework.PodGroupInfo{
-					UnscheduledPods: []*v1.Pod{podGroupPod},
+					UnscheduledPods: []*v1.Pod{podGroupPodInfo.Pod},
 				},
 			}
 
@@ -2580,7 +2583,8 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					podGroupAlgorithmResult{},
 					algorithmResult{},
 					ScheduleResult{},
-					fwk.Status{}),
+					fwk.Status{},
+					framework.PodInfo{}),
 				cmpopts.IgnoreFields(podGroupAlgorithmResult{}, "placementCycleState"),
 				cmpopts.IgnoreFields(algorithmResult{}, "podCtx", "schedulingDuration"),
 				statusCmpOpt,

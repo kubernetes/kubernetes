@@ -2437,8 +2437,9 @@ type fakePodActivator struct {
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
 
 type mockProposedAssignment struct {
-	nodeName string
-	pod      *v1.Pod
+	nodeName   string
+	podInfo    fwk.PodInfo
+	cycleState fwk.CycleState
 }
 
 func (pa *mockProposedAssignment) GetNodeName() string {
@@ -2446,7 +2447,15 @@ func (pa *mockProposedAssignment) GetNodeName() string {
 }
 
 func (pa *mockProposedAssignment) GetPod() *v1.Pod {
-	return pa.pod
+	return pa.podInfo.GetPod()
+}
+
+func (pa *mockProposedAssignment) GetPodInfo() fwk.PodInfo {
+	return pa.podInfo
+}
+
+func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
+	return pa.cycleState
 }
 
 func TestPreEnqueue(t *testing.T) {
@@ -2637,15 +2646,19 @@ func TestPreEnqueue(t *testing.T) {
 				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 					nodeInfo, _ := f.SnapshotSharedLister().NodeInfos().Get("node1")
 					if len(nodeInfo.GetPods()) == 0 {
+						triggerPodInfo, _ := framework.NewPodInfo(tt.podToTriggerPreemption)
+						checkPodInfo, _ := framework.NewPodInfo(tt.podToCheck)
 						return &fwk.PodGroupAssignments{
 							ProposedAssignments: []fwk.ProposedAssignment{
 								&mockProposedAssignment{
-									nodeName: "node1",
-									pod:      tt.podToTriggerPreemption,
+									podInfo:    triggerPodInfo,
+									nodeName:   "node1",
+									cycleState: framework.NewCycleState(),
 								},
 								&mockProposedAssignment{
-									nodeName: "node1",
-									pod:      tt.podToCheck,
+									podInfo:    checkPodInfo,
+									nodeName:   "node1",
+									cycleState: framework.NewCycleState(),
 								},
 							},
 						}, fwk.NewStatus(fwk.Success)
@@ -2865,7 +2878,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 
 			preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-				return nil, nil
+				return nil, fwk.NewStatus(fwk.Unschedulable)
 			}
 
 			pgInfo := &framework.PodGroupInfo{
@@ -2890,6 +2903,14 @@ type mockMutableSnapshotLister struct {
 	fwk.MutableSnapshotSharedLister
 	startMutationError error
 	endMutationError   error
+}
+
+func (m *mockMutableSnapshotLister) AddPod(podInfo fwk.PodInfo, nodeName string) error {
+	return nil
+}
+
+func (m *mockMutableSnapshotLister) RemovePod(logger klog.Logger, pod *v1.Pod, nodeName string) error {
+	return nil
 }
 
 func (m *mockMutableSnapshotLister) StartMutations() error {

@@ -675,8 +675,13 @@ type Placement struct {
 type ProposedAssignment interface {
 	// GetPod returns the pod that has the proposed node assignment.
 	GetPod() *v1.Pod
+	// GetPodInfo returns the PodInfo for the pod that has the proposed node assignment.
+	// It should be treated as immutable, read only data.
+	GetPodInfo() PodInfo
 	// GetNodeName returns the name of the proposed node for the pod.
 	GetNodeName() string
+	// GetCycleState returns the CycleState computed for this pod during pod group scheduling cycle.
+	GetCycleState() CycleState
 }
 
 // PodGroupAssignments holds the temporary assignments of pods in a pod group to nodes for a placement.
