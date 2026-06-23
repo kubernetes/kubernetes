@@ -20,9 +20,11 @@ import (
 	"context"
 	"time"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -47,7 +49,14 @@ func NewTestQueueWithObjects(
 	recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, ctx.Done())
 	// We set it before the options that users provide, so that users can override it.
 	opts = append([]Option{WithMetricsRecorder(recorder)}, opts...)
-	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
+	pq := NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
+	logger := klog.FromContext(ctx)
+	for _, obj := range objs {
+		if pg, ok := obj.(*schedulingv1alpha3.PodGroup); ok {
+			pq.AddPodGroup(logger, pg)
+		}
+	}
+	return pq
 }
 
 func NewTestQueueWithInformerFactory(

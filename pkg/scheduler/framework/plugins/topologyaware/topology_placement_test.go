@@ -231,6 +231,7 @@ func TestGeneratePlacements(t *testing.T) {
 			podGroupInfo := &framework.PodGroupInfo{
 				Name:      tt.podGroup.Name,
 				Namespace: tt.podGroup.Namespace,
+				PodGroup:  tt.podGroup,
 			}
 
 			result, status := pl.GeneratePlacements(tCtx, framework.NewCycleState(), podGroupInfo, placement)

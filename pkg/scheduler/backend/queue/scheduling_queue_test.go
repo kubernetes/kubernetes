@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,6 +51,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 const queueMetricMetadata = `
@@ -175,6 +177,13 @@ func TestPriorityQueue_Add(t *testing.T) {
 			}
 
 			objs := []runtime.Object{medPod, unschedPod, highPod}
+			if tt.usePodGroups {
+				objs = append(objs,
+					&schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg-med", Namespace: medPod.Namespace}, Spec: schedulingv1alpha3.PodGroupSpec{Priority: ptr.To(midPriority)}},
+					&schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg-unsched", Namespace: unschedPod.Namespace}, Spec: schedulingv1alpha3.PodGroupSpec{Priority: ptr.To(lowPriority)}},
+					&schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg-high", Namespace: highPod.Namespace}, Spec: schedulingv1alpha3.PodGroupSpec{Priority: ptr.To(highPriority)}},
+				)
+			}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 			q.Add(ctx, medPod)
 			q.Add(ctx, unschedPod)
@@ -1025,10 +1034,17 @@ func Test_InFlightPods(t *testing.T) {
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				obj := make([]runtime.Object, 0, len(test.initialPods))
+				obj := make([]runtime.Object, 0, len(test.initialPods)+1)
 				for _, p := range test.initialPods {
 					obj = append(obj, p)
 				}
+				pgGroup := &schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      pgName,
+						Namespace: pgPod1.Namespace,
+					},
+				}
+				obj = append(obj, pgGroup)
 				fakeClock := testingclock.NewFakeClock(time.Now())
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), obj, WithQueueingHintMapPerProfile(test.queueingHintMap), WithClock(fakeClock))
 				sortOpt := cmpopts.SortSlices(func(a, b string) bool { return a < b })
@@ -1411,12 +1427,12 @@ func TestPriorityQueue_Pop(t *testing.T) {
 
 			var medEntity, backoffEntity, errorBackoffEntity, unschedEntity framework.QueuedEntityInfo
 			if tt.usePodGroups {
-				medEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, medPod))
-				backoffPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, backoffPod, "plugin"))
+				medEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, medPod), nil)
+				backoffPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, backoffPod, "plugin"), nil)
 				backoffPodGroup.UnschedulablePlugins = sets.New("plugin")
 				backoffEntity = backoffPodGroup
-				errorBackoffEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, errorBackoffPod))
-				unschedPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, unschedPod, "plugin"))
+				errorBackoffEntity = q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, errorBackoffPod), nil)
+				unschedPodGroup := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(ctx, unschedPod, "plugin"), nil)
 				unschedPodGroup.UnschedulablePlugins = sets.New("plugin")
 				unschedEntity = unschedPodGroup
 			} else {
@@ -3850,9 +3866,15 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			if test.disableBackoff {
 				opts = append(opts, WithPodInitialBackoffDuration(0), WithPodMaxBackoffDuration(0))
 			}
-			q := NewTestQueue(tCtx, newDefaultQueueSort(), opts...)
-
-			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1))
+			pg := &schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pgName,
+					Namespace: "ns1",
+					UID:       "pg-uid",
+				},
+			}
+			q := NewTestQueueWithObjects(tCtx, newDefaultQueueSort(), []runtime.Object{pg}, opts...)
+			pgInfo := q.newQueuedPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1), pg)
 
 			test.setup(tCtx, q, pgInfo)
 
@@ -6130,7 +6152,13 @@ func TestAddPodGroupMember(t *testing.T) {
 					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
 				},
 			}
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: pgName, Namespace: "ns1"},
+				},
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap))
 
 			var initialPods []*v1.Pod
 			if tt.initialPod != nil {
@@ -6329,7 +6357,12 @@ func TestDeletePodGroupMember(t *testing.T) {
 					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
 				},
 			}
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-test", Namespace: "ns1"},
+				},
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 			// Add pending pods
@@ -6562,7 +6595,13 @@ func TestUpdatePodGroupMember(t *testing.T) {
 					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
 				},
 			}
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.newPod}, WithPreEnqueuePluginMap(preEnqueueMap))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-test", Namespace: "ns1"},
+				},
+				tt.newPod,
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 			// Add pending pods
@@ -6729,7 +6768,12 @@ func TestActivatePodGroupMember(t *testing.T) {
 					"preEnqueuePlugin": &preEnqueuePlugin{allowlists: []string{"allow"}},
 				},
 			}
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-test", Namespace: "ns1"},
+				},
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 			// Add pending pods
@@ -6913,7 +6957,13 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 				},
 			}
 
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithQueueingHintMapPerProfile(m))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-test", Namespace: "ns1"},
+				},
+			}
+
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap), WithQueueingHintMapPerProfile(m))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 
@@ -7036,7 +7086,12 @@ func TestFlushBackoffQCompletedPodGroupMember(t *testing.T) {
 			}
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithClock(fakeClock))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: pgName, Namespace: "ns1"},
+				},
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap), WithClock(fakeClock))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 
@@ -7138,7 +7193,12 @@ func TestFlushUnschedulableEntitiesLeftoverPodGroupMember(t *testing.T) {
 			}
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap), WithClock(fakeClock))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: pgName, Namespace: "ns1"},
+				},
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap), WithClock(fakeClock))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 
@@ -7310,7 +7370,12 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 				},
 			}
 
-			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqueueMap))
+			objs := []runtime.Object{
+				&schedulingv1alpha3.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-test", Namespace: "ns1"},
+				},
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithPreEnqueuePluginMap(preEnqueueMap))
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState)
 

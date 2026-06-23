@@ -50,6 +50,7 @@ type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
 	PodGroupStates() PodGroupStateLister
+	PodGroups() PodGroupLister
 }
 
 // PodGroupStateLister provides read access to pod group states.

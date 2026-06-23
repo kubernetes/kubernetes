@@ -628,8 +628,8 @@ func TestPodGroupQueueing(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2Large},
 				},
 				{
-					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsInUnschedulableEntities: []string{"p1", "p2"},
+					Name:                            "Verify pods are gated at PreEnqueue (no PodGroup object)",
+					WaitForPodsInIncompleteEntities: []string{"p1", "p2"},
 				},
 				{
 					Name:           "Create Gang Policy PodGroup with MinCount 1",

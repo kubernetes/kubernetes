@@ -77,7 +77,11 @@ func (p *pendingPodGroupMemberPods) getPod(pgInfoLookup framework.QueuedEntityIn
 // It returns the updated pod info if the pod was found, nil otherwise.
 func (p *pendingPodGroupMemberPods) update(pgInfoLookup framework.QueuedEntityInfo, newPod *v1.Pod) *framework.QueuedPodInfo {
 	pgKey := queuedEntityKeyFunc(pgInfoLookup)
-	for _, pInfo := range p.podGroupToPods[pgKey] {
+	pInfos, ok := p.podGroupToPods[pgKey]
+	if !ok {
+		return nil
+	}
+	for _, pInfo := range pInfos {
 		if pInfo.Pod.Name == newPod.Name && pInfo.Pod.Namespace == newPod.Namespace {
 			pInfo.Pod = newPod
 			return pInfo

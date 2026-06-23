@@ -187,8 +187,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsInUnschedulableEntities: []string{"p1", "p2", "p3"},
+					Name:                            "Verify pods are gated at PreEnqueue (no PodGroup object)",
+					WaitForPodsInIncompleteEntities: []string{"p1", "p2", "p3"},
 				},
 				{
 					Name:           "Create the PodGroup to unblock PreEnqueue",
@@ -352,8 +352,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
 				{
-					Name:                               "Verify pods are gated at PreEnqueue (no PodGroup object)",
-					WaitForPodsInUnschedulableEntities: []string{"p1", "p2", "p3"},
+					Name:                            "Verify pods are gated at PreEnqueue (no PodGroup object)",
+					WaitForPodsInIncompleteEntities: []string{"p1", "p2", "p3"},
 				},
 				{
 					Name:           "Create the PodGroup to unblock PreEnqueue",

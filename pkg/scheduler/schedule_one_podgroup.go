@@ -48,6 +48,16 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	logger = klog.LoggerWithValues(logger, "podGroup", klog.KObj(podGroupInfo))
 	ctx = klog.NewContext(ctx, logger)
 
+	podGroup, err := sched.Cache.GetPodGroup(podGroupInfo.Namespace, podGroupInfo.Name)
+	if err != nil {
+		// It can happen that the pod group was popped from the scheduling queue before it observed the PodGroup deletion.
+		// PodGroup should come back to the scheduling queue.
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to get PodGroup object from informer", "podGroup", klog.KObj(podGroupInfo))
+		// TODO: Handle failure
+		return
+	}
+	podGroupInfo.PodGroup = podGroup
+
 	schedFwk, err := sched.frameworkForPodGroup(podGroupInfo)
 	if err != nil {
 		for _, podInfo := range podGroupInfo.QueuedPodInfos {
@@ -226,9 +236,9 @@ func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk
 		return nil, fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled")
 	}
 
-	pg, err := schedFwk.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister().PodGroups(podGroupInfo.Namespace).Get(podGroupInfo.Name)
-	if err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", err))
+	pg := podGroupInfo.GetPodGroup()
+	if pg == nil {
+		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod group object: podgroup.scheduling.k8s.io %q not found", podGroupInfo.Name))
 	}
 	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints")
@@ -607,9 +617,8 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 
 	// If the PodGroup was already successfully scheduled, don't regress the
 	// condition back to False on a subsequent cycle for extra pods.
-	pg, err := sched.podGroupLister.PodGroups(podGroupInfo.Namespace).Get(podGroupInfo.Name)
-	if err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Failed to get PodGroup for status update", "podGroup", klog.KObj(podGroupInfo))
+	pg := podGroupInfo.PodGroup
+	if pg == nil {
 		return
 	}
 

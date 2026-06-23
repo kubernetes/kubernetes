@@ -50,7 +50,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
@@ -1030,7 +1029,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotBinding *v1.Binding
 		var gotNominatingInfo *fwk.NominatingInfo
 
-		var podGroupLister schedulinglisters.PodGroupLister
 		var clientObjs []runtime.Object
 		if scheduleAsPodGroup {
 			group := &v1.PodSchedulingGroup{
@@ -1073,7 +1071,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		internalCache := internalcache.New(ctx, apiDispatcher, scheduleAsPodGroup)
 
 		if scheduleAsPodGroup {
-			podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 			internalCache.AddPodGroupMember(item.sendPod)
 		}
 		cache := &fakecache.Cache{
@@ -1151,8 +1148,16 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			SchedulingQueue:                        queue,
 			Profiles:                               profile.Map{testSchedulerName: schedFramework},
 			APIDispatcher:                          apiDispatcher,
-			podGroupLister:                         podGroupLister,
 			nominatedNodeNameForExpectationEnabled: features.nominatedNodeNameForExpectationEnabled,
+		}
+		informerFactory.Start(ctx.Done())
+		informerFactory.WaitForCacheSync(ctx.Done())
+
+		if scheduleAsPodGroup {
+			testPG := &schedulingv1alpha3.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
+			}
+			queue.AddPodGroup(logger, testPG)
 		}
 		queue.Add(ctx, item.sendPod)
 
@@ -1177,8 +1182,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		informerFactory.Start(ctx.Done())
-		informerFactory.WaitForCacheSync(ctx.Done())
 		sched.nodeInfoSnapshot = internalcache.NewEmptySnapshot()
 		sched.ScheduleOne(ctx)
 

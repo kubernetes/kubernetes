@@ -148,6 +148,8 @@ type Step struct {
 	WaitForPodsInActiveQ []string
 	// WaitForPodsInUnschedulableEntities is use to wait for pods to be in unschedulableEntities.
 	WaitForPodsInUnschedulableEntities []string
+	// WaitForPodsInIncompleteEntities is use to wait for pods to be in incompleteEntities.
+	WaitForPodsInIncompleteEntities []string
 	// WaitForPodsUnschedulable is use to wait for pods to be unschedulable.
 	WaitForPodsUnschedulable []string
 	// WaitForPodsScheduled is use to wait for pods to be scheduled.
@@ -173,6 +175,16 @@ type Step struct {
 func podInUnschedulableEntities(queue queue.SchedulingQueue, podName string) bool {
 	unschedPods := queue.UnschedulablePods()
 	for _, pod := range unschedPods {
+		if pod.Name == podName {
+			return true
+		}
+	}
+	return false
+}
+
+func podInIncompleteEntities(queue queue.SchedulingQueue, podName string) bool {
+	incompletePods := queue.IncompleteEntitiesPods()
+	for _, pod := range incompletePods {
 		if pod.Name == podName {
 			return true
 		}
@@ -355,6 +367,20 @@ func waitForPodsInUnschedulableEntities(testCtx *testutils.TestContext, ns strin
 	return nil
 }
 
+func waitForPodsInIncompleteEntities(testCtx *testutils.TestContext, ns string, podNames []string) error {
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(_ context.Context) (bool, error) {
+				return podInIncompleteEntities(testCtx.Scheduler.SchedulingQueue, podName), nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s to be in incomplete entities: %w", podName, err)
+		}
+	}
+	return nil
+}
+
 func waitForPodsUnschedulable(testCtx *testutils.TestContext, ns string, podNames []string) error {
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
@@ -526,6 +552,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = waitForPodsInActiveQ(testCtx, step.WaitForPodsInActiveQ)
 		case step.WaitForPodsInUnschedulableEntities != nil:
 			err = waitForPodsInUnschedulableEntities(testCtx, ns, step.WaitForPodsInUnschedulableEntities)
+		case step.WaitForPodsInIncompleteEntities != nil:
+			err = waitForPodsInIncompleteEntities(testCtx, ns, step.WaitForPodsInIncompleteEntities)
 		case step.WaitForPodsUnschedulable != nil:
 			err = waitForPodsUnschedulable(testCtx, ns, step.WaitForPodsUnschedulable)
 		case step.WaitForPodsScheduled != nil:

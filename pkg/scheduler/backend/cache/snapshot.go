@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -61,6 +62,8 @@ type Snapshot struct {
 	assumedPods map[string]*v1.Pod
 	// podGroupStates maps a pod group key to a snapshot of its state, used during a pod group scheduling cycle.
 	podGroupStates map[podGroupKey]*podGroupStateSnapshot
+	// podGroups caches PodGroup API objects to provide a consistent view during a scheduling cycle.
+	podGroups map[podGroupKey]*schedulingv1alpha3.PodGroup
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
 	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
@@ -82,6 +85,7 @@ func NewEmptySnapshot() *Snapshot {
 		usedPVCSet:             sets.New[string](),
 		assumedPods:            make(map[string]*v1.Pod),
 		podGroupStates:         make(map[podGroupKey]*podGroupStateSnapshot),
+		podGroups:              make(map[podGroupKey]*schedulingv1alpha3.PodGroup),
 		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
 }
@@ -277,6 +281,26 @@ func (s *Snapshot) StorageInfos() fwk.StorageInfoLister {
 // PodGroupStates returns a PodGroupStateLister.
 func (s *Snapshot) PodGroupStates() fwk.PodGroupStateLister {
 	return &podGroupStateSnapshotLister{podGroupStates: s.podGroupStates}
+}
+
+// PodGroups returns a PodGroupLister.
+func (s *Snapshot) PodGroups() fwk.PodGroupLister {
+	return &podGroupSnapshotLister{podGroups: s.podGroups}
+}
+
+var _ fwk.PodGroupLister = &podGroupSnapshotLister{}
+
+type podGroupSnapshotLister struct {
+	podGroups map[podGroupKey]*schedulingv1alpha3.PodGroup
+}
+
+func (l *podGroupSnapshotLister) Get(namespace string, name string) (*schedulingv1alpha3.PodGroup, error) {
+	key := newPodGroupKey(namespace, name)
+	pg, ok := l.podGroups[key]
+	if !ok {
+		return nil, fmt.Errorf("pod group %q not found in snapshot", key)
+	}
+	return pg, nil
 }
 
 var _ fwk.PodGroupStateLister = &podGroupStateSnapshotLister{}

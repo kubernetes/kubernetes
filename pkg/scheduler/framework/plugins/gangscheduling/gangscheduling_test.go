@@ -390,6 +390,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to add podGroup %s to store: %v", wl.Name, err)
 				}
+				cache.AddPodGroup(wl)
 			}
 
 			for _, p := range tt.initialPods {
@@ -410,6 +411,10 @@ func TestGangSchedulingFlow(t *testing.T) {
 			if !gotPreEnqueueStatus.IsSuccess() {
 				// Pod is rejected.
 				return
+			}
+
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
 			// Simulate that other pods have already hit Permit and are now waiting.
@@ -454,6 +459,9 @@ func TestGangSchedulingFlow(t *testing.T) {
 				// Assume pod in the cache, as in a pod-by-pod scheduling cycle, where Permit reads from cache.
 				if err := cache.AssumePod(logger, pod); err != nil {
 					t.Fatalf("Failed to assume pod %q in cache: %v", pod.Name, err)
+				}
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Failed to update snapshot: %v", err)
 				}
 			}
 
@@ -713,10 +721,11 @@ func TestPlacementFeasible(t *testing.T) {
 			// Inject the mock lister
 			pl.snapshotLister = mockLister
 
-			pgInfo := &testPodGroupInfo{
-				namespace:       namespace,
-				name:            pgName,
-				unscheduledPods: tc.unscheduledPods,
+			pgInfo := &schedulerframework.PodGroupInfo{
+				Namespace:       namespace,
+				Name:            pgName,
+				UnscheduledPods: tc.unscheduledPods,
+				PodGroup:        pg,
 			}
 
 			cycleState := schedulerframework.NewCycleState()
@@ -735,13 +744,3 @@ func TestPlacementFeasible(t *testing.T) {
 		})
 	}
 }
-
-type testPodGroupInfo struct {
-	namespace       string
-	name            string
-	unscheduledPods []*v1.Pod
-}
-
-func (t *testPodGroupInfo) GetNamespace() string          { return t.namespace }
-func (t *testPodGroupInfo) GetName() string               { return t.name }
-func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod { return t.unscheduledPods }

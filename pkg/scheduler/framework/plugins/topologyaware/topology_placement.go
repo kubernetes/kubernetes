@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -37,8 +36,7 @@ const (
 
 // TopologyPlacement is a plugin that generates placements for a pod group based on its topology constraints.
 type TopologyPlacement struct {
-	handle         fwk.Handle
-	podGroupLister schedulinglisters.PodGroupLister
+	handle fwk.Handle
 }
 
 var _ fwk.PlacementGeneratePlugin = &TopologyPlacement{}
@@ -46,8 +44,7 @@ var _ fwk.PlacementGeneratePlugin = &TopologyPlacement{}
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (*TopologyPlacement, error) {
 	return &TopologyPlacement{
-		handle:         fh,
-		podGroupLister: fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
+		handle: fh,
 	}, nil
 }
 
@@ -59,10 +56,7 @@ func (pl *TopologyPlacement) Name() string {
 // GeneratePlacements generates placements for a pod group based on the topology constraints in the pod group spec.
 // It uses the parent placement to find the nodes that are available for placement.
 func (pl *TopologyPlacement) GeneratePlacements(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
-	podGroupResource, err := pl.podGroupLister.PodGroups(podGroup.GetNamespace()).Get(podGroup.GetName())
-	if err != nil {
-		return nil, fwk.AsStatus(err)
-	}
+	podGroupResource := podGroup.GetPodGroup()
 	topologyKey, ok := pl.getTopologyKey(podGroupResource)
 	if !ok {
 		// No topology constraints, return a single placement with no constraints.
