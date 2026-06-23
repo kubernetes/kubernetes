@@ -327,6 +327,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidWorkload()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -610,7 +613,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 
 	updateObj := mkValidWorkload(setResourceVersion("1"))
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.Options{StringentFinalizerValidation: true})
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidWorkload(tweaks ...func(obj *scheduling.Workload)) scheduling.Workload {

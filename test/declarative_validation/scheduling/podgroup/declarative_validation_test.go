@@ -302,6 +302,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidPodGroup()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -516,8 +519,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		})
 	}
 
-	updateObj := mkValidPodGroup(setResourceVersion("1"))
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.NewStrategy(), meta.Options{StringentFinalizerValidation: true})
+	updateObj := mkValidPodGroup()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.NewStrategy(), meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
