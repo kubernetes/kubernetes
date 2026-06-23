@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -38,6 +39,11 @@ func NewTestBitMask(sockets ...int) bitmask.BitMask {
 }
 
 func TestNewManager(t *testing.T) {
+	numaDistanceErr := "error getting NUMA distances from cadvisor"
+	if runtime.GOOS == "windows" {
+		numaDistanceErr = fmt.Sprintf("the %q policy option is not supported on Windows because NUMA node distances are not available", PreferClosestNUMANodes)
+	}
+
 	tcases := []struct {
 		description    string
 		policyName     string
@@ -97,7 +103,7 @@ func TestNewManager(t *testing.T) {
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
 			},
-			expectedError: fmt.Errorf("error getting NUMA distances from cadvisor"),
+			expectedError: fmt.Errorf("%s", numaDistanceErr),
 			topology: []cadvisorapi.Node{
 				{
 					Id: 0,
