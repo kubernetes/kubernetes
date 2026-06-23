@@ -27,7 +27,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
-func TestAuditEventTotalIsBeta(t *testing.T) {
+func TestAuditEventTotal(t *testing.T) {
 	eventCounter.Reset()
 	defer eventCounter.Reset()
 
@@ -44,7 +44,7 @@ func TestAuditEventTotalIsBeta(t *testing.T) {
 	}
 }
 
-func TestAuditErrorTotalIsBeta(t *testing.T) {
+func TestAuditErrorTotal(t *testing.T) {
 	errorCounter.Reset()
 	defer errorCounter.Reset()
 
@@ -61,7 +61,7 @@ func TestAuditErrorTotalIsBeta(t *testing.T) {
 	}
 }
 
-func TestAuditLevelTotalIsBeta(t *testing.T) {
+func TestAuditLevelTotal(t *testing.T) {
 	levelCounter.Reset()
 	defer levelCounter.Reset()
 
