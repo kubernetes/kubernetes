@@ -42,7 +42,7 @@ const (
 	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
 
 	// owner: @jefftree, @tchap
-	//
+	// kep:  http://kep.k8s.io/5366
 	// Make kube-controller-manager release leader election lock on exit.
 	ControllerManagerReleaseLeaderElectionLockOnExit featuregate.Feature = "ControllerManagerReleaseLeaderElectionLockOnExit"
 )
