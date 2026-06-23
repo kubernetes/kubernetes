@@ -141,5 +141,6 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	WatchListClient: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: Beta},
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: Beta},
 	},
 }
