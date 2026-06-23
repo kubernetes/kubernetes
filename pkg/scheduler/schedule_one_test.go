@@ -1398,6 +1398,91 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 	}
 }
 
+func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pod := st.MakePod().Name("foo").Namespace("ns").UID("pod-uid").Node("node1").SchedulerName(testSchedulerName).Obj()
+	pod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodScheduled,
+			Status: v1.ConditionTrue,
+		},
+		{
+			Type:   v1.PodResizePending,
+			Reason: v1.PodReasonDeferred,
+		},
+	}
+
+	client := clientsetfake.NewClientset(pod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+	sched := &Scheduler{
+		client:          client,
+		SchedulingQueue: queue,
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	queue.Add(ctx, pod)
+	popped, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop: %v", err)
+	}
+	poppedPod := popped.(*framework.QueuedPodInfo)
+
+	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+
+	// Assert queue status (pod should be added back to the scheduling queue)
+	if _, found := queue.GetPod(pod.Name, pod.Namespace, nil); !found {
+		t.Errorf("expected pod to be added back to the scheduling queue")
+	}
+
+	// Retrieve the pod from client to verify status updates
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert PodScheduled status condition remains True
+	var gotScheduledStatus v1.ConditionStatus
+	for _, cond := range updatedPod.Status.Conditions {
+		if cond.Type == v1.PodScheduled {
+			gotScheduledStatus = cond.Status
+		}
+	}
+	if gotScheduledStatus != v1.ConditionTrue {
+		t.Errorf("expected PodScheduled condition status to remain True, got %v", gotScheduledStatus)
+	}
+
+	// Assert NominatedNodeName remains empty
+	if updatedPod.Status.NominatedNodeName != "" {
+		t.Errorf("expected NominatedNodeName to remain empty, got %q", updatedPod.Status.NominatedNodeName)
+	}
+}
+
 type constSigPluginConfig struct {
 	name       string
 	signature  []fwk.SignFragment
