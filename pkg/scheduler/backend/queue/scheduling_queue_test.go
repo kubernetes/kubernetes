@@ -9451,3 +9451,64 @@ func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *sche
 		},
 	}
 }
+
+func TestPriorityQueue_DeferredPodGroupCompatibility(t *testing.T) {
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		expectIsGroupMember bool
+	}{
+		{
+			name: "deferred pod with scheduling group is queued individually",
+			pod: st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName("pg1").
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			expectIsGroupMember: false,
+		},
+		{
+			name:                "not-deferred pod with scheduling group is queued as group member",
+			pod:                 st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").PodGroupName("pg1").Obj(),
+			expectIsGroupMember: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueue(ctx, nil)
+			defer q.Close()
+
+			if tt.pod.Spec.SchedulingGroup != nil && tt.pod.Spec.SchedulingGroup.PodGroupName != nil {
+				pg := st.MakePodGroup().Name(*tt.pod.Spec.SchedulingGroup.PodGroupName).Namespace(tt.pod.Namespace).Obj()
+				q.AddPodGroup(logger, pg)
+			}
+
+			q.Add(ctx, tt.pod)
+
+			// Verify if the pod group was created/joined
+			pgLookup := newQueuedPodGroupInfoForLookup(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName, fwk.PodGroupKeyType)
+			hasGroup := q.activeQ.has(pgLookup)
+			if hasGroup != tt.expectIsGroupMember {
+				t.Errorf("Unexpected group enqueuing: got hasGroup=%v, want=%v", hasGroup, tt.expectIsGroupMember)
+			}
+
+			// Verify if the pod was enqueued individually
+			pInfo, _ := framework.NewPodInfo(tt.pod)
+			podLookup := &framework.QueuedPodInfo{PodInfo: pInfo}
+			hasIndividual := q.activeQ.has(podLookup)
+			if hasIndividual == tt.expectIsGroupMember {
+				t.Errorf("Unexpected individual enqueuing: got hasIndividual=%v, want=%v", hasIndividual, !tt.expectIsGroupMember)
+			}
+
+			// Verify it is not tracked in pending pod group pods
+			if q.pendingPodGroupPods.has(tt.pod) {
+				t.Errorf("Expected pod to not be in pendingPodGroupPods")
+			}
+		})
+	}
+}
