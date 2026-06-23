@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -42,6 +42,9 @@ const (
 	// enabled in the cluster.
 	ListAttribute
 )
+
+// maxNUMANodes is the upper bound for valid NUMA node IDs (Linux kernel maximum).
+const maxNUMANodes = 1024
 
 // GetNUMANodeAttributeByPCIBusID returns the numaNode attribute for a PCI
 // device, reading the physical NUMA node from sysfs numa_node.
@@ -96,6 +99,9 @@ func GetNUMANodeAttributeByPCIBusID(pciBusID string, attrForm AttributeForm, mod
 func GetNUMANodeAttribute(numaNode int, attrForm AttributeForm, mods ...MachineModifier) (DeviceAttribute, error) {
 	if numaNode < 0 {
 		return DeviceAttribute{}, fmt.Errorf("invalid NUMA node %d: do not publish the numaNode attribute for a device with no NUMA affinity", numaNode)
+	}
+	if numaNode >= maxNUMANodes {
+		return DeviceAttribute{}, fmt.Errorf("invalid NUMA node %d: exceeds maximum supported (%d)", numaNode, maxNUMANodes-1)
 	}
 
 	if attrForm == ScalarAttribute {
@@ -172,18 +178,20 @@ func makeNUMANodeListAttribute(mc machine, physicalNode int) DeviceAttribute {
 	}
 }
 
+func readSysfsInt(mc machine, path string) (int, error) {
+	data, err := fs.ReadFile(mc.sysfs, path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(data)))
+}
+
 func readNUMANode(mc machine, pciBusID string) (int, error) {
 	numaNodePath := filepath.Join("bus", "pci", "devices", pciBusID, "numa_node")
-	data, err := fs.ReadFile(mc.sysfs, numaNodePath)
+	node, err := readSysfsInt(mc, numaNodePath)
 	if err != nil {
 		return -1, fmt.Errorf("failed to read NUMA node for PCI Bus ID %s: %w", pciBusID, err)
 	}
-
-	node, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil {
-		return -1, fmt.Errorf("failed to parse NUMA node for PCI Bus ID %s: %w", pciBusID, err)
-	}
-
 	return node, nil
 }
 
@@ -260,7 +268,7 @@ func getEquidistantNUMANodes(mc machine, node int) ([]int, error) {
 		nodes = append(nodes, i)
 	}
 
-	sort.Ints(nodes)
+	slices.Sort(nodes)
 	return nodes, nil
 }
 
@@ -277,12 +285,7 @@ func getSocketForNUMANode(mc machine, node int) (int, bool) {
 	}
 
 	pkgPath := filepath.Join("devices", "system", "cpu", fmt.Sprintf("cpu%d", cpus[0]), "topology", "physical_package_id")
-	pkgData, err := fs.ReadFile(mc.sysfs, pkgPath)
-	if err != nil {
-		return -1, false
-	}
-
-	socketID, err := strconv.Atoi(strings.TrimSpace(string(pkgData)))
+	socketID, err := readSysfsInt(mc, pkgPath)
 	if err != nil {
 		return -1, false
 	}
