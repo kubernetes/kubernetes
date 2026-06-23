@@ -61,14 +61,15 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 
 	e.pvLister = pvInformer.Lister()
 	e.pvListerSynced = pvInformer.Informer().HasSynced
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := pvInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.pvAddedUpdated(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			e.pvAddedUpdated(logger, new)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return e
 }
