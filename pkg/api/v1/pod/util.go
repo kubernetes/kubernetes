@@ -396,6 +396,25 @@ func IsRestartableInitContainer(initContainer *v1.Container) bool {
 	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
 
+// VisitContainersWithResourceHealthStatus invokes the visitor for containers
+// whose allocated resource health can be reported in pod status.
+func VisitContainersWithResourceHealthStatus(podSpec *v1.PodSpec, visitor ContainerVisitor) bool {
+	for i := range podSpec.InitContainers {
+		if !IsRestartableInitContainer(&podSpec.InitContainers[i]) {
+			continue
+		}
+		if !visitor(&podSpec.InitContainers[i], InitContainers) {
+			return false
+		}
+	}
+	for i := range podSpec.Containers {
+		if !visitor(&podSpec.Containers[i], Containers) {
+			return false
+		}
+	}
+	return true
+}
+
 // IsContainerRestartable returns true if the container can be restarted. A container can be
 // restarted if it has a pod-level restart policy "Always" or "OnFailure" and not override by
 // container-level restart policy, or a container-level restart policy "Always" or "OnFailure",

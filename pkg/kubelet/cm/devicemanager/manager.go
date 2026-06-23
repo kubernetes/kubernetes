@@ -1169,8 +1169,27 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.Pod
 	// Today we ignore edge cases that are not likely to happen:
 	//  - update statuses for containers that are in spec, but not in status
 	//  - update statuses for resources requested in spec, but with no information in podDevices
-	for i, containerStatus := range status.ContainerStatuses {
-		devices := m.podDevices.getContainerDevices(string(pod.UID), containerStatus.Name)
+	containerNames := containersWithResourceHealthStatusNames(pod)
+	m.updateAllocatedResourcesStatus(string(pod.UID), status.InitContainerStatuses, containerNames.Has)
+	m.updateAllocatedResourcesStatus(string(pod.UID), status.ContainerStatuses, containerNames.Has)
+}
+
+func containersWithResourceHealthStatusNames(pod *v1.Pod) sets.Set[string] {
+	names := sets.New[string]()
+	podutil.VisitContainersWithResourceHealthStatus(&pod.Spec, func(container *v1.Container, _ podutil.ContainerType) bool {
+		names.Insert(container.Name)
+		return true
+	})
+	return names
+}
+
+func (m *ManagerImpl) updateAllocatedResourcesStatus(podUID string, containerStatuses []v1.ContainerStatus, shouldUpdate func(string) bool) {
+	for i := range containerStatuses {
+		containerStatus := &containerStatuses[i]
+		if !shouldUpdate(containerStatus.Name) {
+			continue
+		}
+		devices := m.podDevices.getContainerDevices(podUID, containerStatus.Name)
 
 		for resourceName, deviceInstances := range devices {
 			for id, d := range deviceInstances {
@@ -1205,22 +1224,22 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.Pod
 				})
 			}
 
-			if status.ContainerStatuses[i].AllocatedResourcesStatus == nil {
-				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
+			if containerStatus.AllocatedResourcesStatus == nil {
+				containerStatus.AllocatedResourcesStatus = []v1.ResourceStatus{}
 			}
 
 			// look up the resource status by name and update it
 			found := false
-			for j, rs := range status.ContainerStatuses[i].AllocatedResourcesStatus {
+			for j, rs := range containerStatus.AllocatedResourcesStatus {
 				if rs.Name == resourceStatus.Name {
-					status.ContainerStatuses[i].AllocatedResourcesStatus[j] = resourceStatus
+					containerStatus.AllocatedResourcesStatus[j] = resourceStatus
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, resourceStatus)
+				containerStatus.AllocatedResourcesStatus = append(containerStatus.AllocatedResourcesStatus, resourceStatus)
 			}
 		}
 	}

@@ -1174,6 +1174,36 @@ func TestIsContainerRestartable(t *testing.T) {
 	}
 }
 
+func TestVisitContainersWithResourceHealthStatus(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	podSpec := &v1.PodSpec{
+		InitContainers: []v1.Container{
+			{Name: "regular-init"},
+			{Name: "restartable-init", RestartPolicy: &restartAlways},
+		},
+		Containers: []v1.Container{
+			{Name: "app"},
+		},
+		EphemeralContainers: []v1.EphemeralContainer{
+			{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "ephemeral"}},
+		},
+	}
+
+	gotContainers := []string{}
+	completed := VisitContainersWithResourceHealthStatus(podSpec, func(c *v1.Container, _ ContainerType) bool {
+		gotContainers = append(gotContainers, c.Name)
+		return true
+	})
+	if !completed {
+		t.Fatalf("VisitContainersWithResourceHealthStatus() = false, want true")
+	}
+
+	wantContainers := []string{"restartable-init", "app"}
+	if !cmp.Equal(gotContainers, wantContainers) {
+		t.Errorf("VisitContainersWithResourceHealthStatus() visited %+v, want %+v", gotContainers, wantContainers)
+	}
+}
+
 func TestContainerHasRestartablePolicy(t *testing.T) {
 	var (
 		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways

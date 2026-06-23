@@ -2276,6 +2276,11 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	renamedClaimObject := "renamed-claim-object"
 	templateName := "template-name"
 	templatedClaimName := "pod-templated-templated-claim"
+	restartAlways := v1.ContainerRestartPolicyAlways
+	regularInitClaimObject := "regular-init-claim-object"
+	restartableInitClaimObject := "restartable-init-claim-object"
+	appClaimObject := "app-claim-object"
+	healthyDeviceMessage := "Device is operating normally"
 
 	testCases := []struct {
 		name                             string
@@ -2283,6 +2288,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 		claimInfos                       []*ClaimInfo
 		initialStatus                    *v1.PodStatus
 		expectedAllocatedResourcesStatus []v1.ResourceStatus
+		expectedInitResourcesStatus      []v1.ResourceStatus
 	}{
 		{
 			name: "Direct claim",
@@ -2438,6 +2444,107 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Restartable init container",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-restartable-init", UID: "pod-restartable-init-uid"},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "regular-init",
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{{Name: "regular-init-claim"}},
+							},
+						},
+						{
+							Name:          "restartable-init",
+							RestartPolicy: &restartAlways,
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{{Name: "restartable-init-claim"}},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{Name: "regular-init-claim", ResourceClaimName: &regularInitClaimObject},
+						{Name: "restartable-init-claim", ResourceClaimName: &restartableInitClaimObject},
+						{Name: "app-claim", ResourceClaimName: &appClaimObject},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							Resources: v1.ResourceRequirements{
+								Claims: []v1.ResourceClaim{{Name: "app-claim"}},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: "regular-init-claim", ResourceClaimName: &regularInitClaimObject},
+						{Name: "restartable-init-claim", ResourceClaimName: &restartableInitClaimObject},
+						{Name: "app-claim", ResourceClaimName: &appClaimObject},
+					},
+				},
+			},
+			claimInfos: []*ClaimInfo{
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: regularInitClaimObject,
+						PodUIDs:   sets.New("pod-restartable-init-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{
+								PoolName:   "pool",
+								DeviceName: "dev-regular-init",
+							}}},
+						},
+					},
+				},
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: restartableInitClaimObject,
+						PodUIDs:   sets.New("pod-restartable-init-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{
+								PoolName:   "pool",
+								DeviceName: "dev-restartable-init",
+							}}},
+						},
+					},
+				},
+				{
+					ClaimInfoState: state.ClaimInfoState{
+						ClaimName: appClaimObject,
+						PodUIDs:   sets.New("pod-restartable-init-uid"),
+						DriverState: map[string]state.DriverState{
+							"test-driver": {Devices: []state.Device{{
+								PoolName:   "pool",
+								DeviceName: "dev-app",
+							}}},
+						},
+					},
+				},
+			},
+			initialStatus: &v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{{Name: "regular-init"}, {Name: "restartable-init"}},
+				ContainerStatuses:     []v1.ContainerStatus{{Name: "container1"}},
+			},
+			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: "claim:app-claim",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-app", Health: v1.ResourceHealthStatusHealthy, Message: &healthyDeviceMessage},
+					},
+				},
+			},
+			expectedInitResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: "claim:restartable-init-claim",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "test-driver/pool/dev-restartable-init", Health: v1.ResourceHealthStatusHealthy, Message: &healthyDeviceMessage},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2474,6 +2581,11 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 
 			require.Len(t, status.ContainerStatuses, 1)
 			assert.Equal(t, tc.expectedAllocatedResourcesStatus, status.ContainerStatuses[0].AllocatedResourcesStatus)
+			if len(tc.expectedInitResourcesStatus) > 0 {
+				require.Len(t, status.InitContainerStatuses, 2)
+				assert.Empty(t, status.InitContainerStatuses[0].AllocatedResourcesStatus)
+				assert.Equal(t, tc.expectedInitResourcesStatus, status.InitContainerStatuses[1].AllocatedResourcesStatus)
+			}
 		})
 	}
 }

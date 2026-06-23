@@ -40,6 +40,7 @@ import (
 
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -807,18 +808,31 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 	logger := klog.FromContext(context.Background()).WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	enableHealthMessage := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatusMessage)
-	for i := range status.ContainerStatuses {
-		containerStatus := &status.ContainerStatuses[i]
-
-		// Find the corresponding container spec in the pod spec.
-		var containerSpec *v1.Container
-		for j := range pod.Spec.Containers {
-			if pod.Spec.Containers[j].Name == containerStatus.Name {
-				containerSpec = &pod.Spec.Containers[j]
-				break
-			}
+	containerSpecs := containerSpecsWithResourceHealthStatusByName(pod)
+	podClaimStatusMap := make(map[string]string, len(pod.Status.ResourceClaimStatuses))
+	for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
+		if podClaimStatus.ResourceClaimName != nil {
+			podClaimStatusMap[podClaimStatus.Name] = *podClaimStatus.ResourceClaimName
 		}
+	}
 
+	m.updateAllocatedResourcesStatus(logger, pod, status.InitContainerStatuses, containerSpecs, podClaimStatusMap, enableHealthMessage)
+	m.updateAllocatedResourcesStatus(logger, pod, status.ContainerStatuses, containerSpecs, podClaimStatusMap, enableHealthMessage)
+}
+
+func containerSpecsWithResourceHealthStatusByName(pod *v1.Pod) map[string]*v1.Container {
+	containerSpecs := make(map[string]*v1.Container, len(pod.Spec.Containers))
+	podutil.VisitContainersWithResourceHealthStatus(&pod.Spec, func(container *v1.Container, _ podutil.ContainerType) bool {
+		containerSpecs[container.Name] = container
+		return true
+	})
+	return containerSpecs
+}
+
+func (m *Manager) updateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, containerStatuses []v1.ContainerStatus, containerSpecs map[string]*v1.Container, podClaimStatusMap map[string]string, enableHealthMessage bool) {
+	for i := range containerStatuses {
+		containerStatus := &containerStatuses[i]
+		containerSpec := containerSpecs[containerStatus.Name]
 		// Skip if there's no matching container spec or it has no resource claims.
 		if containerSpec == nil || len(containerSpec.Resources.Claims) == 0 {
 			continue
@@ -828,14 +842,6 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 		if containerStatus.AllocatedResourcesStatus != nil {
 			for j := range containerStatus.AllocatedResourcesStatus {
 				resourceStatusMap[containerStatus.AllocatedResourcesStatus[j].Name] = &containerStatus.AllocatedResourcesStatus[j]
-			}
-		}
-
-		// Build a map of pod claim statuses for O(1) lookup
-		podClaimStatusMap := make(map[string]string, len(pod.Status.ResourceClaimStatuses))
-		for _, podClaimStatus := range pod.Status.ResourceClaimStatuses {
-			if podClaimStatus.ResourceClaimName != nil {
-				podClaimStatusMap[podClaimStatus.Name] = *podClaimStatus.ResourceClaimName
 			}
 		}
 
