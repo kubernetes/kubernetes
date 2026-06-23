@@ -260,9 +260,10 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
 type ResourceRequestsOptions struct {
-	EnablePodLevelResources           bool
-	EnableDRAExtendedResource         bool
-	EnableDRANodeAllocatableResources bool
+	EnablePodLevelResources                            bool
+	EnableDRAExtendedResource                          bool
+	EnableDRANodeAllocatableResources                  bool
+	EnableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 // shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
@@ -662,11 +663,12 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	}
 
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		EnablePodLevelResources:                            f.enablePodLevelResources,
+		EnableDRAExtendedResource:                          f.enableDRAExtendedResource,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: f.enableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts)
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts, pod)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -682,6 +684,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 
 		return fwk.NewStatus(statusCode, failureReasons...)
 	}
+
 	return nil
 }
 
@@ -701,10 +704,10 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts)
+	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, pod)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
@@ -725,7 +728,9 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		return insufficientResources
 	}
 
-	if podRequest.MilliCPU > 0 && podRequest.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
+	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasToAccomodateCacheDiscrepancy(opts, podRequest, nodeInfo, pod)
+
+	if podRequest.MilliCPU > 0 && deltaMilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceCPU,
 			Reason:       "Insufficient cpu",
@@ -735,7 +740,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 			Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
 		})
 	}
-	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
+	if podRequest.Memory > 0 && deltaMemory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceMemory,
 			Reason:       "Insufficient memory",
@@ -746,7 +751,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		})
 	}
 	if podRequest.EphemeralStorage > 0 &&
-		podRequest.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
+		deltaEphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceEphemeralStorage,
 			Reason:       "Insufficient ephemeral-storage",
@@ -757,7 +762,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		})
 	}
 
-	for rName, rQuant := range podRequest.ScalarResources {
+	for rName, rQuant := range deltaScalarResources {
 		// Skip in case request quantity is zero
 		if rQuant == 0 {
 			continue
@@ -778,7 +783,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		if shouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
 			continue
 		}
-		if rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName]) {
+		if podRequest.ScalarResources[rName] > 0 && rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName]-nodeInfo.GetRequested().GetScalarResources()[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				ResourceName: rName,
 				Reason:       fmt.Sprintf("Insufficient %v", rName),
@@ -791,6 +796,51 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 	}
 
 	return insufficientResources
+}
+
+// adjustDeltasToAccomodateCacheDiscrepancy calculates the resource requests to evaluate
+// for a pod. For an assigned pod, its desired resources are already accounted for in the
+// node cache (max(desired, allocated, actual)), so ideally we only check if the node is
+// overallocated. This function exists to amortize asynchronous discrepancies between the
+// pod info in the scheduling queue and the node snapshot cache.
+func adjustDeltasToAccomodateCacheDiscrepancy(opts ResourceRequestsOptions, podRequest *preFilterState, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
+	deltaMilliCPU := podRequest.MilliCPU
+	deltaMemory := podRequest.Memory
+	deltaEphemeralStorage := podRequest.EphemeralStorage
+	deltaScalarResources := podRequest.ScalarResources
+
+	if !opts.EnableInPlacePodVerticalScalingSchedulerPreemption || pod == nil || len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName != nodeInfo.Node().Name {
+		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+	}
+
+	var cachedPodInfo fwk.PodInfo
+	for _, pInfo := range nodeInfo.GetPods() {
+		if pInfo.GetPod().UID == pod.UID {
+			cachedPodInfo = pInfo
+			break
+		}
+	}
+	if cachedPodInfo == nil {
+		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+	}
+
+	cachedRes := cachedPodInfo.CalculateResource().Resource
+	// We take max(0, ...) to prevent negative deltas when podRequest < cachedRes (e.g., during scale-down
+	// or asynchronous cache lag). Allowing a negative delta would improperly reduce the node's requested
+	// usage before the Kubelet has actually freed the resources. If a stale larger cachedRes causes
+	// preemption to fail, eventual cache convergence will emit a scale-down event to wake up the pod.
+	deltaMilliCPU = max(0, podRequest.MilliCPU-cachedRes.GetMilliCPU())
+	deltaMemory = max(0, podRequest.Memory-cachedRes.GetMemory())
+	deltaEphemeralStorage = max(0, podRequest.EphemeralStorage-cachedRes.GetEphemeralStorage())
+
+	adjustedScalars := make(map[v1.ResourceName]int64)
+	cachedScalars := cachedRes.GetScalarResources()
+	for rName, rQuant := range podRequest.ScalarResources {
+		adjustedScalars[rName] = max(0, rQuant-cachedScalars[rName])
+	}
+	deltaScalarResources = adjustedScalars
+
+	return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
 }
 
 // Score invoked at the Score extension point.
