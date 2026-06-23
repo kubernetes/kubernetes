@@ -541,8 +541,8 @@ func TestNewNodeInfo(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:                   map[string]*fwk.ImageStateSummary{},
-		PVCRefCounts:                  map[string]int{},
+		ImageStates:  map[string]*fwk.ImageStateSummary{},
+		PVCRefCounts: map[string]int{},
 		Pods: []fwk.PodInfo{
 			&PodInfo{
 				Pod: &v1.Pod{
@@ -652,8 +652,8 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:                   map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:                  map[string]int{},
+				ImageStates:  map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts: map[string]int{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -742,8 +742,8 @@ func TestNodeInfoClone(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:                   map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:                  map[string]int{},
+				ImageStates:  map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts: map[string]int{},
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -824,24 +824,24 @@ func TestNodeInfoClone(t *testing.T) {
 		},
 		{
 			nodeInfo: &NodeInfo{
-				Requested:                     &Resource{},
-				NonZeroRequested:              &Resource{},
-				Allocatable:                   &Resource{},
-				Generation:                    3,
-				UsedPorts:                     fwk.HostPortInfo{},
-				ImageStates:                   map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:                  map[string]int{},
-				DeclaredFeatures:              declaredFeatureSet.Clone(),
+				Requested:        &Resource{},
+				NonZeroRequested: &Resource{},
+				Allocatable:      &Resource{},
+				Generation:       3,
+				UsedPorts:        fwk.HostPortInfo{},
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: declaredFeatureSet.Clone(),
 			},
 			expected: &NodeInfo{
-				Requested:                     &Resource{},
-				NonZeroRequested:              &Resource{},
-				Allocatable:                   &Resource{},
-				Generation:                    3,
-				UsedPorts:                     fwk.HostPortInfo{},
-				ImageStates:                   map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:                  map[string]int{},
-				DeclaredFeatures:              declaredFeatureSet,
+				Requested:        &Resource{},
+				NonZeroRequested: &Resource{},
+				Allocatable:      &Resource{},
+				Generation:       3,
+				UsedPorts:        fwk.HostPortInfo{},
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: declaredFeatureSet,
 			},
 		},
 		{
@@ -1040,9 +1040,9 @@ func TestNodeInfoAddPod(t *testing.T) {
 				{Protocol: "TCP", Port: 8080}: {},
 			},
 		},
-		ImageStates:                   map[string]*fwk.ImageStateSummary{},
-		PVCRefCounts:                  map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
-		DeclaredFeatures:              ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+		ImageStates:      map[string]*fwk.ImageStateSummary{},
+		PVCRefCounts:     map[string]int{"node_info_cache_test/pvc-1": 2, "node_info_cache_test/pvc-2": 1},
+		DeclaredFeatures: ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
 		Pods: []fwk.PodInfo{
 			&PodInfo{
 				Pod: &v1.Pod{
@@ -1291,9 +1291,9 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:                   map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:                  map[string]int{"node_info_cache_test/pvc-1": 1},
-				DeclaredFeatures:              ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{"node_info_cache_test/pvc-1": 1},
+				DeclaredFeatures: ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -1458,9 +1458,9 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},
-				ImageStates:                   map[string]*fwk.ImageStateSummary{},
-				PVCRefCounts:                  map[string]int{},
-				DeclaredFeatures:              ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
+				ImageStates:      map[string]*fwk.ImageStateSummary{},
+				PVCRefCounts:     map[string]int{},
+				DeclaredFeatures: ndf.DefaultFramework.NewFeatureSet(), // Empty FeatureSet.
 				Pods: []fwk.PodInfo{
 					&PodInfo{
 						Pod: &v1.Pod{
@@ -3368,4 +3368,3 @@ func TestNewPodInfo(t *testing.T) {
 		})
 	}
 }
-

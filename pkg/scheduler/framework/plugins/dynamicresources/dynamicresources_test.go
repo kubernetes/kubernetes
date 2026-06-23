@@ -3566,10 +3566,25 @@ func testPlugin(tCtx ktesting.TContext) {
 		},
 		"node-allocatable-overhead-only-sharing-allowed": {
 			enableDRANodeAllocatableResources: true,
-			nodes:                             []*v1.Node{workerNode},
+			nodes:                             []*v1.Node{workerNodeWithCapacity},
 			pod:                               podWithClaimReferenceInContainer,
-			claims:                            []*resourceapi.ResourceClaim{allocatedClaim},
-			classes:                           []*resourceapi.DeviceClass{deviceClass},
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: claimName,
+						Containers:        []string{"c1"},
+						Overhead: []v1.NodeAllocatableOverheadResources{
+							{
+								Name:   v1.ResourceMemory,
+								PerPod: ptr.To(apiresource.MustParse("100")),
+							},
+						},
+					},
+				}
+			},
+			claims:  []*resourceapi.ResourceClaim{allocatedClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("other-pod").Namespace("default").
 					Node(nodeName).
@@ -3596,7 +3611,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			}(),
 			want: want{
 				filter: perNodeResult{
-					workerNode.Name: {status: nil},
+					workerNodeWithCapacity.Name: {status: nil},
 				},
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimReferenceInContainer)),
@@ -3608,6 +3623,157 @@ func testPlugin(tCtx ktesting.TContext) {
 								claim = addAllocationTimestamp(claim)
 							}
 							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+									{
+										ResourceClaimName: claimName,
+										Containers:        []string{"c1"},
+										Overhead: []v1.NodeAllocatableOverheadResources{
+											{
+												Name:   v1.ResourceMemory,
+												PerPod: ptr.To(apiresource.MustParse("100")),
+											},
+										},
+									},
+								}
+								return p
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-unreferenced-claim-direct-mapped": {
+			enableDRANodeAllocatableResources: true,
+			nodes:                             []*v1.Node{workerNodeWithCapacity},
+			pod:                               podWithClaimName, // claim not referenced in any container
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: claimName,
+						Containers:        []string{},
+						Direct: []v1.NodeAllocatableDirectResources{
+							{
+								Name:     v1.ResourceCPU,
+								Quantity: apiresource.MustParse("1"),
+							},
+						},
+					},
+				}
+			},
+			claims:  []*resourceapi.ResourceClaim{allocatedClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceCPU: {Direct: &resourceapi.NodeAllocatableDirectMapping{AllocationMultiplier: ptr.To(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimName}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {status: nil},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+									{
+										ResourceClaimName: claimName,
+										Containers:        []string{},
+										Direct: []v1.NodeAllocatableDirectResources{
+											{
+												Name:     v1.ResourceCPU,
+												Quantity: apiresource.MustParse("1"),
+											},
+										},
+									},
+								}
+								return p
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-unreferenced-claim-overhead": {
+			enableDRANodeAllocatableResources: true,
+			nodes:                             []*v1.Node{workerNodeWithCapacity},
+			pod:                               podWithClaimName, // claim not referenced in any container
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = tc.pod.DeepCopy()
+				tc.pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: claimName,
+						Containers:        []string{},
+						Overhead: []v1.NodeAllocatableOverheadResources{
+							{
+								Name:   v1.ResourceMemory,
+								PerPod: ptr.To(apiresource.MustParse("1Gi")),
+							},
+						},
+					},
+				}
+			},
+			claims:  []*resourceapi.ResourceClaim{allocatedClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {Overhead: &resourceapi.NodeAllocatableOverhead{PerPod: apiresource.NewQuantity(1024*1024*1024, apiresource.BinarySI)}}, // 1Gi
+				}
+				return []apiruntime.Object{slice, podWithClaimName}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {status: nil},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								p := pod.DeepCopy()
+								p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+									{
+										ResourceClaimName: claimName,
+										Containers:        []string{},
+										Overhead: []v1.NodeAllocatableOverheadResources{
+											{
+												Name:   v1.ResourceMemory,
+												PerPod: ptr.To(apiresource.MustParse("1Gi")),
+											},
+										},
+									},
+								}
+								return p
+							}
+							return pod
 						},
 					},
 				},

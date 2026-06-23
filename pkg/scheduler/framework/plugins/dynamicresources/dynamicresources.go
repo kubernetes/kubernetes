@@ -459,7 +459,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	// anything for it. We just initialize an empty state to record that
 	// observation for the other functions. This gets updated below
 	// if we get that far.
-	s := &stateData{}
+	s := &stateData{
+		nodeAllocations: make(map[string]nodeAllocation),
+	}
 	state.Write(stateKey, s)
 
 	podGroupState, err := getPodGroupStateData(state)
@@ -686,7 +688,6 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
-		s.nodeAllocations = make(map[string]nodeAllocation)
 	}
 	s.claims = claims
 	return nil, nil
@@ -840,6 +841,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
 	var nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
+	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -869,6 +871,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			if state.informationsForClaim[index].allocation != nil {
 				pendingResult = append(pendingResult, *state.informationsForClaim[index].allocation)
+				allocationsMap[claim.UID] = state.informationsForClaim[index].allocation
 				continue
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
@@ -907,27 +910,26 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		}
 
-		if pl.fts.EnableDRANodeAllocatableResources {
-			allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
-			for i, claim := range claimsToAllocate {
-				allocationsMap[claim.UID] = &allocationResult[i]
-			}
-			for i, claim := range state.claims.toAllocate() {
-				if state.informationsForClaim[i].allocation != nil {
-					allocationsMap[claim.UID] = state.informationsForClaim[i].allocation
-				}
-			}
-			nodeAllocatableClaimStatus, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
-			if status != nil {
-				return status
-			}
-		}
 		// Reserve uses this information.
 		allocations = append(allocationResult, pendingResult...)
+
+		// allocations contains allocationResult followed by pendingResult.
+		// The first len(claimsToAllocate) elements match claimsToAllocate.
+		for i, claim := range claimsToAllocate {
+			allocationsMap[claim.UID] = &allocations[i]
+		}
+	}
+
+	if pl.fts.EnableDRANodeAllocatableResources {
+		var status *fwk.Status
+		nodeAllocatableClaimStatus, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
+		if status != nil {
+			return status
+		}
 	}
 
 	// Store information in state while holding the mutex.
-	if state.allocator != nil || len(unavailableClaims) > 0 {
+	if state.allocator != nil || len(unavailableClaims) > 0 || len(nodeAllocatableClaimStatus) > 0 {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
 	}
@@ -946,7 +948,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
-	if state.allocator != nil {
+	if state.allocator != nil || len(nodeAllocatableClaimStatus) > 0 {
 		state.nodeAllocations[node.Name] = nodeAllocation{
 			allocationResults:                    allocations,
 			extendedResourceClaim:                nodeExtendedResourceClaim,

@@ -68,7 +68,11 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 	nodeAllocatableClaimUIDs := sets.New[types.UID]()
 
 	for _, claim := range state.claims.all() {
-		if alloc, ok := allocations[claim.UID]; ok {
+		alloc := claim.Status.Allocation
+		if a, ok := allocations[claim.UID]; ok {
+			alloc = a
+		}
+		if alloc != nil {
 			for _, result := range alloc.Devices.Results {
 				device, err := getDeviceFromManager(pl.draManager, result.Pool, result.Device)
 				if err != nil {
@@ -294,11 +298,18 @@ func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, 
 		if scheduledPod.Namespace != pod.Namespace {
 			continue
 		}
-		// We only need to check ResourceClaimName here. Claims created from templates
-		// (ResourceClaimTemplateName) are owned and uniquely generated for a single pod,
-		// meaning they are private by design and can never be shared across pods.
+		// Check claims directly referenced by name in the scheduled pod's spec.
+		// We ignore ResourceClaimTemplateName here because template names in the spec
+		// are not concrete claim names.
 		for _, podClaim := range scheduledPod.Spec.ResourceClaims {
 			if podClaim.ResourceClaimName != nil && *podClaim.ResourceClaimName == claimName {
+				// Conflict! The claim is already used by another pod on this node.
+				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s is already used by another pod", claimName))
+			}
+		}
+		// Check claims that were dynamically generated from templates for the scheduled pod.
+		for _, claimStatus := range scheduledPod.Status.ResourceClaimStatuses {
+			if claimStatus.ResourceClaimName != nil && *claimStatus.ResourceClaimName == claimName {
 				// Conflict! The claim is already used by another pod on this node.
 				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s is already used by another pod", claimName))
 			}
@@ -310,7 +321,7 @@ func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, 
 
 // validatePodLevelRequestsCoverDRA checks if the pod-level requests, if specified, are sufficient to cover
 // the container level and DRA claim requests.
-func (pl *DynamicResources) validatePodLevelRequestsCoverDRA(logger klog.Logger, pod *v1.Pod, requestWithPodLevel v1.ResourceList) *fwk.Status {
+func (pl *DynamicResources) validatePodLevelRequestsCoverDRA(logger klog.Logger, pod *v1.Pod) *fwk.Status {
 	if !pl.fts.EnablePodLevelResources || pod.Spec.Resources == nil || pod.Spec.Resources.Requests == nil {
 		return nil
 	}
@@ -322,8 +333,11 @@ func (pl *DynamicResources) validatePodLevelRequestsCoverDRA(logger klog.Logger,
 	}
 	requestWithoutPodLevel := resourcehelper.PodRequests(pod, optsSum)
 
-	// For resources specified at pod level, check if container and DRA aggregates does not exceed pod level budget.
-	for resName, podLevelReq := range requestWithPodLevel {
+	// For resources specified at pod level, check if container and DRA aggregates do not exceed pod level budget.
+	for resName, podLevelReq := range pod.Spec.Resources.Requests {
+		if !resourcehelper.IsSupportedPodLevelResource(resName) {
+			continue
+		}
 		val, ok := requestWithoutPodLevel[resName]
 		if !ok {
 			continue
@@ -365,14 +379,6 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 		return nil, nil, statusError(logger, err)
 	}
 
-	for _, status := range nodeAllocatableStatus {
-		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
-		// This is pending on defining kubelet cgroup enforcement.
-		if len(status.Containers) == 0 {
-			return nil, nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("claim %s: node-allocatable resource claim not referenced by any container within the pod", status.ResourceClaimName))
-		}
-	}
-
 	// Calculate the final totalPodDemand to be used for node fitting
 	optsTotal := resourcehelper.PodResourcesOptions{
 		SkipPodLevelResources:                    !pl.fts.EnablePodLevelResources,
@@ -385,7 +391,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 	// Validate that pod-level requests, if specified, cover the aggregated container + DRA requests.
 	// The API validation in pkg/apis/core/validation/validation.go only checks pod.Spec.Resources against container
 	// requests within the Spec. It cannot account for DRA-derived resources, which are determined after device allocation.
-	if status := pl.validatePodLevelRequestsCoverDRA(logger, podCopy, totalPodDemandRes); status != nil {
+	if status := pl.validatePodLevelRequestsCoverDRA(logger, podCopy); status != nil {
 		return nil, nil, status
 	}
 

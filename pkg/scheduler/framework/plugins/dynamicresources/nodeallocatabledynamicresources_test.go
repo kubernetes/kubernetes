@@ -314,6 +314,35 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 			},
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
+		{
+			name:  "direct mapped claim, shared (other pod using it via template)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimDirect,
+			nodeInfo: func() *framework.NodeInfo {
+				ni := framework.NewNodeInfo()
+				otherPod := st.MakePod().Name("other-pod").Namespace(claimNameSpace).UID("other-pod-uid").Obj()
+				otherPod.Spec.ResourceClaims = []v1.PodResourceClaim{
+					{
+						Name:                      "my-claim-ref",
+						ResourceClaimTemplateName: ptr.To("some-template"),
+					},
+				}
+				otherPod.Status = v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{
+							Name:              "my-claim-ref",
+							ResourceClaimName: ptr.To(claimName),
+						},
+					},
+				}
+				ni.AddPod(otherPod)
+				return ni
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceDirect},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim is already used by another pod"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -696,6 +725,70 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 				Direct: []v1.NodeAllocatableDirectResources{{
 					Name:     v1.ResourceCPU,
 					Quantity: resource.MustParse("4"),
+				}},
+			}},
+		},
+		{
+			name: "Unreferenced Claims with Overhead",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{Name: "c1"}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("unref-claim", "unref-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       ptr.To(resource.MustParse("1Gi")),
+								PerContainer: ptr.To(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "unref-claim",
+				Containers:        []string{},
+				Direct:            []v1.NodeAllocatableDirectResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       ptr.To(resource.MustParse("1Gi")),
+					PerContainer: ptr.To(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Unreferenced Claims with Overhead Per Container Only",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{Name: "c1"}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("unref-claim", "unref-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerContainer: ptr.To(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "unref-claim",
+				Containers:        []string{},
+				Direct:            []v1.NodeAllocatableDirectResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: ptr.To(resource.MustParse("500Mi")),
 				}},
 			}},
 		},
@@ -1314,9 +1407,9 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 		name                  string
 		pod                   *v1.Pod
 		nodeAllocatableStatus []v1.NodeAllocatableResourceClaimStatus
-		requestWithPodLevel   v1.ResourceList
-		wantStatusCode        fwk.Code
-		wantErrorMessage      string
+
+		wantStatusCode   fwk.Code
+		wantErrorMessage string
 	}{
 		{
 			name: "PodLevelResources enabled, no pod resources set",
@@ -1341,8 +1434,7 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: resource.MustParse("512Mi"),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{},
-			wantStatusCode:      fwk.Success,
+			wantStatusCode: fwk.Success,
 		},
 		{
 			name: "PodLevel resources sufficient",
@@ -1373,10 +1465,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: resource.MustParse("512Mi"),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1408,10 +1496,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: resource.MustParse("512Mi"),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for cpu is insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1444,10 +1528,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: resource.MustParse("100Mi"),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("1Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1489,10 +1569,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					Quantity: resource.MustParse("1Gi"),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4"),
-				v1.ResourceMemory: resource.MustParse("3Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1524,10 +1600,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					PerContainer: ptr.To(resource.MustParse("1Gi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("3Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1559,10 +1631,6 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 					PerContainer: ptr.To(resource.MustParse("1Gi")),
 				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for memory is insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1574,7 +1642,7 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				fts: feature.Features{EnablePodLevelResources: true},
 			}
 			tt.pod.Status.NodeAllocatableResourceClaimStatuses = tt.nodeAllocatableStatus
-			gotStatus := pl.validatePodLevelRequestsCoverDRA(klog.TODO(), tt.pod, tt.requestWithPodLevel)
+			gotStatus := pl.validatePodLevelRequestsCoverDRA(klog.TODO(), tt.pod)
 			if diff := cmp.Diff(tt.wantStatusCode, gotStatus.Code()); diff != "" {
 				t.Errorf("validatePodLevelRequestsCoverDRA() returned diff (-want +got):\n%s", diff)
 			}

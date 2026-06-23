@@ -664,6 +664,18 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 		Obj()
 	pod = createPod(tCtx, env.namespace, "", pod, claim)
 
-	expectedErrorMsg := "node-allocatable resource claim not referenced by any container within the pod"
-	expectPodUnschedulable(tCtx, pod, expectedErrorMsg)
+	// Verify that a pod specifying a node-allocatable resource claim in its spec,
+	// but not referencing it in any container, can still be scheduled successfully,
+	// and that the pod status correctly lists the allocated claim with an empty container list.
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+
+	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: claimName,
+		Containers:        nil,
+		Direct: []v1.NodeAllocatableDirectResources{{
+			Name:     v1.ResourceCPU,
+			Quantity: resource.MustParse(nodeCPUCapacity),
+		}},
+	}}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
