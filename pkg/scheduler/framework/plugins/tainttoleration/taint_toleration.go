@@ -22,9 +22,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-helpers/resource"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -37,6 +40,7 @@ type TaintToleration struct {
 	enableTaintTolerationComparisonOperators bool
 }
 
+var _ fwk.PreFilterPlugin = &TaintToleration{}
 var _ fwk.FilterPlugin = &TaintToleration{}
 var _ fwk.PreScorePlugin = &TaintToleration{}
 var _ fwk.ScorePlugin = &TaintToleration{}
@@ -96,6 +100,19 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 
 	logger.V(5).Info("node was created or updated, but it doesn't change the TaintToleration plugin's decision", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return fwk.QueueSkip, nil
+}
+
+// PreFilter invoked at the prefilter extension point.
+func (pl *TaintToleration) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
+	return nil, nil
+}
+
+// PreFilterExtensions do not exist for this plugin.
+func (pl *TaintToleration) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
