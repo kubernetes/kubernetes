@@ -91,43 +91,35 @@ func ForbiddenMap[K comparable, T any](_ context.Context, _ operation.Operation,
 	return field.ErrorList{field.Forbidden(fldPath, "")}
 }
 
-// OptionalValue verifies that the specified value is not the zero-value for
-// its type. This is identical to RequiredValue, but the caller should treat an
-// error here as an indication that the optional value was not specified.
-func OptionalValue[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+// OptionalValue reports whether the specified value is non-zero (i.e. present).
+// Returns true if the value is set, false if it is the zero value for its type.
+// The generated code uses this to skip further validation when an optional field
+// is absent; a false return is not an error.
+func OptionalValue[T comparable](_ context.Context, _ operation.Operation, _ *field.Path, value, _ *T) bool {
 	var zero T
-	if *value != zero {
-		return nil
-	}
-	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
+	return *value != zero
 }
 
-// OptionalPointer verifies that the specified pointer is not nil. This is
-// identical to RequiredPointer, but the caller should treat an error here as an
-// indication that the optional value was not specified.
-func OptionalPointer[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
-	if value != nil {
-		return nil
-	}
-	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
+// OptionalPointer reports whether the specified pointer is non-nil (i.e. present).
+// Returns true if the pointer is set, false if it is nil.
+// The generated code uses this to skip further validation when an optional field
+// is absent; a false return is not an error.
+func OptionalPointer[T any](_ context.Context, _ operation.Operation, _ *field.Path, value, _ *T) bool {
+	return value != nil
 }
 
-// OptionalSlice verifies that the specified slice is not empty. This is
-// identical to RequiredSlice, but the caller should treat an error here as an
-// indication that the optional value was not specified.
-func OptionalSlice[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T) field.ErrorList {
-	if len(value) > 0 {
-		return nil
-	}
-	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
+// OptionalSlice reports whether the specified slice is non-empty (i.e. present).
+// Returns true if the slice has at least one element, false if it is nil or empty.
+// The generated code uses this to skip further validation when an optional field
+// is absent; a false return is not an error.
+func OptionalSlice[T any](_ context.Context, _ operation.Operation, _ *field.Path, value, _ []T) bool {
+	return len(value) > 0
 }
 
-// OptionalMap verifies that the specified map is not empty. This is identical
-// to RequiredMap, but the caller should treat an error here as an indication that
-// the optional value was not specified.
-func OptionalMap[K comparable, T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
-	if len(value) > 0 {
-		return nil
-	}
-	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
+// OptionalMap reports whether the specified map is non-empty (i.e. present).
+// Returns true if the map has at least one entry, false if it is nil or empty.
+// The generated code uses this to skip further validation when an optional field
+// is absent; a false return is not an error.
+func OptionalMap[K comparable, T any](_ context.Context, _ operation.Operation, _ *field.Path, value, _ map[K]T) bool {
+	return len(value) > 0
 }

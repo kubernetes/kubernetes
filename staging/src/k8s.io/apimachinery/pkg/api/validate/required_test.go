@@ -327,302 +327,321 @@ func TestRequiredMap(t *testing.T) {
 
 func TestOptionalValue(t *testing.T) {
 	cases := []struct {
-		fn  func(op operation.Operation, fp *field.Path) field.ErrorList
-		err string // regex
-	}{{
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := "value"
-			return OptionalValue(context.Background(), op, fp, &value, nil)
+		name    string
+		present bool
+		fn       func(op operation.Operation, fp *field.Path) bool
+	}{
+		{
+			name:    "non-zero string",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := "value"
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "zero string",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := "" // zero-value
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "non-zero int",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := 123
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "zero int",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := 0 // zero-value
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "true bool",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := true
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "false bool (zero)",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := false // zero-value
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "non-zero struct",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := struct{ S string }{"value"}
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "zero struct",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := struct{ S string }{} // zero-value
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "non-nil pointer (zero pointee)",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := ptr.To("")
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "nil pointer (zero value)",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := (*string)(nil) // zero-value
+				return OptionalValue(context.Background(), op, fp, &value, nil)
+			},
 		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := "" // zero-value
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := 123
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := 0 // zero-value
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := true
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := false // zero-value
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := struct{ S string }{"value"}
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := struct{ S string }{} // zero-value
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := ptr.To("")
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := (*string)(nil) // zero-value
-			return OptionalValue(context.Background(), op, fp, &value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}}
+	}
 
-	for i, tc := range cases {
-		result := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
-		if len(result) > 0 && tc.err == "" {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err != "" {
-			t.Errorf("case %d: unexpected success: expected %q", i, tc.err)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
+			if got != tc.present {
+				t.Errorf("expected present=%v, got %v", tc.present, got)
 			}
-			if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
-				t.Errorf("case %d: wrong error\nexpected: %q\n     got: %v", i, tc.err, fmtErrs(result))
-			}
-		}
+		})
 	}
 }
+
 
 func TestOptionalPointer(t *testing.T) {
 	cases := []struct {
-		fn  func(op operation.Operation, fp *field.Path) field.ErrorList
-		err string // regex
-	}{{
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := ""
-			return OptionalPointer(context.Background(), op, fp, &value, nil)
+		name    string
+		present bool
+		fn       func(op operation.Operation, fp *field.Path) bool
+	}{
+		{
+			name:    "non-nil string pointer",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := ""
+				return OptionalPointer(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "nil string pointer",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				pointer := (*string)(nil)
+				return OptionalPointer(context.Background(), op, fp, pointer, nil)
+			},
+		}, {
+			name:    "non-nil int pointer",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := 0
+				return OptionalPointer(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "nil int pointer",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				pointer := (*int)(nil)
+				return OptionalPointer(context.Background(), op, fp, pointer, nil)
+			},
+		}, {
+			name:    "non-nil bool pointer",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := false
+				return OptionalPointer(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "nil bool pointer",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				pointer := (*bool)(nil)
+				return OptionalPointer(context.Background(), op, fp, pointer, nil)
+			},
+		}, {
+			name:    "non-nil struct pointer",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := struct{ S string }{}
+				return OptionalPointer(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "nil struct pointer",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				pointer := (*struct{ S string })(nil)
+				return OptionalPointer(context.Background(), op, fp, pointer, nil)
+			},
+		}, {
+			name:    "non-nil pointer-to-pointer",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := (*string)(nil)
+				return OptionalPointer(context.Background(), op, fp, &value, nil)
+			},
+		}, {
+			name:    "nil pointer-to-pointer",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				pointer := (**string)(nil)
+				return OptionalPointer(context.Background(), op, fp, pointer, nil)
+			},
 		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			pointer := (*string)(nil)
-			return OptionalPointer(context.Background(), op, fp, pointer, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := 0
-			return OptionalPointer(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			pointer := (*int)(nil)
-			return OptionalPointer(context.Background(), op, fp, pointer, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := false
-			return OptionalPointer(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			pointer := (*bool)(nil)
-			return OptionalPointer(context.Background(), op, fp, pointer, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := struct{ S string }{}
-			return OptionalPointer(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			pointer := (*struct{ S string })(nil)
-			return OptionalPointer(context.Background(), op, fp, pointer, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := (*string)(nil)
-			return OptionalPointer(context.Background(), op, fp, &value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			pointer := (**string)(nil)
-			return OptionalPointer(context.Background(), op, fp, pointer, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}}
+	}
 
-	for i, tc := range cases {
-		result := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
-		if len(result) > 0 && tc.err == "" {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err != "" {
-			t.Errorf("case %d: unexpected success: expected %q", i, tc.err)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
+			if got != tc.present {
+				t.Errorf("expected present=%v, got %v", tc.present, got)
 			}
-			if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
-				t.Errorf("case %d: wrong error\nexpected: %q\n     got: %v", i, tc.err, fmtErrs(result))
-			}
-		}
+		})
 	}
 }
+
 
 func TestOptionalSlice(t *testing.T) {
 	cases := []struct {
-		fn  func(op operation.Operation, fp *field.Path) field.ErrorList
-		err string // regex
-	}{{
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []string{""}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
+		name    string
+		present bool
+		fn       func(op operation.Operation, fp *field.Path) bool
+	}{
+		{
+			name:    "non-empty string slice",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []string{""}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty string slice",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []string{}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "non-empty int slice",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []int{0}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty int slice",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []int{}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "non-empty bool slice",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []bool{false}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty bool slice",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []bool{}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "non-empty pointer slice",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []*string{nil}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty pointer slice",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := []*string{}
+				return OptionalSlice(context.Background(), op, fp, value, nil)
+			},
 		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []string{}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []int{0}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []int{}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []bool{false}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []bool{}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []*string{nil}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := []*string{}
-			return OptionalSlice(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}}
+	}
 
-	for i, tc := range cases {
-		result := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
-		if len(result) > 0 && tc.err == "" {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err != "" {
-			t.Errorf("case %d: unexpected success: expected %q", i, tc.err)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
+			if got != tc.present {
+				t.Errorf("expected present=%v, got %v", tc.present, got)
 			}
-			if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
-				t.Errorf("case %d: wrong error\nexpected: %q\n     got: %v", i, tc.err, fmtErrs(result))
-			}
-		}
+		})
 	}
 }
+
 
 func TestOptionalMap(t *testing.T) {
 	cases := []struct {
-		fn  func(op operation.Operation, fp *field.Path) field.ErrorList
-		err string // regex
-	}{{
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := map[string]string{"": ""}
-			return OptionalMap(context.Background(), op, fp, value, nil)
+		name    string
+		present bool
+		fn       func(op operation.Operation, fp *field.Path) bool
+	}{
+		{
+			name:    "non-empty string map",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := map[string]string{"": ""}
+				return OptionalMap(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty string map",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := map[string]string{}
+				return OptionalMap(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "non-empty int map",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := map[int]int{0: 0}
+				return OptionalMap(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty int map",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := map[int]int{}
+				return OptionalMap(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "non-empty bool map",
+			present: true,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := map[bool]bool{false: false}
+				return OptionalMap(context.Background(), op, fp, value, nil)
+			},
+		}, {
+			name:    "empty bool map",
+			present: false,
+			fn: func(op operation.Operation, fp *field.Path) bool {
+				value := map[string]bool{}
+				return OptionalMap(context.Background(), op, fp, value, nil)
+			},
 		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := map[string]string{}
-			return OptionalMap(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := map[int]int{0: 0}
-			return OptionalMap(context.Background(), op, fp, value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := map[int]int{}
-			return OptionalMap(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := map[bool]bool{false: false}
-			return OptionalMap(context.Background(), op, fp, value, nil)
-		},
-	}, {
-		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
-			value := map[string]bool{}
-			return OptionalMap(context.Background(), op, fp, value, nil)
-		},
-		err: "fldpath:.*optional value was not specified",
-	}}
+	}
 
-	for i, tc := range cases {
-		result := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
-		if len(result) > 0 && tc.err == "" {
-			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
-			continue
-		}
-		if len(result) == 0 && tc.err != "" {
-			t.Errorf("case %d: unexpected success: expected %q", i, tc.err)
-			continue
-		}
-		if len(result) > 0 {
-			if len(result) > 1 {
-				t.Errorf("case %d: unexepected multi-error: %v", i, fmtErrs(result))
-				continue
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.fn(operation.Operation{}, field.NewPath("fldpath"))
+			if got != tc.present {
+				t.Errorf("expected present=%v, got %v", tc.present, got)
 			}
-			if re := regexp.MustCompile(tc.err); !re.MatchString(result[0].Error()) {
-				t.Errorf("case %d: wrong error\nexpected: %q\n     got: %v", i, tc.err, fmtErrs(result))
-			}
-		}
+		})
 	}
 }
+
 
 func TestForbiddenValue(t *testing.T) {
 	cases := []struct {
