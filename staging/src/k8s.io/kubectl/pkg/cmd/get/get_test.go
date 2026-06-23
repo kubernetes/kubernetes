@@ -23,7 +23,6 @@ import (
 	"io"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -82,7 +81,6 @@ func testComponentStatusData() *corev1.ComponentStatusList {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
-	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
@@ -108,28 +106,14 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
-	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
-	actual := []runtime.Object{}
-	if len(actual) != len(expected) {
-		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
-	}
-	t.Logf("actual: %#v", actual[0])
-	for i, obj := range actual {
-		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
-		expectedMap := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(expectedJSON), &expectedMap); err != nil {
-			t.Fatal(err)
-		}
-
-		actualJSON := runtime.EncodeOrDie(codec, obj)
-		actualMap := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(expectedMap, actualMap) {
-			t.Errorf("expectedMap: %#v, but actualMap: %#v", expectedMap, actualMap)
-		}
+	// The object is served as an unknown (external) type, so get falls back to
+	// the generic table printer. ExternalType carries its name as a top-level
+	// "name" field rather than "metadata.name", so the NAME column is empty.
+	expected := `NAME   AGE
+       <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
