@@ -104,23 +104,28 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
-	p.VolumeInformer.Informer().AddEventHandler(
+	logger := klog.FromContext(ctx)
+	_, err := p.VolumeInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
 		},
+		cache.HandlerOptions{Logger: &logger},
 	)
+	utilruntime.Must(err)
 	controller.volumeLister = p.VolumeInformer.Lister()
 	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
-	p.ClaimInformer.Informer().AddEventHandler(
+	_, err = p.ClaimInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
 		},
+		cache.HandlerOptions{Logger: &logger},
 	)
+	utilruntime.Must(err)
 	controller.claimLister = p.ClaimInformer.Lister()
 	controller.claimListerSynced = p.ClaimInformer.Informer().HasSynced
 
