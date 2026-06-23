@@ -2,12 +2,7 @@
 - name: GangPreemptionBasic
   featureGates:
     GenericWorkload: true
-  metricsCollectorConfig:
-    metrics:
-      scheduler_podgroup_scheduling_attempt_duration_seconds:
-      - label: result
-        values: [waiting_on_preemption, scheduled, unschedulable]
-      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -30,9 +25,8 @@
   - opcode: waitForPodGroups
     namespace: gang-preempt-0
     countParam: $initPodGroups
-  - opcode: startCollectingMetrics
-    namespaces: [gang-preempt-0]
   - opcode: createPods
+    collectMetrics: true
     countParam: $initPodGroups
     countMultiplierParam: $podsPerGroup
     namespace: gang-preempt-0
@@ -40,7 +34,6 @@
     templateParams:
       podsPerGroup: $podsPerGroup
       cpuRequest: $gangCpuRequest
-  - opcode: stopCollectingMetrics
 
   workloads:
   - name: 2Nodes_10InitPods_1Gang_2Pods
@@ -74,12 +67,7 @@
 - name: GangPreemptionPodGroups
   featureGates:
     GenericWorkload: true
-  metricsCollectorConfig:
-    metrics:
-      scheduler_podgroup_scheduling_attempt_duration_seconds:
-      - label: result
-        values: [waiting_on_preemption, scheduled, unschedulable]
-      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -115,9 +103,8 @@
   - opcode: waitForPodGroups
     namespace: gang-preempt-0
     countParam: $highPriorityGroups
-  - opcode: startCollectingMetrics
-    namespaces: [gang-preempt-0]
   - opcode: createPods
+    collectMetrics: true
     countParam: $highPriorityGroups
     countMultiplierParam: $podsPerGroup
     namespace: gang-preempt-0
@@ -126,7 +113,6 @@
       podsPerGroup: $podsPerGroup
       cpuRequest: $highPriorityCpuRequest
       hostPortBase: 9000
-  - opcode: stopCollectingMetrics
 
   workloads:
   - name: 2Nodes_2LowPriorityGangs_1Gang_2Pods
@@ -177,12 +163,7 @@
 - name: GangPreemptionAffinity
   featureGates:
     GenericWorkload: true
-  metricsCollectorConfig:
-    metrics:
-      scheduler_podgroup_scheduling_attempt_duration_seconds:
-      - label: result
-        values: [waiting_on_preemption, scheduled, unschedulable]
-      scheduler_podgroup_scheduling_algorithm_duration_seconds: null
+
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -214,16 +195,14 @@
   - opcode: waitForPodGroups
     namespace: gang-preempt-0
     countParam: $initPodGroups
-  - opcode: startCollectingMetrics
-    namespaces: [gang-preempt-0]
   - opcode: createPods
+    collectMetrics: true
     countParam: $initPodGroups
     countMultiplierParam: $podsPerGroup
     namespace: gang-preempt-0
     podTemplatePath: templates/pod-gang-affinity.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-  - opcode: stopCollectingMetrics
 
   workloads:
   - name: 2Nodes_10InitPods_1Gang_2Pods
