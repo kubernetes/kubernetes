@@ -690,6 +690,14 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	}
 
 	if isDeferred && len(pod.Spec.NodeName) > 0 && pod.Spec.NodeName == nodeInfo.Node().Name {
+		if s, err := cycleState.Read(framework.PreemptionTriggeredKey); err == nil {
+			if stateData, ok := s.(*framework.PreemptionTriggeredState); ok && stateData.Triggered {
+				// We are in preemption dry-run, and the pod fits in this node.
+				return nil
+			}
+		}
+		// Pod fits on the node, mark as UnschedulableAndUnresolvable to keep it in the Unschedulable queue without
+		// triggering preemption.
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod resize fits, waiting for Kubelet actuation")
 	}
 	return nil

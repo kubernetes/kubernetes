@@ -155,6 +155,18 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
+const PreemptionTriggeredKey fwk.StateKey = "preemption-triggered"
+
+// PreemptionTriggeredState is stored in CycleState to indicate preemption simulation is running.
+type PreemptionTriggeredState struct {
+	Triggered bool
+}
+
+// Clone returns the state itself.
+func (s *PreemptionTriggeredState) Clone() fwk.StateData {
+	return s
+}
+
 // SortedScoredNodes is a list of scored nodes, returned from scheduling.
 type SortedScoredNodes interface {
 	Pop() string

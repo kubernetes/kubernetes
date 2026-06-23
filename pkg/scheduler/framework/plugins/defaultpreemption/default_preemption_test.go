@@ -35,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,6 +45,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	compresource "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -158,6 +160,37 @@ func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.
 	return nil
 }
 
+// SkipOnDeferredFilterPlugin is a mock plugin used to verify that skipped plugins
+// are bypassed in preemption and reprieve dry-runs.
+type SkipOnDeferredFilterPlugin struct{}
+
+func newSkipOnDeferredFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &SkipOnDeferredFilterPlugin{}, nil
+}
+
+func (pl *SkipOnDeferredFilterPlugin) Name() string {
+	return "skip-on-deferred"
+}
+
+// PreFilter returns Skip for deferred resize pods, causing the framework to
+// bypass execution of its Filter method. For other pods, it returns Success.
+func (pl *SkipOnDeferredFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if compresource.IsPodResizeDeferred(p) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
+	return nil, nil
+}
+
+func (pl *SkipOnDeferredFilterPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
+// Filter always returns Unschedulable. This method should only be reached
+// and executed if PreFilter did not return Skip (i.e. for non-deferred pods).
+func (pl *SkipOnDeferredFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Unschedulable, "SkipOnDeferredFilterPlugin: always fail for non-deferred pods")
+}
+
 const (
 	LabelKeyIsViolatingPDB    = "test.kubernetes.io/is-violating-pdb"
 	LabelValueViolatingPDB    = "violating"
@@ -177,6 +210,7 @@ func TestPostFilter(t *testing.T) {
 		filteredNodesStatuses *framework.NodeToStatus
 		features              feature.Features
 		extender              fwk.Extender
+		registerPlugins       []tf.RegisterPluginFunc
 		wantResult            *fwk.PostFilterResult
 		wantStatus            *fwk.Status
 	}{
@@ -464,6 +498,235 @@ func TestPostFilter(t *testing.T) {
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
+		{
+			name: "deferred pod resize preemption success (mitigates double counting)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "p",
+					UID:       "p",
+					Namespace: v1.NamespaceDefault,
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node1",
+					Priority: &highPriority,
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				// Resizing pod itself is running on node1 with cached resource requests
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "p",
+						UID:       "p",
+						Namespace: v1.NamespaceDefault,
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Priority: &highPriority,
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("100"),
+									},
+								},
+							},
+						},
+					},
+				},
+				// Victim pod to preempt
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "100m",
+					v1.ResourceMemory: "100",
+				}).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "deferred pod resize preemption success (bypasses skipped filter plugins)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "p",
+					UID:       "p",
+					Namespace: v1.NamespaceDefault,
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node1",
+					Priority: &highPriority,
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "p",
+						UID:       "p",
+						Namespace: v1.NamespaceDefault,
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Priority: &highPriority,
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("100"),
+									},
+								},
+							},
+						},
+					},
+				},
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "100m",
+					v1.ResourceMemory: "100",
+				}).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions("skip-on-deferred", newSkipOnDeferredFilterPlugin, "Filter", "PreFilter"),
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "deferred pod resize preemption fails because victim search is isolated to host node",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "p",
+					UID:       "p",
+					Namespace: v1.NamespaceDefault,
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node1",
+					Priority: &highPriority,
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "p",
+						UID:       "p",
+						Namespace: v1.NamespaceDefault,
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Priority: &highPriority,
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("100"),
+									},
+								},
+							},
+						},
+					},
+				},
+				// p2 is a low priority victim running on node2 (not the host node!)
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node2").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "100m",
+					v1.ResourceMemory: "100",
+				}).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)), // node2 is absent, so it defaults to UnschedulableAndUnresolvable
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling."),
+		},
 	}
 
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
@@ -499,12 +762,14 @@ func TestPostFilter(t *testing.T) {
 				}
 
 				// Register NodeResourceFit as the Filter & PreFilter plugin.
+				nodeResourcesFitFuncWithFeatures := frameworkruntime.FactoryAdapter(tt.features, noderesources.NewFit)
 				registeredPlugins := []tf.RegisterPluginFunc{
 					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-					tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+					tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFuncWithFeatures, "Filter", "PreFilter"),
 					tf.RegisterPluginAsExtensions("test-plugin", newTestPlugin, "PreFilter"),
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				}
+				registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
 				var extenders []fwk.Extender
 				if tt.extender != nil {
 					extenders = append(extenders, tt.extender)
