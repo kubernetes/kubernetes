@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -294,4 +296,28 @@ func PodGroupPriority(pg *schedulingv1alpha3.PodGroup) int32 {
 	// that there was no global default priority class and the priority class
 	// name of the pod group was empty. So, we resolve to the static default priority.
 	return 0
+}
+
+// IsResizePreemptionDisabledForPod returns true if the PodResizePreemptionDisabled condition
+// is True, or if the node preemption policy disables preemption.
+func IsResizePreemptionDisabledForPod(pod *v1.Pod, getNode func(string) (*v1.Node, error)) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		return false
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == v1.PodResizePreemptionDisabled && cond.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	// TODO: This node preemption policy check is a temporary version-skew fallback during upgrade windows.
+	// Once Kubelets assume sole ownership of policy propagation via the pod condition, this fallback should
+	// be removed at beta+3.
+	if pod.Spec.NodeName != "" && getNode != nil {
+		if node, err := getNode(pod.Spec.NodeName); err == nil && node != nil {
+			if node.Spec.PodPreemptionPolicy != nil && len(node.Spec.PodPreemptionPolicy.DisableResizePreemption) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

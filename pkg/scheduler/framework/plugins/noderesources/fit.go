@@ -91,13 +91,14 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources                              sets.Set[string]
-	ignoredResourceGroups                         sets.Set[string]
-	enableInPlacePodVerticalScaling               bool
-	enablePodLevelResources                       bool
-	enableDRAExtendedResource                     bool
-	enableInPlacePodLevelResourcesVerticalScaling bool
-	handle                                        fwk.Handle
+	ignoredResources                                   sets.Set[string]
+	ignoredResourceGroups                              sets.Set[string]
+	enableInPlacePodVerticalScaling                    bool
+	enablePodLevelResources                            bool
+	enableDRAExtendedResource                          bool
+	enableInPlacePodLevelResourcesVerticalScaling      bool
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
 }
@@ -232,14 +233,15 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                              sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:                         sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling:               fts.EnableInPlacePodVerticalScaling,
-		handle:                                        h,
-		enablePodLevelResources:                       fts.EnablePodLevelResources,
-		enableDRAExtendedResource:                     fts.EnableDRAExtendedResource,
-		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-		resourceAllocationScorer:                      scorer,
+		ignoredResources:                                   sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:                              sets.New(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling:                    fts.EnableInPlacePodVerticalScaling,
+		handle:                                             h,
+		enablePodLevelResources:                            fts.EnablePodLevelResources,
+		enableDRAExtendedResource:                          fts.EnableDRAExtendedResource,
+		enableInPlacePodLevelResourcesVerticalScaling:      fts.EnableInPlacePodLevelResourcesVerticalScaling,
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		resourceAllocationScorer:                           scorer,
 	}
 
 	if fts.EnableTopologyAwareWorkloadScheduling {
@@ -372,6 +374,11 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
 	}
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption {
+		events = append(events,
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleUp},
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleUp})
+	}
 	return events, nil
 }
 
@@ -388,6 +395,13 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 		return fwk.QueueSkip, nil
 	}
 
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		if deletedPod.Spec.NodeName != pod.Spec.NodeName {
+			logger.V(5).Info("another scheduled pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+			return fwk.QueueSkip, nil
+		}
+	}
+
 	// any deletion event to a scheduled pod could make the unscheduled pod schedulable.
 	logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 	return fwk.Queue, nil
@@ -396,6 +410,42 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 // isSchedulableAfterTargetPodScaleDown is invoked when the target pod is scaled down, making itself schedulable.
 func (f *Fit) isSchedulableAfterTargetPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	logger.V(5).Info("the target pod got scaled down and it may be schedulable now", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterTargetPodScaleUp is invoked when the target pod is scaled up.
+// Requeuing is necessary because a pod parked in UnschedulableAndUnresolvable (fitting naturally)
+// may exceed available headroom upon scaling up further, requiring preemption to clear space.
+func (f *Fit) isSchedulableAfterTargetPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	if !f.enableInPlacePodVerticalScalingSchedulerPreemption {
+		return fwk.QueueSkip, nil
+	}
+	if !resource.IsPodResizeDeferred(pod) {
+		return fwk.QueueSkip, nil
+	}
+	logger.V(5).Info("the target pod got scaled up, re-evaluating", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterAssignedPodScaleUp checks if another assigned pod scaled up on the same node.
+// Requeuing is necessary because a competing scale-up can consume the free headroom a parked pod
+// was waiting for, forcing the deferred pod back into active evaluation to initiate preemption.
+func (f *Fit) isSchedulableAfterAssignedPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if !f.enableInPlacePodVerticalScalingSchedulerPreemption {
+		return fwk.QueueSkip, nil
+	}
+	if !resource.IsPodResizeDeferred(pod) {
+		return fwk.QueueSkip, nil
+	}
+	if modifiedPod.Spec.NodeName != pod.Spec.NodeName {
+		logger.V(5).Info("another assigned pod got scaled up, but on a different node than the deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+		return fwk.QueueSkip, nil
+	}
+	logger.V(5).Info("another assigned pod got scaled up on the same node as the deferred resize pod, re-evaluating", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return fwk.Queue, nil
 }
 
@@ -427,6 +477,12 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 		// If the update event is for a unscheduled Pod,
 		// it wouldn't make targetPod schedulable.
 		return false
+	}
+
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(targetPod) {
+		if modifiedPod.Spec.NodeName != targetPod.Spec.NodeName {
+			return false
+		}
 	}
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
@@ -470,6 +526,13 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	originalNode, modifiedNode, err := schedutil.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
+	}
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
+		if modifiedNode.Name != pod.Spec.NodeName {
+			logger.V(5).Info("node was updated, but it is a different node than the deferred resize pod's node", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return fwk.QueueSkip, nil
+		}
 	}
 	// Use the DRA manager's extended resource cache for event handlers
 	var draManager fwk.SharedDRAManager
