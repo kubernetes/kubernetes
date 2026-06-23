@@ -119,12 +119,8 @@ func Validate_PodDisruptionBudgetStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,

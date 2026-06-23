@@ -184,12 +184,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -212,12 +208,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -240,12 +232,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -268,12 +256,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -296,12 +280,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalMap(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -324,12 +304,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalMap(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -352,12 +328,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -380,12 +352,8 @@ func Validate_AllKinds(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -450,12 +418,8 @@ func Validate_MultiDependent(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -478,12 +442,8 @@ func Validate_MultiDependent(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -506,12 +466,8 @@ func Validate_MultiDependent(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -576,12 +532,8 @@ func Validate_MultiTrigger(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -604,12 +556,8 @@ func Validate_MultiTrigger(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -632,12 +580,8 @@ func Validate_MultiTrigger(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -687,12 +631,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -715,12 +655,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -743,12 +679,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}

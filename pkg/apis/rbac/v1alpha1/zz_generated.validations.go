@@ -123,12 +123,8 @@ func Validate_ClusterRole(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
@@ -168,12 +164,8 @@ func Validate_ClusterRoleBinding(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
@@ -276,12 +268,8 @@ func Validate_Role(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
@@ -320,12 +308,8 @@ func Validate_RoleBinding(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {

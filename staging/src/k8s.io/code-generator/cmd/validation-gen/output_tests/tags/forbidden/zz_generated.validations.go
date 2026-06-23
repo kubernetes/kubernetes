@@ -81,11 +81,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -113,11 +113,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -145,11 +145,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -177,11 +177,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -209,11 +209,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -241,11 +241,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -273,11 +273,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -305,11 +305,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -337,11 +337,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -369,11 +369,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -401,11 +401,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -433,11 +433,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -465,11 +465,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -497,11 +497,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -529,11 +529,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -561,11 +561,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalMap(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -593,11 +593,11 @@ func Validate_Struct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalMap(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}

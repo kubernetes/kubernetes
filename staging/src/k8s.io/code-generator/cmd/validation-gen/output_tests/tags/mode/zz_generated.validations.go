@@ -207,11 +207,7 @@ func Validate_Collections(
 				Value: "A",
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 					errs := field.ErrorList{}
-					earlyReturn := false
-					if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-						earlyReturn = true
-					}
-					if earlyReturn {
+					if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
 						return errs
 					}
 					return errs
@@ -234,11 +230,7 @@ func Validate_Collections(
 				Value: "A",
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 					errs := field.ErrorList{}
-					earlyReturn := false
-					if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-						earlyReturn = true
-					}
-					if earlyReturn {
+					if !validate.OptionalMap(ctx, op, fldPath, obj, oldObj) {
 						return errs
 					}
 					return errs
@@ -275,11 +267,7 @@ func Validate_ImplicitForbidden(
 				Value: "A",
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
-					earlyReturn := false
-					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-						earlyReturn = true
-					}
-					if earlyReturn {
+					if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 						return errs
 					}
 					return errs
@@ -427,11 +415,7 @@ func Validate_SharedField(
 				Value: "A",
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
-					earlyReturn := false
-					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-						earlyReturn = true
-					}
-					if earlyReturn {
+					if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 						return errs
 					}
 					return errs
@@ -442,11 +426,7 @@ func Validate_SharedField(
 				Value: "B",
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					errs := field.ErrorList{}
-					earlyReturn := false
-					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-						earlyReturn = true
-					}
-					if earlyReturn {
+					if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 						return errs
 					}
 					return errs

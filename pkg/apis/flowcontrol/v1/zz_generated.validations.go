@@ -133,12 +133,8 @@ func Validate_LimitResponse(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -246,11 +242,7 @@ func Validate_PriorityLevelConfigurationSpec(
 				Value: "Exempt",
 				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1.ExemptPriorityLevelConfiguration) field.ErrorList {
 					errs := field.ErrorList{}
-					earlyReturn := false
-					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-						earlyReturn = true
-					}
-					if earlyReturn {
+					if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 						return errs
 					}
 					return errs
@@ -333,12 +325,8 @@ func Validate_PriorityLevelConfigurationSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_LimitedPriorityLevelConfiguration(ctx, op, fldPath, obj, oldObj)...)
@@ -363,12 +351,8 @@ func Validate_PriorityLevelConfigurationSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}

@@ -109,8 +109,8 @@ func Validate_ClusterTrustBundleSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)

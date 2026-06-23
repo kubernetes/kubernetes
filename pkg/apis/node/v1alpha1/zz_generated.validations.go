@@ -149,12 +149,8 @@ func Validate_RuntimeClassSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_Scheduling(ctx, op, fldPath, obj, oldObj)...)
@@ -190,12 +186,8 @@ func Validate_Scheduling(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, v1.Validate_Toleration); len(e) != 0 {

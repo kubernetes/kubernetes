@@ -329,12 +329,8 @@ func Validate_IngressClassSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_IngressClassParametersReference(ctx, op, fldPath, obj, oldObj)...)
@@ -404,12 +400,8 @@ func Validate_NetworkPolicyEgressRule(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
@@ -447,12 +439,8 @@ func Validate_NetworkPolicyIngressRule(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
@@ -491,12 +479,8 @@ func Validate_NetworkPolicyPeer(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_IPBlock(ctx, op, fldPath, obj, oldObj)...)
@@ -532,12 +516,8 @@ func Validate_NetworkPolicySpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyIngressRule); len(e) != 0 {
@@ -564,12 +544,8 @@ func Validate_NetworkPolicySpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyEgressRule); len(e) != 0 {

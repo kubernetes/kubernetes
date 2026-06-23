@@ -110,12 +110,8 @@ func Validate_DisruptionMode(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -138,12 +134,8 @@ func Validate_DisruptionMode(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -322,12 +314,8 @@ func Validate_PodGroupResourceClaim(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -353,12 +341,8 @@ func Validate_PodGroupResourceClaim(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -395,12 +379,8 @@ func Validate_PodGroupResourceClaimStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -440,11 +420,11 @@ func Validate_PodGroupSchedulingConstraints(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_TopologyConstraint); len(e) != 0 {
@@ -503,11 +483,11 @@ func Validate_PodGroupSchedulingPolicy(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -531,8 +511,8 @@ func Validate_PodGroupSchedulingPolicy(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -578,11 +558,11 @@ func Validate_PodGroupSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_PodGroupTemplateReference(ctx, op, fldPath, obj, oldObj)...)
@@ -634,11 +614,11 @@ func Validate_PodGroupSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.OptionalPointer) {
+				return // field absent, skip validation
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer) {
+				return // field absent, skip validation
 			}
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -679,11 +659,11 @@ func Validate_PodGroupSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -761,11 +741,11 @@ func Validate_PodGroupSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -796,11 +776,11 @@ func Validate_PodGroupSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Maximum(ctx, op, fldPath, obj, oldObj, 1000000000); len(e) != 0 {
 				errs = append(errs, e...)
@@ -835,12 +815,8 @@ func Validate_PodGroupStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -878,11 +854,11 @@ func Validate_PodGroupStatus(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -987,11 +963,11 @@ func Validate_PodGroupTemplate(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.OptionalPointer) {
+				return // field absent, skip validation
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", true, validate.OptionalPointer) {
+				return // field absent, skip validation
 			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1032,11 +1008,11 @@ func Validate_PodGroupTemplate(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -1078,11 +1054,11 @@ func Validate_PodGroupTemplate(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DisruptionMode(ctx, op, fldPath, obj, oldObj)...)
@@ -1112,11 +1088,11 @@ func Validate_PodGroupTemplate(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1147,11 +1123,11 @@ func Validate_PodGroupTemplate(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Maximum(ctx, op, fldPath, obj, oldObj, 1000000000); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1198,12 +1174,8 @@ func Validate_PodGroupTemplateReference(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_WorkloadPodGroupTemplateReference(ctx, op, fldPath, obj, oldObj)...)
@@ -1278,12 +1250,8 @@ func Validate_TypedLocalObjectReference(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1494,11 +1462,11 @@ func Validate_WorkloadSpec(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_TypedLocalObjectReference(ctx, op, fldPath, obj, oldObj)...)

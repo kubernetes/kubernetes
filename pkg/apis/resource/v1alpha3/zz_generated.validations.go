@@ -241,12 +241,8 @@ func Validate_DeviceTaintRuleStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -384,12 +380,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
 				errs = append(errs, e...)
@@ -415,12 +407,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
@@ -446,12 +434,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
@@ -477,12 +461,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
@@ -508,12 +488,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
 				errs = append(errs, e...)
@@ -539,12 +515,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -570,12 +542,8 @@ func Validate_PoolStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256); len(e) != 0 {
 				errs = append(errs, e...)
@@ -644,12 +612,8 @@ func Validate_ResourcePoolStatusRequest(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourcePoolStatusRequestStatus(ctx, op, fldPath, obj, oldObj)...)
@@ -715,12 +679,8 @@ func Validate_ResourcePoolStatusRequestSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -828,11 +788,11 @@ func Validate_ResourcePoolStatusRequestStatus(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PoolStatus); len(e) != 0 {
@@ -864,11 +824,11 @@ func Validate_ResourcePoolStatusRequestStatus(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,

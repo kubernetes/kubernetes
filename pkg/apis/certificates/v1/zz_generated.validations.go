@@ -113,12 +113,8 @@ func Validate_CertificateSigningRequestStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningRequestStatus_conditions_,
 				func(list []certificatesv1.CertificateSigningRequestCondition) bool {

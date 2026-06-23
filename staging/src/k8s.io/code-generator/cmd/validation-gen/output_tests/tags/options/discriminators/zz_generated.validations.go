@@ -78,11 +78,7 @@ func Validate_Discriminator(
 						Value: "A",
 						Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 							errs := field.ErrorList{}
-							earlyReturn := false
-							if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-								earlyReturn = true
-							}
-							if earlyReturn {
+							if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 								return errs
 							}
 							return errs
@@ -108,11 +104,7 @@ func Validate_Discriminator(
 						Value: "B",
 						Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 							errs := field.ErrorList{}
-							earlyReturn := false
-							if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-								earlyReturn = true
-							}
-							if earlyReturn {
+							if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 								return errs
 							}
 							return errs
@@ -151,11 +143,7 @@ func Validate_DiscriminatorDisabled(
 						Value: "A",
 						Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 							errs := field.ErrorList{}
-							earlyReturn := false
-							if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-								earlyReturn = true
-							}
-							if earlyReturn {
+							if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 								return errs
 							}
 							return errs
@@ -181,11 +169,7 @@ func Validate_DiscriminatorDisabled(
 						Value: "B",
 						Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 							errs := field.ErrorList{}
-							earlyReturn := false
-							if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-								earlyReturn = true
-							}
-							if earlyReturn {
+							if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
 								return errs
 							}
 							return errs

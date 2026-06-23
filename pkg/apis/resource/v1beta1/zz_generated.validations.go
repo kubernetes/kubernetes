@@ -128,12 +128,8 @@ func Validate_AllocatedDeviceStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -159,12 +155,8 @@ func Validate_AllocatedDeviceStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -199,12 +191,8 @@ func Validate_AllocatedDeviceStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_NetworkDeviceData(ctx, op, fldPath, obj, oldObj)...)
@@ -286,12 +274,8 @@ func Validate_BasicDevice(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalMap(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the map and call the value type's validation function
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_DeviceAttribute); len(e) != 0 {
@@ -321,8 +305,8 @@ func Validate_BasicDevice(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -370,12 +354,8 @@ func Validate_BasicDevice(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint); len(e) != 0 {
@@ -405,8 +385,8 @@ func Validate_BasicDevice(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -437,8 +417,8 @@ func Validate_BasicDevice(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -554,12 +534,8 @@ func Validate_Device(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_BasicDevice(ctx, op, fldPath, obj, oldObj)...)
@@ -625,8 +601,8 @@ func Validate_DeviceAllocationConfiguration(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -707,8 +683,8 @@ func Validate_DeviceAllocationResult(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -743,8 +719,8 @@ func Validate_DeviceAllocationResult(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -841,12 +817,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -869,12 +841,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -897,12 +865,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -925,12 +889,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -953,12 +913,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -981,12 +937,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -1009,12 +961,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
@@ -1043,12 +991,8 @@ func Validate_DeviceAttribute(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -1081,8 +1025,8 @@ func Validate_DeviceClaim(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1123,8 +1067,8 @@ func Validate_DeviceClaim(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1159,8 +1103,8 @@ func Validate_DeviceClaim(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1204,8 +1148,8 @@ func Validate_DeviceClaimConfiguration(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1273,13 +1217,9 @@ func Validate_DeviceClass(
 			}
 			// call field-attached validations
 			func() { // cohort = "name"
-				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
+				if !validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
+					func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue) {
+					return // field absent, skip validation
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
 					func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkAlpha(); len(e) != 0 {
@@ -1370,8 +1310,8 @@ func Validate_DeviceClassSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1402,8 +1342,8 @@ func Validate_DeviceClassSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1437,12 +1377,8 @@ func Validate_DeviceClassSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1477,12 +1413,8 @@ func Validate_DeviceConfiguration(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_OpaqueDeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
@@ -1517,8 +1449,8 @@ func Validate_DeviceConstraint(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1552,12 +1484,8 @@ func Validate_DeviceConstraint(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1670,8 +1598,8 @@ func Validate_DeviceRequest(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1701,12 +1629,8 @@ func Validate_DeviceRequest(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceAllocationMode(ctx, op, fldPath, obj, oldObj)...)
@@ -1735,8 +1659,8 @@ func Validate_DeviceRequest(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1780,12 +1704,8 @@ func Validate_DeviceRequest(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
@@ -1894,12 +1814,8 @@ func Validate_DeviceRequestAllocationResult(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
@@ -1927,8 +1843,8 @@ func Validate_DeviceRequestAllocationResult(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1959,8 +1875,8 @@ func Validate_DeviceRequestAllocationResult(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1990,12 +1906,8 @@ func Validate_DeviceRequestAllocationResult(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2070,11 +1982,11 @@ func Validate_DeviceSubRequest(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -2097,12 +2009,8 @@ func Validate_DeviceSubRequest(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceAllocationMode(ctx, op, fldPath, obj, oldObj)...)
@@ -2129,12 +2037,8 @@ func Validate_DeviceSubRequest(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
@@ -2230,12 +2134,8 @@ func Validate_DeviceToleration(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2295,12 +2195,8 @@ func Validate_DeviceToleration(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceTaintEffect(ctx, op, fldPath, obj, oldObj)...)
@@ -2350,12 +2246,8 @@ func Validate_NetworkDeviceData(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2382,8 +2274,8 @@ func Validate_NetworkDeviceData(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2417,12 +2309,8 @@ func Validate_NetworkDeviceData(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 128).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2599,8 +2487,8 @@ func Validate_ResourceClaimStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2633,8 +2521,8 @@ func Validate_ResourceClaimStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2671,12 +2559,8 @@ func Validate_ResourceClaimStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
@@ -2829,12 +2713,8 @@ func Validate_ResourceSliceSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device); len(e) != 0 {
@@ -2864,8 +2744,8 @@ func Validate_ResourceSliceSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)

@@ -145,12 +145,8 @@ func Validate_CertificateSigningRequestStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_,
 				func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
@@ -237,8 +233,8 @@ func Validate_ClusterTrustBundleSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
@@ -313,12 +309,8 @@ func Validate_PodCertificateRequestStatus(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,

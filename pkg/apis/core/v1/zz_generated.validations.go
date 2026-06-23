@@ -180,12 +180,8 @@ func Validate_PodSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalSlice(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Toleration); len(e) != 0 {
@@ -309,13 +305,9 @@ func Validate_ReplicationController(
 			}
 			// call field-attached validations
 			func() { // cohort = "name"
-				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
+				if !validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
+					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue) {
+					return // field absent, skip validation
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
 					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkAlpha(); len(e) != 0 {
@@ -435,12 +427,8 @@ func Validate_ReplicationControllerSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
@@ -485,11 +473,11 @@ func Validate_Secret(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -521,12 +509,8 @@ func Validate_Toleration(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalValue(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)

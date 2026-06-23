@@ -127,12 +127,8 @@ func Validate_HorizontalPodAutoscalerSpec(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {

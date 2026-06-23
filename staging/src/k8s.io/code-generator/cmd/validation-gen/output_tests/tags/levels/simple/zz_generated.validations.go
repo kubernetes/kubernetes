@@ -159,11 +159,11 @@ func Validate_SpecialValidationStruct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
@@ -191,11 +191,11 @@ func Validate_SpecialValidationStruct(
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
 			if earlyReturn {
 				return // do not proceed
+			}
+			if !validate.OptionalPointer(ctx, op, fldPath, obj, oldObj) {
+				return // field absent, skip validation
 			}
 			return
 		}
