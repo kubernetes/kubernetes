@@ -25,7 +25,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
-func TestAuthorizationWebhookEvaluationsTotalIsBeta(t *testing.T) {
+func TestAuthorizationWebhookEvaluationsTotal(t *testing.T) {
 	ResetWebhookMetricsForTest()
 	defer ResetWebhookMetricsForTest()
 
@@ -43,7 +43,7 @@ func TestAuthorizationWebhookEvaluationsTotalIsBeta(t *testing.T) {
 	}
 }
 
-func TestAuthorizationWebhookDurationSecondsIsBeta(t *testing.T) {
+func TestAuthorizationWebhookDurationSeconds(t *testing.T) {
 	ResetWebhookMetricsForTest()
 	defer ResetWebhookMetricsForTest()
 
@@ -74,7 +74,7 @@ func TestAuthorizationWebhookDurationSecondsIsBeta(t *testing.T) {
 	}
 }
 
-func TestAuthorizationWebhookEvaluationsFailOpenTotalIsBeta(t *testing.T) {
+func TestAuthorizationWebhookEvaluationsFailOpenTotal(t *testing.T) {
 	ResetWebhookMetricsForTest()
 	defer ResetWebhookMetricsForTest()
 
