@@ -79,6 +79,7 @@
     templatePath: templates/resourceslice-basic-devices.yaml
     countParam: $nodesWithDRA
     templateParams:
+      numPCIRoots: $numPCIRoots|2
       numDevices: 10
   - opcode: createAny
     templatePath: templates/deviceclass.yaml
@@ -91,6 +92,10 @@
   - opcode: createAny
     templatePath: templates/resourceclaimtemplate.yaml
     namespace: test
+    templateParams:
+      numRequests: $numRequests|1
+      selectors: $selectors|
+      constraints: $constraints|
   - opcode: createPods
     namespace: test
     countParam: $measurePods
@@ -153,6 +158,7 @@
       nodesWithDRA: 500
       nodesWithoutDRA: 0
       initClaims: 0
+      measurePods: 10
       steadyState: true
       duration: 10s
   # In the "half" scenarios, half of the devices are in use.
@@ -213,6 +219,110 @@
       measurePods: 10
       steadyState: true
       duration: 10s
+
+  # "selector" adds usage of a CEL selector compared to the base workloads.
+  # All devices match, but CEL nonetheless must be evaluated.
+  - name: selector_fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 10
+      steadyState: false
+      duration: 0s # unused
+      selectors:
+      - cel:
+          expression: device.attributes["test-driver.cdi.k8s.io"].driverVersion.major() >= 1 && device.capacity["test-driver.cdi.k8s.io"].memory.isGreaterThan(quantity("1Mi"))
+  - name: selector_empty_500nodes
+    labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fselector_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 64 # TODO: update this
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+      selectors:
+      - cel:
+          expression: device.attributes["test-driver.cdi.k8s.io"].driverVersion.major() >= 1 && device.capacity["test-driver.cdi.k8s.io"].memory.isGreaterThan(quantity("1Mi"))
+
+  # "match" adds usage of a match attribute with five requests, so each pod allocates half of one node.
+  #
+  # Devices are defined with alternating PCI roots, which means that always one device has to be skipped
+  # to find the next matching one.
+  - name: match_fast
+    labels: [integration-test, short]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      measurePods: 2
+      steadyState: false
+      duration: 0s # unused
+      numRequests: 5
+      numPCIRoots: 2
+      constraints:
+      - matchAttribute: resource.kubernetes.io/pciRoot
+  - name: match_empty_500nodes
+    labels: [performance]
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fmatch_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra: 64 # TODO: update this
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      measurePods: 10
+      steadyState: true
+      duration: 10s
+      selectors:
+      numRequests: 5
+      numPCIRoots: 2
+      constraints:
+      - matchAttribute: resource.kubernetes.io/pciRoot
+
+  # "distinct" adds usage of a distinct attribute with five requests for five different PCI roots (more than for the match case
+  # to allow allocating the same number of pods).
+  #
+  # Devices are defined with different PCI roots next to each other, which means that no device has to be skipped
+  # to find the next with a distinct attribute.
+  #
+  # distinctAttribute is part of DRAConsumableCapacity which might be disabled for some executions of this test.
+  # Therefore we cannot cover it here yet. This can be changed once it is GA and locked to true.
+  # - name: distinct_fast
+  #   labels: [integration-test, short]
+  #   params:
+  #     nodesWithDRA: 1
+  #     nodesWithoutDRA: 1
+  #     initClaims: 0
+  #     measurePods: 2
+  #     steadyState: false
+  #     duration: 0s # unused
+  #     numRequests: 5
+  #     numPCIRoots: 5
+  #     constraints:
+  #     - distinctAttribute: resource.kubernetes.io/pciRoot
+  # - name: distinct_empty_500nodes
+  #   labels: [performance]
+  #   threshold:
+  #     # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fdistinct_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+  #     dra: 64 # TODO: update this
+  #   params:
+  #     nodesWithDRA: 500
+  #     nodesWithoutDRA: 0
+  #     initClaims: 0
+  #     measurePods: 10
+  #     steadyState: true
+  #     duration: 10s
+  #     selectors:
+  #     numRequests: 5
+  #     numPCIRoots: 5
+  #     constraints:
+  #     - distinctAttribute: resource.kubernetes.io/pciRoot
 
 # SchedulingWithResourceClaim uses ResourceClaims
 # with deterministic names that are shared between pods.
