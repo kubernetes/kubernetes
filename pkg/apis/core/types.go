@@ -2196,6 +2196,11 @@ type VolumeMount struct {
 	// SubPathExpr and SubPath are mutually exclusive.
 	// +optional
 	SubPathExpr string
+	// bindMountOptions is the list of additional bind mount options to apply when
+	// mounting this volume into the container. Allowed values are noexec,
+	// nodev, and nosuid.
+	// +optional
+	BindMountOptions []string
 }
 
 // MountPropagationMode describes mount propagation.
