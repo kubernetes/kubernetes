@@ -67,8 +67,8 @@ github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
 github.com/chai2010/gettext-go/plural
 github.com/chai2010/gettext-go/po
-# github.com/container-storage-interface/spec v1.9.0
-## explicit; go 1.18
+# github.com/container-storage-interface/spec v1.7.1-0.20260701153011-15c0135084c5 => github.com/gnufied/spec v1.7.1-0.20260701153011-15c0135084c5
+## explicit; go 1.24.0
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/containerd/api v1.11.0
 ## explicit; go 1.24.0
@@ -252,9 +252,6 @@ github.com/golang-jwt/jwt/v5
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/proto
-github.com/golang/protobuf/protoc-gen-go/descriptor
-github.com/golang/protobuf/ptypes/timestamp
-github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.1.3
 ## explicit; go 1.18
 github.com/google/btree
@@ -1314,3 +1311,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# github.com/container-storage-interface/spec => github.com/gnufied/spec v1.7.1-0.20260701153011-15c0135084c5

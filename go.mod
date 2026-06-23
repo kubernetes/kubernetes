@@ -16,7 +16,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/Microsoft/hnslib v0.1.3
 	github.com/blang/semver/v4 v4.0.0
-	github.com/container-storage-interface/spec v1.9.0
+	github.com/container-storage-interface/spec v1.7.1-0.20260701153011-15c0135084c5
 	github.com/coredns/corefile-migration v1.0.33
 	github.com/coreos/go-oidc v2.5.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.7.0
@@ -222,6 +222,7 @@ require (
 )
 
 replace (
+	github.com/container-storage-interface/spec => github.com/gnufied/spec v1.7.1-0.20260701153011-15c0135084c5
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
