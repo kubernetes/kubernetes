@@ -1537,6 +1537,7 @@ const (
 	RowCompleted RowConditionType = "Completed"
 )
 
+// +k8s:alpha(since: "1.37")=+k8s:enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
@@ -1636,6 +1637,7 @@ type Condition struct {
 	// +required
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=True;False;Unknown
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status"`
 	// observedGeneration represents the .metadata.generation that the condition was set based upon.
 	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date

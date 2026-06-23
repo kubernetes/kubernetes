@@ -109,6 +109,64 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					},
 					ExpectedErrs: nil,
 				},
+				{
+					Name: "invalid missing status",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakStatus(""),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.Required(field.NewPath("status", "conditions").Index(0).Child("status"), "").MarkAlpha(),
+						// handwritten validation requires "True"
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "", []string{"True"}).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid status value",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakStatus("Invalid"),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.NotSupported(
+							field.NewPath("status", "conditions").Index(0).Child("status"),
+							metav1.ConditionStatus("Invalid"),
+							[]string{"False", "True", "Unknown"},
+						).MarkAlpha(),
+						// handwritten validation requires "True"
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "Invalid", []string{"True"}).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid status value: Unknown",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakStatus("Unknown"),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						// handwritten validation requires "True"
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "Unknown", []string{"True"}).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid status value: False",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakStatus("False"),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						// handwritten validation requires "True"
+						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "False", []string{"True"}).MarkFromImperative(),
+					},
+				},
 			}
 
 			for _, tc := range testCases {
