@@ -36,8 +36,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
+	pvcmetrics "k8s.io/kubernetes/pkg/controller/volume/pvcprotection/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/dump"
@@ -208,6 +210,11 @@ func generatePodListErrorFunc(t *testing.T, failures int) clienttesting.Reaction
 	}
 }
 
+func setupMetrics() {
+	pvcmetrics.Register()
+	pvcmetrics.UnusedConditionSyncsTotal.Reset()
+}
+
 func TestPVCProtectionController(t *testing.T) {
 	pvcGVR := schema.GroupVersionResource{
 		Group:    v1.GroupName,
@@ -248,6 +255,9 @@ func TestPVCProtectionController(t *testing.T) {
 		// List of expected kubeclient actions that should happen during the
 		// test.
 		expectedActions []clienttesting.Action
+		// Expected metric counts for unused condition syncs.
+		expectedSuccessMetrics float64
+		expectedErrorMetrics   float64
 	}{
 		//
 		// PVC events
@@ -432,6 +442,7 @@ func TestPVCProtectionController(t *testing.T) {
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: PVC already has Unused=True and is still unused -> no update",
@@ -451,6 +462,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: PVC in use by running pod without condition -> Unused=False set proactively",
@@ -462,6 +474,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: deleting PVC -> condition not updated, finalizer removed",
@@ -473,9 +486,11 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 		},
 		{
-			name:            "feature disabled: unused PVC with no pods -> no condition action",
-			updatedPVCs:     []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
-			expectedActions: []clienttesting.Action{},
+			name:                   "feature disabled: unused PVC with no pods -> no condition action",
+			updatedPVCs:            []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			expectedActions:        []clienttesting.Action{},
+			expectedSuccessMetrics: 0,
+			expectedErrorMetrics:   0,
 		},
 		{
 			name:                     "feature enabled: unscheduled pending pod references PVC -> Unused=False set proactively",
@@ -487,6 +502,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: terminated (Succeeded) pod does not count as using PVC -> Unused=True set",
@@ -499,6 +515,7 @@ func TestPVCProtectionController(t *testing.T) {
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: terminated (Failed) pod does not count as using PVC -> Unused=True set",
@@ -511,6 +528,7 @@ func TestPVCProtectionController(t *testing.T) {
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: status update fails -> controller retries",
@@ -531,6 +549,8 @@ func TestPVCProtectionController(t *testing.T) {
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
+			expectedErrorMetrics:   2,
 		},
 		{
 			name:                     "feature enabled: pod not in informer cache but exists in API -> Unused=False set proactively",
@@ -544,6 +564,7 @@ func TestPVCProtectionController(t *testing.T) {
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: one of two pods deleted, remaining pod keeps PVC in use -> Unused=False set proactively",
@@ -556,6 +577,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: deleting PVC that already has Unused=True condition -> condition preserved when removing finalizer",
@@ -579,6 +601,7 @@ func TestPVCProtectionController(t *testing.T) {
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: used PVC without finalizer -> Unused=False set then finalizer added",
@@ -593,6 +616,7 @@ func TestPVCProtectionController(t *testing.T) {
 				// Then: finalizer added (Update on original PVC without condition)
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 			},
+			expectedSuccessMetrics: 1,
 		},
 		{
 			name:                     "feature enabled: deleted PVC with finalizer and pod using it -> finalizer kept (existing behavior)",
@@ -686,6 +710,7 @@ func TestPVCProtectionController(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		setupMetrics()
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeClaimUnusedSinceTime, test.enablePVCUnusedSinceTime)
 
@@ -816,6 +841,20 @@ func TestPVCProtectionController(t *testing.T) {
 			for _, a := range test.expectedActions[len(actions):] {
 				t.Logf("    %+v", a)
 			}
+		}
+
+		// Verify unused condition sync metrics
+		successMetric, err := metricstestutil.GetCounterMetricValue(pvcmetrics.UnusedConditionSyncsTotal.WithLabelValues("success"))
+		if err != nil {
+			t.Errorf("Test %q: error getting success metric: %v", test.name, err)
+		} else if successMetric != test.expectedSuccessMetrics {
+			t.Errorf("Test %q: expected %v success metric(s), got %v", test.name, test.expectedSuccessMetrics, successMetric)
+		}
+		errorMetric, err := metricstestutil.GetCounterMetricValue(pvcmetrics.UnusedConditionSyncsTotal.WithLabelValues("error"))
+		if err != nil {
+			t.Errorf("Test %q: error getting error metric: %v", test.name, err)
+		} else if errorMetric != test.expectedErrorMetrics {
+			t.Errorf("Test %q: expected %v error metric(s), got %v", test.name, test.expectedErrorMetrics, errorMetric)
 		}
 
 	}

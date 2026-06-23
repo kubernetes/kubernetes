@@ -5641,6 +5641,16 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: unused_condition_syncs_total
+  subsystem: pvc_protection_controller
+  help: Number of PVC Unused condition status update attempts
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - result
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: reconstruct_volume_operations_errors_total
   help: The number of volumes that failed reconstruction from the operating system
     during kubelet startup.
