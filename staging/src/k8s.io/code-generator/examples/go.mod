@@ -64,3 +64,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace github.com/container-storage-interface/spec => github.com/gnufied/spec v1.7.1-0.20260701153011-15c0135084c5
