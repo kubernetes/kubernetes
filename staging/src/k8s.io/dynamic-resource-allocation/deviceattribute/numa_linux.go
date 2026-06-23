@@ -27,27 +27,36 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 )
 
+// AttributeForm selects whether the numaNode attribute is published as a
+// scalar IntValue or a list IntValues.
+type AttributeForm int
+
+const (
+	// ScalarAttribute produces a scalar IntValue with the physical NUMA node.
+	// This form has no feature-gate dependency.
+	ScalarAttribute AttributeForm = iota
+	// ListAttribute produces an IntValues list. The first element is the
+	// physical NUMA node; additional elements are same-socket nodes at the
+	// minimum ACPI SLIT distance. Falls back to a single-element list when
+	// SLIT distances are unavailable. Requires DRAListTypeAttributes to be
+	// enabled in the cluster.
+	ListAttribute
+)
+
 // GetNUMANodeAttributeByPCIBusID returns the numaNode attribute for a PCI
 // device, reading the physical NUMA node from sysfs numa_node.
 //
-// listEnabled selects the form of the attribute and MUST reflect the cluster's
+// attrForm selects the form of the attribute and MUST reflect the cluster's
 // DRAListTypeAttributes state. A driver cannot detect that state (feature gates
 // are per-process), so the operator configures it on the driver, consistent
 // with what the apiserver and scheduler have enabled. The helper renders
-// whichever form it is told; it does not detect anything:
+// whichever form it is told; it does not detect anything.
 //
-//   - listEnabled true: the SLIT-based list (IntValues). The first element is
-//     the physical NUMA node; additional elements are same-socket nodes at the
-//     minimum ACPI SLIT distance. Falls back to a single-element list when SLIT
-//     distances are unavailable.
-//   - listEnabled false: the scalar physical NUMA node (IntValue), which has no
-//     feature-gate dependency.
-//
-// If listEnabled is true but DRAListTypeAttributes is off in the cluster, the
+// If ListAttribute is used but DRAListTypeAttributes is off in the cluster, the
 // apiserver drops the list value and rejects the resulting value-less
 // attribute; the driver should treat that publish failure as fatal rather than
 // adapting.
-func GetNUMANodeAttributeByPCIBusID(pciBusID string, listEnabled bool, mods ...MachineModifier) (DeviceAttribute, error) {
+func GetNUMANodeAttributeByPCIBusID(pciBusID string, attrForm AttributeForm, mods ...MachineModifier) (DeviceAttribute, error) {
 	var mc machine
 	initDefaultMachine(&mc)
 	for _, mod := range mods {
@@ -71,7 +80,7 @@ func GetNUMANodeAttributeByPCIBusID(pciBusID string, listEnabled bool, mods ...M
 		return DeviceAttribute{}, fmt.Errorf("PCI device %s has no NUMA affinity (numa_node=%d); do not publish the numaNode attribute for it", pciBusID, physicalNode)
 	}
 
-	if listEnabled {
+	if attrForm == ListAttribute {
 		return makeNUMANodeListAttribute(mc, physicalNode), nil
 	}
 	return makeNUMANodeScalarAttribute(physicalNode), nil
@@ -79,17 +88,17 @@ func GetNUMANodeAttributeByPCIBusID(pciBusID string, listEnabled bool, mods ...M
 
 // GetNUMANodeAttribute returns the numaNode attribute for a device that already
 // knows its NUMA node (for example CPU and memory devices). See
-// GetNUMANodeAttributeByPCIBusID for the meaning of listEnabled.
+// GetNUMANodeAttributeByPCIBusID for the meaning of attrForm.
 //
 // numaNode must be a valid (non-negative) NUMA node. A negative value indicates
 // no NUMA affinity, for which the attribute must not be published (it would
 // match every other NUMA-less device), so an error is returned.
-func GetNUMANodeAttribute(numaNode int, listEnabled bool, mods ...MachineModifier) (DeviceAttribute, error) {
+func GetNUMANodeAttribute(numaNode int, attrForm AttributeForm, mods ...MachineModifier) (DeviceAttribute, error) {
 	if numaNode < 0 {
 		return DeviceAttribute{}, fmt.Errorf("invalid NUMA node %d: do not publish the numaNode attribute for a device with no NUMA affinity", numaNode)
 	}
 
-	if !listEnabled {
+	if attrForm == ScalarAttribute {
 		return makeNUMANodeScalarAttribute(numaNode), nil
 	}
 
@@ -110,8 +119,8 @@ func makeNUMANodeScalarAttribute(numaNode int) DeviceAttribute {
 	}
 }
 
-// GetNUMANodeForCPU returns the NUMA node ID for a given CPU core by scanning
-// /sys/devices/system/node/node*/cpulist.
+// GetNUMANodeForCPU returns the NUMA node ID for a given CPU core by reading
+// the /sys/devices/system/cpu/cpuX/nodeY symlink.
 func GetNUMANodeForCPU(cpuID int, mods ...MachineModifier) (int, error) {
 	var mc machine
 	initDefaultMachine(&mc)
@@ -119,34 +128,21 @@ func GetNUMANodeForCPU(cpuID int, mods ...MachineModifier) (int, error) {
 		mod(&mc)
 	}
 
-	matches, err := fs.Glob(mc.sysfs, filepath.Join("devices", "system", "node", "node*", "cpulist"))
+	pattern := filepath.Join("devices", "system", "cpu", fmt.Sprintf("cpu%d", cpuID), "node[0-9]*")
+	matches, err := fs.Glob(mc.sysfs, pattern)
 	if err != nil {
-		return -1, fmt.Errorf("failed to glob NUMA node cpulists: %w", err)
+		return -1, fmt.Errorf("failed to find NUMA node for CPU %d: %w", cpuID, err)
+	}
+	if len(matches) == 0 {
+		return -1, fmt.Errorf("CPU %d not found in any NUMA node", cpuID)
 	}
 
-	for _, match := range matches {
-		data, err := fs.ReadFile(mc.sysfs, match)
-		if err != nil {
-			// Skip a node whose cpulist cannot be read and keep scanning the
-			// rest; if the CPU is in no readable node, the final not-found
-			// error below is returned.
-			continue
-		}
-
-		cpus := parseCPUList(strings.TrimSpace(string(data)))
-		for _, cpu := range cpus {
-			if cpu == cpuID {
-				nodeDir := filepath.Base(filepath.Dir(match))
-				nodeNum, err := strconv.Atoi(strings.TrimPrefix(nodeDir, "node"))
-				if err != nil {
-					return -1, fmt.Errorf("failed to parse NUMA node number from %s: %w", nodeDir, err)
-				}
-				return nodeNum, nil
-			}
-		}
+	nodeDir := filepath.Base(matches[0])
+	nodeNum, err := strconv.Atoi(strings.TrimPrefix(nodeDir, "node"))
+	if err != nil {
+		return -1, fmt.Errorf("failed to parse NUMA node number from %s: %w", nodeDir, err)
 	}
-
-	return -1, fmt.Errorf("CPU %d not found in any NUMA node", cpuID)
+	return nodeNum, nil
 }
 
 // makeNUMANodeListAttribute builds the list-form numaNode attribute. The caller
@@ -301,7 +297,7 @@ func parseCPUList(cpulist string) []int {
 		return nil
 	}
 	var cpus []int
-	for _, part := range strings.Split(cpulist, ",") {
+	for part := range strings.SplitSeq(cpulist, ",") {
 		bounds := strings.SplitN(part, "-", 2)
 		start, err := strconv.Atoi(strings.TrimSpace(bounds[0]))
 		if err != nil {

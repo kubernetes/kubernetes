@@ -23,8 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/utils/ptr"
-
 	resourceapi "k8s.io/api/resource/v1"
 )
 
@@ -35,7 +33,7 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 	tests := map[string]struct {
 		setup             func(t *testing.T, root string)
 		address           string
-		listEnabled       bool
+		attrForm          AttributeForm
 		expectedAttribute *DeviceAttribute
 		expectsError      bool
 		expectedErrMsg    string
@@ -44,11 +42,11 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 			setup: func(t *testing.T, root string) {
 				writeFile(t, filepath.Join(root, numaNodePath), "4\n")
 			},
-			address:     pciBusID,
-			listEnabled: false,
+			address:  pciBusID,
+			attrForm: ScalarAttribute,
 			expectedAttribute: &DeviceAttribute{
 				Name:  StandardDeviceAttributeNUMANode,
-				Value: resourceapi.DeviceAttribute{IntValue: ptr.To(int64(4))},
+				Value: resourceapi.DeviceAttribute{IntValue: new(int64(4))},
 			},
 		},
 		"list with equidistant nodes": {
@@ -60,8 +58,8 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 				// all minimum-distance nodes are kept.
 				writeFile(t, filepath.Join(root, "devices", "system", "node", "node1", "distance"), "12 10 12\n")
 			},
-			address:     pciBusID,
-			listEnabled: true,
+			address:  pciBusID,
+			attrForm: ListAttribute,
 			expectedAttribute: &DeviceAttribute{
 				Name:  StandardDeviceAttributeNUMANode,
 				Value: resourceapi.DeviceAttribute{IntValues: []int64{1, 0, 2}},
@@ -73,8 +71,8 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 				// Only a self distance, so there are no equidistant peers.
 				writeFile(t, filepath.Join(root, "devices", "system", "node", "node0", "distance"), "10\n")
 			},
-			address:     pciBusID,
-			listEnabled: true,
+			address:  pciBusID,
+			attrForm: ListAttribute,
 			expectedAttribute: &DeviceAttribute{
 				Name:  StandardDeviceAttributeNUMANode,
 				Value: resourceapi.DeviceAttribute{IntValues: []int64{0}},
@@ -93,8 +91,8 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 				writeFile(t, filepath.Join(root, "devices", "system", "cpu", "cpu1", "topology", "physical_package_id"), "0\n")
 				writeFile(t, filepath.Join(root, "devices", "system", "cpu", "cpu2", "topology", "physical_package_id"), "1\n")
 			},
-			address:     pciBusID,
-			listEnabled: true,
+			address:  pciBusID,
+			attrForm: ListAttribute,
 			expectedAttribute: &DeviceAttribute{
 				Name:  StandardDeviceAttributeNUMANode,
 				Value: resourceapi.DeviceAttribute{IntValues: []int64{0, 1}},
@@ -105,19 +103,19 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 				writeFile(t, filepath.Join(root, numaNodePath), "-1\n")
 			},
 			address:        pciBusID,
-			listEnabled:    true,
+			attrForm:       ListAttribute,
 			expectsError:   true,
 			expectedErrMsg: "no NUMA affinity",
 		},
 		"empty PCI Bus ID": {
 			address:        "",
-			listEnabled:    true,
+			attrForm:       ListAttribute,
 			expectsError:   true,
 			expectedErrMsg: "PCI Bus ID cannot be empty",
 		},
 		"missing numa_node": {
 			address:        pciBusID,
-			listEnabled:    false,
+			attrForm:       ScalarAttribute,
 			expectsError:   true,
 			expectedErrMsg: "failed to read NUMA node",
 		},
@@ -128,7 +126,7 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 			if test.setup != nil {
 				test.setup(t, root)
 			}
-			got, err := GetNUMANodeAttributeByPCIBusID(test.address, test.listEnabled, WithFSFromRoot(root))
+			got, err := GetNUMANodeAttributeByPCIBusID(test.address, test.attrForm, WithFSFromRoot(root))
 			if test.expectsError {
 				if err == nil {
 					t.Fatalf("expected error but got none")
@@ -150,13 +148,13 @@ func TestGetNUMANodeAttributeByPCIBusID(t *testing.T) {
 
 func TestGetNUMANodeAttribute(t *testing.T) {
 	t.Run("scalar", func(t *testing.T) {
-		got, err := GetNUMANodeAttribute(4, false)
+		got, err := GetNUMANodeAttribute(4, ScalarAttribute)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		want := DeviceAttribute{
 			Name:  StandardDeviceAttributeNUMANode,
-			Value: resourceapi.DeviceAttribute{IntValue: ptr.To(int64(4))},
+			Value: resourceapi.DeviceAttribute{IntValue: new(int64(4))},
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("expected %+v, got %+v", want, got)
@@ -169,7 +167,7 @@ func TestGetNUMANodeAttribute(t *testing.T) {
 	t.Run("list with equidistant nodes", func(t *testing.T) {
 		root := t.TempDir()
 		writeFile(t, filepath.Join(root, "devices", "system", "node", "node1", "distance"), "12 10 12\n")
-		got, err := GetNUMANodeAttribute(1, true, WithFSFromRoot(root))
+		got, err := GetNUMANodeAttribute(1, ListAttribute, WithFSFromRoot(root))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -186,7 +184,7 @@ func TestGetNUMANodeAttribute(t *testing.T) {
 	})
 
 	t.Run("no NUMA affinity is rejected", func(t *testing.T) {
-		_, err := GetNUMANodeAttribute(-1, false)
+		_, err := GetNUMANodeAttribute(-1, ScalarAttribute)
 		if err == nil {
 			t.Fatal("expected error for a device with no NUMA affinity, got none")
 		}
@@ -204,25 +202,22 @@ func TestGetNUMANodeForCPU(t *testing.T) {
 		expectsErr  bool
 		errContains string
 	}{
-		"cpu in single-range node": {
+		"cpu on node1": {
 			setup: func(t *testing.T, root string) {
-				writeFile(t, filepath.Join(root, "devices", "system", "node", "node0", "cpulist"), "0-3\n")
-				writeFile(t, filepath.Join(root, "devices", "system", "node", "node1", "cpulist"), "4-7\n")
+				mkDirAll(t, filepath.Join(root, "devices", "system", "cpu", "cpu5", "node1"))
 			},
 			cpuID:    5,
 			wantNode: 1,
 		},
-		"cpu in comma-and-range list": {
+		"cpu on node0": {
 			setup: func(t *testing.T, root string) {
-				writeFile(t, filepath.Join(root, "devices", "system", "node", "node0", "cpulist"), "0-3,8-11\n")
+				mkDirAll(t, filepath.Join(root, "devices", "system", "cpu", "cpu9", "node0"))
 			},
 			cpuID:    9,
 			wantNode: 0,
 		},
 		"cpu not found": {
-			setup: func(t *testing.T, root string) {
-				writeFile(t, filepath.Join(root, "devices", "system", "node", "node0", "cpulist"), "0-3\n")
-			},
+			setup:       func(t *testing.T, root string) {},
 			cpuID:       99,
 			expectsErr:  true,
 			errContains: "not found in any NUMA node",
