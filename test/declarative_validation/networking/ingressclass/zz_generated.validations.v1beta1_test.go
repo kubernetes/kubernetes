@@ -30,6 +30,9 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1beta1", Kind: "IngressClass"},
 		coverage.FieldRules{
+			"spec.controller": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.parameters.kind": {
 				{ErrorType: "FieldValueRequired"},
 			},

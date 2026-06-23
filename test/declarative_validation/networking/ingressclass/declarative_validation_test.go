@@ -84,7 +84,7 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateUpdateParameters(t *testing.T) {
+func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testCases := map[string]struct {
@@ -131,6 +131,18 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkAlpha(),
+					},
+				},
+				"update fails when controller is changed": {
+					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+					}),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.ResourceVersion = "1"
+						obj.Spec.Controller = "example.com/different-controller"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "controller"), "example.com/different-controller", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
 			}
