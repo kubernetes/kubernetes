@@ -1440,7 +1440,9 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		hasShortCircuits := false
 		lastShortCircuitIdx := -1
 		for i, v := range validations {
-			if v.Flags.IsSet(validators.ShortCircuit) {
+			// BoolResult validators are emitted separately (see below); exclude
+			// them from the earlyReturn group so we don't emit an unused variable.
+			if v.Flags.IsSet(validators.ShortCircuit) && !v.Flags.IsSet(validators.BoolResult) {
 				hasShortCircuits = true
 				lastShortCircuitIdx = i
 			}
@@ -1453,10 +1455,41 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		for i, v := range validations {
 			isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
 			isNonError := v.Flags.IsSet(validators.NonError)
+			isBoolResult := v.Flags.IsSet(validators.BoolResult)
 
 			targs := generator.Args{
 				"funcName": c.Universe.Type(v.Function),
 				"field":    mkSymbolArgs(c, fieldPkgSymbols),
+			}
+
+			// BoolResult validators (Optional*) return bool, not field.ErrorList.
+			// Emit a standalone presence check: if !fn(...) { return }.
+			// They are not part of the shared earlyReturn group.
+			if isBoolResult {
+				for _, comment := range v.Comments {
+					sw.Do("// $.$\n", comment)
+				}
+				sw.Do("if !", nil)
+				sw.Do("$.funcName|raw$", targs)
+				if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+					sw.Do("[", nil)
+					for j, typeArg := range typeArgs {
+						sw.Do("$.|raw$", c.Universe.Type(typeArg))
+						if j < len(typeArgs)-1 {
+							sw.Do(",", nil)
+						}
+					}
+					sw.Do("]", nil)
+				}
+				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
+				for _, arg := range v.Args {
+					sw.Do(", ", nil)
+					toGolangSourceDataLiteral(sw, c, arg, flNewlineOK)
+				}
+				sw.Do(") {\n", nil)
+				sw.Do("  return // field absent, skip validation\n", nil)
+				sw.Do("}\n", nil)
+				continue
 			}
 
 			emitCall := func() {
@@ -1754,7 +1787,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 		hasShortCircuits := false
 		lastShortCircuitIdx := -1
 		for i, fg := range v.Functions {
-			if fg.Flags.IsSet(validators.ShortCircuit) {
+			// BoolResult validators are emitted separately (see below); exclude
+			// them from the earlyReturn group so we don't emit an unused variable.
+			if fg.Flags.IsSet(validators.ShortCircuit) && !fg.Flags.IsSet(validators.BoolResult) {
 				hasShortCircuits = true
 				lastShortCircuitIdx = i
 			}
@@ -1765,6 +1800,32 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 
 		for i, fg := range v.Functions {
 			isNonError := fg.Flags.IsSet(validators.NonError)
+			isBoolResult := fg.Flags.IsSet(validators.BoolResult)
+
+			// BoolResult validators (Optional*) return bool, not field.ErrorList.
+			// Emit a standalone presence check before the earlyReturn group.
+			if isBoolResult {
+				targs := generator.Args{"funcName": c.Universe.Type(fg.Function)}
+				sw.Do("if !", nil)
+				sw.Do("$.funcName|raw$", targs)
+				if typeArgs := fg.TypeArgs; len(typeArgs) > 0 {
+					sw.Do("[", nil)
+					for j, typeArg := range typeArgs {
+						sw.Do("$.|raw$", c.Universe.Type(typeArg))
+						if j < len(typeArgs)-1 {
+							sw.Do(",", nil)
+						}
+					}
+					sw.Do("]", nil)
+				}
+				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
+				for _, arg := range fg.Args {
+					sw.Do(", ", nil)
+					toGolangSourceDataLiteral(sw, c, arg, flNewlineOK)
+				}
+				sw.Do(") {\n  return errs\n}\n", nil)
+				continue
+			}
 
 			if fg.Flags.IsSet(validators.ShortCircuit) {
 				// Short-circuiting functions stop execution if they return an error.

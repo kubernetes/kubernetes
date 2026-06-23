@@ -465,6 +465,13 @@ const (
 	// accumulated as an error, but should trigger other aspects of the failure
 	// path (e.g. early return when combined with ShortCircuit).
 	NonError
+
+	// BoolResult indicates that the validator returns bool instead of
+	// field.ErrorList.  true means the field is present/valid and validation
+	// should continue; false means the field is absent and further validation
+	// should be skipped (which is not an error for optional fields).
+	// Must be combined with ShortCircuit|NonError.
+	BoolResult
 )
 
 // Conditions defines what conditions must be true for a resource to be validated.
