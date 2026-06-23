@@ -501,8 +501,9 @@ func buildQueueingHintMap(ctx context.Context, es []fwk.EnqueueExtensions) (inte
 			}
 
 			queueingHintFn := &internalqueue.QueueingHintFunction{
-				PluginName:     e.Name(),
-				QueueingHintFn: fn,
+				PluginName:        e.Name(),
+				QueueingHintFn:    fn,
+				PreQueueingHintFn: event.PreQueueingHintFn,
 			}
 
 			if event.Event.Resource == fwk.Pod {

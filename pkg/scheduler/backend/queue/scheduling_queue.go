@@ -214,12 +214,18 @@ type PriorityQueue struct {
 	isGenericWorkloadEnabled bool
 	// isOpportunisticBatchingEnabled indicates whether the OpportunisticBatching feature gate is enabled.
 	isOpportunisticBatchingEnabled bool
+	// isPreQueueingHintsEnabled indicates whether the SchedulerPreQueueingHints feature gate is enabled.
+	isPreQueueingHintsEnabled bool
+	// activePreQueueingHintKeys holds per-plugin PreQueueingHint results for the current event.
+	// Set during moveAllToActiveOrBackoffQueue, cleared after. nil means no narrowing.
+	activePreQueueingHintKeys *preQueueingHintPodKeys
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
 type QueueingHintFunction struct {
-	PluginName     string
-	QueueingHintFn fwk.QueueingHintFn
+	PluginName        string
+	QueueingHintFn    fwk.QueueingHintFn
+	PreQueueingHintFn fwk.PreQueueingHintFn
 }
 
 // clusterEvent has the event and involved objects.
@@ -385,6 +391,7 @@ func NewPriorityQueue(
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
 	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
 	isOpportunisticBatchingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
+	isPreQueueingHintsEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPreQueueingHints)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
@@ -405,6 +412,7 @@ func NewPriorityQueue(
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
 		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 		isOpportunisticBatchingEnabled:    isOpportunisticBatchingEnabled,
+		isPreQueueingHintsEnabled:         isPreQueueingHintsEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -555,6 +563,17 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 			if !rejectorPlugins.Has(hintfn.PluginName) {
 				// skip if it's not hintfn from rejectorPlugins.
 				continue
+			}
+
+			// Per-plugin PreQueueingHint: skip this plugin's QueueingHintFn if its
+			// PreQueueingHint didn't identify this pod.
+			if p.activePreQueueingHintKeys != nil {
+				if pluginPods, ok := p.activePreQueueingHintKeys.perPlugin[hintfn.PluginName]; ok {
+					podKey := pod.Name + "_" + pod.Namespace
+					if !pluginPods.Has(podKey) {
+						continue
+					}
+				}
 			}
 
 			start := time.Now()
@@ -1406,17 +1425,39 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		return
 	}
 
-	unschedulableEntities := make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
-	for _, entity := range p.unschedulableEntities.entityInfoMap {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-			if preCheck == nil || preCheck(pInfo.Pod) {
-				unschedulableEntities = append(unschedulableEntities, entity)
-				return false
-			}
-			return true
-		})
+	// Run PreQueueingHintFns to narrow the pod set.
+	hintKeys := p.getPreQueueingHintPodKeys(logger, event, oldObj, newObj)
+
+	var unschedulableEntities []framework.QueuedEntityInfo
+	if hintKeys != nil {
+		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", hintKeys.allPods.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
+		// Only check entities for pods identified by PreQueueingHint (union across plugins).
+		unschedulableEntities = make([]framework.QueuedEntityInfo, 0, hintKeys.allPods.Len())
+		for _, entity := range p.unschedulableEntities.entityInfoMap {
+			entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				key := pInfo.Pod.Name + "_" + pInfo.Pod.Namespace
+				if hintKeys.allPods.Has(key) && (preCheck == nil || preCheck(pInfo.Pod)) {
+					unschedulableEntities = append(unschedulableEntities, entity)
+					return false
+				}
+				return true
+			})
+		}
+	} else {
+		unschedulableEntities = make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
+		for _, entity := range p.unschedulableEntities.entityInfoMap {
+			entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				if preCheck == nil || preCheck(pInfo.Pod) {
+					unschedulableEntities = append(unschedulableEntities, entity)
+					return false
+				}
+				return true
+			})
+		}
 	}
+	p.activePreQueueingHintKeys = hintKeys
 	p.moveEntitiesToActiveOrBackoffQueue(logger, unschedulableEntities, event, oldObj, newObj)
+	p.activePreQueueingHintKeys = nil
 }
 
 // MoveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
@@ -1455,6 +1496,67 @@ func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, en
 	}
 	// Entity is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.
 	return unschedulableQ
+}
+
+// preQueueingHintPodKeys holds the per-plugin PreQueueingHint results for an event.
+// Plugins with allPods=true or no PreQueueingHintFn are not tracked (they evaluate all pods).
+type preQueueingHintPodKeys struct {
+	// perPlugin maps plugin name -> set of pod keys (name_namespace) that plugin wants to evaluate.
+	perPlugin map[string]sets.Set[string]
+	// allPods is the union of all pods across all plugins (for entity filtering).
+	allPods sets.Set[string]
+	// narrowed is true if at least one plugin provided a narrowed set.
+	narrowed bool
+}
+
+// getPreQueueingHintPodKeys returns per-plugin PreQueueingHint results for the given event.
+// Returns nil if all pods should be evaluated (feature disabled or any plugin signals AllPods
+// without a per-plugin narrowing).
+//
+// NOTE: this function assumes lock has been acquired in caller
+func (p *PriorityQueue) getPreQueueingHintPodKeys(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) *preQueueingHintPodKeys {
+	if !p.isPreQueueingHintsEnabled {
+		return nil
+	}
+	result := &preQueueingHintPodKeys{
+		perPlugin: make(map[string]sets.Set[string]),
+	}
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch, hintfns := range hintMap {
+			if !framework.MatchClusterEvents(eventToMatch, event) {
+				continue
+			}
+			for _, hintfn := range hintfns {
+				if hintfn.PreQueueingHintFn == nil {
+					continue
+				}
+				hintResult := hintfn.PreQueueingHintFn(logger, oldObj, newObj)
+				if hintResult.AllPods {
+					// This plugin wants all pods evaluated; we cannot narrow.
+					return nil
+				}
+				result.narrowed = true
+				keys := sets.New[string]()
+				for _, nn := range hintResult.Pods {
+					keys.Insert(nn.Name + "_" + nn.Namespace)
+				}
+				if existing, ok := result.perPlugin[hintfn.PluginName]; ok {
+					result.perPlugin[hintfn.PluginName] = existing.Union(keys)
+				} else {
+					result.perPlugin[hintfn.PluginName] = keys
+				}
+				if result.allPods == nil {
+					result.allPods = keys
+				} else {
+					result.allPods = result.allPods.Union(keys)
+				}
+			}
+		}
+	}
+	if !result.narrowed {
+		return nil
+	}
+	return result
 }
 
 // NOTE: this function assumes lock has been acquired in caller

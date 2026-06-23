@@ -710,3 +710,5 @@ type AdmissionResult struct {
 	Reason               string
 	InsufficientResource *noderesources.InsufficientResource
 }
+
+

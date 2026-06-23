@@ -934,6 +934,13 @@ const (
 	// This allows to process potentially schedulable pods ASAP, eliminating a penalty effect of the backoff queue.
 	SchedulerPopFromBackoffQ featuregate.Feature = "SchedulerPopFromBackoffQ"
 
+	// owner: @geetasg
+	// alpha: v1.37
+	//
+	// Enables PreQueueingHint to narrow the set of pods evaluated on cluster events,
+	// reducing requeue overhead for plugins like DynamicResources.
+	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
+
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	//
@@ -1850,6 +1857,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	SchedulerPreQueueingHints: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	SeparateTaintEvictionController: {
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37 (locked to default in 1.34)
@@ -2499,6 +2510,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	SchedulerAsyncPreemption: {},
 
 	SchedulerPopFromBackoffQ: {},
+
+	SchedulerPreQueueingHints: {},
 
 	SeparateTaintEvictionController: {},
 
