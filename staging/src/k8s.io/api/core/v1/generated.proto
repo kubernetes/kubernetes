@@ -7301,6 +7301,14 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+
+  // bindMountOptions is the list of additional bind mount options to apply when
+  // mounting this volume into the container. Allowed values are noexec,
+  // nodev, and nosuid.
+  // +featureGate=VolumeBindMountOptions
+  // +optional
+  // +listType=set
+  repeated string bindMountOptions = 8;
 }
 
 // VolumeMountStatus shows status of volume mounts.

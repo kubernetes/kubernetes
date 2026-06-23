@@ -2572,7 +2572,29 @@ type VolumeMount struct {
 	// SubPathExpr and SubPath are mutually exclusive.
 	// +optional
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
+	// bindMountOptions is the list of additional bind mount options to apply when
+	// mounting this volume into the container. Allowed values are noexec,
+	// nodev, and nosuid. These are Linux mount options and have no effect on
+	// Windows nodes.
+	// This field is not supported with image volumes.
+	// This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.
+	// +featureGate=VolumeBindMountOptions
+	// +optional
+	// +listType=set
+	BindMountOptions []string `json:"bindMountOptions,omitempty" protobuf:"bytes,8,rep,name=bindMountOptions"`
 }
+
+// BindMountOption defines the supported bind mount options.
+type BindMountOption string
+
+const (
+	// BindMountOptionNoExec prevents execution of binaries on the mounted volume.
+	BindMountOptionNoExec BindMountOption = "noexec"
+	// BindMountOptionNoDev ignores device special files on the mounted volume.
+	BindMountOptionNoDev BindMountOption = "nodev"
+	// BindMountOptionNoSUID ignores set-user-identifier or set-group-identifier bits on the mounted volume.
+	BindMountOptionNoSUID BindMountOption = "nosuid"
+)
 
 // MountPropagationMode describes mount propagation.
 // +enum
