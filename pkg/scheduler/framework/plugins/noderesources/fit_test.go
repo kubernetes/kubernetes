@@ -1501,12 +1501,24 @@ func Test_isSchedulableAfterAssignedPodDelete(t *testing.T) {
 			oldObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).NominatedNodeName("fake").UID("uid1").Obj(),
 			expectedHint: fwk.Queue,
 		},
+		"skip-queue-on-other-pod-deleted-different-node-when-deferred": {
+			pod:          st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"queue-on-other-pod-deleted-same-node-when-deferred": {
+			pod:          st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.Queue,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1611,13 +1623,26 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 			newObj:       st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
 			expectedHint: fwk.Queue,
 		},
+		"skip-queue-on-other-pod-scaled-down-different-node-when-deferred": {
+			pod:          st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			newObj:       st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"queue-on-other-pod-scaled-down-same-node-when-deferred": {
+			pod:          st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			newObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.Queue,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScaling: true,
+				EnableInPlacePodVerticalScaling:                    true,
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -1912,6 +1937,115 @@ func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
 				t.Fatal(err)
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterTargetPodScaleUp(t *testing.T) {
+	testcases := map[string]struct {
+		enablePreemptionGate bool
+		pod                  *v1.Pod
+		expectedHint         fwk.QueueingHint
+	}{
+		"skip-queue-on-pod-not-deferred": {
+			enablePreemptionGate: true,
+			pod:                  st.MakePod().Name("pod1").Node("node1").Obj(),
+			expectedHint:         fwk.QueueSkip,
+		},
+		"queue-on-deferred-target-pod-scale-up": {
+			enablePreemptionGate: true,
+			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			expectedHint:         fwk.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: tc.enablePreemptionGate,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterTargetPodScaleUp(logger, tc.pod, nil, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if actualHint != tc.expectedHint {
+				t.Errorf("unexpected hint: got %v, want %v", actualHint, tc.expectedHint)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterAssignedPodScaleUp(t *testing.T) {
+	testcases := map[string]struct {
+		enablePreemptionGate bool
+		pod                  *v1.Pod
+		oldObj, newObj       interface{}
+		expectedHint         fwk.QueueingHint
+		expectedErr          bool
+	}{
+		"backoff-wrong-old-object": {
+			enablePreemptionGate: true,
+			pod:                  &v1.Pod{},
+			oldObj:               "not-a-pod",
+			expectedHint:         fwk.Queue,
+			expectedErr:          true,
+		},
+		"backoff-wrong-new-object": {
+			enablePreemptionGate: true,
+			pod:                  &v1.Pod{},
+			newObj:               "not-a-pod",
+			expectedHint:         fwk.Queue,
+			expectedErr:          true,
+		},
+		"skip-queue-on-pod-not-deferred": {
+			enablePreemptionGate: true,
+			pod:                  st.MakePod().Name("pod1").Node("node1").Obj(),
+			oldObj:               st.MakePod().Name("pod2").Node("node1").Obj(),
+			newObj:               st.MakePod().Name("pod2").Node("node1").Obj(),
+			expectedHint:         fwk.QueueSkip,
+		},
+		"skip-queue-on-different-node-scale-up": {
+			enablePreemptionGate: true,
+			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			oldObj:               st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			newObj:               st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			expectedHint:         fwk.QueueSkip,
+		},
+		"queue-on-same-node-scale-up": {
+			enablePreemptionGate: true,
+			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			oldObj:               st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			newObj:               st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			expectedHint:         fwk.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: tc.enablePreemptionGate,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterAssignedPodScaleUp(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
