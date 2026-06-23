@@ -825,6 +825,9 @@ func (scp stopCollectingProfileOp) patchParams(_ *Workload) (realOp, error) {
 }
 
 // resolveTemplateParams resolves the template parameters using the workload parameters.
+// Values starting with $ are references to workload parameters.
+// The string after an optional | is the default value, using YAML encoding
+// (in particular, a plain string without quotation marks is valid).
 func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[string]any, error) {
 	if len(templateParams) == 0 {
 		return templateParams, nil
@@ -833,8 +836,24 @@ func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[stri
 	for k, v := range resolved {
 		if s, ok := v.(string); ok && strings.HasPrefix(s, "$") {
 			paramKey := s[1:]
+			var def *string
+			sep := strings.Index(paramKey, "|")
+			if sep > 0 {
+				def = new(paramKey[sep+1:])
+				paramKey = paramKey[:sep]
+			}
 			if val, found := w.Params.params[paramKey]; found {
 				w.Params.isUsed[paramKey] = true
+				resolved[k] = val
+				continue
+			}
+			if def != nil {
+				// Must convert string into actual value first,
+				// otherwise only string values could have defaults.
+				var val any
+				if err := yaml.Unmarshal([]byte(*def), &val); err != nil {
+					return nil, fmt.Errorf("decoding parameter %q default %q as YAML: %w", paramKey, *def, err)
+				}
 				resolved[k] = val
 				continue
 			}
