@@ -269,36 +269,45 @@ func (p *plainResponseWriter) Close() error {
 	return nil
 }
 
-var _ watchStreamWriter = &gzipResponseWriter{}
+var _ watchStreamWriter = &perFlushGzipWriter{}
 
-type gzipResponseWriter struct {
-	gw      *gzip.Writer
-	flusher http.Flusher
+type perFlushGzipWriter struct {
+	delegateRW http.ResponseWriter
+	flusher    http.Flusher
+	gw         *gzip.Writer
 }
 
-func (g *gzipResponseWriter) Write(b []byte) (int, error) {
-	return g.gw.Write(b)
-}
-
-// Flush pushes data through two buffers: gzip's internal buffer into the
-// http.ResponseWriter, then the http.ResponseWriter's buffer to the network.
-func (g *gzipResponseWriter) Flush() error {
-	if err := g.gw.Flush(); err != nil {
-		return err
+func (p *perFlushGzipWriter) Write(b []byte) (int, error) {
+	if p.gw == nil {
+		p.gw = watchGzipPool.Get().(*gzip.Writer)
+		p.gw.Reset(p.delegateRW)
 	}
-	g.flusher.Flush()
-	return nil
+	return p.gw.Write(b)
 }
 
-func (g *gzipResponseWriter) Close() error {
-	if g.gw == nil {
+// Flush writes compressed data to the client and releases the gzip.Writer back to the pool.
+func (p *perFlushGzipWriter) Flush() error {
+	// no writer means Write was not called, nothing to flush
+	if p.gw == nil {
 		return nil
 	}
-	err := g.gw.Close()
-	g.gw.Reset(nil)
-	watchGzipPool.Put(g.gw)
+	if err := p.gw.Flush(); err != nil {
+		return err
+	}
+	err := p.Close()
+	p.flusher.Flush()
+	return err
+}
+
+func (p *perFlushGzipWriter) Close() error {
+	if p.gw == nil {
+		return nil
+	}
+	err := p.gw.Close()
+	p.gw.Reset(nil)
+	watchGzipPool.Put(p.gw)
 	// prevent double-close returning the writer to the pool twice
-	g.gw = nil
+	p.gw = nil
 	return err
 }
 
@@ -328,9 +337,7 @@ func (w *watchResponseWriter) BeginStream(mediaType string) {
 	if w.contentEncoding == "gzip" && w.isWatchListRequest {
 		w.delegateRW.Header().Set("Content-Encoding", "gzip")
 		w.delegateRW.Header().Add("Vary", "Accept-Encoding")
-		gw := watchGzipPool.Get().(*gzip.Writer)
-		gw.Reset(w.delegateRW)
-		w.writer = &gzipResponseWriter{gw: gw, flusher: w.flusher}
+		w.writer = &perFlushGzipWriter{delegateRW: w.delegateRW, flusher: w.flusher}
 	}
 	w.delegateRW.WriteHeader(http.StatusOK)
 	// Flush HTTP headers only
@@ -462,6 +469,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					span.AddEvent("Writing initial events done")
 					span.End(5 * time.Second)
 					s.watchListCompleteHook()
+				}
+				// release the gzip writer back to the pool so idle watches don't hold gzip state.
+				if err := rw.Flush(); err != nil {
+					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response after initial events")
+					return
 				}
 			}
 		}
