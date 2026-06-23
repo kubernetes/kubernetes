@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/utils/ptr"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -292,12 +290,6 @@ func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) e
 
 	// drop init container annotations so they don't show up as differences when receiving requests from old clients
 	out.Annotations = dropInitContainerAnnotations(out.Annotations)
-
-	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
-	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
-	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
-		out.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
-	}
 	return nil
 }
 
@@ -309,12 +301,6 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 	// drop init container annotations so they don't take effect on legacy kubelets.
 	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
 	out.Annotations = dropInitContainerAnnotations(out.Annotations)
-
-	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
-	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
-	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
-		out.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
-	}
 	return nil
 }
 

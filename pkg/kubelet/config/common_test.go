@@ -419,3 +419,36 @@ func TestStaticPodNameGenerate(t *testing.T) {
 		}
 	}
 }
+
+// TestDecodeSinglePodTerminationGracePeriodSeconds ensures
+// a negative TerminationGracePeriodSeconds is clamped.
+func TestDecodeSinglePodTerminationGracePeriodSeconds(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	grace := int64(-1)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", UID: "12345", Namespace: "mynamespace"},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+			}},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	parsed, podOut, err := tryDecodeSinglePod(logger, json, noDefault)
+	if !parsed || err != nil {
+		t.Fatalf("parsed=%v, unexpected error: %v", parsed, err)
+	}
+	if podOut.Spec.TerminationGracePeriodSeconds == nil || *podOut.Spec.TerminationGracePeriodSeconds != 1 {
+		t.Errorf("expected negative grace period clamped to 1 by decode defaulting, got %v", podOut.Spec.TerminationGracePeriodSeconds)
+	}
+}

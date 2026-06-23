@@ -10721,6 +10721,9 @@ func TestValidatePod(t *testing.T) {
 
 	successCases := map[string]core.Pod{
 		"basic fields": *podtest.MakePod("123"),
+		"zero terminationGracePeriodSeconds": *podtest.MakePod("123",
+			podtest.SetTerminationGracePeriodSeconds(0),
+		),
 		"just about everything": *podtest.MakePod("abc.123.do-re-mi",
 			podtest.SetInitContainers(podtest.MakeContainer("ictr")),
 			podtest.SetVolumes(podtest.MakeEmptyVolume(("vol"))),
@@ -11500,6 +11503,10 @@ func TestValidatePod(t *testing.T) {
 		"bad spec": {
 			expectedError: "spec.containers[0].name",
 			spec:          *podtest.MakePod("123", podtest.SetContainers(core.Container{})),
+		},
+		"negative terminationGracePeriodSeconds": {
+			expectedError: "spec.terminationGracePeriodSeconds: Invalid value: -1: must be greater than or equal to 0",
+			spec:          *podtest.MakePod("123", podtest.SetTerminationGracePeriodSeconds(-1)),
 		},
 		"bad label": {
 			expectedError: "NoUppercaseOrSpecialCharsLike=Equals",
