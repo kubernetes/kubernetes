@@ -144,6 +144,7 @@ type schedulerOptions struct {
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
 	applyDefaultProfile        bool
+	nodeInfoSnapshot           *internalcache.Snapshot
 }
 
 // Option configures a Scheduler
@@ -258,6 +259,13 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 	}
 }
 
+// WithNodeInfoSnapshot sets the nodeInfoSnapshot for Scheduler.
+func WithNodeInfoSnapshot(snapshot *internalcache.Snapshot) Option {
+	return func(o *schedulerOptions) {
+		o.nodeInfoSnapshot = snapshot
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
@@ -317,7 +325,10 @@ func New(ctx context.Context,
 		podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 	}
 
-	snapshot := internalcache.NewEmptySnapshot()
+	snapshot := options.nodeInfoSnapshot
+	if snapshot == nil {
+		snapshot = internalcache.NewEmptySnapshot()
+	}
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
