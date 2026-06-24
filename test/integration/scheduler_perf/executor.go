@@ -32,6 +32,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,8 +95,8 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runBarrierOp(tCtx, opIndex, concreteOp)
 	case *sleepOp:
 		return e.runSleepOp(tCtx, concreteOp)
-	case *waitForPodGroups:
-		return e.runWaitForPodGroupsOp(tCtx, concreteOp)
+	case *createPodGroups:
+		return e.runCreatePodGroupsOp(tCtx, concreteOp)
 	case *startCollectingMetricsOp:
 		return e.runStartCollectingMetricsOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
@@ -194,12 +195,35 @@ func (e *WorkloadExecutor) runSleepOp(tCtx ktesting.TContext, op *sleepOp) error
 	return nil
 }
 
-// runWaitForPodGroupsOp executes the waitForPodGroups operation.
-// It polls the scheduler's informer cache until the expected number of pod groups
-// are visible in the given namespace. This ensures that subsequent operations
-// (like creating pods that reference these pod groups) won't fail due to cache lag.
+// runCreatePodGroupsOp executes the createPodGroups operation.
+// It creates the configured number of PodGroups from a template and
+// then waits for them to be visible in the scheduler's informer cache.
+// This ensures that subsequent operations (like creating pods that reference these pod groups) won't fail due to cache lag.
 // It timeouts after 10 seconds if the condition is not met.
-func (e *WorkloadExecutor) runWaitForPodGroupsOp(tCtx ktesting.TContext, op *waitForPodGroups) error {
+func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *createPodGroups) error {
+	if err := createNamespaceIfNotPresent(tCtx, op.Namespace, &e.numPodsScheduledPerNamespace); err != nil {
+		return err
+	}
+
+	tCtx.Logf("creating %d PodGroups in namespace %q", op.Count, op.Namespace)
+
+	for index := range op.Count {
+		env := make(map[string]any)
+		maps.Copy(env, op.TemplateParams)
+		env["Index"] = index
+
+		obj := &schedulingapi.PodGroup{}
+		if err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
+			return fmt.Errorf("%s: %w", op.TemplatePath, err)
+		}
+
+		if err := e.createPodGroupWithRetry(tCtx, obj, op.Namespace, op.TemplatePath); err != nil {
+			return err
+		}
+	}
+
+	// Wait for pod groups to be visible in the scheduler's informer cache.
+	// It times out after 10 seconds if the condition is not met.
 	tCtx.Logf("waiting for %d PodGroups in namespace %q", op.Count, op.Namespace)
 	err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		podGroups, err := e.podGroupInformer.Lister().PodGroups(op.Namespace).List(labels.Everything())
@@ -212,9 +236,36 @@ func (e *WorkloadExecutor) runWaitForPodGroupsOp(tCtx ktesting.TContext, op *wai
 		return false, nil
 	})
 	if err != nil {
-		return fmt.Errorf("timed out waiting for PodGroups: %w", err)
+		return fmt.Errorf("timed out waiting for PodGroups to be cached: %w", err)
 	}
+
 	return nil
+}
+
+func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *schedulingapi.PodGroup, namespace, templatePath string) error {
+	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
+
+	defer cancel()
+	for {
+		_, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
+			FieldValidation: "Strict",
+		})
+
+		if err == nil {
+			return nil
+		}
+
+		// Fail fast on non-retriable client errors (invalid specs, bad requests, forbidden access).
+		if apierrors.IsInvalid(err) || apierrors.IsBadRequest(err) || apierrors.IsForbidden(err) {
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%s: timed out (%w) while creating %q, last error was: %w", templatePath, context.Cause(ctx), klog.KObj(obj), err)
+		case <-time.After(time.Second):
+		}
+	}
 }
 
 func (e *WorkloadExecutor) runStopCollectingMetrics(tCtx ktesting.TContext, opIndex int) error {

@@ -636,38 +636,59 @@ func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	return &so, nil
 }
 
-// waitForPodGroups defines an op that waits for a specific number of PodGroup objects to be visible in the scheduler's cache.
-type waitForPodGroups struct {
-	// Must be waitForPodGroupsOpcode.
+// createPodGroups defines an op where PodGroups get created from a YAML template
+// then waits for them to be visible in the scheduler's informer cache.
+type createPodGroups struct {
+	// Must match createPodGroupsOpcode.
 	Opcode operationCode
-	// Namespace the objects should be in.
+	// Namespace the objects should be created in.
 	Namespace string
-	// Count determines how many objects to wait for.
+	// Path to spec file describing the PodGroup to create.
+	TemplatePath string
+	// Params to be passed to the template.
+	TemplateParams map[string]any
+	// Count determines how many PodGroups get created.
 	Count int
 	// CountParam is the name of the parameter that determines the count.
 	CountParam string
 }
 
-func (w *waitForPodGroups) isValid(allowParameterization bool) error {
-	if !isValidCount(allowParameterization, w.Count, w.CountParam) {
-		return fmt.Errorf("invalid Count=%d / CountParam=%q", w.Count, w.CountParam)
+func (cpg *createPodGroups) isValid(allowParameterization bool) error {
+	if cpg.TemplatePath == "" {
+		return fmt.Errorf("templatePath must be set")
+	}
+	if cpg.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	if !isValidCount(allowParameterization, cpg.Count, cpg.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpg.Count, cpg.CountParam)
+	}
+	if !allowParameterization && cpg.Count < 1 {
+		return fmt.Errorf("count must be greater than 0, got %d", cpg.Count)
 	}
 	return nil
 }
 
-func (w *waitForPodGroups) collectsMetrics() bool {
+func (cpg *createPodGroups) collectsMetrics() bool {
 	return false
 }
 
-func (w waitForPodGroups) patchParams(workload *Workload) (realOp, error) {
-	if w.CountParam != "" {
+func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
+	if cpg.CountParam != "" {
+		count, err := w.Params.get(cpg.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpg.Count = count
+	}
+	if len(cpg.TemplateParams) > 0 {
 		var err error
-		w.Count, err = workload.Params.get(w.CountParam[1:])
+		cpg.TemplateParams, err = resolveTemplateParams(cpg.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &w, (&w).isValid(false)
+	return &cpg, cpg.isValid(false)
 }
 
 // startCollectingMetricsOp defines an op that starts metrics collectors.

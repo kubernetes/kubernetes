@@ -11,25 +11,22 @@
   - opcode: createNodes
     countParam: $initNodes
   - opcode: createNamespaces
-    prefix: gang
+    prefix: gang-ns
     count: 1
-  - opcode: createAny
-    # Create pod groups (gangs), each has a min count policy specified in pod group template.
-    # Each pod group is named gang-0, gang-1, ... gang-(n-1).
+  - opcode: createPodGroups
+    # Create pod groups, and wait for the scheduler's informer cache to reflect the newly created pod group objects.
+    # Each pod group is named gang-0, gang-1, ..., gang-(n-1), where n is the number of pod groups.
+    # Each group has gang policy and min count specified in the pod group template.
     countParam: $initPodGroups
-    namespace: gang-0
+    namespace: gang-ns-0
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-  - opcode: waitForPodGroups
-    # Wait for the scheduler's informer cache to reflect the newly created PodGroup objects.
-    namespace: gang-0
-    countParam: $initPodGroups
   - opcode: createPods
     # Create pods with reference to the pod groups (gangs) according to their indices (e.g., pods 0-2 → gang-0, pods 3-5 → gang-1, etc.).
     countParam: $initPodGroups
     countMultiplierParam: $podsPerGroup
-    namespace: gang-0
+    namespace: gang-ns-0
     podTemplatePath: templates/gang-pod.yaml
     collectMetrics: true
     templateParams:

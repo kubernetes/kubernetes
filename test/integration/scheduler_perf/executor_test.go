@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -458,6 +459,62 @@ func TestRunOp(t *testing.T) {
 			},
 			expectedFailure: true,
 		},
+		{
+			name: "Create PodGroups",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        2,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(2),
+				verifyNamespaceCreated("namespace-0"),
+				verifyObj(
+					&schedulingapi.PodGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "namespace-0",
+						},
+						Spec: schedulingapi.PodGroupSpec{
+							SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+								Gang: &schedulingapi.GangSchedulingPolicy{
+									MinCount: 3,
+								},
+							},
+						},
+					}),
+			},
+		},
+		{
+			name: "Create PodGroups with Invalid Template Path",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: "non-existent-file.yaml",
+				Count:        1,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups with empty namespace",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "",
+				TemplatePath: *newPodGroupTemplateFile(t, ""),
+				Count:        1,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups with zero count",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        0,
+			},
+			expectedFailure: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -468,6 +525,8 @@ func TestRunOp(t *testing.T) {
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer.Informer()
 			informerFactory.Start(tCtx.Done())
 			informerFactory.WaitForCacheSync(tCtx.Done())
 
@@ -477,8 +536,9 @@ func TestRunOp(t *testing.T) {
 				testCase: &testCase{
 					DefaultPodTemplatePath: newPodTemplateFile(t, "namespace-0"),
 				},
-				podInformer: podInformer,
-				workload:    tt.workload,
+				podInformer:      podInformer,
+				podGroupInformer: podGroupInformer,
+				workload:         tt.workload,
 			}
 
 			opToRun := tt.op
@@ -545,6 +605,14 @@ func verifyCount(expectedCount int) verifyFunc {
 			}
 			if got := len(pods.Items); got != expectedCount {
 				return fmt.Errorf("unexpected pod count: got %d, want %d", got, expectedCount)
+			}
+		case *createPodGroups:
+			pgs, err := tCtx.Client().SchedulingV1alpha3().PodGroups(concreteOp.Namespace).List(tCtx, metav1.ListOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to list pod groups: %w", err)
+			}
+			if got := len(pgs.Items); got != expectedCount {
+				return fmt.Errorf("unexpected pod group count: got %d, want %d", got, expectedCount)
 			}
 		default:
 			return fmt.Errorf("verifyCount doesn't support this operation type: %T", op)
@@ -710,6 +778,34 @@ func verifyObj(expectedObj any) verifyFunc {
 			}
 			got = gotPods
 			want = wantPods
+		case *createPodGroups:
+			expectedPodGroupTemplate, ok := expectedObj.(*schedulingapi.PodGroup)
+			if !ok {
+				return fmt.Errorf("expectedObj must be *schedulingapi.PodGroup when op is *createPodGroups, got %T", expectedObj)
+			}
+
+			namespace := expectedPodGroupTemplate.Namespace
+			if namespace == "" {
+				return fmt.Errorf("expectedPodGroupTemplate.Namespace must be set")
+			}
+
+			podGroupsList, listErr := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).List(tCtx, metav1.ListOptions{})
+			if listErr != nil {
+				return fmt.Errorf("failed to list pod groups: %w", listErr)
+			}
+			gotPodGroups := podGroupsList.Items
+
+			wantPodGroups := make([]schedulingapi.PodGroup, len(gotPodGroups))
+			for i := range gotPodGroups {
+				wantPodGroups[i] = *expectedPodGroupTemplate
+			}
+
+			cmpOpts = []cmp.Option{
+				cmpopts.EquateEmpty(),
+				cmpOptsIgnoreObjectMeta,
+			}
+			got = gotPodGroups
+			want = wantPodGroups
 		default:
 			return fmt.Errorf("verifyObj doesn't support this operation type for cmp.Diff: %T", opDetails)
 		}
@@ -747,7 +843,7 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 	}()
 
 	switch obj := obj.(type) {
-	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim:
+	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim, *schedulingapi.PodGroup:
 		if err := json.NewEncoder(f).Encode(obj); err != nil {
 			t.Fatalf("Failed to encode the template to %s: %v", templateFile, err)
 		}
@@ -1035,6 +1131,23 @@ func newPodTemplateFile(t *testing.T, namespace string) *string {
 		},
 	}
 	return createObjTemplateFile(t, pod)
+}
+
+func newPodGroupTemplateFile(t *testing.T, namespace string) *string {
+	pg := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gang-{{.Index}}",
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangSchedulingPolicy{
+					MinCount: 3,
+				},
+			},
+		},
+	}
+	return createObjTemplateFile(t, pg)
 }
 
 func newPersistentVolumeTemplateFile(t *testing.T) *string {
