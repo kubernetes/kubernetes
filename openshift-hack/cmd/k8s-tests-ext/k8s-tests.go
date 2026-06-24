@@ -70,16 +70,17 @@ func main() {
 		Qualifiers: []string{withExcludedTestsFilter(`(name.contains('[Serial]') || labels.exists(l, l == '[Serial]')) && labels.exists(l, l == "Conformance")`)},
 	})
 
-	// AddGlobalSuite so the umbrella starts with zero qualifiers and inherits
-	// exclusively from its children via mergeParentQualifiers in origin.
-	kubeTestsExtension.AddGlobalSuite(e.Suite{
-		Name: "kubernetes/conformance",
+	// kubernetes/conformance is used by OCPT to run the minimal true upstream
+	// Kubernetes conformance tests, not the broader view OCP takes of what
+	// "conformance" means.
+	kubeTestsExtension.AddSuite(e.Suite{
+		Name:       "kubernetes/conformance",
+		Qualifiers: []string{withExcludedTestsFilter(`labels.exists(l, l == "Conformance")`)},
 	})
 
 	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/parallel",
 		Parents: []string{
-			"kubernetes/conformance",
 			"openshift/conformance/parallel",
 		},
 		Qualifiers: []string{withExcludedTestsFilter(`(!name.contains('[Serial]') && !labels.exists(l, l == '[Serial]'))`)},
@@ -88,7 +89,6 @@ func main() {
 	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/serial",
 		Parents: []string{
-			"kubernetes/conformance",
 			"openshift/conformance/serial",
 		},
 		Qualifiers: []string{withExcludedTestsFilter(`(name.contains('[Serial]') || labels.exists(l, l == '[Serial]'))`)},
