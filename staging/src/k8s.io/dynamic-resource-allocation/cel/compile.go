@@ -75,6 +75,7 @@ var (
 type Features struct {
 	EnableConsumableCapacity bool
 	EnableListTypeAttributes bool
+	EnableDerivedAttributes  bool
 }
 
 func GetCompiler(features Features) *compiler {
@@ -146,6 +147,9 @@ type Options struct {
 	// DisableCostEstimation can be set to skip estimating the worst-case CEL cost.
 	// If disabled or after an error, [CompilationResult.MaxCost] will be set to [math.Uint64].
 	DisableCostEstimation bool
+
+	// DerivedAttribute indicates if the expression is for a derived attribute.
+	DerivedAttribute bool
 }
 
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
@@ -175,19 +179,8 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
 
-	attributeReturnType, err := attributeTypeFromEnv(env)
-	if err != nil {
-		return resultError("unexpected error loading CEL environment: "+err.Error(), apiservercel.ErrorTypeInternal)
-	}
-
-	// This has to be valid because the end result of a CEL expression might be
-	// a boolean type, which then has the attribute type of this environment.
-	expectedReturnType := cel.BoolType
-	if ast.OutputType().IsExactType(expectedReturnType) ||
-		ast.OutputType().IsExactType(attributeReturnType) {
-		// Okay, is one of the acceptable types.
-	} else {
-		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
+	if outputTypeErr := c.validateOutputType(env, ast.OutputType(), options); outputTypeErr != nil {
+		return resultError(outputTypeErr.Detail, outputTypeErr.Type)
 	}
 
 	_, err = cel.AstToCheckedExpr(ast)
@@ -689,4 +682,67 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 
 func (s *sizeEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
 	return nil
+}
+
+func (c compiler) validateOutputType(env *cel.Env, t *cel.Type, options Options) *apiservercel.Error {
+	// Scenario: Derived attributes.
+	// They must evaluate to primitive scalars or lists of those scalars to
+	// ensure they can be matched by the scheduler using basic equality or
+	// disjointness comparisons.
+	if options.DerivedAttribute {
+		if !c.features.EnableDerivedAttributes {
+			return nil
+		}
+		if c.isAllowedDerivedAttributeType(t) {
+			return nil
+		}
+		detail := "must evaluate to a primitive scalar (string, integer, boolean), not %v"
+		if c.features.EnableListTypeAttributes {
+			detail = "must evaluate to a primitive scalar (string, integer, boolean) or a list of these scalars, not %v"
+		}
+		return &apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInvalid,
+			Detail: fmt.Sprintf(detail, t.String()),
+		}
+	}
+
+	// Scenario: Device selector expressions.
+	attributeReturnType, err := attributeTypeFromEnv(env)
+	if err != nil {
+		return &apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInternal,
+			Detail: "unexpected error loading CEL environment: " + err.Error(),
+		}
+	}
+
+	expectedReturnType := cel.BoolType
+	if t.IsExactType(expectedReturnType) || t.IsExactType(attributeReturnType) {
+		return nil
+	}
+	return &apiservercel.Error{
+		Type:   apiservercel.ErrorTypeInvalid,
+		Detail: fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), t.String()),
+	}
+}
+
+func (c compiler) isAllowedDerivedAttributeType(t *cel.Type) bool {
+	if c.isAllowedDerivedAttributeScalarType(t) {
+		return true
+	}
+	// A list in CEL is a unary generic type parameterized by exactly 1
+	// type parameter (the element type). We check that the length is 1
+	// to ensure it is a valid list and to safely access the element type.
+	if c.features.EnableListTypeAttributes && t.TypeName() == "list" && len(t.Parameters()) == 1 {
+		return c.isAllowedDerivedAttributeScalarType(t.Parameters()[0])
+	}
+	return false
+}
+
+func (c compiler) isAllowedDerivedAttributeScalarType(t *cel.Type) bool {
+	return t.IsExactType(cel.BoolType) ||
+		t.IsExactType(cel.IntType) ||
+		t.IsExactType(cel.StringType) ||
+		t.IsExactType(cel.AnyType) ||
+		t.IsExactType(cel.DynType) ||
+		t.IsExactType(apiservercel.SemverType)
 }

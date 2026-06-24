@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -110,6 +111,7 @@ func TestValidateClaim(t *testing.T) {
 		wantFailures                  field.ErrorList
 		consumableCapacityFeatureGate bool
 		derivedAttributesFeatureGate  bool
+		listTypeAttributesFeatureGate bool
 	}{
 		"good-claim": {
 			claim: testClaim(goodName, goodNS, validClaimSpec),
@@ -727,6 +729,167 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"derived-attributes-valid": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-invalid-name": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), badName, content.IsCIdentifier(string(badName))[0]),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       resource.QualifiedName(badName), // Invalid name format (contains special characters)
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-duplicate-name": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(1), "sharedNumaNode").MarkCoveredByDeclarative(),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+					{
+						Name:       "sharedNumaNode", // Duplicate name
+						Expression: `device.attributes["dra.example.com"]["socket"]`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-compile-errors": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `device.attributes[true].someBoolean`, "compilation failed: ERROR: <input>:1:18: found no matching overload for '_[_]' applied to '(map(string, map(string, any)), bool)'\n | device.attributes[true].someBoolean\n | .................^"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes[true].someBoolean`, // Invalid map lookup key type (boolean instead of string)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-invalid-type": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `device.attributes`, "must evaluate to a primitive scalar (string, integer, boolean), not map(string, map(string, google.protobuf.Any))"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes`, // Invalid return type (map instead of primitive scalar or list)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-length": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				expression := `device.driver == ""`
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "sharedNumaNode",
+						// Expression length exceeds maximum allowed characters (1023)
+						Expression: strings.ReplaceAll(expression, `""`, `"`+strings.Repeat("x", resource.CELSelectorExpressionMaxLength-len(expression)+1)+`"`),
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-CEL-cost": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), "too complex, exceeds cost limit"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name: "sharedNumaNode",
+						// Expression complexity exceeds maximum allowed execution cost
+						Expression: `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))`,
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate: true,
+		},
+		"derived-attributes-list-type-disabled": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), `[1, 2, 3]`, "must evaluate to a primitive scalar (string, integer, boolean), not list(int)"),
+			},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `[1, 2, 3]`, // List return type (rejected if DRAListTypeAttributes feature gate is disabled)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate:  true,
+			listTypeAttributesFeatureGate: false,
+		},
+		"derived-attributes-list-type-enabled": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `[1, 2, 3]`, // List return type (allowed if DRAListTypeAttributes feature gate is enabled)
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate:  true,
+			listTypeAttributesFeatureGate: true,
+		},
+		"derived-attributes-disabled-feature-gate": {
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `[device.attributes]`, // Completely invalid type, but should be ignored because gate is disabled
+					},
+				}
+				return claim
+			}(),
+			derivedAttributesFeatureGate:  false,
+			listTypeAttributesFeatureGate: false,
+		},
 		"prioritized-list-valid": {
 			wantFailures: nil,
 			claim: func() *resource.ResourceClaim {
@@ -972,8 +1135,11 @@ func TestValidateClaim(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, scenario.derivedAttributesFeatureGate)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: scenario.consumableCapacityFeatureGate,
+				features.DRADerivedAttributes:  scenario.derivedAttributesFeatureGate,
+				features.DRAListTypeAttributes: scenario.listTypeAttributesFeatureGate,
+			})
 			errs := ValidateResourceClaim(scenario.claim)
 			assertFailures(t, scenario.wantFailures, errs)
 		})

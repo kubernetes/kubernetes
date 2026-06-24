@@ -57,12 +57,12 @@ import (
 var ResourceNormalizationRules = []field.NormalizationRule{
 	{
 		// ResourceClaim
-		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 	{
 		// ResourceClaimTemplate (RCT.Spec.Spec adds an extra "spec." prefix)
-		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.spec.devices.requests[$1].exactly.$2",
 	},
 	{
@@ -278,6 +278,7 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(subRequest.DerivedAttributes, fldPath.Child("derivedAttributes"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -289,6 +290,7 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(request.DerivedAttributes, fldPath.Child("derivedAttributes"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -382,6 +384,60 @@ func convertCELErrorToValidationError(fldPath *field.Path, expression string, er
 		}
 	}
 	return field.InternalError(fldPath, fmt.Errorf("unsupported error type: %w", err))
+}
+
+func validateDeviceDerivedAttributes(attrs []resource.DeviceDerivedAttribute, fldPath *field.Path, stored bool) field.ErrorList {
+	return validateSet(attrs, resource.DeviceDerivedAttributesMaxSize,
+		func(attr resource.DeviceDerivedAttribute, fldPath *field.Path) field.ErrorList {
+			return validateDeviceDerivedAttribute(attr, fldPath, stored)
+		},
+		func(attr resource.DeviceDerivedAttribute) string {
+			return string(attr.Name)
+		},
+		fldPath, sizeCovered, uniquenessCovered)
+}
+
+func validateDeviceDerivedAttribute(attr resource.DeviceDerivedAttribute, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	if attr.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, validateQualifiedName(attr.Name, fldPath.Child("name"))...)
+	}
+	if attr.Expression == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("expression"), "").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, validateCELDerivedAttributeExpression(attr.Expression, fldPath.Child("expression"), stored)...)
+	}
+	return allErrs
+}
+
+func validateCELDerivedAttributeExpression(expression string, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	envType := environment.NewExpressions
+	if stored {
+		envType = environment.StoredExpressions
+	}
+	if len(expression) > resource.CELSelectorExpressionMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.CELSelectorExpressionMaxLength))
+		return allErrs
+	}
+
+	result := dracel.GetCompiler(dracel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+		EnableDerivedAttributes:  utilfeature.DefaultFeatureGate.Enabled(features.DRADerivedAttributes),
+	}).CompileCELExpression(expression, dracel.Options{
+		EnvType:          &envType,
+		DerivedAttribute: true,
+	})
+	if result.Error != nil {
+		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, expression, result.Error))
+	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, exceeds cost limit"))
+	}
+
+	return allErrs
 }
 
 func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *field.Path, requestNames requestNames, derivedAttrs requestDerivedAttributes) field.ErrorList {

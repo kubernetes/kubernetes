@@ -360,6 +360,62 @@ var objWithCapacityRequests = &resource.ResourceClaim{
 	},
 }
 
+var objWithDerivedAttributes = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						DerivedAttributes: []resource.DeviceDerivedAttribute{
+							{
+								Name:       "sharedNumaNode",
+								Expression: `device.attributes["dra.example.com"]["numa"]`,
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithDerivedAttributesInPrioritizedList = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           1,
+							DerivedAttributes: []resource.DeviceDerivedAttribute{
+								{
+									Name:       "sharedNumaNode",
+									Expression: `device.attributes["dra.example.com"]["numa"]`,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
 var ns1 = &corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   "default",
@@ -998,6 +1054,129 @@ func TestStrategyUpdate(t *testing.T) {
 			expectObj.ResourceVersion = "4"
 			assert.Equal(t, expectObj, newObj)
 			tc.verify(t, fakeClient.Actions())
+		})
+	}
+}
+
+func TestStrategyCreateWithDerivedAttributes(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := []struct {
+		name              string
+		obj               *resource.ResourceClaim
+		derivedAttributes bool // DRADerivedAttributes feature gate
+		expectObj         *resource.ResourceClaim
+	}{
+		{
+			name:              "should drop derivedAttributes during creation when the feature gate is disabled",
+			obj:               objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         obj,
+		},
+		{
+			name:              "should preserve derivedAttributes during creation when the feature gate is enabled",
+			obj:               objWithDerivedAttributes,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributes,
+		},
+		{
+			name:              "should drop derivedAttributes in prioritized list during creation when the feature gate is disabled",
+			obj:               objWithDerivedAttributesInPrioritizedList,
+			derivedAttributes: false,
+			expectObj:         objWithPrioritizedList,
+		},
+		{
+			name:              "should preserve derivedAttributes in prioritized list during creation when the feature gate is enabled",
+			obj:               objWithDerivedAttributesInPrioritizedList,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributesInPrioritizedList,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(ns1, ns2)
+			mockNSClient := fakeClient.CoreV1().Namespaces()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			strategy := NewStrategy(mockNSClient, nil)
+
+			obj := tc.obj.DeepCopy()
+			strategy.PrepareForCreate(ctx, obj)
+			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
+				t.Fatalf("unexpected error(s): %v", errs)
+			}
+			strategy.Canonicalize(obj)
+			assert.Equal(t, tc.expectObj, obj)
+		})
+	}
+}
+
+func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := []struct {
+		name                  string
+		oldObj                *resource.ResourceClaim
+		newObj                *resource.ResourceClaim
+		derivedAttributes     bool // DRADerivedAttributes feature gate
+		expectValidationError string
+		expectObj             *resource.ResourceClaim
+	}{
+		{
+			name:              "should drop derivedAttributes during update when the feature gate is disabled and they were not previously in use",
+			oldObj:            obj,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         obj,
+		},
+		{
+			name:                  "should fail validation on update when the feature gate is enabled because spec is immutable",
+			oldObj:                obj,
+			newObj:                objWithDerivedAttributes,
+			derivedAttributes:     true,
+			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add derived attributes.
+		},
+		{
+			name:              "should preserve derivedAttributes during update when the feature gate is enabled and they were already in use",
+			oldObj:            objWithDerivedAttributes,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributes,
+		},
+		{
+			name:              "should preserve derivedAttributes during update even if the feature gate is disabled because they were already in use",
+			oldObj:            objWithDerivedAttributes,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         objWithDerivedAttributes,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(ns1, ns2)
+			mockNSClient := fakeClient.CoreV1().Namespaces()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			strategy := NewStrategy(mockNSClient, nil)
+
+			oldObj := tc.oldObj.DeepCopy()
+			newObj := tc.newObj.DeepCopy()
+			newObj.ResourceVersion = "4"
+
+			strategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.Len(t, errs, 1, "exactly one error expected")
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				return
+			}
+			if tc.expectValidationError != "" {
+				t.Fatal("expected validation error(s), got none")
+			}
+			strategy.Canonicalize(newObj)
+			expectObj := tc.expectObj.DeepCopy()
+			expectObj.ResourceVersion = "4"
+			assert.Equal(t, expectObj, newObj)
 		})
 	}
 }

@@ -959,3 +959,100 @@ func BenchmarkDeviceMatches(b *testing.B) {
 		}
 	}
 }
+
+func TestCompileDerivedAttributes(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		expression                string
+		listTypeAttributesEnabled bool
+		derivedAttributesEnabled  *bool // default to true if nil
+		expectCompileError        string
+	}{
+		{
+			name:                      "valid-bool",
+			expression:                "true",
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-int",
+			expression:                "1",
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-string",
+			expression:                `"fish"`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-semver",
+			expression:                `semver("1.0.0")`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-semver-list",
+			expression:                `[semver("1.0.0"), semver("2.0.0")]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-attribute-lookup",
+			expression:                `device.attributes["dra.example.com"]["numa"]`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "invalid-map-type",
+			expression:                `device.attributes`,
+			listTypeAttributesEnabled: false,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean), not map(string, map(string, dyn))",
+		},
+		{
+			name:                      "valid-list-when-listType-enabled",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "invalid-list-when-listType-disabled",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: false,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean), not list(int)",
+		},
+		{
+			name:                      "invalid-list-of-maps",
+			expression:                `[device.attributes]`,
+			listTypeAttributesEnabled: true,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean) or a list of these scalars, not list(map(string, map(string, dyn)))",
+		},
+		{
+			name:                     "disabled-feature-gate",
+			expression:               `[device.attributes]`, // syntactically valid expression with invalid return type (list of maps)
+			derivedAttributesEnabled: new(bool),             // but gate is disabled
+			expectCompileError:       "",                    // so the type check is bypassed and it returns NO error!
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			enableDerivedAttributes := true
+			if tc.derivedAttributesEnabled != nil {
+				enableDerivedAttributes = *tc.derivedAttributesEnabled
+			}
+			compiler := GetCompiler(Features{
+				EnableListTypeAttributes: tc.listTypeAttributesEnabled,
+				EnableDerivedAttributes:  enableDerivedAttributes,
+			})
+			result := compiler.CompileCELExpression(tc.expression, Options{
+				DerivedAttribute: true,
+			})
+
+			if tc.expectCompileError != "" {
+				if result.Error == nil {
+					t.Fatalf("expected compile error %q, got none", tc.expectCompileError)
+				}
+				if !strings.Contains(result.Error.Error(), tc.expectCompileError) {
+					t.Fatalf("expected compile error to contain %q, but got: %v", tc.expectCompileError, result.Error)
+				}
+			} else if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+		})
+	}
+}
