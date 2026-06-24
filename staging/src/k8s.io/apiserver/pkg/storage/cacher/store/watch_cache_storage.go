@@ -99,21 +99,21 @@ func (w *WatchCacheStorage) MarkConsistent(consistent bool) {
 	}
 }
 
-func (w *WatchCacheStorage) GetLatestSnapshotLocked(key, continueKey string) (Snapshot, error) {
-	if w.snapshots != nil && w.snapshottingEnabled.Load() {
-		snap, ok := w.snapshots.Latest()
-		if ok {
-			// Snapshots are added in order as we update store, so the
-			// latest snapshot match latest store state and latest revision.
-			return snap, nil
-		}
+func (w *WatchCacheStorage) LatestSnapshotLocked() (Snapshot, bool) {
+	if w.SnapshottingEnabled() {
+		return w.snapshots.Latest()
+	}
+	return nil, false
+}
+
+func (w *WatchCacheStorage) GetLatestSnapshotOrBuildLocked(key, continueKey string) (Snapshot, error) {
+	if snap, ok := w.LatestSnapshotLocked(); ok {
+		// Snapshots are added in order as we update store, so the
+		// latest snapshot match latest store state and latest revision.
+		return snap, nil
 	}
 	// TODO: Consider using Indexer Clone() after benchmarking.
-	snap, err := orderedSnapshotResponseFromIndexer(w.store, key, continueKey)
-	if err != nil {
-		return nil, err
-	}
-	return snap, nil
+	return orderedSnapshotResponseFromIndexer(w.store, key, continueKey)
 }
 
 func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string) (Snapshot, error) {

@@ -69,6 +69,29 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLatestSnapshotLocked(t *testing.T) {
+	keyFunc := func(obj runtime.Object) (string, error) {
+		return obj.(*mockObject).key, nil
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+	indexers := &cache.Indexers{}
+	s := NewWatchCacheStorage(keyFunc, indexers)
+
+	_, ok := s.LatestSnapshotLocked()
+	assert.False(t, ok, "expected no snapshot before any writes")
+
+	elem := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
+	require.NoError(t, s.UpdateStoreLocked(watch.Added, elem, 100))
+
+	snap, ok := s.LatestSnapshotLocked()
+	require.True(t, ok, "expected snapshot after write")
+	items, err := snap.OrderedListPrefix("", "")
+	require.NoError(t, err)
+	assert.Len(t, items, 1)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].(*Element).Object)
+}
+
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return obj.(*mockObject).key, nil
