@@ -1219,3 +1219,150 @@ func TestProfileCollection(t *testing.T) {
 		}
 	})
 }
+
+func TestStopChurnOpCancellation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	t.Run("stop specific named churn", func(t *testing.T) {
+		called1, called2 := false, false
+		exec := &WorkloadExecutor{
+			churnCancels: map[string]context.CancelFunc{
+				"churn-1": func() { called1 = true },
+				"churn-2": func() { called2 = true },
+			},
+		}
+
+		op := &stopChurnOp{
+			Opcode: stopChurnOpcode,
+			Name:   "churn-1",
+		}
+
+		err := exec.runStopChurnOp(tCtx, op)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if !called1 {
+			t.Errorf("Expected churn-1 to be cancelled")
+		}
+		if called2 {
+			t.Errorf("Expected churn-2 not to be cancelled")
+		}
+		if _, exists := exec.churnCancels["churn-1"]; exists {
+			t.Errorf("Expected churn-1 to be deleted from map")
+		}
+		if _, exists := exec.churnCancels["churn-2"]; !exists {
+			t.Errorf("Expected churn-2 to remain in map")
+		}
+	})
+
+	t.Run("stop all churns when no name specified", func(t *testing.T) {
+		called1, called2 := false, false
+		exec := &WorkloadExecutor{
+			churnCancels: map[string]context.CancelFunc{
+				"churn-1": func() { called1 = true },
+				"churn-2": func() { called2 = true },
+			},
+		}
+
+		op := &stopChurnOp{
+			Opcode: stopChurnOpcode,
+			Name:   "",
+		}
+
+		err := exec.runStopChurnOp(tCtx, op)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if !called1 {
+			t.Errorf("Expected churn-1 to be cancelled")
+		}
+		if !called2 {
+			t.Errorf("Expected churn-2 to be cancelled")
+		}
+		if exec.churnCancels != nil {
+			t.Errorf("Expected churnCancels map to be nil after stopping all")
+		}
+	})
+
+	t.Run("stop non-existent named churn errors", func(t *testing.T) {
+		exec := &WorkloadExecutor{
+			churnCancels: map[string]context.CancelFunc{
+				"churn-1": func() {},
+			},
+		}
+
+		op := &stopChurnOp{
+			Opcode: stopChurnOpcode,
+			Name:   "churn-non-existent",
+		}
+
+		err := exec.runStopChurnOp(tCtx, op)
+		if err == nil {
+			t.Fatalf("Expected error when stopping non-existent named churn, got nil")
+		}
+		expectedErr := `no active churn generator with name "churn-non-existent"`
+		if err.Error() != expectedErr {
+			t.Errorf("Expected error message %q, got %q", expectedErr, err.Error())
+		}
+	})
+
+	t.Run("stop named churn when no churns exist errors", func(t *testing.T) {
+		exec := &WorkloadExecutor{
+			churnCancels: nil,
+		}
+
+		op := &stopChurnOp{
+			Opcode: stopChurnOpcode,
+			Name:   "churn-1",
+		}
+
+		err := exec.runStopChurnOp(tCtx, op)
+		if err == nil {
+			t.Fatalf("Expected error when stopping named churn with no active churns, got nil")
+		}
+		expectedErr := `no active churn generator with name "churn-1"`
+		if err.Error() != expectedErr {
+			t.Errorf("Expected error message %q, got %q", expectedErr, err.Error())
+		}
+	})
+}
+
+func TestStopAllBackgroundChurns(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	t.Run("stop all churns when some churns exist", func(t *testing.T) {
+		called1, called2 := false, false
+		exec := &WorkloadExecutor{
+			churnCancels: map[string]context.CancelFunc{
+				"churn-1": func() { called1 = true },
+				"churn-2": func() { called2 = true },
+			},
+		}
+
+		exec.stopAllBackgroundChurns(tCtx)
+
+		if !called1 {
+			t.Errorf("Expected churn-1 to be cancelled")
+		}
+		if !called2 {
+			t.Errorf("Expected churn-2 to be cancelled")
+		}
+		if exec.churnCancels != nil {
+			t.Errorf("Expected churnCancels map to be nil after stopping all")
+		}
+	})
+
+	t.Run("stop all churns when no churns exist", func(t *testing.T) {
+		exec := &WorkloadExecutor{
+			churnCancels: nil,
+		}
+
+		exec.stopAllBackgroundChurns(tCtx)
+
+		if exec.churnCancels != nil {
+			t.Errorf("Expected churnCancels map to remain nil")
+		}
+	})
+}
