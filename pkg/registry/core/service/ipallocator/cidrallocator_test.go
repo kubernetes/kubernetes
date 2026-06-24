@@ -138,7 +138,7 @@ func TestCIDRAllocateMultiple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -308,7 +308,7 @@ func TestCIDRAllocateGrow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -400,7 +400,7 @@ func TestCIDRAllocateShrink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -419,7 +419,7 @@ func TestCIDRAllocateShrink(t *testing.T) {
 	if _, err := r.AllocateNext(); err == nil {
 		t.Fatal(err)
 	}
-	for _, ip := range found.List() {
+	for _, ip := range sets.List(found) {
 		err = r.Release(netutils.ParseIPSloppy(ip))
 		if err != nil {
 			t.Fatalf("unexpected error releasing ip %s", err)
@@ -525,7 +525,7 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 	}
 	r.bitmapAllocator = bitmapAllocator
 
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -641,7 +641,7 @@ func TestCIDRAllocateIPv6(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	found := sets.NewString()
+	found := sets.New[string]()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -665,7 +665,7 @@ func TestCIDRAllocateIPv6(t *testing.T) {
 	}
 
 	// releasing every address must make the whole range available again
-	for _, ip := range found.List() {
+	for _, ip := range sets.List(found) {
 		if err := r.Release(netutils.ParseIPSloppy(ip)); err != nil {
 			t.Fatalf("unexpected error releasing ip %s: %v", ip, err)
 		}
@@ -829,7 +829,7 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	expectMetrics(t, "192.168.1.0/30", em1)
 
 	// Allocate all IPs from first CIDR (should be 2 usable IPs: .1 and .2)
-	found := sets.NewString()
+	found := sets.New[string]()
 	allocatedFromCIDR1 := 0
 	for r.Free() > 0 && allocatedFromCIDR1 < 2 {
 		ip, err := r.AllocateNext()
