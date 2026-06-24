@@ -108,6 +108,15 @@ dependencies:
     - path: hack/testdata/pod-with-large-name.yaml
       match: registry.k8s.io/e2e-test-images/agnhost:\d+\.\d+\.\d+
 
+  # sample-device-plugin - E2E test image
+  - name: "sample-device-plugin"
+    version: "1.7"
+    refPaths:
+    - path: test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin.yaml
+      match: registry.k8s.io/e2e-test-images/sample-device-plugin:\d+\.\d+
+    - path: test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin-control-registration.yaml
+      match: registry.k8s.io/e2e-test-images/sample-device-plugin:\d+\.\d+
+
   - name: "node-problem-detector"
     version: 1.35.2
     refPaths:
