@@ -2618,3 +2618,316 @@ func setContainerStatus(podStatus *kubecontainer.PodStatus, c *v1.Container, idx
 		},
 	}
 }
+
+// TestPodWillNeedAllocation verifies the PodWillNeedAllocation method correctly
+// identifies pods that need allocation but haven't been allocated yet.
+func TestPodWillNeedAllocation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name               string
+		pod                *v1.Pod
+		setAllocation      bool
+		expectedNeedsAlloc bool
+		description        string
+	}{
+		{
+			name: "pod with CPU requests, no allocation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-1"),
+					Name:      "pod-1",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: true,
+			description:        "Pod with CPU requests but no allocation should need allocation",
+		},
+		{
+			name: "pod with memory requests, no allocation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-2"),
+					Name:      "pod-2",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: true,
+			description:        "Pod with memory requests but no allocation should need allocation",
+		},
+		{
+			name: "pod with CPU limits only, no allocation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-3"),
+					Name:      "pod-3",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: true,
+			description:        "Pod with CPU limits but no allocation should need allocation",
+		},
+		{
+			name: "pod with resources and allocation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-4"),
+					Name:      "pod-4",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			setAllocation:      true,
+			expectedNeedsAlloc: false,
+			description:        "Pod with resources and allocation should NOT need allocation",
+		},
+		{
+			name: "pod without any resources, no allocation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-5"),
+					Name:      "pod-5",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							// No resources specified
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: false,
+			description:        "Pod without resources should NOT need allocation",
+		},
+		{
+			name: "pod with init container resources, no allocation",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-6"),
+					Name:      "pod-6",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:  "init",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: true,
+			description:        "Pod with init container resources but no allocation should need allocation",
+		},
+		{
+			name: "pod with multiple containers, some with resources",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-7"),
+					Name:      "pod-7",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							// No resources
+						},
+						{
+							Name:  "c2",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: true,
+			description:        "Pod with at least one container having resources should need allocation",
+		},
+		{
+			name: "pod with empty resource lists",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       types.UID("pod-8"),
+					Name:      "pod-8",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c1",
+							Image: "test",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{},
+								Limits:   v1.ResourceList{},
+							},
+						},
+					},
+				},
+			},
+			setAllocation:      false,
+			expectedNeedsAlloc: false,
+			description:        "Pod with empty resource lists should NOT need allocation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a simple allocation manager
+			mgr := NewManager(
+				t.TempDir(),
+				nil, // status manager not needed for this test
+				func(ctx context.Context, pod *v1.Pod) {}, // trigger pod sync
+				func() []*v1.Pod { return nil },
+				func(types.UID) (*v1.Pod, bool) { return nil, false },
+				nil, // sources ready
+				record.NewFakeRecorder(10),
+				logger,
+			)
+
+			// Set allocation if requested
+			if tt.setAllocation {
+				err := mgr.SetAllocatedResources(logger, tt.pod)
+				require.NoError(t, err, "Failed to set allocation")
+			}
+
+			// Test PodWillNeedAllocation
+			result := mgr.PodWillNeedAllocation(tt.pod)
+			assert.Equal(t, tt.expectedNeedsAlloc, result, tt.description)
+		})
+	}
+}
+
+// TestPodWillNeedAllocation_ResizeScenario tests the resize scenario where
+// a pod has an old allocation but is being resized to new resources.
+func TestPodWillNeedAllocation_ResizeScenario(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	// Create pod with 100m CPU allocated
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID("resize-pod"),
+			Name:      "resize-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "test",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100m"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	mgr := NewManager(
+		t.TempDir(),
+		nil,
+		func(ctx context.Context, pod *v1.Pod) {},
+		func() []*v1.Pod { return nil },
+		func(types.UID) (*v1.Pod, bool) { return nil, false },
+		nil,
+		record.NewFakeRecorder(10),
+		logger,
+	)
+
+	// Set initial allocation (100m)
+	err := mgr.SetAllocatedResources(logger, pod)
+	require.NoError(t, err)
+
+	// Pod should NOT need allocation (already has one)
+	assert.False(t, mgr.PodWillNeedAllocation(pod), "Pod with allocation should not need allocation")
+
+	// Now user requests resize to 200m
+	resizedPod := pod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("200m")
+
+	// Even though desired resources changed, pod still has an allocation (the old one)
+	// So PodWillNeedAllocation should return false
+	assert.False(t, mgr.PodWillNeedAllocation(resizedPod),
+		"Pod being resized should not need allocation (already has old allocation)")
+}
