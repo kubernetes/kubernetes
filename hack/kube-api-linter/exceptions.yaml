@@ -123,3 +123,7 @@
 # Validation makes this require at least one of the fields within to be set.
 - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate).SchedulingPolicy is a non-pointer struct with no required fields."
   path: "staging/src/k8s.io/api/scheduling/v1alpha3/types.go"
+
+# Dependenttags - pre-existing listType/listMapKey violations to be resolved later
+- text: "dependenttags: field .* with marker \\+(?:listType|listMapKey) is missing required marker\\(s\\): \\+k8s:(?:listType|listMapKey)"
+  path: "staging/src/k8s.io/api/(admission|admissionregistration|apidiscovery|apiserverinternal|apps|authentication|authorization|autoscaling|batch|certificates|core|extensions|flowcontrol|imagepolicy|networking|node|rbac|resource|scheduling|storage|storagemigration)/"
