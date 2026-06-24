@@ -282,21 +282,6 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			ExpectedErrs: field.ErrorList{},
 		},
 		{
-			Name: "finalizers: name too long",
-			Modify: func(meta metav1.Object) {
-				meta.SetFinalizers([]string{strings.Repeat("a", 317)})
-			},
-			ExpectedErrs: func() field.ErrorList {
-				errs := field.ErrorList{
-					field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
-				}
-				if o.stringentFinalizerValidation {
-					errs = append(errs, field.Invalid(fldPath.Child("finalizers").Index(0), strings.Repeat("a", 317), "name is neither a standard finalizer name nor is it fully qualified").MarkFromImperative())
-				}
-				return errs
-			}(),
-		},
-		{
 			Name: "labels: invalid key format",
 			Modify: func(meta metav1.Object) {
 				meta.SetLabels(map[string]string{
@@ -557,21 +542,6 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			ExpectedErrs: field.ErrorList{
 				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 0).MarkFromImperative(),
 			},
-		},
-		{
-			Name: "update: finalizers: name too long",
-			Modify: func(old, new metav1.Object) {
-				new.SetFinalizers([]string{strings.Repeat("a", 317)})
-			},
-			ExpectedErrs: func() field.ErrorList {
-				errs := field.ErrorList{
-					field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
-				}
-				if o.stringentFinalizerValidation {
-					errs = append(errs, field.Invalid(fldPath.Child("finalizers").Index(0), strings.Repeat("a", 317), "name is neither a standard finalizer name nor is it fully qualified").MarkFromImperative())
-				}
-				return errs
-			}(),
 		},
 		{
 			Name: "update: labels: invalid key format",

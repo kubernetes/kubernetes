@@ -18,7 +18,6 @@ package replicationcontroller
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"strings"
 	"testing"
 
@@ -29,6 +28,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
