@@ -215,10 +215,26 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go le.config.Callbacks.OnStartedLeading(ctx)
+
+	if !le.config.ReleaseOnCancel {
+		go le.config.Callbacks.OnStartedLeading(ctx)
+		le.renew(ctx)
+		return
+	}
+
+	// When ReleaseOnCancel is set, we need to make sure OnStartedLeading returns before we release the lock
+	// to ensure there is no business logic running while the lock is already released.
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		le.config.Callbacks.OnStartedLeading(ctx)
+	})
 	le.renew(ctx)
+	cancel()
+	wg.Wait()
+	le.release(klog.FromContext(ctx))
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
@@ -305,10 +321,6 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		cancel()
 	}, le.config.RetryPeriod)
 
-	// if we hold the lease, give it up
-	if le.config.ReleaseOnCancel {
-		le.release(logger)
-	}
 }
 
 // release attempts to release the leader lease if we have acquired it.

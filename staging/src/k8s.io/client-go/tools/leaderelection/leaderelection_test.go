@@ -1036,6 +1036,112 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 	}
 }
 
+// TestReleaseOnRenewalFailure verifies that when leadership is lost because
+// every renewal update fails (as opposed to the parent context being
+// cancelled), Run() still returns promptly and the lock is released only
+// after OnStartedLeading has returned. The update reactor rejects all
+// renewal updates, which causes renew() to exceed its deadline and return.
+// Run() must then cancel the context given to OnStartedLeading, wait for it
+// to finish, and only then call release().
+func TestReleaseOnRenewalFailure(t *testing.T) {
+	objectType := "leases"
+
+	var (
+		lockObj   runtime.Object
+		lockObjMu sync.Mutex
+
+		events   []string
+		eventsMu sync.Mutex
+	)
+
+	trackEvent := func(name string) {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		events = append(events, name)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockObjMu.Lock()
+		defer lockObjMu.Unlock()
+		if lockObj != nil {
+			return true, lockObj, nil
+		}
+		act := action.(fakeclient.GetAction)
+		return true, nil, errors.NewNotFound(act.GetResource().GroupResource(), act.GetName())
+	})
+	c.AddReactor("create", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockObjMu.Lock()
+		defer lockObjMu.Unlock()
+		lockObj = action.(fakeclient.CreateAction).GetObject()
+		return true, lockObj, nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		lockObjMu.Lock()
+		defer lockObjMu.Unlock()
+
+		lease := action.(fakeclient.UpdateAction).GetObject().(*coordinationv1.Lease)
+
+		if lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity == "" {
+			trackEvent("lock released")
+			lockObj = lease
+			return true, lockObj, nil
+		}
+
+		return true, nil, fmt.Errorf("renewal failed")
+	})
+
+	lock, err := rl.New(objectType, "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+	if err != nil {
+		t.Fatal("Failed to create a resource lock: ", err)
+	}
+
+	lec := LeaderElectionConfig{
+		Lock:            lock,
+		LeaseDuration:   500 * time.Millisecond,
+		RenewDeadline:   200 * time.Millisecond,
+		RetryPeriod:     50 * time.Millisecond,
+		ReleaseOnCancel: true,
+		Callbacks: LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				<-ctx.Done()
+				trackEvent("OnStartedLeading returned")
+			},
+			OnStoppedLeading: func() {},
+		},
+	}
+
+	elector, err := NewLeaderElector(lec)
+	if err != nil {
+		t.Fatal("Failed to create leader elector: ", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		elector.Run(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run() did not return; likely deadlock when leadership is lost via renewal failure")
+	}
+
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	assert.Equal(t, []string{"OnStartedLeading returned", "lock released"}, events,
+		"OnStartedLeading must return before release()")
+}
+
 func TestLeaderElectionConfigValidation(t *testing.T) {
 	resourceLockConfig := rl.ResourceLockConfig{
 		Identity: "baz",
