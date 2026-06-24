@@ -9036,7 +9036,6 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 		podHostname         string
 		podSubdomain        string
 		podHostnameOverride *string
-		featureGateEnabled  bool
 		expectedHostname    string
 		expectedDomain      string
 		expectError         bool
@@ -9075,42 +9074,29 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 			expectedDomain:   "my-subdomain.default.svc.cluster.local",
 		},
 		{
-			name:                "HostnameOverride - enabled - overrides all",
+			name:                "HostnameOverride - overrides all",
 			podName:             "test-pod",
 			podHostname:         "custom-hostname",
 			podSubdomain:        "my-subdomain",
 			podHostnameOverride: ptr.To("override-hostname"),
-			featureGateEnabled:  true,
 			expectedHostname:    "override-hostname",
 			expectedDomain:      "",
 		},
 		{
-			name:                "HostnameOverride - enabled - overrides all - invalid hostname",
+			name:                "HostnameOverride - overrides all - invalid hostname",
 			podName:             "test-pod",
 			podHostname:         "custom-hostname",
 			podSubdomain:        "my-subdomain",
 			podHostnameOverride: ptr.To("Invalid-Hostname-!"),
-			featureGateEnabled:  true,
 			expectError:         true,
 			errorContains:       "pod HostnameOverride \"Invalid-Hostname-!\" is not a valid DNS subdomain",
 		},
 		{
-			name:                "HostnameOverride - enabled - overrides all - valid DNS hostname",
+			name:                "HostnameOverride - overrides all - valid DNS hostname",
 			podName:             "test-pod",
 			podHostnameOverride: ptr.To("valid.hostname"),
 			expectedHostname:    "valid.hostname",
-			featureGateEnabled:  true,
 			errorContains:       "",
-		},
-		{
-			name:                "HostnameOverride - disabled - is ignored",
-			podName:             "test-pod",
-			podHostname:         "custom-hostname",
-			podSubdomain:        "my-subdomain",
-			podHostnameOverride: ptr.To("override-hostname"),
-			featureGateEnabled:  false,
-			expectedHostname:    "custom-hostname",
-			expectedDomain:      "my-subdomain.default.svc.cluster.local",
 		},
 		{
 			name:             "Hostname Truncation - pod name is too long",
@@ -9145,7 +9131,6 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostnameOverride, tc.featureGateEnabled)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.podName,

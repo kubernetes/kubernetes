@@ -272,7 +272,6 @@ type PodSpecApplyConfiguration struct {
 	// - `hostNetwork` must be set to false.
 	//
 	// This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
-	// Requires the HostnameOverride feature gate to be enabled.
 	HostnameOverride *string `json:"hostnameOverride,omitempty"`
 	// SchedulingGroup provides a reference to the immediate scheduling runtime
 	// grouping object that this Pod belongs to.
