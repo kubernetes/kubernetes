@@ -724,27 +724,8 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 		container = pod.Spec.Containers[containerIdx]
 	}
 
-	// Determine if the *running* container needs resource update by comparing v1.Spec.Resources (desired)
-	// with v1.Status.Resources / runtime.Status.Resources (last known actual).
-	// Proceed only when kubelet has accepted the resize a.k.a v1.Spec.Resources.Requests == v1.Status.AllocatedResources.
-	// Skip if runtime containerID doesn't match pod.Status containerID (container is restarting)
-	if kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
-		// Non-running container being restarted
-		actuatedContainerResources, _ := m.actuatedState.GetContainerResources(pod.UID, container.Name)
-		var actuatedPodResources *v1.ResourceRequirements
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-			actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
-		}
-		desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
-		currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
-		if currentResources != desiredResources {
-			changes.UpdatePodResources = true
-		}
-		return true
-	}
-
 	actuatedContainerResources, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
-	if !found {
+	if !found && kubeContainerStatus.State == kubecontainer.ContainerStateRunning {
 		logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "container", container.Name)
 		// Proceed with the zero-value actuated resources. For restart NotRequired, this may
 		// result in an extra call to UpdateContainerResources, but that call should be idempotent.
@@ -761,6 +742,15 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 
 	if currentResources == desiredResources {
 		// No resize required.
+		return true
+	}
+
+	// Determine if the *running* container needs resource update by comparing v1.Spec.Resources (desired)
+	// with v1.Status.Resources / runtime.Status.Resources (last known actual).
+	// Proceed only when kubelet has accepted the resize a.k.a v1.Spec.Resources.Requests == v1.Status.AllocatedResources.
+	// Skip if runtime containerID doesn't match pod.Status containerID (container is restarting)
+	if kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
+		changes.UpdatePodResources = true
 		return true
 	}
 
@@ -1323,7 +1313,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 				// kubelet manages the pod cgroups while CRI manages the container-level cgroups,
 				// so kubelet must explicitly adjust the pod cgroups first
 				// before making the CRI call to start the container
-				if containerStatus != nil {
+				if containerStatus != nil && !changes.UpdatePodResources {
 					m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes)
 				}
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
