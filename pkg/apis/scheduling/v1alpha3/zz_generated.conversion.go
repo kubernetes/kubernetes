@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -252,6 +251,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha3_AllDisruptionMode_To_scheduling_AllDisruptionMode(in *schedulingv1alpha3.AllDisruptionMode, out *scheduling.AllDisruptionMode, s conversion.Scope) error {
+	*out = *(*scheduling.AllDisruptionMode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -261,6 +261,7 @@ func Convert_v1alpha3_AllDisruptionMode_To_scheduling_AllDisruptionMode(in *sche
 }
 
 func autoConvert_scheduling_AllDisruptionMode_To_v1alpha3_AllDisruptionMode(in *scheduling.AllDisruptionMode, out *schedulingv1alpha3.AllDisruptionMode, s conversion.Scope) error {
+	*out = *(*schedulingv1alpha3.AllDisruptionMode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -270,6 +271,7 @@ func Convert_scheduling_AllDisruptionMode_To_v1alpha3_AllDisruptionMode(in *sche
 }
 
 func autoConvert_v1alpha3_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(in *schedulingv1alpha3.BasicSchedulingPolicy, out *scheduling.BasicSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.BasicSchedulingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -279,6 +281,7 @@ func Convert_v1alpha3_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(
 }
 
 func autoConvert_scheduling_BasicSchedulingPolicy_To_v1alpha3_BasicSchedulingPolicy(in *scheduling.BasicSchedulingPolicy, out *schedulingv1alpha3.BasicSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1alpha3.BasicSchedulingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -288,8 +291,7 @@ func Convert_scheduling_BasicSchedulingPolicy_To_v1alpha3_BasicSchedulingPolicy(
 }
 
 func autoConvert_v1alpha3_DisruptionMode_To_scheduling_DisruptionMode(in *schedulingv1alpha3.DisruptionMode, out *scheduling.DisruptionMode, s conversion.Scope) error {
-	out.Single = (*scheduling.SingleDisruptionMode)(unsafe.Pointer(in.Single))
-	out.All = (*scheduling.AllDisruptionMode)(unsafe.Pointer(in.All))
+	*out = *(*scheduling.DisruptionMode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -299,8 +301,7 @@ func Convert_v1alpha3_DisruptionMode_To_scheduling_DisruptionMode(in *scheduling
 }
 
 func autoConvert_scheduling_DisruptionMode_To_v1alpha3_DisruptionMode(in *scheduling.DisruptionMode, out *schedulingv1alpha3.DisruptionMode, s conversion.Scope) error {
-	out.Single = (*schedulingv1alpha3.SingleDisruptionMode)(unsafe.Pointer(in.Single))
-	out.All = (*schedulingv1alpha3.AllDisruptionMode)(unsafe.Pointer(in.All))
+	*out = *(*schedulingv1alpha3.DisruptionMode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -310,7 +311,7 @@ func Convert_scheduling_DisruptionMode_To_v1alpha3_DisruptionMode(in *scheduling
 }
 
 func autoConvert_v1alpha3_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in *schedulingv1alpha3.GangSchedulingPolicy, out *scheduling.GangSchedulingPolicy, s conversion.Scope) error {
-	out.MinCount = in.MinCount
+	*out = *(*scheduling.GangSchedulingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -320,7 +321,7 @@ func Convert_v1alpha3_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in
 }
 
 func autoConvert_scheduling_GangSchedulingPolicy_To_v1alpha3_GangSchedulingPolicy(in *scheduling.GangSchedulingPolicy, out *schedulingv1alpha3.GangSchedulingPolicy, s conversion.Scope) error {
-	out.MinCount = in.MinCount
+	*out = *(*schedulingv1alpha3.GangSchedulingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -384,9 +385,7 @@ func Convert_scheduling_PodGroupList_To_v1alpha3_PodGroupList(in *scheduling.Pod
 }
 
 func autoConvert_v1alpha3_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim(in *schedulingv1alpha3.PodGroupResourceClaim, out *scheduling.PodGroupResourceClaim, s conversion.Scope) error {
-	out.Name = in.Name
-	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
-	out.ResourceClaimTemplateName = (*string)(unsafe.Pointer(in.ResourceClaimTemplateName))
+	*out = *(*scheduling.PodGroupResourceClaim)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -396,9 +395,7 @@ func Convert_v1alpha3_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim(
 }
 
 func autoConvert_scheduling_PodGroupResourceClaim_To_v1alpha3_PodGroupResourceClaim(in *scheduling.PodGroupResourceClaim, out *schedulingv1alpha3.PodGroupResourceClaim, s conversion.Scope) error {
-	out.Name = in.Name
-	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
-	out.ResourceClaimTemplateName = (*string)(unsafe.Pointer(in.ResourceClaimTemplateName))
+	*out = *(*schedulingv1alpha3.PodGroupResourceClaim)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -408,8 +405,7 @@ func Convert_scheduling_PodGroupResourceClaim_To_v1alpha3_PodGroupResourceClaim(
 }
 
 func autoConvert_v1alpha3_PodGroupResourceClaimStatus_To_scheduling_PodGroupResourceClaimStatus(in *schedulingv1alpha3.PodGroupResourceClaimStatus, out *scheduling.PodGroupResourceClaimStatus, s conversion.Scope) error {
-	out.Name = in.Name
-	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
+	*out = *(*scheduling.PodGroupResourceClaimStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -419,8 +415,7 @@ func Convert_v1alpha3_PodGroupResourceClaimStatus_To_scheduling_PodGroupResource
 }
 
 func autoConvert_scheduling_PodGroupResourceClaimStatus_To_v1alpha3_PodGroupResourceClaimStatus(in *scheduling.PodGroupResourceClaimStatus, out *schedulingv1alpha3.PodGroupResourceClaimStatus, s conversion.Scope) error {
-	out.Name = in.Name
-	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
+	*out = *(*schedulingv1alpha3.PodGroupResourceClaimStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -430,7 +425,7 @@ func Convert_scheduling_PodGroupResourceClaimStatus_To_v1alpha3_PodGroupResource
 }
 
 func autoConvert_v1alpha3_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedulingConstraints(in *schedulingv1alpha3.PodGroupSchedulingConstraints, out *scheduling.PodGroupSchedulingConstraints, s conversion.Scope) error {
-	out.Topology = *(*[]scheduling.TopologyConstraint)(unsafe.Pointer(&in.Topology))
+	*out = *(*scheduling.PodGroupSchedulingConstraints)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -440,7 +435,7 @@ func Convert_v1alpha3_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedu
 }
 
 func autoConvert_scheduling_PodGroupSchedulingConstraints_To_v1alpha3_PodGroupSchedulingConstraints(in *scheduling.PodGroupSchedulingConstraints, out *schedulingv1alpha3.PodGroupSchedulingConstraints, s conversion.Scope) error {
-	out.Topology = *(*[]schedulingv1alpha3.TopologyConstraint)(unsafe.Pointer(&in.Topology))
+	*out = *(*schedulingv1alpha3.PodGroupSchedulingConstraints)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -450,8 +445,7 @@ func Convert_scheduling_PodGroupSchedulingConstraints_To_v1alpha3_PodGroupSchedu
 }
 
 func autoConvert_v1alpha3_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(in *schedulingv1alpha3.PodGroupSchedulingPolicy, out *scheduling.PodGroupSchedulingPolicy, s conversion.Scope) error {
-	out.Basic = (*scheduling.BasicSchedulingPolicy)(unsafe.Pointer(in.Basic))
-	out.Gang = (*scheduling.GangSchedulingPolicy)(unsafe.Pointer(in.Gang))
+	*out = *(*scheduling.PodGroupSchedulingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -461,8 +455,7 @@ func Convert_v1alpha3_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingP
 }
 
 func autoConvert_scheduling_PodGroupSchedulingPolicy_To_v1alpha3_PodGroupSchedulingPolicy(in *scheduling.PodGroupSchedulingPolicy, out *schedulingv1alpha3.PodGroupSchedulingPolicy, s conversion.Scope) error {
-	out.Basic = (*schedulingv1alpha3.BasicSchedulingPolicy)(unsafe.Pointer(in.Basic))
-	out.Gang = (*schedulingv1alpha3.GangSchedulingPolicy)(unsafe.Pointer(in.Gang))
+	*out = *(*schedulingv1alpha3.PodGroupSchedulingPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -472,16 +465,7 @@ func Convert_scheduling_PodGroupSchedulingPolicy_To_v1alpha3_PodGroupSchedulingP
 }
 
 func autoConvert_v1alpha3_PodGroupSpec_To_scheduling_PodGroupSpec(in *schedulingv1alpha3.PodGroupSpec, out *scheduling.PodGroupSpec, s conversion.Scope) error {
-	out.PodGroupTemplateRef = (*scheduling.PodGroupTemplateReference)(unsafe.Pointer(in.PodGroupTemplateRef))
-	if err := Convert_v1alpha3_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
-		return err
-	}
-	out.SchedulingConstraints = (*scheduling.PodGroupSchedulingConstraints)(unsafe.Pointer(in.SchedulingConstraints))
-	out.ResourceClaims = *(*[]scheduling.PodGroupResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
-	out.DisruptionMode = (*scheduling.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
-	out.PriorityClassName = in.PriorityClassName
-	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*scheduling.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	*out = *(*scheduling.PodGroupSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -491,16 +475,7 @@ func Convert_v1alpha3_PodGroupSpec_To_scheduling_PodGroupSpec(in *schedulingv1al
 }
 
 func autoConvert_scheduling_PodGroupSpec_To_v1alpha3_PodGroupSpec(in *scheduling.PodGroupSpec, out *schedulingv1alpha3.PodGroupSpec, s conversion.Scope) error {
-	out.PodGroupTemplateRef = (*schedulingv1alpha3.PodGroupTemplateReference)(unsafe.Pointer(in.PodGroupTemplateRef))
-	if err := Convert_scheduling_PodGroupSchedulingPolicy_To_v1alpha3_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
-		return err
-	}
-	out.SchedulingConstraints = (*schedulingv1alpha3.PodGroupSchedulingConstraints)(unsafe.Pointer(in.SchedulingConstraints))
-	out.ResourceClaims = *(*[]schedulingv1alpha3.PodGroupResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
-	out.DisruptionMode = (*schedulingv1alpha3.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
-	out.PriorityClassName = in.PriorityClassName
-	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
-	out.PreemptionPolicy = (*schedulingv1alpha3.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
+	*out = *(*schedulingv1alpha3.PodGroupSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -510,8 +485,7 @@ func Convert_scheduling_PodGroupSpec_To_v1alpha3_PodGroupSpec(in *scheduling.Pod
 }
 
 func autoConvert_v1alpha3_PodGroupStatus_To_scheduling_PodGroupStatus(in *schedulingv1alpha3.PodGroupStatus, out *scheduling.PodGroupStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
-	out.ResourceClaimStatuses = *(*[]scheduling.PodGroupResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
+	*out = *(*scheduling.PodGroupStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -521,8 +495,7 @@ func Convert_v1alpha3_PodGroupStatus_To_scheduling_PodGroupStatus(in *scheduling
 }
 
 func autoConvert_scheduling_PodGroupStatus_To_v1alpha3_PodGroupStatus(in *scheduling.PodGroupStatus, out *schedulingv1alpha3.PodGroupStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
-	out.ResourceClaimStatuses = *(*[]schedulingv1alpha3.PodGroupResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
+	*out = *(*schedulingv1alpha3.PodGroupStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -532,15 +505,7 @@ func Convert_scheduling_PodGroupStatus_To_v1alpha3_PodGroupStatus(in *scheduling
 }
 
 func autoConvert_v1alpha3_PodGroupTemplate_To_scheduling_PodGroupTemplate(in *schedulingv1alpha3.PodGroupTemplate, out *scheduling.PodGroupTemplate, s conversion.Scope) error {
-	out.Name = in.Name
-	if err := Convert_v1alpha3_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
-		return err
-	}
-	out.SchedulingConstraints = (*scheduling.PodGroupSchedulingConstraints)(unsafe.Pointer(in.SchedulingConstraints))
-	out.ResourceClaims = *(*[]scheduling.PodGroupResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
-	out.DisruptionMode = (*scheduling.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
-	out.PriorityClassName = in.PriorityClassName
-	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	*out = *(*scheduling.PodGroupTemplate)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -550,15 +515,7 @@ func Convert_v1alpha3_PodGroupTemplate_To_scheduling_PodGroupTemplate(in *schedu
 }
 
 func autoConvert_scheduling_PodGroupTemplate_To_v1alpha3_PodGroupTemplate(in *scheduling.PodGroupTemplate, out *schedulingv1alpha3.PodGroupTemplate, s conversion.Scope) error {
-	out.Name = in.Name
-	if err := Convert_scheduling_PodGroupSchedulingPolicy_To_v1alpha3_PodGroupSchedulingPolicy(&in.SchedulingPolicy, &out.SchedulingPolicy, s); err != nil {
-		return err
-	}
-	out.SchedulingConstraints = (*schedulingv1alpha3.PodGroupSchedulingConstraints)(unsafe.Pointer(in.SchedulingConstraints))
-	out.ResourceClaims = *(*[]schedulingv1alpha3.PodGroupResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
-	out.DisruptionMode = (*schedulingv1alpha3.DisruptionMode)(unsafe.Pointer(in.DisruptionMode))
-	out.PriorityClassName = in.PriorityClassName
-	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	*out = *(*schedulingv1alpha3.PodGroupTemplate)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -568,7 +525,7 @@ func Convert_scheduling_PodGroupTemplate_To_v1alpha3_PodGroupTemplate(in *schedu
 }
 
 func autoConvert_v1alpha3_PodGroupTemplateReference_To_scheduling_PodGroupTemplateReference(in *schedulingv1alpha3.PodGroupTemplateReference, out *scheduling.PodGroupTemplateReference, s conversion.Scope) error {
-	out.Workload = (*scheduling.WorkloadPodGroupTemplateReference)(unsafe.Pointer(in.Workload))
+	*out = *(*scheduling.PodGroupTemplateReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -578,7 +535,7 @@ func Convert_v1alpha3_PodGroupTemplateReference_To_scheduling_PodGroupTemplateRe
 }
 
 func autoConvert_scheduling_PodGroupTemplateReference_To_v1alpha3_PodGroupTemplateReference(in *scheduling.PodGroupTemplateReference, out *schedulingv1alpha3.PodGroupTemplateReference, s conversion.Scope) error {
-	out.Workload = (*schedulingv1alpha3.WorkloadPodGroupTemplateReference)(unsafe.Pointer(in.Workload))
+	*out = *(*schedulingv1alpha3.PodGroupTemplateReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -588,6 +545,7 @@ func Convert_scheduling_PodGroupTemplateReference_To_v1alpha3_PodGroupTemplateRe
 }
 
 func autoConvert_v1alpha3_SingleDisruptionMode_To_scheduling_SingleDisruptionMode(in *schedulingv1alpha3.SingleDisruptionMode, out *scheduling.SingleDisruptionMode, s conversion.Scope) error {
+	*out = *(*scheduling.SingleDisruptionMode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -597,6 +555,7 @@ func Convert_v1alpha3_SingleDisruptionMode_To_scheduling_SingleDisruptionMode(in
 }
 
 func autoConvert_scheduling_SingleDisruptionMode_To_v1alpha3_SingleDisruptionMode(in *scheduling.SingleDisruptionMode, out *schedulingv1alpha3.SingleDisruptionMode, s conversion.Scope) error {
+	*out = *(*schedulingv1alpha3.SingleDisruptionMode)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -606,7 +565,7 @@ func Convert_scheduling_SingleDisruptionMode_To_v1alpha3_SingleDisruptionMode(in
 }
 
 func autoConvert_v1alpha3_TopologyConstraint_To_scheduling_TopologyConstraint(in *schedulingv1alpha3.TopologyConstraint, out *scheduling.TopologyConstraint, s conversion.Scope) error {
-	out.Key = in.Key
+	*out = *(*scheduling.TopologyConstraint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -616,7 +575,7 @@ func Convert_v1alpha3_TopologyConstraint_To_scheduling_TopologyConstraint(in *sc
 }
 
 func autoConvert_scheduling_TopologyConstraint_To_v1alpha3_TopologyConstraint(in *scheduling.TopologyConstraint, out *schedulingv1alpha3.TopologyConstraint, s conversion.Scope) error {
-	out.Key = in.Key
+	*out = *(*schedulingv1alpha3.TopologyConstraint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -626,9 +585,7 @@ func Convert_scheduling_TopologyConstraint_To_v1alpha3_TopologyConstraint(in *sc
 }
 
 func autoConvert_v1alpha3_TypedLocalObjectReference_To_scheduling_TypedLocalObjectReference(in *schedulingv1alpha3.TypedLocalObjectReference, out *scheduling.TypedLocalObjectReference, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
-	out.Kind = in.Kind
-	out.Name = in.Name
+	*out = *(*scheduling.TypedLocalObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -638,9 +595,7 @@ func Convert_v1alpha3_TypedLocalObjectReference_To_scheduling_TypedLocalObjectRe
 }
 
 func autoConvert_scheduling_TypedLocalObjectReference_To_v1alpha3_TypedLocalObjectReference(in *scheduling.TypedLocalObjectReference, out *schedulingv1alpha3.TypedLocalObjectReference, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
-	out.Kind = in.Kind
-	out.Name = in.Name
+	*out = *(*schedulingv1alpha3.TypedLocalObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -698,8 +653,7 @@ func Convert_scheduling_WorkloadList_To_v1alpha3_WorkloadList(in *scheduling.Wor
 }
 
 func autoConvert_v1alpha3_WorkloadPodGroupTemplateReference_To_scheduling_WorkloadPodGroupTemplateReference(in *schedulingv1alpha3.WorkloadPodGroupTemplateReference, out *scheduling.WorkloadPodGroupTemplateReference, s conversion.Scope) error {
-	out.WorkloadName = in.WorkloadName
-	out.PodGroupTemplateName = in.PodGroupTemplateName
+	*out = *(*scheduling.WorkloadPodGroupTemplateReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -709,8 +663,7 @@ func Convert_v1alpha3_WorkloadPodGroupTemplateReference_To_scheduling_WorkloadPo
 }
 
 func autoConvert_scheduling_WorkloadPodGroupTemplateReference_To_v1alpha3_WorkloadPodGroupTemplateReference(in *scheduling.WorkloadPodGroupTemplateReference, out *schedulingv1alpha3.WorkloadPodGroupTemplateReference, s conversion.Scope) error {
-	out.WorkloadName = in.WorkloadName
-	out.PodGroupTemplateName = in.PodGroupTemplateName
+	*out = *(*schedulingv1alpha3.WorkloadPodGroupTemplateReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -720,8 +673,7 @@ func Convert_scheduling_WorkloadPodGroupTemplateReference_To_v1alpha3_WorkloadPo
 }
 
 func autoConvert_v1alpha3_WorkloadSpec_To_scheduling_WorkloadSpec(in *schedulingv1alpha3.WorkloadSpec, out *scheduling.WorkloadSpec, s conversion.Scope) error {
-	out.ControllerRef = (*scheduling.TypedLocalObjectReference)(unsafe.Pointer(in.ControllerRef))
-	out.PodGroupTemplates = *(*[]scheduling.PodGroupTemplate)(unsafe.Pointer(&in.PodGroupTemplates))
+	*out = *(*scheduling.WorkloadSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -731,8 +683,7 @@ func Convert_v1alpha3_WorkloadSpec_To_scheduling_WorkloadSpec(in *schedulingv1al
 }
 
 func autoConvert_scheduling_WorkloadSpec_To_v1alpha3_WorkloadSpec(in *scheduling.WorkloadSpec, out *schedulingv1alpha3.WorkloadSpec, s conversion.Scope) error {
-	out.ControllerRef = (*schedulingv1alpha3.TypedLocalObjectReference)(unsafe.Pointer(in.ControllerRef))
-	out.PodGroupTemplates = *(*[]schedulingv1alpha3.PodGroupTemplate)(unsafe.Pointer(&in.PodGroupTemplates))
+	*out = *(*schedulingv1alpha3.WorkloadSpec)(unsafe.Pointer(in))
 	return nil
 }
 

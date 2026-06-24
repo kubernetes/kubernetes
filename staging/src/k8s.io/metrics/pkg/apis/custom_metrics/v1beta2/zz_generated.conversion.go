@@ -24,7 +24,6 @@ package v1beta2
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	custommetrics "k8s.io/metrics/pkg/apis/custom_metrics"
@@ -81,8 +80,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in *MetricIdentifier, out *custommetrics.MetricIdentifier, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	*out = *(*custommetrics.MetricIdentifier)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -92,8 +90,7 @@ func Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in *Met
 }
 
 func autoConvert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(in *custommetrics.MetricIdentifier, out *MetricIdentifier, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	*out = *(*MetricIdentifier)(unsafe.Pointer(in))
 	return nil
 }
 

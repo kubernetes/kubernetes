@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	resource "k8s.io/kubernetes/pkg/apis/resource"
@@ -172,7 +171,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha3_CELDeviceSelector_To_resource_CELDeviceSelector(in *resourcev1alpha3.CELDeviceSelector, out *resource.CELDeviceSelector, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*resource.CELDeviceSelector)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -182,7 +181,7 @@ func Convert_v1alpha3_CELDeviceSelector_To_resource_CELDeviceSelector(in *resour
 }
 
 func autoConvert_resource_CELDeviceSelector_To_v1alpha3_CELDeviceSelector(in *resource.CELDeviceSelector, out *resourcev1alpha3.CELDeviceSelector, s conversion.Scope) error {
-	out.Expression = in.Expression
+	*out = *(*resourcev1alpha3.CELDeviceSelector)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -192,7 +191,7 @@ func Convert_resource_CELDeviceSelector_To_v1alpha3_CELDeviceSelector(in *resour
 }
 
 func autoConvert_v1alpha3_DeviceSelector_To_resource_DeviceSelector(in *resourcev1alpha3.DeviceSelector, out *resource.DeviceSelector, s conversion.Scope) error {
-	out.CEL = (*resource.CELDeviceSelector)(unsafe.Pointer(in.CEL))
+	*out = *(*resource.DeviceSelector)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -202,7 +201,7 @@ func Convert_v1alpha3_DeviceSelector_To_resource_DeviceSelector(in *resourcev1al
 }
 
 func autoConvert_resource_DeviceSelector_To_v1alpha3_DeviceSelector(in *resource.DeviceSelector, out *resourcev1alpha3.DeviceSelector, s conversion.Scope) error {
-	out.CEL = (*resourcev1alpha3.CELDeviceSelector)(unsafe.Pointer(in.CEL))
+	*out = *(*resourcev1alpha3.DeviceSelector)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -212,10 +211,7 @@ func Convert_resource_DeviceSelector_To_v1alpha3_DeviceSelector(in *resource.Dev
 }
 
 func autoConvert_v1alpha3_DeviceTaint_To_resource_DeviceTaint(in *resourcev1alpha3.DeviceTaint, out *resource.DeviceTaint, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Value = in.Value
-	out.Effect = resource.DeviceTaintEffect(in.Effect)
-	out.TimeAdded = (*v1.Time)(unsafe.Pointer(in.TimeAdded))
+	*out = *(*resource.DeviceTaint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -225,10 +221,7 @@ func Convert_v1alpha3_DeviceTaint_To_resource_DeviceTaint(in *resourcev1alpha3.D
 }
 
 func autoConvert_resource_DeviceTaint_To_v1alpha3_DeviceTaint(in *resource.DeviceTaint, out *resourcev1alpha3.DeviceTaint, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Value = in.Value
-	out.Effect = resourcev1alpha3.DeviceTaintEffect(in.Effect)
-	out.TimeAdded = (*v1.Time)(unsafe.Pointer(in.TimeAdded))
+	*out = *(*resourcev1alpha3.DeviceTaint)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -292,10 +285,7 @@ func Convert_resource_DeviceTaintRuleList_To_v1alpha3_DeviceTaintRuleList(in *re
 }
 
 func autoConvert_v1alpha3_DeviceTaintRuleSpec_To_resource_DeviceTaintRuleSpec(in *resourcev1alpha3.DeviceTaintRuleSpec, out *resource.DeviceTaintRuleSpec, s conversion.Scope) error {
-	out.DeviceSelector = (*resource.DeviceTaintSelector)(unsafe.Pointer(in.DeviceSelector))
-	if err := Convert_v1alpha3_DeviceTaint_To_resource_DeviceTaint(&in.Taint, &out.Taint, s); err != nil {
-		return err
-	}
+	*out = *(*resource.DeviceTaintRuleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -305,10 +295,7 @@ func Convert_v1alpha3_DeviceTaintRuleSpec_To_resource_DeviceTaintRuleSpec(in *re
 }
 
 func autoConvert_resource_DeviceTaintRuleSpec_To_v1alpha3_DeviceTaintRuleSpec(in *resource.DeviceTaintRuleSpec, out *resourcev1alpha3.DeviceTaintRuleSpec, s conversion.Scope) error {
-	out.DeviceSelector = (*resourcev1alpha3.DeviceTaintSelector)(unsafe.Pointer(in.DeviceSelector))
-	if err := Convert_resource_DeviceTaint_To_v1alpha3_DeviceTaint(&in.Taint, &out.Taint, s); err != nil {
-		return err
-	}
+	*out = *(*resourcev1alpha3.DeviceTaintRuleSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -318,7 +305,7 @@ func Convert_resource_DeviceTaintRuleSpec_To_v1alpha3_DeviceTaintRuleSpec(in *re
 }
 
 func autoConvert_v1alpha3_DeviceTaintRuleStatus_To_resource_DeviceTaintRuleStatus(in *resourcev1alpha3.DeviceTaintRuleStatus, out *resource.DeviceTaintRuleStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*resource.DeviceTaintRuleStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -328,7 +315,7 @@ func Convert_v1alpha3_DeviceTaintRuleStatus_To_resource_DeviceTaintRuleStatus(in
 }
 
 func autoConvert_resource_DeviceTaintRuleStatus_To_v1alpha3_DeviceTaintRuleStatus(in *resource.DeviceTaintRuleStatus, out *resourcev1alpha3.DeviceTaintRuleStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*resourcev1alpha3.DeviceTaintRuleStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -338,9 +325,7 @@ func Convert_resource_DeviceTaintRuleStatus_To_v1alpha3_DeviceTaintRuleStatus(in
 }
 
 func autoConvert_v1alpha3_DeviceTaintSelector_To_resource_DeviceTaintSelector(in *resourcev1alpha3.DeviceTaintSelector, out *resource.DeviceTaintSelector, s conversion.Scope) error {
-	out.Driver = (*string)(unsafe.Pointer(in.Driver))
-	out.Pool = (*string)(unsafe.Pointer(in.Pool))
-	out.Device = (*string)(unsafe.Pointer(in.Device))
+	*out = *(*resource.DeviceTaintSelector)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -350,9 +335,7 @@ func Convert_v1alpha3_DeviceTaintSelector_To_resource_DeviceTaintSelector(in *re
 }
 
 func autoConvert_resource_DeviceTaintSelector_To_v1alpha3_DeviceTaintSelector(in *resource.DeviceTaintSelector, out *resourcev1alpha3.DeviceTaintSelector, s conversion.Scope) error {
-	out.Driver = (*string)(unsafe.Pointer(in.Driver))
-	out.Pool = (*string)(unsafe.Pointer(in.Pool))
-	out.Device = (*string)(unsafe.Pointer(in.Device))
+	*out = *(*resourcev1alpha3.DeviceTaintSelector)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -362,16 +345,7 @@ func Convert_resource_DeviceTaintSelector_To_v1alpha3_DeviceTaintSelector(in *re
 }
 
 func autoConvert_v1alpha3_PoolStatus_To_resource_PoolStatus(in *resourcev1alpha3.PoolStatus, out *resource.PoolStatus, s conversion.Scope) error {
-	out.Driver = in.Driver
-	out.PoolName = in.PoolName
-	out.Generation = in.Generation
-	out.ResourceSliceCount = (*int32)(unsafe.Pointer(in.ResourceSliceCount))
-	out.TotalDevices = (*int32)(unsafe.Pointer(in.TotalDevices))
-	out.AllocatedDevices = (*int32)(unsafe.Pointer(in.AllocatedDevices))
-	out.AvailableDevices = (*int32)(unsafe.Pointer(in.AvailableDevices))
-	out.UnavailableDevices = (*int32)(unsafe.Pointer(in.UnavailableDevices))
-	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.ValidationError = (*string)(unsafe.Pointer(in.ValidationError))
+	*out = *(*resource.PoolStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -381,16 +355,7 @@ func Convert_v1alpha3_PoolStatus_To_resource_PoolStatus(in *resourcev1alpha3.Poo
 }
 
 func autoConvert_resource_PoolStatus_To_v1alpha3_PoolStatus(in *resource.PoolStatus, out *resourcev1alpha3.PoolStatus, s conversion.Scope) error {
-	out.Driver = in.Driver
-	out.PoolName = in.PoolName
-	out.Generation = in.Generation
-	out.ResourceSliceCount = (*int32)(unsafe.Pointer(in.ResourceSliceCount))
-	out.TotalDevices = (*int32)(unsafe.Pointer(in.TotalDevices))
-	out.AllocatedDevices = (*int32)(unsafe.Pointer(in.AllocatedDevices))
-	out.AvailableDevices = (*int32)(unsafe.Pointer(in.AvailableDevices))
-	out.UnavailableDevices = (*int32)(unsafe.Pointer(in.UnavailableDevices))
-	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
-	out.ValidationError = (*string)(unsafe.Pointer(in.ValidationError))
+	*out = *(*resourcev1alpha3.PoolStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -450,9 +415,7 @@ func Convert_resource_ResourcePoolStatusRequestList_To_v1alpha3_ResourcePoolStat
 }
 
 func autoConvert_v1alpha3_ResourcePoolStatusRequestSpec_To_resource_ResourcePoolStatusRequestSpec(in *resourcev1alpha3.ResourcePoolStatusRequestSpec, out *resource.ResourcePoolStatusRequestSpec, s conversion.Scope) error {
-	out.Driver = in.Driver
-	out.PoolName = (*string)(unsafe.Pointer(in.PoolName))
-	out.Limit = (*int32)(unsafe.Pointer(in.Limit))
+	*out = *(*resource.ResourcePoolStatusRequestSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -462,9 +425,7 @@ func Convert_v1alpha3_ResourcePoolStatusRequestSpec_To_resource_ResourcePoolStat
 }
 
 func autoConvert_resource_ResourcePoolStatusRequestSpec_To_v1alpha3_ResourcePoolStatusRequestSpec(in *resource.ResourcePoolStatusRequestSpec, out *resourcev1alpha3.ResourcePoolStatusRequestSpec, s conversion.Scope) error {
-	out.Driver = in.Driver
-	out.PoolName = (*string)(unsafe.Pointer(in.PoolName))
-	out.Limit = (*int32)(unsafe.Pointer(in.Limit))
+	*out = *(*resourcev1alpha3.ResourcePoolStatusRequestSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -474,9 +435,7 @@ func Convert_resource_ResourcePoolStatusRequestSpec_To_v1alpha3_ResourcePoolStat
 }
 
 func autoConvert_v1alpha3_ResourcePoolStatusRequestStatus_To_resource_ResourcePoolStatusRequestStatus(in *resourcev1alpha3.ResourcePoolStatusRequestStatus, out *resource.ResourcePoolStatusRequestStatus, s conversion.Scope) error {
-	out.PoolCount = (*int32)(unsafe.Pointer(in.PoolCount))
-	out.Pools = *(*[]resource.PoolStatus)(unsafe.Pointer(&in.Pools))
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*resource.ResourcePoolStatusRequestStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -486,9 +445,7 @@ func Convert_v1alpha3_ResourcePoolStatusRequestStatus_To_resource_ResourcePoolSt
 }
 
 func autoConvert_resource_ResourcePoolStatusRequestStatus_To_v1alpha3_ResourcePoolStatusRequestStatus(in *resource.ResourcePoolStatusRequestStatus, out *resourcev1alpha3.ResourcePoolStatusRequestStatus, s conversion.Scope) error {
-	out.PoolCount = (*int32)(unsafe.Pointer(in.PoolCount))
-	out.Pools = *(*[]resourcev1alpha3.PoolStatus)(unsafe.Pointer(&in.Pools))
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*resourcev1alpha3.ResourcePoolStatusRequestStatus)(unsafe.Pointer(in))
 	return nil
 }
 

@@ -123,7 +123,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1_AuthenticationMetadata_To_audit_AuthenticationMetadata(in *AuthenticationMetadata, out *audit.AuthenticationMetadata, s conversion.Scope) error {
-	out.ImpersonationConstraint = in.ImpersonationConstraint
+	*out = *(*audit.AuthenticationMetadata)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -133,7 +133,7 @@ func Convert_v1_AuthenticationMetadata_To_audit_AuthenticationMetadata(in *Authe
 }
 
 func autoConvert_audit_AuthenticationMetadata_To_v1_AuthenticationMetadata(in *audit.AuthenticationMetadata, out *AuthenticationMetadata, s conversion.Scope) error {
-	out.ImpersonationConstraint = in.ImpersonationConstraint
+	*out = *(*AuthenticationMetadata)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -217,9 +217,7 @@ func Convert_audit_EventList_To_v1_EventList(in *audit.EventList, out *EventList
 }
 
 func autoConvert_v1_GroupResources_To_audit_GroupResources(in *GroupResources, out *audit.GroupResources, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
+	*out = *(*audit.GroupResources)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -229,9 +227,7 @@ func Convert_v1_GroupResources_To_audit_GroupResources(in *GroupResources, out *
 }
 
 func autoConvert_audit_GroupResources_To_v1_GroupResources(in *audit.GroupResources, out *GroupResources, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
+	*out = *(*GroupResources)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -241,14 +237,7 @@ func Convert_audit_GroupResources_To_v1_GroupResources(in *audit.GroupResources,
 }
 
 func autoConvert_v1_ObjectReference_To_audit_ObjectReference(in *ObjectReference, out *audit.ObjectReference, s conversion.Scope) error {
-	out.Resource = in.Resource
-	out.Namespace = in.Namespace
-	out.Name = in.Name
-	out.UID = types.UID(in.UID)
-	out.APIGroup = in.APIGroup
-	out.APIVersion = in.APIVersion
-	out.ResourceVersion = in.ResourceVersion
-	out.Subresource = in.Subresource
+	*out = *(*audit.ObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -258,14 +247,7 @@ func Convert_v1_ObjectReference_To_audit_ObjectReference(in *ObjectReference, ou
 }
 
 func autoConvert_audit_ObjectReference_To_v1_ObjectReference(in *audit.ObjectReference, out *ObjectReference, s conversion.Scope) error {
-	out.Resource = in.Resource
-	out.Namespace = in.Namespace
-	out.Name = in.Name
-	out.UID = types.UID(in.UID)
-	out.APIGroup = in.APIGroup
-	out.APIVersion = in.APIVersion
-	out.ResourceVersion = in.ResourceVersion
-	out.Subresource = in.Subresource
+	*out = *(*ObjectReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -323,15 +305,7 @@ func Convert_audit_PolicyList_To_v1_PolicyList(in *audit.PolicyList, out *Policy
 }
 
 func autoConvert_v1_PolicyRule_To_audit_PolicyRule(in *PolicyRule, out *audit.PolicyRule, s conversion.Scope) error {
-	out.Level = audit.Level(in.Level)
-	out.Users = *(*[]string)(unsafe.Pointer(&in.Users))
-	out.UserGroups = *(*[]string)(unsafe.Pointer(&in.UserGroups))
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.Resources = *(*[]audit.GroupResources)(unsafe.Pointer(&in.Resources))
-	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
-	out.OmitStages = *(*[]audit.Stage)(unsafe.Pointer(&in.OmitStages))
-	out.OmitManagedFields = (*bool)(unsafe.Pointer(in.OmitManagedFields))
+	*out = *(*audit.PolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -341,15 +315,7 @@ func Convert_v1_PolicyRule_To_audit_PolicyRule(in *PolicyRule, out *audit.Policy
 }
 
 func autoConvert_audit_PolicyRule_To_v1_PolicyRule(in *audit.PolicyRule, out *PolicyRule, s conversion.Scope) error {
-	out.Level = Level(in.Level)
-	out.Users = *(*[]string)(unsafe.Pointer(&in.Users))
-	out.UserGroups = *(*[]string)(unsafe.Pointer(&in.UserGroups))
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.Resources = *(*[]GroupResources)(unsafe.Pointer(&in.Resources))
-	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
-	out.OmitStages = *(*[]Stage)(unsafe.Pointer(&in.OmitStages))
-	out.OmitManagedFields = (*bool)(unsafe.Pointer(in.OmitManagedFields))
+	*out = *(*PolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 

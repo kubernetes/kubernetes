@@ -25,11 +25,9 @@ import (
 	unsafe "unsafe"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
-	corev1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
-	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -125,12 +123,7 @@ func Convert_certificates_CertificateSigningRequest_To_v1_CertificateSigningRequ
 }
 
 func autoConvert_v1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *certificatesv1.CertificateSigningRequestCondition, out *certificates.CertificateSigningRequestCondition, s conversion.Scope) error {
-	out.Type = certificates.RequestConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
+	*out = *(*certificates.CertificateSigningRequestCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -140,12 +133,7 @@ func Convert_v1_CertificateSigningRequestCondition_To_certificates_CertificateSi
 }
 
 func autoConvert_certificates_CertificateSigningRequestCondition_To_v1_CertificateSigningRequestCondition(in *certificates.CertificateSigningRequestCondition, out *certificatesv1.CertificateSigningRequestCondition, s conversion.Scope) error {
-	out.Type = certificatesv1.RequestConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.Reason = in.Reason
-	out.Message = in.Message
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
+	*out = *(*certificatesv1.CertificateSigningRequestCondition)(unsafe.Pointer(in))
 	return nil
 }
 
