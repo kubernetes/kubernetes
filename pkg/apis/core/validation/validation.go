@@ -3450,6 +3450,7 @@ func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorL
 }
 
 var supportedHTTPSchemes = sets.New(core.URISchemeHTTP, core.URISchemeHTTPS)
+var supportedHTTPProtocols = sets.New(core.HTTPProtocolHTTP1, core.HTTPProtocolHTTP2)
 
 func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -3463,6 +3464,17 @@ func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.
 	for _, header := range http.HTTPHeaders {
 		for _, msg := range validation.IsHTTPHeaderName(header.Name) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	if http.Protocol != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Child("protocol"), "only supported when the H2CContainerProbe feature gate is enabled"))
+		} else if !supportedHTTPProtocols.Has(*http.Protocol) {
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("protocol"), *http.Protocol, sets.List(supportedHTTPProtocols)))
+		} else if *http.Protocol == core.HTTPProtocolHTTP2 && http.Scheme != core.URISchemeHTTP {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("protocol"), *http.Protocol, "HTTP2 only supported with HTTP (H2C)"))
+		} else if *http.Protocol == core.HTTPProtocolHTTP2 && len(http.Host) > 0 {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("host"), http.Host, "host must be empty when protocol is HTTP2"))
 		}
 	}
 	return allErrors

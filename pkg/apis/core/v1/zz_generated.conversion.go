@@ -4458,6 +4458,7 @@ func autoConvert_v1_HTTPGetAction_To_core_HTTPGetAction(in *corev1.HTTPGetAction
 	out.Host = in.Host
 	out.Scheme = core.URIScheme(in.Scheme)
 	out.HTTPHeaders = *(*[]core.HTTPHeader)(unsafe.Pointer(&in.HTTPHeaders))
+	out.Protocol = (*core.HTTPProtocol)(unsafe.Pointer(in.Protocol))
 	return nil
 }
 
@@ -4472,6 +4473,7 @@ func autoConvert_core_HTTPGetAction_To_v1_HTTPGetAction(in *core.HTTPGetAction, 
 	out.Host = in.Host
 	out.Scheme = corev1.URIScheme(in.Scheme)
 	out.HTTPHeaders = *(*[]corev1.HTTPHeader)(unsafe.Pointer(&in.HTTPHeaders))
+	out.Protocol = (*corev1.HTTPProtocol)(unsafe.Pointer(in.Protocol))
 	return nil
 }
 

@@ -1,32 +1,21 @@
-/*
-Copyright 2018 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package framework
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/pflag"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,21 +58,43 @@ type TestServerSetup struct {
 	ModifyServerConfig     func(*controlplane.Config)
 	// DisableInvariantChecks skips the invariant checks at the end of the test.
 	DisableInvariantChecks bool
+	// Flags holds command-line flags to apply to the server.
+	Flags []string
+}
+
+var (
+	buildBinaryOnce sync.Once
+	apiserverBinary string
+)
+
+func buildAPIServer(t testing.TB) string {
+	buildBinaryOnce.Do(func() {
+		apiserverBinary = filepath.Join(os.TempDir(), "kube-apiserver-integration-"+uuid.New().String())
+		cmd := exec.Command("go", "build", "-o", apiserverBinary, "k8s.io/kubernetes/cmd/kube-apiserver")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to build kube-apiserver: %v", err)
+		}
+	})
+	return apiserverBinary
 }
 
 type TearDownFunc func()
 
-// StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
-// TODO (pohly): convert to ktesting contexts
-func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
-	ctx, cancel := context.WithCancel(ctx)
+type testServerEnvironment struct {
+	certDir   string
+	port      int
+	listener  net.Listener
+	finalArgs []string
+}
 
+func setupTestServerEnvironment(t testing.TB, setupFlags []string) testServerEnvironment {
 	certDir, err := os.MkdirTemp("", "test-integration-"+strings.ReplaceAll(t.Name(), "/", "_"))
 	if err != nil {
 		t.Fatalf("Couldn't create temp dir: %v", err)
 	}
 
-	var errCh chan error
 	_, defaultServiceClusterIPRange, _ := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	proxySigningKey, err := utils.NewPrivateKey()
 	if err != nil {
@@ -98,6 +109,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatal(err)
 	}
 	defer proxyCACertFile.Close()
+	
 	clientSigningKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +123,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatal(err)
 	}
 	defer clientCACertFile.Close()
+	
 	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +138,67 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
+	tokenFile := filepath.Join(certDir, "token.csv")
+	if err := os.WriteFile(tokenFile, []byte("test-token,test-user,1,\"system:masters\"\n"), 0644); err != nil {
+		t.Fatalf("Failed to write token.csv: %v", err)
+	}
+
+	port := listener.Addr().(*net.TCPAddr).Port
+
+	defaultArgs := []string{
+		fmt.Sprintf("--secure-port=%d", port),
+		"--bind-address=127.0.0.1",
+		"--cert-dir=" + certDir,
+		"--service-account-signing-key-file=" + saSigningKeyFile.Name(),
+		"--service-account-key-file=" + saSigningKeyFile.Name(),
+		"--service-account-issuer=https://kubernetes.default.svc",
+		"--authorization-mode=Node,RBAC",
+		"--etcd-prefix=" + path.Join("/", uuid.New().String(), "registry"),
+		"--etcd-servers=" + GetEtcdURL(),
+		"--service-cluster-ip-range=" + defaultServiceClusterIPRange.String(),
+		"--requestheader-username-headers=X-Remote-User",
+		"--requestheader-group-headers=X-Remote-Group",
+		"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+		"--requestheader-allowed-names=kube-aggregator",
+		"--requestheader-client-ca-file=" + proxyCACertFile.Name(),
+		"--client-ca-file=" + clientCACertFile.Name(),
+		"--api-audiences=https://foo.bar.example.com",
+		"--token-auth-file=" + tokenFile,
+	}
+
+	overrideFlags := make(map[string]bool)
+	for _, f := range setupFlags {
+		parts := strings.SplitN(f, "=", 2)
+		name := strings.TrimPrefix(parts[0], "--")
+		overrideFlags[name] = true
+	}
+	
+	var finalArgs []string
+	for _, f := range defaultArgs {
+		parts := strings.SplitN(f, "=", 2)
+		name := strings.TrimPrefix(parts[0], "--")
+		if !overrideFlags[name] {
+			finalArgs = append(finalArgs, f)
+		}
+	}
+	finalArgs = append(finalArgs, setupFlags...)
+
+	return testServerEnvironment{
+		certDir:   certDir,
+		port:      port,
+		listener:  listener,
+		finalArgs: finalArgs,
+	}
+}
+
+// StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
+// TODO (pohly): convert to ktesting contexts
+func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+	ctx, cancel := context.WithCancel(ctx)
+	env := setupTestServerEnvironment(t, setup.Flags)
+
 	opts := options.NewServerRunOptions()
+
 	// If EmulationVersion of DefaultFeatureGate is set during test, we need to propagate it to the apiserver ComponentGlobalsRegistry.
 	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	effectiveVersion := compatibility.DefaultKubeEffectiveVersionForTest()
@@ -137,37 +210,37 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}
 	opts.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 
-	opts.SecureServing.Listener = listener
-	opts.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
-	opts.SecureServing.ServerCert.CertDirectory = certDir
-	opts.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
-	opts.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")
-	opts.Etcd.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
-	opts.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
-	opts.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
-	opts.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
-	opts.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
-	opts.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
-	opts.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
-	opts.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
-	opts.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
-	opts.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
-	opts.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
-	opts.Authorization.Modes = []string{"Node", "RBAC"}
+	// Parse default arguments and user-provided flags into opts.
+	// This ensures both in-process and out-of-process paths share the exact same configuration logic.
+	flagSet := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	for _, f := range opts.Flags().FlagSets {
+		flagSet.AddFlagSet(f)
+	}
+	if err := flagSet.Parse(env.finalArgs); err != nil {
+		t.Fatalf("Failed to parse flags: %v", err)
+	}
 
 	if setup.ModifyServerRunOptions != nil {
 		setup.ModifyServerRunOptions(opts)
 	}
+
+	if err := opts.GenericServerRunOptions.ComponentGlobalsRegistry.Set(); err != nil {
+		t.Fatalf("Failed to set ComponentGlobalsRegistry: %v", err)
+	}
+
+	// In-process execution must use the listener we bound
+	opts.SecureServing.Listener = env.listener
 
 	// If the local ComponentGlobalsRegistry is changed by ModifyServerRunOptions,
 	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
 	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) || !featureGate.MinCompatibilityVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.MinCompatibilityVersion()) {
 		featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
+	parsedFeatureGate := opts.GenericServerRunOptions.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
 	featureOverrides := map[featuregate.Feature]bool{}
 	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
-		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
-			featureOverrides[f] = featureGate.Enabled(f)
+		if parsedFeatureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featureOverrides[f] = parsedFeatureGate.Enabled(f)
 		}
 	}
 	if len(featureOverrides) > 0 {
@@ -207,7 +280,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatal(err)
 	}
 
-	errCh = make(chan error)
+	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
 		if err := kubeAPIServer.ControlPlane.GenericAPIServer.PrepareRun().RunWithContext(ctx); err != nil {
@@ -217,12 +290,56 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 
 	// Adjust the loopback config for external use (external server name and CA)
 	kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.ControlPlane.Generic.LoopbackClientConfig)
-	kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
+	kubeAPIServerClientConfig.CAFile = path.Join(env.certDir, "apiserver.crt")
 	kubeAPIServerClientConfig.CAData = nil
 	kubeAPIServerClientConfig.ServerName = ""
 
+	return waitForServerReady(ctx, t, env, setup, errCh, kubeAPIServerClientConfig, cancel)
+}
+
+// StartTestServerProcess runs a kube-apiserver as a separate process.
+func StartTestServerProcess(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+	if setup.ModifyServerRunOptions != nil || setup.ModifyServerConfig != nil {
+		t.Fatalf("ModifyServerRunOptions and ModifyServerConfig are not supported for StartTestServerProcess")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	env := setupTestServerEnvironment(t, setup.Flags)
+	
+	binary := buildAPIServer(t)
+	env.listener.Close() // Release port for the child process
+
+	cmd := exec.CommandContext(ctx, binary, env.finalArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("Failed to start apiserver process: %v", err)
+	}
+
+	errCh := make(chan error)
+	go func() {
+		defer close(errCh)
+		if err := cmd.Wait(); err != nil {
+			if err.Error() != "signal: killed" {
+				errCh <- err
+			}
+		}
+	}()
+
+	kubeAPIServerClientConfig := &rest.Config{
+		Host:        fmt.Sprintf("https://127.0.0.1:%d", env.port),
+		BearerToken: "test-token",
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}
+
+	return waitForServerReady(ctx, t, env, setup, errCh, kubeAPIServerClientConfig, cancel)
+}
+
+func waitForServerReady(ctx context.Context, t testing.TB, env testServerEnvironment, setup TestServerSetup, errCh chan error, kubeAPIServerClientConfig *rest.Config, cancel context.CancelFunc) (client.Interface, *rest.Config, TearDownFunc) {
 	// wait for health
-	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		select {
 		case err := <-errCh:
 			return false, err
@@ -286,7 +403,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 				t.Error(err)
 			}
 		}
-		if err := os.RemoveAll(certDir); err != nil {
+		if err := os.RemoveAll(env.certDir); err != nil {
 			t.Log(err)
 		}
 	}

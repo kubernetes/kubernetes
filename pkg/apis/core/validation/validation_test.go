@@ -7899,6 +7899,61 @@ func TestValidateHandler(t *testing.T) {
 	}
 }
 
+func TestValidateHTTPGetActionProtocol(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, true)
+
+	http1 := core.HTTPProtocolHTTP1
+	http2 := core.HTTPProtocolHTTP2
+
+	successCases := []core.ProbeHandler{
+		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: "HTTP", Protocol: &http1}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: "HTTP", Protocol: &http2}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/health", Port: intstr.FromInt32(8080), Scheme: "HTTPS", Protocol: &http1}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: "HTTP"}},
+	}
+	for _, h := range successCases {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			t.Errorf("expected success for %#v, got: %v", h, errs)
+		}
+	}
+
+	badProto := core.HTTPProtocol("SPDY")
+	errorCases := []struct {
+		name    string
+		handler core.ProbeHandler
+	}{
+		{
+			name:    "unsupported protocol value",
+			handler: core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: "HTTP", Protocol: &badProto}},
+		},
+		{
+			name:    "HTTPS combined with HTTP2 is not supported",
+			handler: core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(443), Scheme: "HTTPS", Protocol: &http2}},
+		},
+		{
+			name:    "HTTP2 with host set is rejected",
+			handler: core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: "HTTP", Host: "example.com", Protocol: &http2}},
+		},
+	}
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := validateHandler(handlerFromProbe(&tc.handler), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+				t.Errorf("expected failure for %#v", tc.handler)
+			}
+		})
+	}
+}
+
+func TestValidateHTTPGetActionProtocolFeatureGateDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, false)
+
+	http2 := core.HTTPProtocolHTTP2
+	h := core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: "HTTP", Protocol: &http2}}
+	if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		t.Errorf("expected failure when H2CContainerProbe feature gate is disabled for %#v", h)
+	}
+}
+
 func TestValidatePullPolicy(t *testing.T) {
 	type T struct {
 		Container      core.Container
