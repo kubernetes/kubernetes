@@ -832,7 +832,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 		return err
 	}
 
-	claimHandler, err := tc.claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	claimHandler, err := tc.claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			claim, ok := obj.(*resourceapi.ResourceClaim)
 			if !ok {
@@ -870,7 +870,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 			defer tc.mutex.Unlock()
 			tc.handleClaimChange(claim, nil)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return fmt.Errorf("adding claim event handler:%w", err)
 	}
@@ -879,7 +879,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	}()
 	tc.haveSynced = append(tc.haveSynced, claimHandler.HasSyncedChecker())
 
-	podHandler, err := tc.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podHandler, err := tc.podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -917,7 +917,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 			defer tc.mutex.Unlock()
 			tc.handlePodChange(pod, nil)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return fmt.Errorf("adding pod event handler: %w", err)
 	}
@@ -927,7 +927,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSyncedChecker())
 
 	if tc.ruleInformer != nil {
-		ruleHandler, err := tc.ruleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		ruleHandler, err := tc.ruleInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj any) {
 				rule, ok := obj.(*resourcbeta.DeviceTaintRule)
 				if !ok {
@@ -965,7 +965,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 				defer tc.mutex.Unlock()
 				tc.handleRuleChange(rule, nil)
 			},
-		})
+		}, cache.HandlerOptions{Logger: &logger})
 		if err != nil {
 			return fmt.Errorf("adding DeviceTaintRule event handler: %w", err)
 		}
@@ -975,7 +975,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 		tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSyncedChecker())
 	}
 
-	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
@@ -1011,7 +1011,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 			defer tc.mutex.Unlock()
 			tc.handleSliceChange(slice, nil)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return fmt.Errorf("adding slice event handler: %w", err)
 	}
