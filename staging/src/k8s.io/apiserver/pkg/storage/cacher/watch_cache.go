@@ -498,7 +498,7 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 			return snap, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	snap, err = w.storage.GetLatestSnapshotLocked(key, continueKey)
+	snap, err = w.storage.GetLatestSnapshotOrBuildLocked(key, continueKey)
 	return snap, w.resourceVersion, "", err
 }
 
