@@ -111,11 +111,15 @@ func NewController(
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
 	}, cache.HandlerOptions{Logger: &logger})
-	runtime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add pod event handler: %w", err)
+	}
 	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: ec.onPVCDelete,
 	}, cache.HandlerOptions{Logger: &logger})
-	runtime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 	if err := common.AddPodPVCIndexerIfNotPresent(ec.podIndexer); err != nil {
 		return nil, fmt.Errorf("could not initialize ephemeral volume controller: %w", err)
 	}

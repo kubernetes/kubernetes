@@ -204,7 +204,9 @@ func NewAttachDetachController(
 			adc.podDelete(logger, obj)
 		},
 	}, kcache.HandlerOptions{Logger: &logger})
-	runtime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add pod event handler: %w", err)
+	}
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
@@ -223,7 +225,9 @@ func NewAttachDetachController(
 			adc.nodeDelete(logger, obj)
 		},
 	}, kcache.HandlerOptions{Logger: &logger})
-	runtime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add node event handler: %w", err)
+	}
 
 	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -233,7 +237,9 @@ func NewAttachDetachController(
 			adc.enqueuePVC(new)
 		},
 	}, kcache.HandlerOptions{Logger: &logger})
-	runtime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 
 	return adc, nil
 }

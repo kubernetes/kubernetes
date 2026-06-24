@@ -159,7 +159,9 @@ func NewExpandController(
 		},
 		DeleteFunc: expc.enqueuePVC,
 	}, cache.HandlerOptions{Logger: &logger})
-	runtime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 
 	return expc, nil
 }

@@ -113,7 +113,9 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		},
 		cache.HandlerOptions{Logger: &logger},
 	)
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add volume event handler: %w", err)
+	}
 	controller.volumeLister = p.VolumeInformer.Lister()
 	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
@@ -125,7 +127,9 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		},
 		cache.HandlerOptions{Logger: &logger},
 	)
-	utilruntime.Must(err)
+	if err != nil {
+		return nil, fmt.Errorf("could not add claim event handler: %w", err)
+	}
 	controller.claimLister = p.ClaimInformer.Lister()
 	controller.claimListerSynced = p.ClaimInformer.Informer().HasSynced
 
