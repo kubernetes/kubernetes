@@ -236,6 +236,22 @@ func (cache *claimInfoCache) hasPodReference(uid types.UID) bool {
 	return false
 }
 
+// claimNamesForPod returns the names of all claims referenced by the pod with
+// the given UID. The claim info cache is the authoritative record of what was
+// prepared for the pod (it is checkpointed and survives kubelet restarts), so
+// this does not depend on pod.Status.ResourceClaimStatuses being present.
+//
+// Must be called while the rlock is held.
+func (cache *claimInfoCache) claimNamesForPod(uid types.UID) []string {
+	var claimNames []string
+	for _, claimInfo := range cache.claimInfo {
+		if claimInfo.hasPodReference(uid) {
+			claimNames = append(claimNames, claimInfo.ClaimName)
+		}
+	}
+	return claimNames
+}
+
 // syncToCheckpoint syncs the full claim info cache state to a checkpoint.
 func (cache *claimInfoCache) syncToCheckpoint() error {
 	claimInfoStateList := make(state.ClaimInfoStateList, 0, len(cache.claimInfo))

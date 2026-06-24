@@ -586,24 +586,36 @@ func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 }
 
 func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) error {
+	// Try to get claim names from the cache first.
 	var claimNames []string
-	for i := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
-		if err != nil {
-			// No wrapping, the error is already informative.
-			return err
+	_ = m.cache.withRLock(func() error {
+		claimNames = m.cache.claimNamesForPod(pod.UID)
+		return nil
+	})
+
+	// If the cache doesn't have any claim names for this pod, it may be because Kubelet was
+	// restarted and claiminfo checkpoint was removed.
+	// We should try to get claim names from the pod spec and status to ensure that we
+	// unprepare all relevant claims.
+	if len(claimNames) == 0 {
+		for i := range pod.Spec.ResourceClaims {
+			claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+			if err != nil {
+				// No wrapping, the error is already informative.
+				return err
+			}
+			if claimName == nil {
+				// The claim name might be nil if no underlying resource claim
+				// was generated for the referenced claim. There are valid use
+				// cases when this might happen, so we simply skip it.
+				continue
+			}
+			claimNames = append(claimNames, *claimName)
 		}
-		// The claim name might be nil if no underlying resource claim
-		// was generated for the referenced claim. There are valid use
-		// cases when this might happen, so we simply skip it.
-		if claimName == nil {
-			continue
-		}
-		claimNames = append(claimNames, *claimName)
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
-		if pod.Status.ExtendedResourceClaimStatus != nil {
-			claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource) {
+			if pod.Status.ExtendedResourceClaimStatus != nil {
+				claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+			}
 		}
 	}
 
