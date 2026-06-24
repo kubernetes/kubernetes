@@ -771,7 +771,13 @@ func TestUpdatePod(t *testing.T) {
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
 			},
-			runtimeStatus: &kubecontainer.PodStatus{ /* we know about this pod */ },
+			runtimeStatus: &kubecontainer.PodStatus{
+				// Pod has been seen by runtime but is in terminal state
+				// Add a terminated container to distinguish from cache miss (empty status)
+				ContainerStatuses: []kubecontainer.ContainerStatus{
+					{State: kubecontainer.ContainerStateExited},
+				},
+			},
 			expectBeforeWorker: &podSyncStatus{
 				fullname:      "done-pod_ns",
 				syncedAt:      time.Unix(1, 0),
