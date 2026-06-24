@@ -29,6 +29,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	config "k8s.io/cloud-provider/config"
 	nodeconfigv1alpha1 "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
+	nodelifecycleconfigv1alpha1 "k8s.io/cloud-provider/controllers/nodelifecycle/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	configv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 )
@@ -93,6 +94,9 @@ func autoConvert_v1alpha1_CloudControllerManagerConfiguration_To_config_CloudCon
 	if err := nodeconfigv1alpha1.Convert_v1alpha1_NodeControllerConfiguration_To_config_NodeControllerConfiguration(&in.NodeController, &out.NodeController, s); err != nil {
 		return err
 	}
+	if err := nodelifecycleconfigv1alpha1.Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLifecycleControllerConfiguration(&in.NodeLifecycleController, &out.NodeLifecycleController, s); err != nil {
+		return err
+	}
 	if err := serviceconfigv1alpha1.Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
 		return err
 	}
@@ -116,6 +120,9 @@ func autoConvert_config_CloudControllerManagerConfiguration_To_v1alpha1_CloudCon
 		return err
 	}
 	if err := nodeconfigv1alpha1.Convert_config_NodeControllerConfiguration_To_v1alpha1_NodeControllerConfiguration(&in.NodeController, &out.NodeController, s); err != nil {
+		return err
+	}
+	if err := nodelifecycleconfigv1alpha1.Convert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(&in.NodeLifecycleController, &out.NodeLifecycleController, s); err != nil {
 		return err
 	}
 	if err := serviceconfigv1alpha1.Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
@@ -153,7 +160,6 @@ func autoConvert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudShared
 	out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
 	out.AllowUntaggedCloud = in.AllowUntaggedCloud
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
-	out.NodeMonitorPeriod = in.NodeMonitorPeriod
 	out.ClusterName = in.ClusterName
 	out.ClusterCIDR = in.ClusterCIDR
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
@@ -173,7 +179,6 @@ func autoConvert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudShared
 	out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
 	out.AllowUntaggedCloud = in.AllowUntaggedCloud
 	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
-	out.NodeMonitorPeriod = in.NodeMonitorPeriod
 	out.ClusterName = in.ClusterName
 	out.ClusterCIDR = in.ClusterCIDR
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs

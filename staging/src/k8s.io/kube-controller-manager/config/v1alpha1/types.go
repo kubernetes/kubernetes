@@ -417,6 +417,8 @@ type NodeLifecycleControllerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.
+	NodeMonitorPeriod metav1.Duration
 }
 
 // PersistentVolumeBinderControllerConfiguration contains elements describing

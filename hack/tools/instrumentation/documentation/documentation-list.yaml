@@ -2456,6 +2456,41 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: cloud_provider_calls_total
+  subsystem: cloud_node_lifecycle_controller
+  help: The total number of cloud provider API calls, labeled by operation and result.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - result
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+- name: monitor_nodes_duration_seconds
+  subsystem: cloud_node_lifecycle_controller
+  help: A metric measuring the duration in seconds of a single MonitorNodes loop execution.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
 - name: request_duration_seconds
   subsystem: cloud_provider_webhook
   help: Request latency in seconds. Broken down by status code.

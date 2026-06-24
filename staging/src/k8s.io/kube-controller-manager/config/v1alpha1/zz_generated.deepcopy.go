@@ -416,6 +416,7 @@ func (in *NodeLifecycleControllerConfiguration) DeepCopyInto(out *NodeLifecycleC
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
 	out.PodEvictionTimeout = in.PodEvictionTimeout
+	out.NodeMonitorPeriod = in.NodeMonitorPeriod
 	return
 }
 

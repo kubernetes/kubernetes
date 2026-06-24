@@ -96,6 +96,7 @@ import (
 	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	configv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
 	nodeconfigv1alpha1 "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
+	nodelifecycleconfigv1alpha1 "k8s.io/cloud-provider/controllers/nodelifecycle/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	logsapiv1 "k8s.io/component-base/logs/api/v1"
@@ -1360,6 +1361,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName():                                                schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(ref),
 		configv1alpha1.WebhookConfiguration{}.OpenAPIModelName():                                                        schema_k8sio_cloud_provider_config_v1alpha1_WebhookConfiguration(ref),
 		nodeconfigv1alpha1.NodeControllerConfiguration{}.OpenAPIModelName():                                             schema_controllers_node_config_v1alpha1_NodeControllerConfiguration(ref),
+		nodelifecycleconfigv1alpha1.NodeLifecycleControllerConfiguration{}.OpenAPIModelName():                           schema_controllers_nodelifecycle_config_v1alpha1_NodeLifecycleControllerConfiguration(ref),
 		serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName():                                       schema_controllers_service_config_v1alpha1_ServiceControllerConfiguration(ref),
 		componentbaseconfigv1alpha1.ClientConnectionConfiguration{}.OpenAPIModelName():                                  schema_k8sio_component_base_config_v1alpha1_ClientConnectionConfiguration(ref),
 		componentbaseconfigv1alpha1.DebuggingConfiguration{}.OpenAPIModelName():                                         schema_k8sio_component_base_config_v1alpha1_DebuggingConfiguration(ref),
@@ -65175,6 +65177,13 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 							Ref:         ref(nodeconfigv1alpha1.NodeControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
+					"NodeLifecycleController": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeLifecycleController holds configuration for node lifecycle controller related features.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(nodelifecycleconfigv1alpha1.NodeLifecycleControllerConfiguration{}.OpenAPIModelName()),
+						},
+					},
 					"ServiceController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ServiceControllerConfiguration holds configuration for ServiceController related features.",
@@ -65196,11 +65205,11 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 						},
 					},
 				},
-				Required: []string{"Generic", "KubeCloudShared", "NodeController", "ServiceController", "NodeStatusUpdateFrequency", "Webhook"},
+				Required: []string{"Generic", "KubeCloudShared", "NodeController", "NodeLifecycleController", "ServiceController", "NodeStatusUpdateFrequency", "Webhook"},
 			},
 		},
 		Dependencies: []string{
-			metav1.Duration{}.OpenAPIModelName(), configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName(), configv1alpha1.WebhookConfiguration{}.OpenAPIModelName(), nodeconfigv1alpha1.NodeControllerConfiguration{}.OpenAPIModelName(), serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName(), controllermanagerconfigv1alpha1.GenericControllerManagerConfiguration{}.OpenAPIModelName()},
+			metav1.Duration{}.OpenAPIModelName(), configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName(), configv1alpha1.WebhookConfiguration{}.OpenAPIModelName(), nodeconfigv1alpha1.NodeControllerConfiguration{}.OpenAPIModelName(), nodelifecycleconfigv1alpha1.NodeLifecycleControllerConfiguration{}.OpenAPIModelName(), serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName(), controllermanagerconfigv1alpha1.GenericControllerManagerConfiguration{}.OpenAPIModelName()},
 	}
 }
 
@@ -65278,12 +65287,6 @@ func schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(re
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
-					"NodeMonitorPeriod": {
-						SchemaProps: spec.SchemaProps{
-							Description: "nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.",
-							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
-						},
-					},
 					"ClusterName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "clusterName is the instance prefix for the cluster.",
@@ -65330,7 +65333,7 @@ func schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(re
 						},
 					},
 				},
-				Required: []string{"CloudProvider", "ExternalCloudVolumePlugin", "UseServiceAccountCredentials", "AllowUntaggedCloud", "RouteReconciliationPeriod", "NodeMonitorPeriod", "ClusterName", "ClusterCIDR", "AllocateNodeCIDRs", "CIDRAllocatorType", "ConfigureCloudRoutes", "NodeSyncPeriod"},
+				Required: []string{"CloudProvider", "ExternalCloudVolumePlugin", "UseServiceAccountCredentials", "AllowUntaggedCloud", "RouteReconciliationPeriod", "ClusterName", "ClusterCIDR", "AllocateNodeCIDRs", "CIDRAllocatorType", "ConfigureCloudRoutes", "NodeSyncPeriod"},
 			},
 		},
 		Dependencies: []string{
@@ -65393,6 +65396,36 @@ func schema_controllers_node_config_v1alpha1_NodeControllerConfiguration(ref com
 				Required: []string{"ConcurrentNodeSyncs", "ConcurrentNodeStatusUpdates"},
 			},
 		},
+	}
+}
+
+func schema_controllers_nodelifecycle_config_v1alpha1_NodeLifecycleControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeLifecycleControllerConfiguration contains elements describing CloudNodeLifecycleController.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"NodeMonitorPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeMonitorPeriod is the period for syncing NodeStatus in CloudNodeLifecycleController.",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+					"ConcurrentNodeLifecycleSyncs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrentNodeLifecycleSyncs is the number of workers for syncing NodeStatus in CloudNodeLifecycleController.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"NodeMonitorPeriod", "ConcurrentNodeLifecycleSyncs"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Duration{}.OpenAPIModelName()},
 	}
 }
 
@@ -67381,8 +67414,14 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 							Format:      "float",
 						},
 					},
+					"NodeMonitorPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 				},
-				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold"},
+				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold", "NodeMonitorPeriod"},
 			},
 		},
 		Dependencies: []string{
