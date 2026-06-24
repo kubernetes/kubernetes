@@ -321,6 +321,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 			return nil, err
 		}
 		metrics.RegisterCollectors(cm.draManager.NewMetricsCollector())
+		cm.topologyManager.AddHintProvider(logger, cm.draManager)
 	}
 	cm.kubeClient = kubeClient
 
