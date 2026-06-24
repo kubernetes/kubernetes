@@ -68,7 +68,13 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		ginkgo.DeferCleanup(cleanup)
 	})
 
-	ginkgo.It("should be able to mount a single ClusterTrustBundle by name", func(ctx context.Context) {
+	/*
+		  Release: v1.37
+		  Testname: Mounting a single ClusterTrustBundle
+		  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+					   MUST be able to mount contents of these API objects inside of pods.
+	*/
+	framework.ConformanceIt("should be able to mount a single ClusterTrustBundle by name", func(ctx context.Context) {
 
 		for _, tt := range []struct {
 			name           string
@@ -144,7 +150,14 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 				expectedOutputRegex: expectedRegexFromPEMs(pemMapping[testSignerOneName].UnsortedList()...),
 			},
 		} {
-			ginkgo.It(tt.name, func(ctx context.Context) {
+			/*
+				  Release: v1.37
+				  Testname: Mounting multiple ClusterTrustBundles
+				  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+							   MUST be able to mount contents of these API objects inside of pods
+							   using different kinds of selectors.
+			*/
+			framework.ConformanceIt(tt.name, func(ctx context.Context) {
 				signerName := tt.signerName + f.UniqueName
 				pod := podForCTBProjection(v1.VolumeProjection{
 					ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
@@ -190,7 +203,14 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 				},
 			},
 		} {
-			ginkgo.It(tt.name, func(ctx context.Context) {
+
+			/*
+				  Release: v1.37
+				  Testname: Failing to mount improperly defined ClusterTrustBundles
+				  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+							   MUST fail to mount these objects if none match the provided selector.
+			*/
+			framework.ConformanceIt(tt.name, func(ctx context.Context) {
 				pod := podForCTBProjection(v1.VolumeProjection{ClusterTrustBundle: tt.ctb})
 
 				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
@@ -235,7 +255,14 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 			})
 		}
 	})
-	ginkgo.It("should be able to specify multiple CTB volumes", func(ctx context.Context) {
+
+	/*
+		  Release: v1.37
+		  Testname: Mounting multiple ClusterTrustBundle volumes
+		  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+					   MUST be able to mount multiple volumes of ClusterTrustBundle type.
+	*/
+	framework.ConformanceIt("should be able to specify multiple CTB volumes", func(ctx context.Context) {
 		pod := podForCTBProjection(
 			v1.VolumeProjection{
 				ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
@@ -263,7 +290,13 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		e2epodoutput.TestContainerOutputsRegexp(ctx, f, "multiple CTB volumes", pod, expectedOutputs)
 	})
 
-	ginkgo.It("should be able to mount a big number (>100) of CTBs", func(ctx context.Context) {
+	/*
+		  Release: v1.37
+		  Testname: Mounting a large number of ClusterTrustBundles
+		  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+					   MUST be able to mount larger number of objects of this type into pods.
+	*/
+	framework.ConformanceIt("should be able to mount a big number (>100) of CTBs", func(ctx context.Context) {
 		const numCTBs = 150
 
 		var initCTBs []*certificatesv1.ClusterTrustBundle
