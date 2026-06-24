@@ -14619,6 +14619,15 @@ func (m *VolumeMount) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.BindMountOptions) > 0 {
+		for iNdEx := len(m.BindMountOptions) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.BindMountOptions[iNdEx])
+			copy(dAtA[i:], m.BindMountOptions[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.BindMountOptions[iNdEx])))
+			i--
+			dAtA[i] = 0x42
+		}
+	}
 	if m.RecursiveReadOnly != nil {
 		i -= len(*m.RecursiveReadOnly)
 		copy(dAtA[i:], *m.RecursiveReadOnly)
@@ -20789,6 +20798,12 @@ func (m *VolumeMount) Size() (n int) {
 		l = len(*m.RecursiveReadOnly)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if len(m.BindMountOptions) > 0 {
+		for _, s := range m.BindMountOptions {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -25027,6 +25042,7 @@ func (this *VolumeMount) String() string {
 		`MountPropagation:` + valueToStringGenerated(this.MountPropagation) + `,`,
 		`SubPathExpr:` + fmt.Sprintf("%v", this.SubPathExpr) + `,`,
 		`RecursiveReadOnly:` + valueToStringGenerated(this.RecursiveReadOnly) + `,`,
+		`BindMountOptions:` + fmt.Sprintf("%v", this.BindMountOptions) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -70448,6 +70464,38 @@ func (m *VolumeMount) Unmarshal(dAtA []byte) error {
 			}
 			s := RecursiveReadOnlyMode(dAtA[iNdEx:postIndex])
 			m.RecursiveReadOnly = &s
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BindMountOptions", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.BindMountOptions = append(m.BindMountOptions, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

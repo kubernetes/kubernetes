@@ -2880,6 +2880,7 @@ var map_VolumeMount = map[string]string{
 	"subPath":           "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
 	"mountPropagation":  "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10. When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified (which defaults to None).",
 	"subPathExpr":       "Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to \"\" (volume's root). SubPathExpr and SubPath are mutually exclusive.",
+	"bindMountOptions":  "bindMountOptions is the list of additional bind mount options to apply when mounting this volume into the container. Allowed values are noexec, nodev, and nosuid. These are Linux mount options and have no effect on Windows nodes. This field is not supported with image volumes. This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {

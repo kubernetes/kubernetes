@@ -7304,7 +7304,10 @@ message VolumeMount {
 
   // bindMountOptions is the list of additional bind mount options to apply when
   // mounting this volume into the container. Allowed values are noexec,
-  // nodev, and nosuid.
+  // nodev, and nosuid. These are Linux mount options and have no effect on
+  // Windows nodes.
+  // This field is not supported with image volumes.
+  // This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.
   // +featureGate=VolumeBindMountOptions
   // +optional
   // +listType=set
