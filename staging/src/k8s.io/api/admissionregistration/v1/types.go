@@ -140,6 +140,7 @@ const (
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 // +k8s:supportsSubresource="/status"
+// +k8s:hubType
 type ValidatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -202,6 +203,7 @@ type ExpressionWarning struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
 
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
+// +k8s:hubType
 type ValidatingAdmissionPolicyList struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.

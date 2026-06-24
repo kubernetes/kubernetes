@@ -253,6 +253,9 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
+		// Binding writes bypass the pod strategy (and thus DropDisabledPodFields),
+		// so scrub the merged annotations here the same way.
+		podutil.DropInitContainerAnnotations(pod.Annotations)
 		// Copy all labels from the Binding over to the Pod object, overwriting
 		// any existing labels set on the Pod.
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodTopologyLabelsAdmission) {

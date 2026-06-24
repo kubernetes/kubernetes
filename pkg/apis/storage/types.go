@@ -287,19 +287,6 @@ type CSIDriverSpec struct {
 	// +optional
 	AttachRequired *bool
 
-	// Defines if the underlying volume supports changing ownership and
-	// permission of the volume before being mounted.
-	// Refer to the specific FSGroupPolicy values for additional details.
-	//
-	// This field was immutable in Kubernetes < 1.29 and now is mutable.
-	//
-	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
-	// to determine if Kubernetes should modify ownership and permissions of the volume.
-	// With the default policy the defined fsGroup will only be applied
-	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
-	// +optional
-	FSGroupPolicy *FSGroupPolicy
-
 	// If set to true, podInfoOnMount indicates this CSI volume driver
 	// requires additional pod information (like podName, podUID, etc.) during
 	// mount operations.
@@ -366,6 +353,19 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	StorageCapacity *bool
+
+	// Defines if the underlying volume supports changing ownership and
+	// permission of the volume before being mounted.
+	// Refer to the specific FSGroupPolicy values for additional details.
+	//
+	// This field was immutable in Kubernetes < 1.29 and now is mutable.
+	//
+	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
+	// to determine if Kubernetes should modify ownership and permissions of the volume.
+	// With the default policy the defined fsGroup will only be applied
+	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
+	// +optional
+	FSGroupPolicy *FSGroupPolicy
 
 	// TokenRequests indicates the CSI driver needs pods' service account
 	// tokens it is mounting volume for to do necessary authentication. Kubelet

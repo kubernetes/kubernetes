@@ -38,12 +38,15 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 }
 
 // The following functions don't do anything special, but they need to be added
-// here due to the dependency of v1beta1 on v1.
+// here due to the dependency of v1beta1 on v1. They are copy-only: JobSpec is
+// memory-identical to its internal peer, so they do not block unsafe conversion.
 
+// +k8s:conversion-fn=copy-only
 func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec, s conversion.Scope) error {
 	return autoConvert_batch_JobSpec_To_v1_JobSpec(in, out, s)
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
 	return autoConvert_v1_JobSpec_To_batch_JobSpec(in, out, s)
 }

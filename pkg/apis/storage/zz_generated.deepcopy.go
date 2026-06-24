@@ -95,11 +95,6 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.FSGroupPolicy != nil {
-		in, out := &in.FSGroupPolicy, &out.FSGroupPolicy
-		*out = new(FSGroupPolicy)
-		**out = **in
-	}
 	if in.PodInfoOnMount != nil {
 		in, out := &in.PodInfoOnMount, &out.PodInfoOnMount
 		*out = new(bool)
@@ -113,6 +108,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 	if in.StorageCapacity != nil {
 		in, out := &in.StorageCapacity, &out.StorageCapacity
 		*out = new(bool)
+		**out = **in
+	}
+	if in.FSGroupPolicy != nil {
+		in, out := &in.FSGroupPolicy, &out.FSGroupPolicy
+		*out = new(FSGroupPolicy)
 		**out = **in
 	}
 	if in.TokenRequests != nil {
