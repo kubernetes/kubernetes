@@ -70,8 +70,8 @@ func (c *dispatcher) Start(ctx context.Context) error {
 
 // Dispatch implements generic.Dispatcher.
 func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []PolicyHook) error {
-
 	var deniedDecisions []policyDecisionWithMetadata
+	var validationFailures []ValidationFailureValue
 
 	addConfigError := func(err error, definition *admissionregistrationv1.ValidatingAdmissionPolicy, binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding) {
 		// we always default the FailurePolicy if it is unset and validate it in API level
@@ -240,7 +240,13 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 								})
 								celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 							case admissionregistrationv1.Audit:
-								publishValidationFailureAnnotation(binding, i, decision, versionedAttr)
+								validationFailures = append(validationFailures, ValidationFailureValue{
+									ExpressionIndex:   i,
+									Message:           decision.Message,
+									ValidationActions: binding.Spec.ValidationActions,
+									Binding:           binding.Name,
+									Policy:            binding.Spec.PolicyName,
+								})
 								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, ErrorType(&decision))
 							case admissionregistrationv1.Warn:
 								warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
@@ -285,6 +291,10 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		auditAnnotationCollector.publish(definition.Name, a)
 	}
 
+	if len(validationFailures) > 0 {
+		publishValidationFailureAnnotations(a, validationFailures)
+	}
+
 	if len(deniedDecisions) > 0 {
 		// TODO: refactor admission.NewForbidden so the name extraction is reusable but the code/reason is customizable
 		var message string
@@ -307,22 +317,16 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 	return nil
 }
 
-func publishValidationFailureAnnotation(binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
+func publishValidationFailureAnnotations(attributes admission.Attributes, failures []ValidationFailureValue) {
 	key := "validation.policy.admission.k8s.io/validation_failure"
-	// Marshal to a list of failures since, in the future, we may need to support multiple failures
-	valueJSON, err := utiljson.Marshal([]ValidationFailureValue{{
-		ExpressionIndex:   expressionIndex,
-		Message:           decision.Message,
-		ValidationActions: binding.Spec.ValidationActions,
-		Binding:           binding.Name,
-		Policy:            binding.Spec.PolicyName,
-	}})
+	valueJSON, err := utiljson.Marshal(failures)
 	if err != nil {
-		klog.Warningf("Failed to set admission audit annotation %s for ValidatingAdmissionPolicy %s and ValidatingAdmissionPolicyBinding %s: %v", key, binding.Spec.PolicyName, binding.Name, err)
+		klog.Warningf("Failed to marshal admission audit validation failures for key %s: %v", key, err)
+		return
 	}
 	value := string(valueJSON)
 	if err := attributes.AddAnnotation(key, value); err != nil {
-		klog.Warningf("Failed to set admission audit annotation %s to %s for ValidatingAdmissionPolicy %s and ValidatingAdmissionPolicyBinding %s: %v", key, value, binding.Spec.PolicyName, binding.Name, err)
+		klog.Warningf("Failed to set admission audit annotation %s to %s: %v", key, value, err)
 	}
 }
 
