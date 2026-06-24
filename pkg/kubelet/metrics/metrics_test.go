@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"k8s.io/component-base/metrics/testutil"
@@ -74,4 +75,30 @@ func TestImagePullDurationMetric(t *testing.T) {
 
 func clearMetrics() {
 	ImagePullDuration.Reset()
+}
+
+func TestEvictionsDeprecatedAndReplacementMetrics(t *testing.T) {
+	Register()
+	defer Evictions.Reset()
+	defer EvictionsTotal.Reset()
+
+	Evictions.WithLabelValues("memory").Inc()
+	EvictionsTotal.WithLabelValues("memory").Inc()
+
+	expected := `# HELP kubelet_evictions [ALPHA] Cumulative number of pod evictions by eviction signal. Deprecated in favor of kubelet_evictions_total
+# TYPE kubelet_evictions counter
+kubelet_evictions{eviction_signal="memory"} 1
+# HELP kubelet_evictions_total [ALPHA] Cumulative number of pod evictions by eviction signal
+# TYPE kubelet_evictions_total counter
+kubelet_evictions_total{eviction_signal="memory"} 1
+`
+
+	if err := testutil.GatherAndCompare(
+		GetGather(),
+		strings.NewReader(expected),
+		"kubelet_evictions",
+		"kubelet_evictions_total",
+	); err != nil {
+		t.Fatal(err)
+	}
 }
