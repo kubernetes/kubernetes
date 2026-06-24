@@ -239,7 +239,7 @@ func (h *crioContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	}
 
 	if h.includedMetrics.Has(container.DiskIOMetrics) {
-		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
+		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), stats.DiskIo)
 	}
 
 	if !h.includedMetrics.Has(container.DiskUsageMetrics) {
@@ -310,7 +310,7 @@ func (h *crioContainerHandler) GetStats() (*info.ContainerStats, error) {
 		return stats, err
 	}
 
-	if h.includedMetrics.Has(container.NetworkUsageMetrics) && len(stats.Network.Interfaces) == 0 {
+	if h.includedMetrics.Has(container.NetworkUsageMetrics) && (stats.Network == nil || len(stats.Network.Interfaces) == 0) {
 		// No network related information indicates that the pid of the
 		// container is not longer valid and we need to ask crio to
 		// provide the pid of another container from that pod

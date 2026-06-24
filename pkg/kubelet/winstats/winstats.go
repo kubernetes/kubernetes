@@ -124,7 +124,7 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapi.ContainerInfo, err
 	var stats []*cadvisorapi.ContainerStats
 	stats = append(stats, &cadvisorapi.ContainerStats{
 		Timestamp: nodeMetrics.timeStamp,
-		Cpu: cadvisorapi.CpuStats{
+		Cpu: &cadvisorapi.CpuStats{
 			Usage: cadvisorapi.CpuUsage{
 				Total: nodeMetrics.cpuUsageCoreNanoSeconds,
 			},
@@ -134,11 +134,11 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapi.ContainerInfo, err
 				Total: nodeMetrics.cpuUsageNanoCores,
 			},
 		},
-		Memory: cadvisorapi.MemoryStats{
+		Memory: &cadvisorapi.MemoryStats{
 			WorkingSet: nodeMetrics.memoryPrivWorkingSetBytes,
 			Usage:      nodeMetrics.memoryCommittedBytes,
 		},
-		Network: cadvisorapi.NetworkStats{
+		Network: &cadvisorapi.NetworkStats{
 			Interfaces: nodeMetrics.interfaceStats,
 		},
 	})

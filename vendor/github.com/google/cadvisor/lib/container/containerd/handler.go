@@ -205,7 +205,7 @@ func (h *containerdContainerHandler) getFsStats(stats *info.ContainerStats) erro
 	}
 
 	if h.includedMetrics.Has(container.DiskIOMetrics) {
-		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
+		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), stats.DiskIo)
 	}
 	return nil
 }

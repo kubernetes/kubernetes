@@ -78,7 +78,7 @@ func TestWinContainerInfos(t *testing.T) {
 	var stats []*cadvisorapi.ContainerStats
 	stats = append(stats, &cadvisorapi.ContainerStats{
 		Timestamp: timeStamp,
-		Cpu: cadvisorapi.CpuStats{
+		Cpu: &cadvisorapi.CpuStats{
 			Usage: cadvisorapi.CpuUsage{
 				Total: 123,
 			},
@@ -88,7 +88,7 @@ func TestWinContainerInfos(t *testing.T) {
 				Total: 23,
 			},
 		},
-		Memory: cadvisorapi.MemoryStats{
+		Memory: &cadvisorapi.MemoryStats{
 			WorkingSet: 1234,
 			Usage:      12345,
 		},

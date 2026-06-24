@@ -151,6 +151,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative user cpu time consumed in seconds.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.Usage.User) / float64(time.Second),
@@ -163,6 +166,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative system cpu time consumed in seconds.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.Usage.System) / float64(time.Second),
@@ -176,6 +182,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"cpu"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					if len(s.Cpu.Usage.PerCpu) == 0 {
 						if s.Cpu.Usage.Total > 0 {
 							return metricValues{{
@@ -203,6 +212,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.CounterValue,
 				condition: func(s info.ContainerSpec) bool { return s.Cpu.Quota != 0 },
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.CFS.Periods),
@@ -215,6 +227,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.CounterValue,
 				condition: func(s info.ContainerSpec) bool { return s.Cpu.Quota != 0 },
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.CFS.ThrottledPeriods),
@@ -227,6 +242,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.CounterValue,
 				condition: func(s info.ContainerSpec) bool { return s.Cpu.Quota != 0 },
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.CFS.ThrottledTime) / float64(time.Second),
@@ -239,6 +257,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.CounterValue,
 				condition: func(s info.ContainerSpec) bool { return s.Cpu.Quota != 0 },
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.CFS.BurstsPeriods),
@@ -251,6 +272,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType: prometheus.CounterValue,
 				condition: func(s info.ContainerSpec) bool { return s.Cpu.Quota != 0 },
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Cpu.CFS.BurstTime) / float64(time.Second),
@@ -267,6 +291,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Time duration the processes of the container have run on the CPU.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{
 						value:     float64(s.Cpu.Schedstat.RunTime) / float64(time.Second),
 						timestamp: s.Timestamp,
@@ -277,6 +304,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Time duration processes of the container have been waiting on a runqueue.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{
 						value:     float64(s.Cpu.Schedstat.RunqueueTime) / float64(time.Second),
 						timestamp: s.Timestamp,
@@ -287,6 +317,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of times processes of the cgroup have run on the cpu",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{
 						value:     float64(s.Cpu.Schedstat.RunPeriods),
 						timestamp: s.Timestamp,
@@ -302,6 +335,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Value of container cpu load average over the last 10 seconds.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Cpu.LoadAverage), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -309,6 +345,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Value of container cpu load.d average over the last 10 seconds.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Cpu.LoadDAverage), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -409,6 +448,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of bytes of page cache memory.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Cache), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -416,6 +458,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Size of RSS in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.RSS), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -423,6 +468,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Size of kernel memory allocated in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.KernelUsage), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -430,6 +478,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Size of memory mapped files in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.MappedFile), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -437,6 +488,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Container swap usage in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Swap), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -444,6 +498,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of memory usage hits limits",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{
 						value:     float64(s.Memory.Failcnt),
 						timestamp: s.Timestamp,
@@ -454,6 +511,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Current memory usage in bytes, including all memory regardless of when it was accessed",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Usage), timestamp: s.Timestamp}}
 				},
 			},
@@ -462,6 +522,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Maximum memory usage recorded in bytes",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.MaxUsage), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -469,6 +532,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Current working set in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.WorkingSet), timestamp: s.Timestamp}}
 				},
 			},
@@ -477,6 +543,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Current total active file in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.TotalActiveFile), timestamp: s.Timestamp}}
 				},
 			},
@@ -485,6 +554,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Current total inactive file in bytes.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.TotalInactiveFile), timestamp: s.Timestamp}}
 				},
 			},
@@ -494,6 +566,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"failure_type", "scope"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Memory.ContainerData.Pgfault),
@@ -522,6 +597,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative count of memory.high throttle events for the container",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Events.High), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -529,6 +607,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative count of memory.max limit hit events for the container",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Events.Max), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -536,6 +617,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of bytes of file cache that has been modified but not yet written back to disk.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.FileDirty), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -543,6 +627,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of bytes of file cache that is currently being written back to disk.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.FileWriteback), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -550,6 +637,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative number of pages scanned by the page reclaim algorithm.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Pgscan), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -557,6 +647,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative number of pages reclaimed by the page reclaim algorithm.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.Pgsteal), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -564,6 +657,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative number of refaults of previously evicted file pages.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.WorkingsetRefaultFile), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -571,6 +667,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Cumulative number of refaults of previously evicted anonymous pages.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Memory.WorkingsetRefaultAnon), timestamp: s.Timestamp}}
 				},
 			},
@@ -594,6 +693,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"type", "scope", "node"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					values := make(metricValues, 0)
 					values = append(values, getNumaStatsPerNode(s.Memory.ContainerData.NumaStats.File,
 						[]string{"file", "container"}, s.Timestamp)...)
@@ -666,6 +768,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiceBytes, "Read", asFloat64,
 						nil, nil,
@@ -678,6 +783,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiced, "Read", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -692,6 +800,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.Sectors, "Read", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -706,6 +817,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoMerged, "Read", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -720,6 +834,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiceTime, "Read", asNanosecondsToSeconds,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -734,6 +851,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiceBytes, "Write", asFloat64,
 						nil, nil,
@@ -746,6 +866,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiced, "Write", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -760,6 +883,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.Sectors, "Write", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -774,6 +900,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoMerged, "Write", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -788,6 +917,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiceTime, "Write", asNanosecondsToSeconds,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -802,6 +934,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoQueued, "Total", asFloat64,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -816,6 +951,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoServiceTime, "Total", asNanosecondsToSeconds,
 						s.Filesystem, func(fs *info.FsStats) float64 {
@@ -840,6 +978,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoCostUsage, "Count", asMicrosecondsToSeconds,
 						[]info.FsStats{}, nil,
@@ -852,6 +993,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoCostWait, "Count", asMicrosecondsToSeconds,
 						[]info.FsStats{}, nil,
@@ -864,6 +1008,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoCostIndebt, "Count", asMicrosecondsToSeconds,
 						[]info.FsStats{}, nil,
@@ -876,6 +1023,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return ioValues(
 						s.DiskIo.IoCostIndelay, "Count", asMicrosecondsToSeconds,
 						[]info.FsStats{}, nil,
@@ -889,6 +1039,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device", "major", "minor", "operation"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					var values metricValues
 					for _, diskStat := range s.DiskIo.IoServiceBytes {
 						for operation, value := range diskStat.Stats {
@@ -915,6 +1068,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -931,6 +1087,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -947,6 +1106,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -963,6 +1125,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -979,6 +1144,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -995,6 +1163,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -1011,6 +1182,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -1027,6 +1201,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"interface"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Network.Interfaces))
 					for _, value := range s.Network.Interfaces {
 						values = append(values, metricValue{
@@ -1048,6 +1225,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"tcp_state"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Network.Tcp.Established),
@@ -1115,6 +1295,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"tcp_state"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Network.Tcp6.Established),
@@ -1184,6 +1367,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"tcp_state"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Network.TcpAdvanced.RtoAlgorithm),
@@ -1595,6 +1781,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"udp_state"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Network.Udp6.Listen),
@@ -1627,6 +1816,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"udp_state"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Network == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Network.Udp.Listen),
@@ -1660,6 +1852,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of processes running inside the container.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Processes == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Processes.ProcessCount), timestamp: s.Timestamp}}
 				},
 			},
@@ -1668,6 +1863,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of open file descriptors for the container.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Processes == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Processes.FdCount), timestamp: s.Timestamp}}
 				},
 			},
@@ -1676,6 +1874,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of open sockets for the container.",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Processes == nil {
+						return nil
+					}
 					return metricValues{{value: float64(s.Processes.SocketCount), timestamp: s.Timestamp}}
 				},
 			},
@@ -1684,6 +1885,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Maximum number of threads allowed inside the container, infinity if value is zero",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Processes == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Processes.ThreadsMax),
@@ -1697,6 +1901,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Number of threads running inside the container",
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Processes == nil {
+						return nil
+					}
 					return metricValues{
 						{
 							value:     float64(s.Processes.ThreadsCurrent),
@@ -1711,6 +1918,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"ulimit"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Processes == nil {
+						return nil
+					}
 					values := make(metricValues, 0, len(s.Processes.Ulimits))
 					for _, ulimit := range s.Processes.Ulimits {
 						values = append(values, metricValue{
@@ -1891,6 +2101,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Total time duration no tasks in the container could make progress due to CPU congestion.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{value: asMicrosecondsToSeconds(s.Cpu.PSI.Full.Total), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -1898,6 +2111,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Total time duration tasks in the container have waited due to CPU congestion.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Cpu == nil {
+						return nil
+					}
 					return metricValues{{value: asMicrosecondsToSeconds(s.Cpu.PSI.Some.Total), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -1905,6 +2121,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Total time duration no tasks in the container could make progress due to memory congestion.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: asMicrosecondsToSeconds(s.Memory.PSI.Full.Total), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -1912,6 +2131,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Total time duration tasks in the container have waited due to memory congestion.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.Memory == nil {
+						return nil
+					}
 					return metricValues{{value: asMicrosecondsToSeconds(s.Memory.PSI.Some.Total), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -1919,6 +2141,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Total time duration no tasks in the container could make progress due to IO congestion.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return metricValues{{value: asMicrosecondsToSeconds(s.DiskIo.PSI.Full.Total), timestamp: s.Timestamp}}
 				},
 			}, {
@@ -1926,6 +2151,9 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				help:      "Total time duration tasks in the container have waited due to IO congestion.",
 				valueType: prometheus.CounterValue,
 				getValues: func(s *info.ContainerStats) metricValues {
+					if s.DiskIo == nil {
+						return nil
+					}
 					return metricValues{{value: asMicrosecondsToSeconds(s.DiskIo.PSI.Some.Total), timestamp: s.Timestamp}}
 				},
 			},

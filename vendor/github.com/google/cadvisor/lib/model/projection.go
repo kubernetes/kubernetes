@@ -45,7 +45,7 @@ type RequestOptions struct {
 // consecutive cumulative samples. Folded in from info/v2: the collapse turns
 // v2's read-time derivations into model-owned projections (design §6.1).
 func InstCpuStats(last, cur *ContainerStats) (*CpuInstStats, error) {
-	if last == nil {
+	if last == nil || cur == nil || last.Cpu == nil || cur.Cpu == nil {
 		return nil, nil
 	}
 	if !cur.Timestamp.After(last.Timestamp) {

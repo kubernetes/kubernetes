@@ -226,7 +226,7 @@ func getTerminatedContainerInfo(seed int, podName string, podNamespace string, c
 	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
 	cinfo.Stats[0].Memory.RSS = 0
 	cinfo.Stats[0].CpuInst.Usage.Total = 0
-	cinfo.Stats[0].Network = cadvisorapi.NetworkStats{
+	cinfo.Stats[0].Network = &cadvisorapi.NetworkStats{
 		Interfaces: []cadvisorapi.InterfaceStats{{
 			Name:     "eth0",
 			RxBytes:  0,
@@ -283,11 +283,11 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 
 	stats := cadvisorapi.ContainerStats{
 		Timestamp: testTime(timestamp, seed),
-		Cpu: cadvisorapi.CpuStats{
+		Cpu: &cadvisorapi.CpuStats{
 			PSI: getTestPSIStats(seed),
 		},
 		CpuInst: &cadvisorapi.CpuInstStats{},
-		Memory: cadvisorapi.MemoryStats{
+		Memory: &cadvisorapi.MemoryStats{
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
 			RSS:        uint64(seed + offsetMemRSSBytes),
@@ -298,7 +298,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 			Swap: uint64(seed + offsetMemSwapUsageBytes),
 			PSI:  getTestPSIStats(seed),
 		},
-		Network: cadvisorapi.NetworkStats{
+		Network: &cadvisorapi.NetworkStats{
 			Interfaces: []cadvisorapi.InterfaceStats{{
 				Name:     "eth0",
 				RxBytes:  uint64(seed + offsetNetRxBytes),
@@ -334,7 +334,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				DutyCycle:   uint64(seed + offsetAcceleratorDutyCycle),
 			},
 		},
-		DiskIo: cadvisorapi.DiskIoStats{
+		DiskIo: &cadvisorapi.DiskIoStats{
 			PSI: getTestPSIStats(seed),
 		},
 	}

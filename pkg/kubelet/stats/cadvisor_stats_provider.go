@@ -540,7 +540,7 @@ func isContainerTerminated(info *cadvisorapi.ContainerInfo) bool {
 	if !found {
 		return true
 	}
-	if info.Spec.HasNetwork {
+	if cstat.Network != nil {
 		iStats := cadvisorInfoToNetworkStats(info)
 		if iStats != nil {
 			for _, iStat := range iStats.Interfaces {
@@ -550,7 +550,7 @@ func isContainerTerminated(info *cadvisorapi.ContainerInfo) bool {
 			}
 		}
 	}
-	if cstat.CpuInst == nil || !info.Spec.HasMemory {
+	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return true
 	}
 	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0

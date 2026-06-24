@@ -53,12 +53,14 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapi.ContainerInfo) (*statsapi
 		if cstat.CpuInst != nil {
 			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
 		}
-		cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-			cpuStats.PSI = cadvisorPSIToStatsPSI(&cstat.Cpu.PSI)
+		if cstat.Cpu != nil {
+			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+				cpuStats.PSI = cadvisorPSIToStatsPSI(&cstat.Cpu.PSI)
+			}
 		}
 	}
-	if info.Spec.HasMemory {
+	if info.Spec.HasMemory && cstat.Memory != nil {
 		pageFaults := cstat.Memory.ContainerData.Pgfault
 		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
 		memoryStats = &statsapi.MemoryStats{
@@ -180,7 +182,7 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapi.Con
 
 func cadvisorInfoToProcessStats(info *cadvisorapi.ContainerInfo) *statsapi.ProcessStats {
 	cstat, found := latestContainerStats(info)
-	if !found || !info.Spec.HasProcesses {
+	if !found || cstat.Processes == nil {
 		return nil
 	}
 	num := cstat.Processes.ProcessCount
@@ -220,6 +222,10 @@ func cadvisorInfoToNetworkStats(info *cadvisorapi.ContainerInfo) *statsapi.Netwo
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
+		return nil
+	}
+
+	if cstat.Network == nil {
 		return nil
 	}
 
@@ -306,7 +312,7 @@ func cadvisorInfoToSwapStats(info *cadvisorapi.ContainerInfo) *statsapi.SwapStat
 
 	var swapStats *statsapi.SwapStats
 
-	if info.Spec.HasMemory {
+	if info.Spec.HasMemory && cstat.Memory != nil {
 		swapStats = &statsapi.SwapStats{
 			Time:           metav1.NewTime(cstat.Timestamp),
 			SwapUsageBytes: &cstat.Memory.Swap,
@@ -329,7 +335,7 @@ func cadvisorInfoToIOStats(info *cadvisorapi.ContainerInfo) *statsapi.IOStats {
 
 	var ioStats *statsapi.IOStats
 
-	if info.Spec.HasDiskIo {
+	if info.Spec.HasDiskIo && cstat.DiskIo != nil {
 		ioStats = &statsapi.IOStats{
 			Time: metav1.NewTime(cstat.Timestamp),
 			PSI:  cadvisorPSIToStatsPSI(&cstat.DiskIo.PSI),

@@ -1032,14 +1032,14 @@ type Health struct {
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time `json:"timestamp"`
-	Cpu       CpuStats  `json:"cpu,omitempty"`
+	Cpu       *CpuStats `json:"cpu,omitempty"`
 	// Instantaneous CPU (nanocores/s). Linux: derived from two cumulative samples
 	// by expose/library; Windows: set directly by winstats. (design §6.1)
 	CpuInst *CpuInstStats           `json:"cpu_inst,omitempty"`
-	DiskIo  DiskIoStats             `json:"diskio,omitempty"`
-	Memory  MemoryStats             `json:"memory,omitempty"`
+	DiskIo  *DiskIoStats            `json:"diskio,omitempty"`
+	Memory  *MemoryStats            `json:"memory,omitempty"`
 	Hugetlb map[string]HugetlbStats `json:"hugetlb,omitempty"`
-	Network NetworkStats            `json:"network,omitempty"`
+	Network *NetworkStats           `json:"network,omitempty"`
 	// Filesystem statistics
 	Filesystem []FsStats `json:"filesystem,omitempty"`
 
@@ -1050,7 +1050,7 @@ type ContainerStats struct {
 	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
 
 	// ProcessStats for Containers
-	Processes ProcessStats `json:"processes,omitempty"`
+	Processes *ProcessStats `json:"processes,omitempty"`
 
 	// Custom metrics from all collectors
 	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`

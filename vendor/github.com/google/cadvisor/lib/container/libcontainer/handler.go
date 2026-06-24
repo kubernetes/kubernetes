@@ -119,6 +119,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 
 	// If we know the pid then get network stats from /proc/<pid>/net/dev
 	if h.pid > 0 {
+		stats.Network = &info.NetworkStats{}
 		if h.includedMetrics.Has(container.NetworkUsageMetrics) {
 			netStats, err := networkStatsFromProc(h.rootFs, h.pid)
 			if err != nil {
@@ -171,13 +172,16 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	// file descriptors etc.) and not required a proper container's
 	// root PID (systemd services don't have the root PID atm)
 	if h.includedMetrics.Has(container.ProcessMetrics) {
+		stats.Processes = &info.ProcessStats{}
 		path, ok := common.GetControllerPath(h.cgroupManager.GetPaths(), "cpu", cgroups.IsCgroup2UnifiedMode())
 		if !ok {
 			klog.V(4).Infof("Could not find cgroups CPU for container %d", h.pid)
 		} else {
-			stats.Processes, err = processStatsFromProcs(h.rootFs, path, h.pid)
-			if err != nil {
-				klog.V(4).Infof("Unable to get Process Stats: %v", err)
+			ps, perr := processStatsFromProcs(h.rootFs, path, h.pid)
+			if perr != nil {
+				klog.V(4).Infof("Unable to get Process Stats: %v", perr)
+			} else {
+				*stats.Processes = ps
 			}
 		}
 
@@ -186,7 +190,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	// For backwards compatibility.
-	if len(stats.Network.Interfaces) > 0 {
+	if stats.Network != nil && len(stats.Network.Interfaces) > 0 {
 		stats.Network.InterfaceStats = stats.Network.Interfaces[0]
 	}
 
@@ -770,6 +774,9 @@ func (h *Handler) GetProcesses() ([]int, error) {
 
 // Convert libcontainer stats to info.ContainerStats.
 func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
+	if ret.Cpu == nil {
+		ret.Cpu = &info.CpuStats{}
+	}
 	ret.Cpu.Usage.User = s.CpuStats.CpuUsage.UsageInUsermode
 	ret.Cpu.Usage.System = s.CpuStats.CpuUsage.UsageInKernelmode
 	ret.Cpu.Usage.Total = s.CpuStats.CpuUsage.TotalUsage
@@ -792,6 +799,9 @@ func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	if ret.DiskIo == nil {
+		ret.DiskIo = &info.DiskIoStats{}
+	}
 	ret.DiskIo.IoServiceBytes = diskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
 	ret.DiskIo.IoServiced = diskStatsCopy(s.BlkioStats.IoServicedRecursive)
 	ret.DiskIo.IoQueued = diskStatsCopy(s.BlkioStats.IoQueuedRecursive)
@@ -808,6 +818,9 @@ func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
 }
 
 func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	if ret.Memory == nil {
+		ret.Memory = &info.MemoryStats{}
+	}
 	ret.Memory.Usage = s.MemoryStats.Usage.Usage
 	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
@@ -887,6 +900,9 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 }
 
 func setMemoryEvents(cgroupPath string, ret *info.ContainerStats) {
+	if ret.Memory == nil {
+		ret.Memory = &info.MemoryStats{}
+	}
 	if val, err := fscommon.GetValueByKey(cgroupPath, "memory.events", "high"); err == nil {
 		ret.Memory.Events.High = val
 	}
@@ -908,6 +924,9 @@ func getNumaStats(memoryStats map[uint8]uint64) map[uint8]uint64 {
 }
 
 func setMemoryNumaStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	if ret.Memory == nil {
+		ret.Memory = &info.MemoryStats{}
+	}
 	ret.Memory.ContainerData.NumaStats.File = getNumaStats(s.MemoryStats.PageUsageByNUMA.File.Nodes)
 	ret.Memory.ContainerData.NumaStats.Anon = getNumaStats(s.MemoryStats.PageUsageByNUMA.Anon.Nodes)
 	ret.Memory.ContainerData.NumaStats.Unevictable = getNumaStats(s.MemoryStats.PageUsageByNUMA.Unevictable.Nodes)
@@ -947,6 +966,9 @@ func setPSIStats(s *cgroups.PSIStats, ret *info.PSIStats) {
 // read from pids path not cpu
 func setThreadsStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	if s != nil {
+		if ret.Processes == nil {
+			ret.Processes = &info.ProcessStats{}
+		}
 		ret.Processes.ThreadsCurrent = s.PidsStats.Current
 		ret.Processes.ThreadsMax = s.PidsStats.Limit
 	}
@@ -955,11 +977,15 @@ func setThreadsStats(s *cgroups.Stats, ret *info.ContainerStats) {
 func newContainerStats(cgroupStats *cgroups.Stats, includedMetrics container.MetricSet) *info.ContainerStats {
 	ret := &info.ContainerStats{
 		Timestamp: time.Now(),
+		// Cpu and Memory are always collected, so they are always present.
+		Cpu:    &info.CpuStats{},
+		Memory: &info.MemoryStats{},
 	}
 
 	if s := cgroupStats; s != nil {
 		setCPUStats(s, ret, includedMetrics.Has(container.PerCpuUsageMetrics))
 		if includedMetrics.Has(container.DiskIOMetrics) {
+			ret.DiskIo = &info.DiskIoStats{}
 			setDiskIoStats(s, ret)
 		}
 		setMemoryStats(s, ret)
