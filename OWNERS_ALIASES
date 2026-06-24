@@ -367,11 +367,13 @@ aliases:
     - smarterclayton
     - thockin
     - liggitt
+    - jpbetz
   # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
   sig-api-machinery-api-approvers:
     - deads2k
     - liggitt
     - smarterclayton
+    - jpbetz
   sig-apps-api-approvers:
     - deads2k
     - liggitt
@@ -437,6 +439,7 @@ aliases:
     - saad-ali
     - luxas
     - janetkuo
+    - jpbetz
     - justinsb
     - pwittrock
     - tallclair
