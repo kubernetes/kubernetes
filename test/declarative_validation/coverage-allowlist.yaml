@@ -22,3 +22,9 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
+- apiVersion: authentication.k8s.io/v1
+  kind: TokenRequest
+  path: spec.expirationSeconds
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: unreachable code, The conversion logic convert this fields nil value to zero value, converting it back to results in pointer(zero), so this field is never nil in the validation.
