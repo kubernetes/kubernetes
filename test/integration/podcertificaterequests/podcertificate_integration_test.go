@@ -28,6 +28,7 @@ import (
 
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	"k8s.io/utils/clock"
@@ -261,6 +263,7 @@ func TestNodeRestriction(t *testing.T) {
 					Image: "notarealimage",
 				},
 			},
+			Volumes: podCertificateVolume("kubernetes.io/foo"),
 		},
 	}
 	pod, err = client.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
@@ -464,6 +467,7 @@ func TestNodeAuthorization(t *testing.T) {
 					Image: "notarealimage",
 				},
 			},
+			Volumes: podCertificateVolume("kubernetes.io/foo"),
 		},
 	}
 	pod, err = client.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
@@ -684,6 +688,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 					Image: "notarealimage",
 				},
 			},
+			Volumes: podCertificateVolume("kubernetes.io/foo"),
 		},
 	}
 	podBarFoo, err = client.CoreV1().Pods("bar").Create(ctx, podBarFoo, metav1.CreateOptions{})
@@ -704,6 +709,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 					Image: "notarealimage",
 				},
 			},
+			Volumes: podCertificateVolume("kubernetes.io/foo"),
 		},
 	}
 	podFooBar, err = client.CoreV1().Pods("foo").Create(ctx, podFooBar, metav1.CreateOptions{})
@@ -851,6 +857,149 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	})
 }
 
+func TestSignerNameAuthorization(t *testing.T) {
+	// The noderestriction admission plugin normally requires that a pod mount a
+	// podCertificate projected volume for a given signer before its node is
+	// allowed to create a PodCertificateRequest for that signer.  As an
+	// administrator override, granting the
+	// "request-serviceaccounts-podcertificate-signer" verb on the signer name
+	// for a service account also authorizes the request.  This test exercises
+	// that override path with a pod that does *not* mount a podCertificate
+	// volume.
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Run an apiserver with PodCertificateRequest features enabled.
+	s := kubeapiservertesting.StartTestServerOrDie(
+		t,
+		kubeapiservertesting.NewDefaultTestServerOptions(),
+		[]string{
+			"--authorization-mode=Node,RBAC",
+			"--enable-admission-plugins=NodeRestriction",
+			"--feature-gates=PodCertificateRequest=true",
+			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
+		},
+		framework.SharedEtcd(),
+	)
+	defer s.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(s.ClientConfig)
+
+	// Make node1
+	node1 := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+		},
+		Spec: corev1.NodeSpec{},
+	}
+	node1, err := client.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error creating node1: %v", err)
+	}
+
+	// Make a serviceaccount
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "sa1",
+		},
+	}
+	sa, err = client.CoreV1().ServiceAccounts("default").Create(ctx, sa, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error creating sa1: %v", err)
+	}
+
+	// Make a pod that does *not* mount a podCertificate projected volume.
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod1",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: sa.ObjectMeta.Name,
+			NodeName:           node1.ObjectMeta.Name,
+			Containers: []corev1.Container{
+				{
+					Name:  "main",
+					Image: "notarealimage",
+				},
+			},
+		},
+	}
+	pod, err = client.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error creating pod1: %v", err)
+	}
+
+	// Create a clientset that impersonates node1
+	node1Client, err := nodeClient(s.ClientConfig, "node1")
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+
+	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
+	makePCR := func() *certsv1beta1.PodCertificateRequest {
+		return &certsv1beta1.PodCertificateRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "pcr1",
+			},
+			Spec: certsv1beta1.PodCertificateRequestSpec{
+				SignerName:                "kubernetes.io/foo",
+				PodName:                   pod.ObjectMeta.Name,
+				PodUID:                    pod.ObjectMeta.UID,
+				ServiceAccountName:        sa.ObjectMeta.Name,
+				ServiceAccountUID:         sa.ObjectMeta.UID,
+				NodeName:                  types.NodeName(node1.ObjectMeta.Name),
+				NodeUID:                   node1.ObjectMeta.UID,
+				PKIXPublicKey:             pubPKIX,
+				ProofOfPossession:         proof,
+				UnverifiedUserAnnotations: map[string]string{hermeticpodcertificatesigner.SpiffePathKey: "pod1"},
+			},
+		}
+	}
+
+	t.Run("node1 cannot create PCR before the signer is authorized", func(t *testing.T) {
+		// Informer lag inside kube-apiserver could cause us to get a
+		// non-Forbidden error from the noderestriction admission plugin.  This
+		// should be transient, so wait for some time to see if we reach our
+		// durable Forbidden condition.
+		var lastErr string
+		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+			_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, makePCR(), metav1.CreateOptions{})
+			if err == nil || k8serrors.IsForbidden(err) {
+				return true, err
+			}
+			if errStr := err.Error(); errStr != lastErr {
+				t.Logf("Create PodCertificateRequest default/pcr1 as node1 failed with non-Forbidden error: %v, retrying...", err)
+				lastErr = errStr
+			}
+			return false, nil
+		})
+		if err == nil {
+			t.Fatalf("PCR creation unexpectedly succeeded before the signer was authorized")
+		} else if !k8serrors.IsForbidden(err) {
+			t.Fatalf("PCR creation failed with unexpected error code (wanted Forbidden): %v", err)
+		}
+	})
+
+	// Grant node1 the ability to request the kubernetes.io/foo signer for sa1.
+	authutil.GrantUserAuthorization(t, ctx, client, "system:node:node1", rbacv1.PolicyRule{
+		APIGroups:     []string{certsv1beta1.GroupName},
+		Resources:     []string{"kubernetes.io:foo"},
+		Verbs:         []string{"request-serviceaccounts-podcertificate-signer"},
+		ResourceNames: []string{sa.ObjectMeta.Name},
+	})
+
+	t.Run("node1 can create PCR once the signer is authorized via RBAC", func(t *testing.T) {
+		_, err := node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, makePCR(), metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("PCR creation unexpectedly failed after the signer was authorized: %v", err)
+		}
+	})
+}
+
 func serviceAccountClient(cfg *restclient.Config, ns, sa string) (*clientset.Clientset, error) {
 	newCfg := restclient.CopyConfig(cfg)
 	newCfg.Impersonate.UserName = fmt.Sprintf("system:serviceaccount:%s:%s", ns, sa)
@@ -863,6 +1012,31 @@ func nodeClient(cfg *restclient.Config, node string) (*clientset.Clientset, erro
 	newCfg.Impersonate.UserName = fmt.Sprintf("system:node:%s", node)
 	newCfg.Impersonate.Groups = []string{"system:authenticated", "system:nodes"}
 	return clientset.NewForConfig(newCfg)
+}
+
+// podCertificateVolume returns a projected volume that mounts a podCertificate
+// for the given signer.  Pods that mount such a volume are allowed by the
+// noderestriction admission plugin to have a PodCertificateRequest created for
+// the matching signer.
+func podCertificateVolume(signerName string) []corev1.Volume {
+	return []corev1.Volume{
+		{
+			Name: "podcert",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							PodCertificate: &corev1.PodCertificateProjection{
+								SignerName:           signerName,
+								KeyType:              "ED25519",
+								CredentialBundlePath: "creds.pem",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte) {

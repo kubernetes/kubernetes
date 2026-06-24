@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -269,6 +270,12 @@ func (a *admitTestCase) run(t *testing.T) {
 		}
 		if len(a.err) > 0 && !strings.Contains(err.Error(), a.err) {
 			t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, a.err)
+		}
+
+		if fakeAuthz, ok := a.authz.(*fakeAuthorizer); ok {
+			if !fakeAuthz.alreadyCalled {
+				t.Errorf("fake authorizer did not receive a call during the test case")
+			}
 		}
 	})
 }
@@ -642,7 +649,39 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 	_, v1PodRequestingPCR := makeTestPod("ns", "pcrpod", pcrNode1.ObjectMeta.Name, false)
 	v1PodRequestingPCR.Spec.ServiceAccountName = pcrSA.Name
+	v1PodRequestingPCR.Spec.Volumes = []corev1.Volume{{
+		Name: "pod-cert",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{{
+					PodCertificate: &corev1.PodCertificateProjection{
+						SignerName: "example.com/foo",
+					},
+				}},
+			},
+		},
+	}}
 	checkNilError(t, pcrPodIndex.Add(v1PodRequestingPCR))
+
+	_, v1PodNoPCRVolume := makeTestPod("ns", "pcrpod-novolume", pcrNode1.ObjectMeta.Name, false)
+	v1PodNoPCRVolume.Spec.ServiceAccountName = pcrSA.Name
+	checkNilError(t, pcrPodIndex.Add(v1PodNoPCRVolume))
+
+	_, v1PodWrongSignerPCRVolume := makeTestPod("ns", "pcrpod-wrongsigner", pcrNode1.ObjectMeta.Name, false)
+	v1PodWrongSignerPCRVolume.Spec.ServiceAccountName = pcrSA.Name
+	v1PodWrongSignerPCRVolume.Spec.Volumes = []corev1.Volume{{
+		Name: "pod-cert",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{{
+					PodCertificate: &corev1.PodCertificateProjection{
+						SignerName: "example.com/other",
+					},
+				}},
+			},
+		},
+	}}
+	checkNilError(t, pcrPodIndex.Add(v1PodWrongSignerPCRVolume))
 
 	tests := []admitTestCase{
 		// Mirror pods bound to us
@@ -1424,13 +1463,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, coremypod.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `serviceaccounts "mysa" is forbidden: system:node:mynode is not authorized to request tokens for audience "foo"`,
-			authz: fakeAuthorizer{
+			authz: saAuthorizerBuilder{
 				t:                  t,
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "foo",
 				decision:           authorizer.DecisionDeny,
-			},
+			}.build(),
 		},
 		{
 			name:            "allow create of token when audience in pod --> csi --> driver --> tokenrequest with audience and ServiceAccountNodeAudienceRestriction is enabled",
@@ -1454,13 +1493,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithCSI.Name, v1mypodWithCSI.UID, []string{"bar"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `system:node:mynode is not authorized to request tokens for audience "bar"`,
-			authz: fakeAuthorizer{
+			authz: saAuthorizerBuilder{
 				t:                  t,
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "bar",
 				decision:           authorizer.DecisionDeny,
-			},
+			}.build(),
 		},
 		{
 			name:            "forbid create of token when audience in pod --> csi --> driver --> tokenrequest with audience and ServiceAccountNodeAudienceRestriction is enabled, csidriver not found",
@@ -1473,7 +1512,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithCSI.Name, v1mypodWithCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `error validating audience "foo": csidriver.storage.k8s.io "com.example.csi.mydriver" not found`,
-			authz:      fakeAuthorizer{},
 		},
 		{
 			name:            "allow create of token when audience in pod --> pvc --> pv --> csi --> driver --> tokenrequest with audience and ServiceAccountNodeAudienceRestriction is enabled",
@@ -1501,13 +1539,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithPVCRefCSI.Name, v1mypodWithPVCRefCSI.UID, []string{"bar"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `system:node:mynode is not authorized to request tokens for audience "bar"`,
-			authz: fakeAuthorizer{
+			authz: saAuthorizerBuilder{
 				t:                  t,
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "bar",
 				decision:           authorizer.DecisionDeny,
-			},
+			}.build(),
 		},
 		{
 			name:            "forbid create of token when audience in pod --> pvc --> pv --> csi --> driver --> tokenrequest with audience and ServiceAccountNodeAudienceRestriction is enabled, pvc not found",
@@ -1522,7 +1560,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithPVCRefCSI.Name, v1mypodWithPVCRefCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `error validating audience "foo": persistentvolumeclaim "pvclaim" not found`,
-			authz:      fakeAuthorizer{},
 		},
 		{
 			name:            "forbid create of token when audience in pod --> pvc --> pv --> csi --> driver --> tokenrequest with audience and ServiceAccountNodeAudienceRestriction is enabled, pv not found",
@@ -1537,7 +1574,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithPVCRefCSI.Name, v1mypodWithPVCRefCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `error validating audience "foo": persistentvolume "pvname" not found`,
-			authz:      fakeAuthorizer{},
 		},
 		{
 			name:            "allow create of token when audience in pod --> ephemeral --> pvc --> pv --> csi --> driver --> tokenrequest with audience and ServiceAccountNodeAudienceRestriction is enabled",
@@ -1565,13 +1601,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithEphemeralVolume.Name, v1mypodWithEphemeralVolume.UID, []string{"bar"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        `system:node:mynode is not authorized to request tokens for audience "bar"`,
-			authz: fakeAuthorizer{
+			authz: saAuthorizerBuilder{
 				t:                  t,
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "bar",
 				decision:           authorizer.DecisionDeny,
-			},
+			}.build(),
 		},
 		{
 			name:            "allow create of token when ServiceAccountNodeAudienceRestriction is disabled, pvc not found should not be checked",
@@ -1658,13 +1694,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, v1mypod.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			authz: fakeAuthorizer{
+			authz: saAuthorizerBuilder{
 				t:                  t,
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "foo",
 				decision:           authorizer.DecisionAllow,
-			},
+			}.build(),
 		},
 		{
 			name:            "forbid create of token when ServiceAccountNodeAudienceRestriction is enabled, clusterrole and clusterrolebinding for audience not configured",
@@ -1678,13 +1714,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypod.Name, v1mypod.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			authz: fakeAuthorizer{
+			authz: saAuthorizerBuilder{
 				t:                  t,
 				serviceAccountName: "mysa",
 				namespace:          coremypod.Namespace,
 				requestAudience:    "foo",
 				decision:           authorizer.DecisionDeny,
-			},
+			}.build(),
 			err: `serviceaccounts "mysa" is forbidden: system:node:mynode is not authorized to request tokens for audience "foo"`,
 		},
 
@@ -1867,6 +1903,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			nodesGetter:          pcrNodes,
 			attributes:           createPCRAttributes(v1PodRequestingPCR.ObjectMeta.Namespace, v1PodRequestingPCR.ObjectMeta.Name, v1PodRequestingPCR.ObjectMeta.UID, v1PodRequestingPCR.Spec.ServiceAccountName, "", pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
 			err:                  "PodCertificateRequest feature gate is disabled",
+			authz:                &uncallableAuthorizer{},
 		},
 		{
 			name:                 "allow node1 create PCR that references pod on node1",
@@ -1879,6 +1916,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
+			authz: &uncallableAuthorizer{},
 		},
 		{
 			name:                 "deny create node2 create PCR that references pod on node1",
@@ -1891,7 +1929,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `PodCertificateRequest.Spec.NodeName="pcr-node-1", which is not the requesting node "pcr-node-2"`,
+			authz: &uncallableAuthorizer{},
+			err:   `PodCertificateRequest.Spec.NodeName="pcr-node-1", which is not the requesting node "pcr-node-2"`,
 		},
 		{
 			name:                 "deny node1 create PCR that references nonexistent pod",
@@ -1904,7 +1943,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `pod "nonexistent-pod" not found`,
+			authz: &uncallableAuthorizer{},
+			err:   `pod "nonexistent-pod" not found`,
 		},
 		{
 			name:                 "deny node1 create PCR that references nonexistent sa",
@@ -1917,7 +1957,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `PodCertificateRequest for pod "ns/pcrpod" contains serviceAccountName ("nonexistent-sa") that differs from running pod ("pcr-sa")`,
+			authz: &uncallableAuthorizer{},
+			err:   `PodCertificateRequest for pod "ns/pcrpod" contains serviceAccountName ("nonexistent-sa") that differs from running pod ("pcr-sa")`,
 		},
 		{
 			name:                 "deny node1 create PCR that references nonexistent node",
@@ -1930,7 +1971,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `PodCertificateRequest.Spec.NodeName="nonexistent-node", which is not the requesting node "pcr-node-1"`,
+			authz: &uncallableAuthorizer{},
+			err:   `PodCertificateRequest.Spec.NodeName="nonexistent-node", which is not the requesting node "pcr-node-1"`,
 		},
 		{
 			name:                 "deny node1 create PCR with mismatched pod UID",
@@ -1943,7 +1985,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `PodCertificateRequest for pod "ns/pcrpod" contains pod UID ("wrong-uid") which differs from running pod "pod-uid"`,
+			authz: &uncallableAuthorizer{},
+			err:   `PodCertificateRequest for pod "ns/pcrpod" contains pod UID ("wrong-uid") which differs from running pod "pod-uid"`,
 		},
 		{
 			name:                 "deny node1 create PCR with mismatched SA UID",
@@ -1965,7 +2008,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `PodCertificateRequest for pod "ns/pcrpod" names service account UID "wrong-uid", which differs from the running service account ("pcr-sa-uid")`,
+			authz: &uncallableAuthorizer{},
+			err:   `PodCertificateRequest for pod "ns/pcrpod" names service account UID "wrong-uid", which differs from the running service account ("pcr-sa-uid")`,
 		},
 		{
 			name:                 "deny node1 create PCR with mismatched node UID",
@@ -1987,7 +2031,107 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				t.Helper()
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
 			},
-			err: `PodCertificateRequest for pod "ns/pcrpod" names node UID "wrong-uid", inconsistent with the running node ("pcr-node-1-uid")`,
+			authz: &uncallableAuthorizer{},
+			err:   `PodCertificateRequest for pod "ns/pcrpod" names node UID "wrong-uid", inconsistent with the running node ("pcr-node-1-uid")`,
+		},
+		{
+			name:                 "deny node1 create PCR for pod without podCertificate volume",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodNoPCRVolume.ObjectMeta.Namespace, v1PodNoPCRVolume.ObjectMeta.Name, v1PodNoPCRVolume.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			authz: &fakeAuthorizer{
+				t:          t,
+				userName:   "system:node:" + pcrNode1.ObjectMeta.Name,
+				groups:     []string{"system:nodes"},
+				verb:       "request-serviceaccounts-podcertificate-signer",
+				apiGroup:   "certificates.k8s.io",
+				apiVersion: "v1beta1",
+				resource:   "example.com:foo",
+				namespace:  v1PodNoPCRVolume.ObjectMeta.Namespace,
+				name:       pcrSA.ObjectMeta.Name,
+				decision:   authorizer.DecisionDeny,
+			},
+			err: `pod "ns/pcrpod-novolume" does not mount a podCertificate projected volume for signer "example.com/foo"`,
+		},
+		{
+			name:                 "deny node1 create PCR for pod without podCertificate volume",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodNoPCRVolume.ObjectMeta.Namespace, v1PodNoPCRVolume.ObjectMeta.Name, v1PodNoPCRVolume.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			authz: &fakeAuthorizer{
+				t:          t,
+				userName:   "system:node:" + pcrNode1.ObjectMeta.Name,
+				groups:     []string{"system:nodes"},
+				verb:       "request-serviceaccounts-podcertificate-signer",
+				apiGroup:   "certificates.k8s.io",
+				apiVersion: "v1beta1",
+				resource:   "example.com:foo",
+				namespace:  v1PodNoPCRVolume.ObjectMeta.Namespace,
+				name:       pcrSA.ObjectMeta.Name,
+				decision:   authorizer.DecisionNoOpinion,
+			},
+			err: `pod "ns/pcrpod-novolume" does not mount a podCertificate projected volume for signer "example.com/foo"`,
+		},
+		{
+			name:                 "deny node1 create PCR for pod with podCertificate volume for wrong signer",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodWrongSignerPCRVolume.ObjectMeta.Namespace, v1PodWrongSignerPCRVolume.ObjectMeta.Name, v1PodWrongSignerPCRVolume.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			authz: &fakeAuthorizer{
+				t:          t,
+				userName:   "system:node:" + pcrNode1.ObjectMeta.Name,
+				groups:     []string{"system:nodes"},
+				verb:       "request-serviceaccounts-podcertificate-signer",
+				apiGroup:   "certificates.k8s.io",
+				apiVersion: "v1beta1",
+				resource:   "example.com:foo",
+				namespace:  v1PodWrongSignerPCRVolume.ObjectMeta.Namespace,
+				name:       pcrSA.ObjectMeta.Name,
+				decision:   authorizer.DecisionDeny,
+			},
+			err: `pod "ns/pcrpod-wrongsigner" does not mount a podCertificate projected volume for signer "example.com/foo"`,
+		},
+		{
+			name:                 "allow node1 create PCR for pod without podCertificate volume when bypass is granted",
+			podsGetter:           pcrPods,
+			serviceAccountGetter: pcrServiceAccounts,
+			nodesGetter:          pcrNodes,
+			attributes:           createPCRAttributes(v1PodNoPCRVolume.ObjectMeta.Namespace, v1PodNoPCRVolume.ObjectMeta.Name, v1PodNoPCRVolume.ObjectMeta.UID, pcrSA.ObjectMeta.Name, pcrSA.ObjectMeta.UID, pcrNode1.ObjectMeta.Name, pcrNode1.ObjectMeta.UID, pcrNode1UserInfo),
+			features:             feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodCertificateRequest, true)
+			},
+			authz: &fakeAuthorizer{
+				t:          t,
+				userName:   "system:node:" + pcrNode1.ObjectMeta.Name,
+				groups:     []string{"system:nodes"},
+				verb:       "request-serviceaccounts-podcertificate-signer",
+				apiGroup:   "certificates.k8s.io",
+				apiVersion: "v1beta1",
+				resource:   "example.com:foo",
+				namespace:  v1PodNoPCRVolume.ObjectMeta.Namespace,
+				name:       pcrSA.ObjectMeta.Name,
+				decision:   authorizer.DecisionAllow,
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -2383,8 +2527,8 @@ func createCSRAttributes(cn, signer string, validCsr bool, key any, user user.In
 }
 
 func createPCRAttributes(namespace string, podName string, podUID types.UID, serviceAccountName string, serviceAccountUID types.UID, nodeName string, nodeUID types.UID, user user.Info) admission.Attributes {
-	pcrResource := certificatesapi.Resource("podcertificaterequests").WithVersion("v1alpha1")
-	pcrKind := certificatesapi.Kind("PodCertificateRequest").WithVersion("v1alpha1")
+	pcrResource := certificatesapi.Resource("podcertificaterequests").WithVersion("v1beta1")
+	pcrKind := certificatesapi.Kind("PodCertificateRequest").WithVersion("v1beta1")
 
 	pcr := &certificatesapi.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2593,7 +2737,73 @@ func checkNilError(t *testing.T, err error) {
 	}
 }
 
+// An authorizer that fails the test if it is called.  Some flows through the
+// noderestriction admission plugin are expected not to make authorization
+// checks, use this implementation to enforce that.
+type uncallableAuthorizer struct {
+	t *testing.T
+}
+
+var _ authorizer.UnconditionalAuthorizer = (*uncallableAuthorizer)(nil)
+
+func (f *uncallableAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	f.t.Errorf("the admission logic called the authorizer when it was not supposed to")
+	return authorizer.DecisionNoOpinion, "", nil
+}
+
 type fakeAuthorizer struct {
+	t        *testing.T
+	userName string
+	groups   []string
+
+	verb string
+
+	apiGroup   string
+	apiVersion string
+
+	resource  string
+	namespace string
+	name      string
+
+	decision authorizer.Decision
+	err      error
+
+	alreadyCalled bool
+}
+
+var _ authorizer.UnconditionalAuthorizer = (*fakeAuthorizer)(nil)
+
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	if f.alreadyCalled {
+		f.t.Errorf("authorizer called more than once; the admission logic should call the authorizer at most once")
+		return authorizer.DecisionNoOpinion, "", nil
+	}
+	f.alreadyCalled = true
+
+	if f.err != nil {
+		return f.decision, "forced error", f.err
+	}
+
+	expectedAttrs := authorizer.AttributesRecord{
+		User:       &user.DefaultInfo{Name: f.userName, Groups: f.groups},
+		Verb:       f.verb,
+		Namespace:  f.namespace,
+		APIGroup:   f.apiGroup,
+		APIVersion: f.apiVersion,
+		Resource:   f.resource,
+		Name:       f.name,
+
+		ResourceRequest: true,
+	}
+
+	if diff := cmp.Diff(expectedAttrs, a); diff != "" {
+		f.t.Errorf("unexpected authorizer attributes; diff (-got +want)\n%s", diff)
+	}
+
+	return f.decision, "", nil
+}
+
+type saAuthorizerBuilder struct {
 	t                  *testing.T
 	serviceAccountName string
 	namespace          string
@@ -2602,25 +2812,23 @@ type fakeAuthorizer struct {
 	err                error
 }
 
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	if f.err != nil {
-		return f.decision, "forced error", f.err
-	}
+func (s saAuthorizerBuilder) build() *fakeAuthorizer {
+	return &fakeAuthorizer{
+		t: s.t,
 
-	expectedAttrs := authorizer.AttributesRecord{
-		User:            &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}},
-		Verb:            "request-serviceaccounts-token-audience",
-		Namespace:       f.namespace,
-		APIGroup:        "",
-		APIVersion:      "v1",
-		Resource:        f.requestAudience,
-		Name:            f.serviceAccountName,
-		ResourceRequest: true,
-	}
+		userName: "system:node:mynode",
+		groups:   []string{"system:nodes"},
 
-	if !reflect.DeepEqual(a, expectedAttrs) {
-		f.t.Errorf("expected attributes: %v, got: %v", expectedAttrs, a)
-	}
+		verb: "request-serviceaccounts-token-audience",
 
-	return f.decision, "", nil
+		apiGroup:   "",
+		apiVersion: "v1",
+
+		resource:  s.requestAudience,
+		namespace: s.namespace,
+		name:      s.serviceAccountName,
+
+		decision: s.decision,
+		err:      s.err,
+	}
 }
