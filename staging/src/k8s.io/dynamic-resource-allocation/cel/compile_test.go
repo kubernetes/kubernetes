@@ -797,3 +797,131 @@ func BenchmarkDeviceMatches(b *testing.B) {
 		})
 	}
 }
+
+func TestCompileDerivedAttributes(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		expression                string
+		listTypeAttributesEnabled bool
+		envType                   *environment.Type // defaults to environment.NewExpressions
+		expectCompileError        string
+	}{
+		{
+			name:                      "valid-bool",
+			expression:                "true",
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-bool-list-when-listType-enabled",
+			expression:                `[true, false]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-int",
+			expression:                "1",
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-int-list-when-listType-enabled",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-string",
+			expression:                `"fish"`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-string-list-when-listType-enabled",
+			expression:                `["a", "b"]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-semver",
+			expression:                `semver("1.0.0")`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-semver-list-when-listType-enabled",
+			expression:                `[semver("1.0.0"), semver("2.0.0")]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-any",
+			expression:                `device.attributes["dra.example.com"]["numa"]`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-any-list-when-listType-enabled",
+			expression:                `[device.attributes["dra.example.com"]["numa"]]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-dyn",
+			expression:                `dyn("foo")`,
+			listTypeAttributesEnabled: false,
+		},
+		{
+			name:                      "valid-dyn-list-when-listType-enabled",
+			expression:                `[dyn("foo"), dyn(1)]`,
+			listTypeAttributesEnabled: true,
+		},
+		{
+			name:                      "valid-int-list-in-stored-expression-despite-disabled-feature-gate",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: false,
+			envType:                   new(environment.StoredExpressions),
+		},
+		{
+			name:                      "invalid-map",
+			expression:                `device.attributes`,
+			listTypeAttributesEnabled: false,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean, semver), not map(string, map(string, google.protobuf.Any))",
+		},
+		{
+			name:                      "invalid-int-list-when-listType-disabled",
+			expression:                `[1, 2, 3]`,
+			listTypeAttributesEnabled: false,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean, semver), not list(int)",
+		},
+		{
+			name:                      "invalid-list-of-maps",
+			expression:                `[device.attributes]`,
+			listTypeAttributesEnabled: true,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean, semver) or a list of these scalars, not list(map(string, map(string, dyn)))",
+		},
+		{
+			name:                      "invalid-null-literal",
+			expression:                `null`,
+			listTypeAttributesEnabled: true,
+			expectCompileError:        "must evaluate to a primitive scalar (string, integer, boolean, semver) or a list of these scalars, not null_type",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := GetCompiler(Features{
+				EnableListTypeAttributes: tc.listTypeAttributesEnabled,
+			})
+			envType := environment.NewExpressions
+			if tc.envType != nil {
+				envType = *tc.envType
+			}
+			result := compiler.CompileCELExpression(tc.expression, Options{
+				EnvType:          new(envType),
+				DerivedAttribute: true,
+			})
+
+			if tc.expectCompileError != "" {
+				if result.Error == nil {
+					t.Fatalf("expected compile error %q, got none", tc.expectCompileError)
+				}
+				if !strings.Contains(result.Error.Error(), tc.expectCompileError) {
+					t.Fatalf("expected compile error to contain %q, but got: %v", tc.expectCompileError, result.Error)
+				}
+			} else if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+		})
+	}
+}
