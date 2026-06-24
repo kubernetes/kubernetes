@@ -1245,6 +1245,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: NodeLifecycleConditions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: NodeLogQuery
   versionedSpecs:
   - default: false
