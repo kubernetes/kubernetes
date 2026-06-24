@@ -152,6 +152,15 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			}
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
+		// Reject pods with mountOptions when the feature gate is disabled
+		// on this kubelet, rather than silently ignoring them. This is
+		// different from the normal "drop disabled fields" approach because
+		// silently ignoring security-critical options would create a gap:
+		// a policy engine may verify mountOptions is set on the API server,
+		// but a kubelet with the gate off would mount without them.
+		if len(spec.Volume.EmptyDir.MountOptions) > 0 && !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirMountOptions) {
+			return nil, fmt.Errorf("emptyDir volume %q has mountOptions %v, but the EmptyDirMountOptions feature gate is not enabled on this node", spec.Name(), spec.Volume.EmptyDir.MountOptions)
+		}
 	}
 	return &emptyDir{
 		pod:             pod,

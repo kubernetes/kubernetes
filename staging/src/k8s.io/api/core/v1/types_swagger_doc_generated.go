@@ -563,9 +563,10 @@ func (DownwardAPIVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_EmptyDirVolumeSource = map[string]string{
-	"":          "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
-	"medium":    "medium represents what type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
-	"sizeLimit": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+	"":             "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
+	"medium":       "medium represents what type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+	"sizeLimit":    "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+	"mountOptions": "mountOptions is a list of mount options (noexec, nodev, nosuid) to apply to the volume when it is mounted into containers. These options are passed through CRI to the container runtime and enforced at the OS level. Only VFS-level bind mount flags are permitted; filesystem-specific options are not allowed. This is an alpha field and requires the EmptyDirMountOptions feature gate.",
 }
 
 func (EmptyDirVolumeSource) SwaggerDoc() map[string]string {
