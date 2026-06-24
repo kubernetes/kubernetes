@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -36,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -128,6 +130,13 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 
 	// create an audit context to allow recording audit information
 	ctx = audit.WithAuditContext(ctx)
+	ctx = request.WithRequestInfo(ctx, &request.RequestInfo{
+		APIGroup:          "authentication.k8s.io",
+		APIVersion:        "v1",
+		Resource:          "tokenrequests",
+		IsResourceRequest: true,
+		Verb:              "create",
+	})
 	_, err = storage.Token.Create(ctx, serviceAccount.Name, &authenticationapi.TokenRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceAccount.Name,
