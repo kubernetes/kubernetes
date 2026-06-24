@@ -774,7 +774,7 @@ func TestUpdatePod(t *testing.T) {
 			runtimeStatus: &kubecontainer.PodStatus{
 				// Pod has been seen by runtime but is in terminal state
 				// Add a terminated container to distinguish from cache miss (empty status)
-				ContainerStatuses: []kubecontainer.ContainerStatus{
+				ContainerStatuses: []*kubecontainer.Status{
 					{State: kubecontainer.ContainerStateExited},
 				},
 			},
