@@ -748,10 +748,14 @@ func TestUpdatePod(t *testing.T) {
 			expectKnownTerminated: true,
 		},
 		{
-			name: "a pod that is terminal and has never started must be terminated if the runtime does not have a cached terminal state",
+			name: "a pod that is terminal and has never started must be terminated if the runtime has an empty status (cache miss)",
 			update: UpdatePodOptions{
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
+			},
+			runtimeStatus: &kubecontainer.PodStatus{
+				// Empty status (no containers or sandboxes) models a real cache miss
+				// where the pod has never been seen by the runtime
 			},
 			expect: &podSyncStatus{
 				fullname:     "done-pod_ns",
