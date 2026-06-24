@@ -378,12 +378,16 @@ func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 	}
 }
 
+func resetFeatureSupportCheckerDuringTest(t *testing.T) {
+	t.Helper()
+	orig := etcdfeature.DefaultFeatureSupportChecker
+	etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
+	t.Cleanup(func() { etcdfeature.DefaultFeatureSupportChecker = orig })
+}
+
 func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, true)
-
-	origChecker := etcdfeature.DefaultFeatureSupportChecker
-	etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
-	t.Cleanup(func() { etcdfeature.DefaultFeatureSupportChecker = origChecker })
+	resetFeatureSupportCheckerDuringTest(t)
 
 	origCtx, store, _ := testSetup(t)
 	initList, err := initStoreData(origCtx, store)
