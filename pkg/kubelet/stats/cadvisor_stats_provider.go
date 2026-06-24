@@ -521,7 +521,10 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapi.ContainerInfo) bool {
 	if !found {
 		return false
 	}
-	if cstat.CpuInst == nil {
+	// Spec.HasMemory does not guarantee a memory sample is present: lib/model
+	// exposes Memory as a pointer that is nil when no memory stats were
+	// collected for this sample, so guard the deref.
+	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return false
 	}
 	return cstat.CpuInst.Usage.Total != 0 && cstat.Memory.RSS != 0

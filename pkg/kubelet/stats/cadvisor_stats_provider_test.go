@@ -1003,3 +1003,18 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	// Validate Pod0 Results
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, nil, fakeStatsSlice, pods[0].EphemeralStorage)
 }
+
+func TestHasMemoryAndCPUInstUsageNilMemory(t *testing.T) {
+	// With lib/model pointer sub-stats, Spec.HasMemory no longer guarantees a
+	// non-nil Memory sample. hasMemoryAndCPUInstUsage must return false instead
+	// of panicking when the memory sample is absent for a container that the
+	// spec says has memory.
+	info := getTestContainerInfo(4000, "pod0", "ns0", "c0")
+	if !hasMemoryAndCPUInstUsage(&info) {
+		t.Fatalf("precondition failed: baseline fixture should report memory and cpuinst usage")
+	}
+	info.Stats[0].Memory = nil
+	if hasMemoryAndCPUInstUsage(&info) {
+		t.Errorf("hasMemoryAndCPUInstUsage with nil Memory and HasMemory=true = true; want false")
+	}
+}
