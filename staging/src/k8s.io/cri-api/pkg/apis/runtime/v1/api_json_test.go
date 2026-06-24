@@ -62,10 +62,10 @@ func TestKeyValueCompat(t *testing.T) {
 		},
 		{
 			name:                 "non-utf8 env",
-			envs:                 []*KeyValue{{Key: "key", Value: []byte{'A', 0x80, 'Z'}}}, // invalid utf8 continuation byte (0x80)
-			variantJSON:          `[{"key":"key","value":"A` + "\x80" + `Z"}]`,             // an alternate JSON input containing the invalid utf8 byte that should coerce to the same result
-			expectedJSON:         `[{"key":"key","value":"A\ufffdZ"}]`,                     // coerced to utf8 replacement character (\ufffd) on marshal
-			expectedRoundTripped: []*KeyValue{{Key: "key", Value: []byte("A\ufffdZ")}},     // round-trips to replacement character (\ufffd) on unmarshal
+			envs:                 []*KeyValue{{Key: "key", Value: []byte{'A', 0x80, 'Z'}}},              // invalid utf8 continuation byte (0x80)
+			variantJSON:          `[{"key":"key","value":"A` + "\x80" + `Z"}]`,                          // an alternate JSON input containing the invalid utf8 byte that should coerce to the same result
+			expectedJSON:         `[{"key":"key","value":"A` + stdlibSerializedReplacementChar + `Z"}]`, // coerced to utf8 replacement character (\ufffd) on marshal
+			expectedRoundTripped: []*KeyValue{{Key: "key", Value: []byte("A\ufffdZ")}},                  // round-trips to replacement character (\ufffd) on unmarshal
 		},
 	}
 
