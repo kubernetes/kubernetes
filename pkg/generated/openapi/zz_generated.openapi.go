@@ -12343,6 +12343,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 						},
 					},
 				},
+				Required: []string{"expirationSeconds"},
 			},
 		},
 		Dependencies: []string{
