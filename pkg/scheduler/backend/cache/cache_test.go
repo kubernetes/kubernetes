@@ -2187,35 +2187,35 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 		expected                       []*v1.Node
 		expectedHavePodsWithAffinity   int
 		expectedPodGroupStatesSnapshot map[podGroupKey]*podGroupStateSnapshot
-		expectedUsedPVCSet             sets.Set[string]
+		expectedUsedPVCCounts          map[string]int
 	}{
 		{
-			name:               "Empty cache",
-			operations:         []operation{},
-			expected:           []*v1.Node{},
-			expectedUsedPVCSet: sets.New[string](),
+			name:                  "Empty cache",
+			operations:            []operation{},
+			expected:              []*v1.Node{},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
-			name:               "Single node",
-			operations:         []operation{addNode(1)},
-			expected:           []*v1.Node{nodes[1]},
-			expectedUsedPVCSet: sets.New[string](),
+			name:                  "Single node",
+			operations:            []operation{addNode(1)},
+			expected:              []*v1.Node{nodes[1]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add node, remove it, add it again",
 			operations: []operation{
 				addNode(1), updateSnapshot(), removeNode(1), addNode(1),
 			},
-			expected:           []*v1.Node{nodes[1]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[1]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add node and remove it in the same cycle, add it again",
 			operations: []operation{
 				addNode(1), updateSnapshot(), addNode(2), removeNode(1),
 			},
-			expected:           []*v1.Node{nodes[2]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[2]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add a few nodes, and snapshot in the middle",
@@ -2223,24 +2223,24 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), updateSnapshot(), addNode(1), updateSnapshot(), addNode(2),
 				updateSnapshot(), addNode(3),
 			},
-			expected:           []*v1.Node{nodes[3], nodes[2], nodes[1], nodes[0]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[3], nodes[2], nodes[1], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add a few nodes, and snapshot in the end",
 			operations: []operation{
 				addNode(0), addNode(2), addNode(5), addNode(6),
 			},
-			expected:           []*v1.Node{nodes[6], nodes[5], nodes[2], nodes[0]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[6], nodes[5], nodes[2], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Update some nodes",
 			operations: []operation{
 				addNode(0), addNode(1), addNode(5), updateSnapshot(), updateNode(1),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[5], nodes[0]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[1], nodes[5], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add a few nodes, and remove all of them",
@@ -2248,8 +2248,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(2), addNode(5), addNode(6), updateSnapshot(),
 				removeNode(0), removeNode(2), removeNode(5), removeNode(6),
 			},
-			expected:           []*v1.Node{},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add a few nodes, and remove some of them",
@@ -2257,8 +2257,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(2), addNode(5), addNode(6), updateSnapshot(),
 				removeNode(0), removeNode(6),
 			},
-			expected:           []*v1.Node{nodes[5], nodes[2]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[5], nodes[2]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add a few nodes, remove all of them, and add more",
@@ -2267,8 +2267,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				removeNode(2), removeNode(5), removeNode(6), updateSnapshot(),
 				addNode(7), addNode(9),
 			},
-			expected:           []*v1.Node{nodes[9], nodes[7]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[9], nodes[7]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Update nodes in particular order",
@@ -2276,8 +2276,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(8), updateNode(2), updateNode(8), updateSnapshot(),
 				addNode(1),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[8], nodes[2]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[1], nodes[8], nodes[2]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add some nodes and some pods",
@@ -2285,24 +2285,24 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(2), addNode(8), updateSnapshot(),
 				addPod(8), addPod(2),
 			},
-			expected:           []*v1.Node{nodes[2], nodes[8], nodes[0]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[2], nodes[8], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Updating a pod moves its node to the head",
 			operations: []operation{
 				addNode(0), addPod(0), addNode(2), addNode(4), updatePod(0),
 			},
-			expected:           []*v1.Node{nodes[0], nodes[4], nodes[2]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[0], nodes[4], nodes[2]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add pod before its node",
 			operations: []operation{
 				addNode(0), addPod(1), updatePod(1), addNode(1),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[0]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Remove node before its pods",
@@ -2311,8 +2311,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				removeNode(1), updateSnapshot(),
 				updatePod(1), updatePod(11), removePod(1), removePod(11),
 			},
-			expected:           []*v1.Node{nodes[0]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[0]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Add Pods with affinity",
@@ -2321,15 +2321,15 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[1], nodes[0]},
 			expectedHavePodsWithAffinity: 1,
-			expectedUsedPVCSet:           sets.New[string](),
+			expectedUsedPVCCounts:        map[string]int{},
 		},
 		{
 			name: "Add Pods with PVC",
 			operations: []operation{
 				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), addNode(1),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[0]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc0"),
+			expected:              []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc0": 1},
 		},
 		{
 			name: "Add multiple nodes with pods with affinity",
@@ -2338,15 +2338,29 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[1], nodes[0]},
 			expectedHavePodsWithAffinity: 2,
-			expectedUsedPVCSet:           sets.New[string](),
+			expectedUsedPVCCounts:        map[string]int{},
 		},
 		{
 			name: "Add multiple nodes with pods with PVC",
 			operations: []operation{
 				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), addNode(1), addPodWithPVC(1, 1, 1), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[0]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc0", "test-ns/test-pvc1"),
+			expected:              []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc0": 1, "test-ns/test-pvc1": 1},
+		},
+		{
+			name: "Add multiple nodes with pods with multiple ref count PVC",
+			operations: []operation{
+				addNode(0), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 0, 0), addPodWithPVC(2, 0, 1),
+				addNode(1), addPodWithPVC(3, 1, 0), addPodWithPVC(4, 1, 3), addPodWithPVC(5, 1, 1),
+				addNode(2), addPodWithPVC(7, 2, 3), addPodWithPVC(8, 2, 1), addPodWithPVC(9, 2, 1), updateSnapshot(),
+			},
+			expected: []*v1.Node{nodes[2], nodes[1], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{
+				"test-ns/test-pvc0": 3,
+				"test-ns/test-pvc1": 4,
+				"test-ns/test-pvc3": 2,
+			},
 		},
 		{
 			name: "Add then Remove pods with affinity",
@@ -2355,23 +2369,56 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[0], nodes[1]},
 			expectedHavePodsWithAffinity: 0,
-			expectedUsedPVCSet:           sets.New[string](),
+			expectedUsedPVCCounts:        map[string]int{},
 		},
 		{
 			name: "Add then Remove pod with PVC",
 			operations: []operation{
 				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), removePodWithPVC(0, 0, 0), addPodWithPVC(2, 0, 2), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[0]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc2"),
+			expected:              []*v1.Node{nodes[0]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc2": 1},
+		},
+		{
+			name: "Add pod with PVC then terminate node without cleaning up pods",
+			operations: []operation{
+				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), updateSnapshot(),
+				removeNode(0), updateSnapshot(),
+			},
+			expected:              []*v1.Node{nodes[1]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc1": 1},
+		},
+		{
+			name: "Add pod with multiple ref count PVC then terminate node without cleaning up pods",
+			operations: []operation{
+				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), addPodWithPVC(2, 1, 1),
+				addPodWithPVC(3, 1, 2), addPodWithPVC(4, 0, 3), addPodWithPVC(5, 0, 0),
+				addPodWithPVC(6, 1, 2), addPodWithPVC(7, 0, 4), addPodWithPVC(8, 1, 2), updateSnapshot(),
+				removeNode(0), updateSnapshot(),
+			},
+			expected:              []*v1.Node{nodes[1]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc1": 2, "test-ns/test-pvc2": 3},
+		},
+		{
+			name: "Add pod with multiple ref count PVC then terminate node before cleaning up pods (node and pods events in reversed order)",
+			operations: []operation{
+				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), addPodWithPVC(2, 1, 1),
+				addPodWithPVC(3, 1, 2), addPodWithPVC(4, 0, 3), addPodWithPVC(5, 0, 0),
+				addPodWithPVC(6, 1, 2), addPodWithPVC(7, 0, 4), addPodWithPVC(8, 1, 2), updateSnapshot(),
+				// Pod and node deletion
+				removeNode(0), updateSnapshot(),
+				removePodWithPVC(4, 0, 3), removePodWithPVC(5, 0, 0), updateSnapshot(),
+			},
+			expected:              []*v1.Node{nodes[1]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc1": 2, "test-ns/test-pvc2": 3},
 		},
 		{
 			name: "Add then Remove pod with PVC and add same pod again",
 			operations: []operation{
 				addNode(0), addPodWithPVC(0, 0, 0), updateSnapshot(), removePodWithPVC(0, 0, 0), addPodWithPVC(0, 0, 0), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[0]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc0"),
+			expected:              []*v1.Node{nodes[0]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc0": 1},
 		},
 		{
 			name: "Add and Remove multiple pods with PVC with same ref count length different content",
@@ -2379,8 +2426,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addNode(0), addNode(1), addPodWithPVC(0, 0, 0), addPodWithPVC(1, 1, 1), updateSnapshot(),
 				removePodWithPVC(0, 0, 0), removePodWithPVC(1, 1, 1), addPodWithPVC(2, 0, 2), addPodWithPVC(3, 1, 3), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[1], nodes[0]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc2", "test-ns/test-pvc3"),
+			expected:              []*v1.Node{nodes[1], nodes[0]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc2": 1, "test-ns/test-pvc3": 1},
 		},
 		{
 			name: "Add, Update and Remove multiple pods with SchedulingGroup",
@@ -2389,7 +2436,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addPodWithPodGroupName(2), updateSnapshot(),
 				updatePodWithPodGroupName(0), removePodWithPodGroupName(1), updateSnapshot(),
 			},
-			expected: []*v1.Node{nodes[1], nodes[0], nodes[2]},
+			expected:              []*v1.Node{nodes[1], nodes[0], nodes[2]},
+			expectedUsedPVCCounts: map[string]int{},
 			expectedPodGroupStatesSnapshot: map[podGroupKey]*podGroupStateSnapshot{
 				newPodGroupKey("test-ns", "pg-0"): {
 					podGroupStateData: podGroupStateData{
@@ -2417,8 +2465,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				addPodWithPVC(3, 1, 3), addPodWithPVC(4, 0, 0), addPodWithPVC(5, 1, 1), updateSnapshot(),
 				removePodWithPVC(0, 0, 0), removePodWithPVC(3, 1, 3), removePodWithPVC(4, 0, 0), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[0], nodes[1]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc1", "test-ns/test-pvc2"),
+			expected:              []*v1.Node{nodes[0], nodes[1]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc1": 1, "test-ns/test-pvc2": 1},
 		},
 		{
 			name: "Assume and forget in cache, and in snapshot",
@@ -2427,8 +2475,8 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				assumePod(8), assumePodInSnapshot(4), assumePod(0), forgetPod(0),
 				assumePodInSnapshot(2), forgetPodInSnapshot(4), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
-			expectedUsedPVCSet: sets.New[string](),
+			expected:              []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
+			expectedUsedPVCCounts: map[string]int{},
 		},
 		{
 			name: "Assume and forget in cache, and in snapshot, with affinity",
@@ -2439,7 +2487,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			},
 			expected:                     []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
 			expectedHavePodsWithAffinity: 1,
-			expectedUsedPVCSet:           sets.New[string](),
+			expectedUsedPVCCounts:        map[string]int{},
 		},
 		{
 			name: "Assume and forget in cache, and in snapshot, with PVC",
@@ -2448,8 +2496,19 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				assumePodWithPVC(8, 8, 8), assumePodWithPVCInSnapshot(4, 4, 4), assumePodWithPVC(0, 0, 0), forgetPodWithPVC(0, 0, 0),
 				assumePodWithPVCInSnapshot(2, 2, 2), forgetPodWithPVCInSnapshot(4, 4, 4), updateSnapshot(),
 			},
-			expected:           []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
-			expectedUsedPVCSet: sets.New("test-ns/test-pvc8"),
+			expected:              []*v1.Node{nodes[0], nodes[8], nodes[4], nodes[2]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc8": 1},
+		},
+		{
+			name: "Assume and forget in cache, and in snapshot, with multiple PVC ref counts",
+			operations: []operation{
+				addNode(0), addNode(2), addNode(4), addNode(8), updateSnapshot(),
+				assumePodWithPVC(8, 8, 0), assumePodWithPVCInSnapshot(4, 4, 0), assumePodWithPVC(0, 0, 0), forgetPodWithPVC(0, 0, 0),
+				assumePodWithPVC(1, 2, 0), assumePodWithPVCInSnapshot(3, 4, 0), assumePodWithPVC(5, 0, 0), forgetPodWithPVC(5, 0, 0),
+				assumePodWithPVC(2, 2, 0), assumePodWithPVCInSnapshot(10, 4, 0), forgetPodWithPVCInSnapshot(4, 4, 0), updateSnapshot(),
+			},
+			expected:              []*v1.Node{nodes[2], nodes[0], nodes[8], nodes[4]},
+			expectedUsedPVCCounts: map[string]int{"test-ns/test-pvc0": 3},
 		},
 	}
 
@@ -2465,19 +2524,27 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 				op(t)
 			}
 
-			if len(test.expected) != len(cache.nodes) {
-				t.Errorf("unexpected number of nodes. Expected: %v, got: %v", len(test.expected), len(cache.nodes))
+			cacheNodeSize := 0
+			for _, n := range cache.nodes {
+				if n.info.Node() != nil { // non-deleted nodes
+					cacheNodeSize++
+				}
+			}
+			if len(test.expected) != cacheNodeSize {
+				t.Errorf("unexpected number of nodes. Expected: %v, got: %v", len(test.expected), cacheNodeSize)
 			}
 			var i int
 			// Check that cache is in the expected state.
 			for node := cache.headNode; node != nil; node = node.next {
-				if node.info.Node() != nil && node.info.Node().Name != test.expected[i].Name {
-					t.Errorf("unexpected node. Expected: %v, got: %v, index: %v", test.expected[i].Name, node.info.Node().Name, i)
+				if node.info.Node() != nil {
+					if node.info.Node().Name != test.expected[i].Name {
+						t.Errorf("unexpected node. Expected: %v, got: %v, index: %v", test.expected[i].Name, node.info.Node().Name, i)
+					}
+					i++
 				}
-				i++
 			}
 			// Make sure we visited all the cached nodes in the above for loop.
-			if i != len(cache.nodes) {
+			if i != cacheNodeSize {
 				t.Errorf("Not all the nodes were visited by following the NodeInfo linked list. Expected to see %v nodes, saw %v.", len(cache.nodes), i)
 			}
 
@@ -2492,7 +2559,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			}
 
 			// Compare content of the used PVC set
-			if diff := cmp.Diff(test.expectedUsedPVCSet, snapshot.usedPVCSet); diff != "" {
+			if diff := cmp.Diff(test.expectedUsedPVCCounts, snapshot.usedPVCRefCounts); diff != "" {
 				t.Errorf("Unexpected usedPVCSet (-want +got):\n%s", diff)
 			}
 
@@ -2528,7 +2595,7 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 
 	expectedNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	expectedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
-	expectedUsedPVCSet := sets.New[string]()
+	expectedUsedPVCSet := map[string]int{}
 	nodesList, err := cache.nodeTree.list()
 	if err != nil {
 		t.Fatal(err)
@@ -2539,8 +2606,8 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 			if len(n.PodsWithAffinity) > 0 {
 				expectedHavePodsWithAffinityNodeInfoList = append(expectedHavePodsWithAffinityNodeInfoList, n)
 			}
-			for key := range n.PVCRefCounts {
-				expectedUsedPVCSet.Insert(key)
+			for key, count := range n.PVCRefCounts {
+				expectedUsedPVCSet[key] += count
 			}
 		} else {
 			return fmt.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen", nodeName)
@@ -2561,9 +2628,9 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		}
 	}
 
-	for key := range expectedUsedPVCSet {
-		if !snapshot.usedPVCSet.Has(key) {
-			return fmt.Errorf("expected PVC %s to exist in UsedPVCSet but it is not found", key)
+	for key, count := range expectedUsedPVCSet {
+		if snapshot.usedPVCRefCounts[key] != count {
+			return fmt.Errorf("expected PVC %s to exist in UsedPVCSet. Expected: %v, got: %v", key, snapshot.usedPVCRefCounts[key], count)
 		}
 	}
 
