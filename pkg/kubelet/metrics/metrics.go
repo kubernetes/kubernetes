@@ -585,7 +585,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:         KubeletSubsystem,
 			Name:              PreemptionsKey,
-			Help:              "Cumulative number of pod preemptions by preemption resource. Deprecate in favor of kubelet_preemptions_total",
+			Help:              "Cumulative number of pod preemptions by preemption resource. Deprecated in favor of kubelet_preemptions_total",
 			StabilityLevel:    metrics.ALPHA,
 			DeprecatedVersion: "1.38.0",
 		},
@@ -1178,7 +1178,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:         KubeletSubsystem,
 			Name:              TopologyManagerAdmissionDurationKey,
-			Help:              "Duration in milliseconds to serve a pod admission request. Deprecated in favor of topology_manager_admission_duration_seconds",
+			Help:              "Duration in milliseconds to serve a pod admission request. Deprecated in favor of kubelet_topology_manager_admission_duration_seconds",
 			Buckets:           metrics.ExponentialBuckets(.05, 2, 15),
 			StabilityLevel:    metrics.ALPHA,
 			DeprecatedVersion: "1.38.0",

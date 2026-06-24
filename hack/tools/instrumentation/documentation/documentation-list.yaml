@@ -4636,7 +4636,7 @@
     endpoint: /metrics
 - name: preemptions
   subsystem: kubelet
-  help: Cumulative number of pod preemptions by preemption resource. Deprecate in
+  help: Cumulative number of pod preemptions by preemption resource. Deprecated in
     favor of kubelet_preemptions_total
   type: Counter
   deprecatedVersion: 1.38.0
@@ -4881,7 +4881,7 @@
 - name: topology_manager_admission_duration_ms
   subsystem: kubelet
   help: Duration in milliseconds to serve a pod admission request. Deprecated in favor
-    of topology_manager_admission_duration_seconds
+    of kubelet_topology_manager_admission_duration_seconds
   type: Histogram
   deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
