@@ -3143,6 +3143,27 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
 		allErrs = append(allErrs, validateMountRecursiveReadOnly(mnt, fldPath.Child("recursiveReadOnly"))...)
+		allErrs = append(allErrs, validateBindMountOptions(mnt.BindMountOptions, idxPath.Child("bindMountOptions"))...)
+	}
+	return allErrs
+}
+
+var supportedBindMountOptions = sets.New("noexec", "nodev", "nosuid")
+
+func validateBindMountOptions(bindMountOptions []string, fldPath *field.Path) field.ErrorList {
+	if len(bindMountOptions) == 0 {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+	seen := sets.New[string]()
+	for i, opt := range bindMountOptions {
+		if !supportedBindMountOptions.Has(opt) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i), opt, sets.List(supportedBindMountOptions)))
+		}
+		if seen.Has(opt) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), opt))
+		}
+		seen.Insert(opt)
 	}
 	return allErrs
 }
