@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
 	metricsfeatures "k8s.io/component-base/metrics/features"
@@ -123,6 +124,7 @@ func BuildGenericConfig(
 	schemes []*runtime.Scheme,
 	resourceConfig *serverstorage.ResourceConfig,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
+	informerName *cache.InformerName,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
@@ -166,7 +168,12 @@ func BuildGenericConfig(
 		}
 		return obj, nil
 	}
-	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(clientgoExternalClient, 10*time.Minute, clientgoinformers.WithTransform(trim))
+	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(
+		clientgoExternalClient,
+		10*time.Minute,
+		clientgoinformers.WithTransform(trim),
+		clientgoinformers.WithInformerName(informerName),
+	)
 
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
