@@ -151,9 +151,13 @@ type NonResourceAttributes struct {
 type SubjectAccessReviewSpec struct {
 	// resourceAttributes describes information for a resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	ResourceAttributes *ResourceAttributes `json:"resourceAttributes,omitempty" protobuf:"bytes,1,opt,name=resourceAttributes"`
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 
 	// user is the user you're testing for.
@@ -187,9 +191,13 @@ func (t ExtraValue) String() string {
 type SelfSubjectAccessReviewSpec struct {
 	// resourceAttributes describes information for a resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	ResourceAttributes *ResourceAttributes `json:"resourceAttributes,omitempty" protobuf:"bytes,1,opt,name=resourceAttributes"`
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 }
 
