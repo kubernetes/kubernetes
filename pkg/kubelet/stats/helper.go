@@ -119,20 +119,29 @@ func cadvisorInfoToContainerStats(logger klog.Logger, name string, info *cadviso
 		result.Rootfs = buildRootfsStats(cstat, imageFs)
 	}
 
-	// Reproduce cadvisor's v2 single-filesystem rollup: only when the container
-	// has exactly one filesystem (multi-device containers were skipped).
+	// One filesystem device populates the rollup; multi-device containers are skipped.
+	var cfs *cadvisorapi.FilesystemSummary
 	if len(cstat.Filesystem) == 1 {
 		fsStat := cstat.Filesystem[0]
-		if result.Rootfs != nil {
-			rootfsUsage := fsStat.BaseUsage
-			result.Rootfs.UsedBytes = &rootfsUsage
+		cfs = &cadvisorapi.FilesystemSummary{
+			BaseUsageBytes:  &fsStat.BaseUsage,
+			TotalUsageBytes: &fsStat.Usage,
+			InodeUsage:      &fsStat.Inodes,
 		}
-		if result.Logs != nil {
-			logsUsage := fsStat.Usage - fsStat.BaseUsage
-			result.Logs.UsedBytes = &logsUsage
+	}
+	if cfs != nil {
+		if cfs.BaseUsageBytes != nil {
+			if result.Rootfs != nil {
+				rootfsUsage := *cfs.BaseUsageBytes
+				result.Rootfs.UsedBytes = &rootfsUsage
+			}
+			if cfs.TotalUsageBytes != nil && result.Logs != nil {
+				logsUsage := *cfs.TotalUsageBytes - *cfs.BaseUsageBytes
+				result.Logs.UsedBytes = &logsUsage
+			}
 		}
-		if result.Rootfs != nil {
-			rootInodes := fsStat.Inodes
+		if cfs.InodeUsage != nil && result.Rootfs != nil {
+			rootInodes := *cfs.InodeUsage
 			result.Rootfs.InodesUsed = &rootInodes
 		}
 	}
