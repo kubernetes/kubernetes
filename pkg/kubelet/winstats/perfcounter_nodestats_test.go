@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 

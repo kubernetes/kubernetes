@@ -23,8 +23,7 @@ package testing
 import (
 	"context"
 
-	v10 "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/lib/model"
 	mock "github.com/stretchr/testify/mock"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -537,26 +536,26 @@ func (_c *MockProvider_GetPods_Call) RunAndReturn(run func() []*v1.Pod) *MockPro
 }
 
 // GetRequestedContainersInfo provides a mock function for the type MockProvider
-func (_mock *MockProvider) GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*v10.ContainerInfo, error) {
+func (_mock *MockProvider) GetRequestedContainersInfo(containerName string, options model.RequestOptions) (map[string]*model.ContainerInfo, error) {
 	ret := _mock.Called(containerName, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRequestedContainersInfo")
 	}
 
-	var r0 map[string]*v10.ContainerInfo
+	var r0 map[string]*model.ContainerInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, v2.RequestOptions) (map[string]*v10.ContainerInfo, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, model.RequestOptions) (map[string]*model.ContainerInfo, error)); ok {
 		return returnFunc(containerName, options)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, v2.RequestOptions) map[string]*v10.ContainerInfo); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, model.RequestOptions) map[string]*model.ContainerInfo); ok {
 		r0 = returnFunc(containerName, options)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]*v10.ContainerInfo)
+			r0 = ret.Get(0).(map[string]*model.ContainerInfo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, v2.RequestOptions) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(string, model.RequestOptions) error); ok {
 		r1 = returnFunc(containerName, options)
 	} else {
 		r1 = ret.Error(1)
@@ -571,20 +570,20 @@ type MockProvider_GetRequestedContainersInfo_Call struct {
 
 // GetRequestedContainersInfo is a helper method to define mock.On call
 //   - containerName string
-//   - options v2.RequestOptions
+//   - options model.RequestOptions
 func (_e *MockProvider_Expecter) GetRequestedContainersInfo(containerName interface{}, options interface{}) *MockProvider_GetRequestedContainersInfo_Call {
 	return &MockProvider_GetRequestedContainersInfo_Call{Call: _e.mock.On("GetRequestedContainersInfo", containerName, options)}
 }
 
-func (_c *MockProvider_GetRequestedContainersInfo_Call) Run(run func(containerName string, options v2.RequestOptions)) *MockProvider_GetRequestedContainersInfo_Call {
+func (_c *MockProvider_GetRequestedContainersInfo_Call) Run(run func(containerName string, options model.RequestOptions)) *MockProvider_GetRequestedContainersInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
 			arg0 = args[0].(string)
 		}
-		var arg1 v2.RequestOptions
+		var arg1 model.RequestOptions
 		if args[1] != nil {
-			arg1 = args[1].(v2.RequestOptions)
+			arg1 = args[1].(model.RequestOptions)
 		}
 		run(
 			arg0,
@@ -594,12 +593,12 @@ func (_c *MockProvider_GetRequestedContainersInfo_Call) Run(run func(containerNa
 	return _c
 }
 
-func (_c *MockProvider_GetRequestedContainersInfo_Call) Return(stringToContainerInfo map[string]*v10.ContainerInfo, err error) *MockProvider_GetRequestedContainersInfo_Call {
+func (_c *MockProvider_GetRequestedContainersInfo_Call) Return(stringToContainerInfo map[string]*model.ContainerInfo, err error) *MockProvider_GetRequestedContainersInfo_Call {
 	_c.Call.Return(stringToContainerInfo, err)
 	return _c
 }
 
-func (_c *MockProvider_GetRequestedContainersInfo_Call) RunAndReturn(run func(containerName string, options v2.RequestOptions) (map[string]*v10.ContainerInfo, error)) *MockProvider_GetRequestedContainersInfo_Call {
+func (_c *MockProvider_GetRequestedContainersInfo_Call) RunAndReturn(run func(containerName string, options model.RequestOptions) (map[string]*model.ContainerInfo, error)) *MockProvider_GetRequestedContainersInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

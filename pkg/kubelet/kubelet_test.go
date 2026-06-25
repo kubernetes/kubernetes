@@ -38,8 +38,7 @@ import (
 
 	"k8s.io/component-base/metrics/legacyregistry"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -3345,7 +3344,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	tp := noopoteltrace.NewTracerProvider()
 	cadvisor := cadvisortest.NewMockInterface(t)
 	cadvisor.EXPECT().MachineInfo(logger).Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
-	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapiv2.FsInfo{
+	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapi.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
 		Available: 600,
@@ -3508,7 +3507,7 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	tp := noopoteltrace.NewTracerProvider()
 	cadvisor := cadvisortest.NewMockInterface(t)
 	cadvisor.EXPECT().MachineInfo(logger).Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
-	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapiv2.FsInfo{
+	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapi.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
 		Available: 600,

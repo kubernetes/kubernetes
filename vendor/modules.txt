@@ -77,23 +77,12 @@ github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
 github.com/containerd/containerd/api/types
 github.com/containerd/containerd/api/types/task
-# github.com/containerd/errdefs v1.0.0
-## explicit; go 1.20
-github.com/containerd/errdefs
-# github.com/containerd/errdefs/pkg v0.3.0
-## explicit; go 1.22
-github.com/containerd/errdefs/pkg/errgrpc
-github.com/containerd/errdefs/pkg/internal/cause
-github.com/containerd/errdefs/pkg/internal/types
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
 # github.com/containerd/ttrpc v1.2.8
 ## explicit; go 1.22
 github.com/containerd/ttrpc
-# github.com/containerd/typeurl/v2 v2.3.0
-## explicit; go 1.21
-github.com/containerd/typeurl/v2
 # github.com/coredns/caddy v1.1.1
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
@@ -272,62 +261,49 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.1.3
 ## explicit; go 1.18
 github.com/google/btree
-# github.com/google/cadvisor v0.57.0
+# github.com/google/cadvisor/lib v0.60.2
 ## explicit; go 1.24.0
-github.com/google/cadvisor/cache/memory
-github.com/google/cadvisor/client/v2
-github.com/google/cadvisor/collector
-github.com/google/cadvisor/container
-github.com/google/cadvisor/container/common
-github.com/google/cadvisor/container/containerd
-github.com/google/cadvisor/container/containerd/containers
-github.com/google/cadvisor/container/containerd/identifiers
-github.com/google/cadvisor/container/containerd/install
-github.com/google/cadvisor/container/containerd/namespaces
-github.com/google/cadvisor/container/containerd/pkg/dialer
-github.com/google/cadvisor/container/crio
-github.com/google/cadvisor/container/crio/install
-github.com/google/cadvisor/container/libcontainer
-github.com/google/cadvisor/container/raw
-github.com/google/cadvisor/container/systemd
-github.com/google/cadvisor/container/systemd/install
-github.com/google/cadvisor/devicemapper
-github.com/google/cadvisor/events
-github.com/google/cadvisor/fs
-github.com/google/cadvisor/fs/btrfs
-github.com/google/cadvisor/fs/btrfs/install
-github.com/google/cadvisor/fs/devicemapper
-github.com/google/cadvisor/fs/devicemapper/install
-github.com/google/cadvisor/fs/nfs
-github.com/google/cadvisor/fs/nfs/install
-github.com/google/cadvisor/fs/overlay
-github.com/google/cadvisor/fs/overlay/install
-github.com/google/cadvisor/fs/tmpfs
-github.com/google/cadvisor/fs/tmpfs/install
-github.com/google/cadvisor/fs/vfs
-github.com/google/cadvisor/fs/vfs/install
-github.com/google/cadvisor/fs/zfs
-github.com/google/cadvisor/fs/zfs/install
-github.com/google/cadvisor/info/v1
-github.com/google/cadvisor/info/v2
-github.com/google/cadvisor/machine
-github.com/google/cadvisor/manager
-github.com/google/cadvisor/metrics
-github.com/google/cadvisor/nvm
-github.com/google/cadvisor/perf
-github.com/google/cadvisor/resctrl
-github.com/google/cadvisor/stats
-github.com/google/cadvisor/storage
-github.com/google/cadvisor/summary
-github.com/google/cadvisor/utils
-github.com/google/cadvisor/utils/cloudinfo
-github.com/google/cadvisor/utils/cpuload
-github.com/google/cadvisor/utils/cpuload/netlink
-github.com/google/cadvisor/utils/oomparser
-github.com/google/cadvisor/utils/sysfs
-github.com/google/cadvisor/utils/sysinfo
-github.com/google/cadvisor/version
-github.com/google/cadvisor/watcher
+github.com/google/cadvisor/lib/cache/memory
+github.com/google/cadvisor/lib/cadvisorflags
+github.com/google/cadvisor/lib/container
+github.com/google/cadvisor/lib/container/common
+github.com/google/cadvisor/lib/container/containerd
+github.com/google/cadvisor/lib/container/containerd/containers
+github.com/google/cadvisor/lib/container/containerd/identifiers
+github.com/google/cadvisor/lib/container/containerd/install
+github.com/google/cadvisor/lib/container/containerd/namespaces
+github.com/google/cadvisor/lib/container/containerd/pkg/dialer
+github.com/google/cadvisor/lib/container/crio
+github.com/google/cadvisor/lib/container/crio/install
+github.com/google/cadvisor/lib/container/libcontainer
+github.com/google/cadvisor/lib/container/raw
+github.com/google/cadvisor/lib/container/systemd
+github.com/google/cadvisor/lib/container/systemd/install
+github.com/google/cadvisor/lib/fs
+github.com/google/cadvisor/lib/fs/btrfs
+github.com/google/cadvisor/lib/fs/btrfs/install
+github.com/google/cadvisor/lib/fs/nfs
+github.com/google/cadvisor/lib/fs/nfs/install
+github.com/google/cadvisor/lib/fs/overlay
+github.com/google/cadvisor/lib/fs/overlay/install
+github.com/google/cadvisor/lib/fs/tmpfs
+github.com/google/cadvisor/lib/fs/tmpfs/install
+github.com/google/cadvisor/lib/fs/vfs
+github.com/google/cadvisor/lib/fs/vfs/install
+github.com/google/cadvisor/lib/fs/zfs
+github.com/google/cadvisor/lib/fs/zfs/install
+github.com/google/cadvisor/lib/machine
+github.com/google/cadvisor/lib/manager
+github.com/google/cadvisor/lib/metrics
+github.com/google/cadvisor/lib/model
+github.com/google/cadvisor/lib/stats
+github.com/google/cadvisor/lib/storage
+github.com/google/cadvisor/lib/utils
+github.com/google/cadvisor/lib/utils/oomparser
+github.com/google/cadvisor/lib/utils/sysfs
+github.com/google/cadvisor/lib/utils/sysinfo
+github.com/google/cadvisor/lib/version
+github.com/google/cadvisor/lib/watcher
 # github.com/google/cel-go v0.27.0
 ## explicit; go 1.23.0
 github.com/google/cel-go/cel
@@ -414,9 +390,6 @@ github.com/liggitt/tabwriter
 # github.com/lithammer/dedent v1.1.0
 ## explicit
 github.com/lithammer/dedent
-# github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
-## explicit
-github.com/mistifyio/go-zfs
 # github.com/mitchellh/go-wordwrap v1.0.1
 ## explicit; go 1.14
 github.com/mitchellh/go-wordwrap

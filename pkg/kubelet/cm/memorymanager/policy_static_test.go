@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 

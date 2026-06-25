@@ -1,0 +1,6 @@
+rules:
+  # Forbid the cAdvisor module everywhere; consumer dirs (pkg/kubelet, cmd/kubelet,
+  # pkg/proxy/conntrack) re-allow only github.com/google/cadvisor/lib.
+  - selectorRegexp: github[.]com/google/cadvisor
+    forbiddenPrefixes:
+      - github.com/google/cadvisor

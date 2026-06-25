@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	cadvisormemory "github.com/google/cadvisor/cache/memory"
+	cadvisormemory "github.com/google/cadvisor/lib/cache/memory"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"

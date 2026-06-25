@@ -23,8 +23,7 @@ import (
 	"net/http"
 
 	restful "github.com/emicklei/go-restful/v3"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +70,7 @@ type Provider interface {
 
 	// GetRequestedContainersInfo returns the information of the container with
 	// the containerName, and with the specified cAdvisor options.
-	GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
+	GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
 
 	// The following information is provided by Kubelet.
 	//

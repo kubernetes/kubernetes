@@ -23,8 +23,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/klog/v2"
@@ -76,16 +75,16 @@ func TestWinContainerInfos(t *testing.T) {
 	actualRootInfos, err := c.WinContainerInfos()
 	assert.NoError(t, err)
 
-	var stats []*cadvisorapiv2.ContainerStats
-	stats = append(stats, &cadvisorapiv2.ContainerStats{
+	var stats []*cadvisorapi.ContainerStats
+	stats = append(stats, &cadvisorapi.ContainerStats{
 		Timestamp: timeStamp,
 		Cpu: &cadvisorapi.CpuStats{
 			Usage: cadvisorapi.CpuUsage{
 				Total: 123,
 			},
 		},
-		CpuInst: &cadvisorapiv2.CpuInstStats{
-			Usage: cadvisorapiv2.CpuInstUsage{
+		CpuInst: &cadvisorapi.CpuInstStats{
+			Usage: cadvisorapi.CpuInstUsage{
 				Total: 23,
 			},
 		},
@@ -94,13 +93,13 @@ func TestWinContainerInfos(t *testing.T) {
 			Usage:      12345,
 		},
 	})
-	infos := make(map[string]cadvisorapiv2.ContainerInfo)
-	infos["/"] = cadvisorapiv2.ContainerInfo{
-		Spec: cadvisorapiv2.ContainerSpec{
+	infos := make(map[string]cadvisorapi.ContainerInfo)
+	infos["/"] = cadvisorapi.ContainerInfo{
+		Spec: cadvisorapi.ContainerSpec{
 			HasCpu:     true,
 			HasMemory:  true,
 			HasNetwork: true,
-			Memory: cadvisorapiv2.MemorySpec{
+			Memory: cadvisorapi.MemorySpec{
 				Limit: 1.6e+10,
 			},
 		},

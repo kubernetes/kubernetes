@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -444,7 +444,7 @@ func TestMachineInfo(t *testing.T) {
 		node                                 *v1.Node
 		maxPods                              int
 		podsPerCore                          int
-		machineInfo                          *cadvisorapiv1.MachineInfo
+		machineInfo                          *cadvisorapi.MachineInfo
 		machineInfoError                     error
 		capacity                             v1.ResourceList
 		devicePluginResourceCapacity         dprc
@@ -458,7 +458,7 @@ func TestMachineInfo(t *testing.T) {
 			desc:    "machine identifiers, basic capacity and allocatable",
 			node:    &v1.Node{},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				MachineID:      "MachineID",
 				SystemUUID:     "SystemUUID",
 				NumCores:       2,
@@ -488,7 +488,7 @@ func TestMachineInfo(t *testing.T) {
 			node:        &v1.Node{},
 			maxPods:     10,
 			podsPerCore: 4,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -512,7 +512,7 @@ func TestMachineInfo(t *testing.T) {
 			node:        &v1.Node{},
 			maxPods:     10,
 			podsPerCore: 6,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -535,7 +535,7 @@ func TestMachineInfo(t *testing.T) {
 			desc:    "allocatable should equal capacity minus reservations",
 			node:    &v1.Node{},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -573,7 +573,7 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -605,7 +605,7 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -636,7 +636,7 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -661,7 +661,7 @@ func TestMachineInfo(t *testing.T) {
 			desc:    "ephemeral storage is reflected in capacity and allocatable",
 			node:    &v1.Node{},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -689,7 +689,7 @@ func TestMachineInfo(t *testing.T) {
 			desc:    "ephemeral storage is not reflected in capacity and allocatable because localStorageCapacityIsolation is disabled",
 			node:    &v1.Node{},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -718,7 +718,7 @@ func TestMachineInfo(t *testing.T) {
 			desc:    "device plugin resources are reflected in capacity and allocatable",
 			node:    &v1.Node{},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -757,7 +757,7 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -791,7 +791,7 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
@@ -842,7 +842,7 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 			maxPods: 110,
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				BootID:         "bar",
 				NumCores:       2,
 				MemoryCapacity: 1024,
@@ -875,7 +875,7 @@ func TestMachineInfo(t *testing.T) {
 		{
 			desc: "with swap info",
 			node: &v1.Node{},
-			machineInfo: &cadvisorapiv1.MachineInfo{
+			machineInfo: &cadvisorapi.MachineInfo{
 				SwapCapacity: uint64(20 * 1024 * 1024 * 1024),
 			},
 			expectNode: &v1.Node{
@@ -916,7 +916,7 @@ func TestMachineInfo(t *testing.T) {
 
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
+			machineInfoFunc := func() (*cadvisorapi.MachineInfo, error) {
 				return tc.machineInfo, tc.machineInfoError
 			}
 			capacityFunc := func(localStorageCapacityIsolation bool) v1.ResourceList {
@@ -962,7 +962,7 @@ func TestVersionInfo(t *testing.T) {
 	cases := []struct {
 		desc                string
 		node                *v1.Node
-		versionInfo         *cadvisorapiv1.VersionInfo
+		versionInfo         *cadvisorapi.VersionInfo
 		versionInfoError    error
 		runtimeType         string
 		runtimeVersion      kubecontainer.Version
@@ -973,7 +973,7 @@ func TestVersionInfo(t *testing.T) {
 		{
 			desc: "versions set in node info",
 			node: &v1.Node{},
-			versionInfo: &cadvisorapiv1.VersionInfo{
+			versionInfo: &cadvisorapi.VersionInfo{
 				KernelVersion:      "KernelVersion",
 				ContainerOsVersion: "ContainerOSVersion",
 			},
@@ -1003,7 +1003,7 @@ func TestVersionInfo(t *testing.T) {
 		{
 			desc:                "error getting runtime version results in Unknown runtime",
 			node:                &v1.Node{},
-			versionInfo:         &cadvisorapiv1.VersionInfo{},
+			versionInfo:         &cadvisorapi.VersionInfo{},
 			runtimeType:         "RuntimeType",
 			runtimeVersionError: fmt.Errorf("foo"),
 			expectNode: &v1.Node{
@@ -1019,7 +1019,7 @@ func TestVersionInfo(t *testing.T) {
 		{
 			desc: "DisableNodeKubeProxyVersion FeatureGate enable, versions set in node info",
 			node: &v1.Node{},
-			versionInfo: &cadvisorapiv1.VersionInfo{
+			versionInfo: &cadvisorapi.VersionInfo{
 				KernelVersion:      "KernelVersion",
 				ContainerOsVersion: "ContainerOSVersion",
 			},
@@ -1052,7 +1052,7 @@ func TestVersionInfo(t *testing.T) {
 					},
 				},
 			},
-			versionInfo: &cadvisorapiv1.VersionInfo{
+			versionInfo: &cadvisorapi.VersionInfo{
 				KernelVersion:      "KernelVersion",
 				ContainerOsVersion: "ContainerOSVersion",
 			},
@@ -1077,7 +1077,7 @@ func TestVersionInfo(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			versionInfoFunc := func() (*cadvisorapiv1.VersionInfo, error) {
+			versionInfoFunc := func() (*cadvisorapi.VersionInfo, error) {
 				return tc.versionInfo, tc.versionInfoError
 			}
 			runtimeTypeFunc := func() string {

@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
-	"github.com/google/cadvisor/utils/oomparser"
+	"github.com/google/cadvisor/lib/utils/oomparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
