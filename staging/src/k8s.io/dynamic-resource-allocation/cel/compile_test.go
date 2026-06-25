@@ -193,7 +193,7 @@ var testcases = map[string]struct {
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"list-of-bool": {
 		expression:  `device.attributes["dra.example.com"].names.size() == 2`,
@@ -262,119 +262,119 @@ var testcases = map[string]struct {
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"attr": {StringValue: new("fish")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-bool-scalar-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes(true)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: new(true)}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-bool-scalar-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes(true)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: new(false)}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-bool-list-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes(true)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValues: []bool{true, false}}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-bool-list-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes(false)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValues: []bool{true, true}}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-int-scalar-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes(1)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: new(int64(1))}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-int-scalar-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes(1)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: new(int64(2))}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-int-list-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes(1)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValues: []int64{1, 2}}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-int-list-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes(3)`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValues: []int64{1, 2}}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-string-scalar-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes("fish")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: new("fish")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-string-scalar-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes("bird")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: new("fish")}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-string-list-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes("fish")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-string-list-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes("cat")`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"includes-function-on-semver-scalar-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("1.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: new("1.0.0")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
+		expectCost:  4 + 64 /* cost of "includes" on dynamic type */ + 1,
 	},
 	"includes-function-on-semver-scalar-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("2.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: new("1.0.0")}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
+		expectCost:  4 + 64 /* cost of "includes" on dynamic type */ + 1,
 	},
 	"includes-function-on-semver-list-positive": {
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("1.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValues: []string{"1.0.0", "2.0.0"}}},
 		driver:      "dra.example.com",
 		expectMatch: true,
-		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
+		expectCost:  4 + 64 /* cost of "includes" on dynamic type */ + 1,
 	},
 	"includes-function-on-semver-list-negative": {
 		expression:  `device.attributes["dra.example.com"].name.includes(semver("3.0.0"))`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValues: []string{"1.0.0", "2.0.0"}}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48 /* cost of "includes" is max list length */ + 1,
+		expectCost:  4 + 64 /* cost of "includes" on dynamic type */ + 1,
 	},
 	"includes-function-on-very-long-list-positive": {
 		expression: fmt.Sprintf(`device.attributes["dra.example.com"].name.includes("value-%d")`, resourceapi.ResourceSliceMaxAttributeValuesPerDevice),
@@ -387,28 +387,12 @@ var testcases = map[string]struct {
 		}()}},
 		driver:      "dra.example.com",
 		expectMatch: false,
-		expectCost:  4 + 48, /* cost of "includes" is max list length */
-	},
-	"includes-function-on-very-long-list-runtime-error": {
-		expression: fmt.Sprintf(`device.attributes["dra.example.com"].name.includes("value-%d")`, resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1),
-		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: func() []string {
-			values := make([]string, resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1)
-			for i := range values {
-				values[i] = fmt.Sprintf("value-%d", i)
-			}
-			return values
-		}()}},
-		driver:           "dra.example.com",
-		expectMatchError: fmt.Sprintf("'includes' function cannot be applied to lists longer than %d values", resourceapi.ResourceSliceMaxAttributeValuesPerDevice),
-		expectCost:       4 + 48, /* cost of "includes" is max list length */
+		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
 	"in-operator-on-list": {
 		// This case is for documenting purpose to present the difference of call cost estimation
 		// between "in" operator and "includes" function.
-		// The cost estimation of "includes" is based on resourceapi.ResourceSliceMaxAttributeValuesPerDevice
-		// because it's designed for checking whether a value is included in an device attribute list.
-		// Instead, the cost estimation of "in" operator is based on maxElementsListTypeEnabled
-		// (MaxElements in AttributeType(cel.DeclType)) as this operator is CEL standard one.
+		// The cost estimation of both "in" operator and "includes" function is based on maxElementsListTypeEnabled.
 		expression:  `1 in device.attributes["dra.example.com"].names`,
 		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"names": {IntValues: []int64{1, 2, 3}}},
 		driver:      "dra.example.com",

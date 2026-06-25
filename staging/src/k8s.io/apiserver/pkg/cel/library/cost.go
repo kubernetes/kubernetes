@@ -101,7 +101,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost := selectorCostEstimate(checker.SizeEstimate{Min: selectorLength, Max: selectorLength})
 			return &cost.Max
 		}
-	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
+	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "includes":
 		var cost uint64
 		if len(args) > 0 {
 			cost += traversalCost(args[0]) // these O(n) operations all cost roughly the cost of a single traversal
@@ -287,7 +287,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		if len(args) == 1 {
 			return &checker.CallEstimate{CostEstimate: selectorCostEstimate(l.sizeEstimate(args[0]))}
 		}
-	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
+	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "includes":
 		if target != nil {
 			// Charge 1 cost for comparing each element in the list
 			elCost := checker.CostEstimate{Min: 1, Max: 1}
@@ -300,7 +300,12 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 					elCost = elCost.Add(sz.MultiplyByCostFactor(common.StringTraversalCostFactor))
 				}
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
-			} else { // the target is a string, which is supported by indexOf and lastIndexOf
+			} else if function == "includes" {
+				// Since target can be a list under DynType, the worst case is a list comparison of size n,
+				// where each comparison costs 1.
+				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
+			} else {
+				// the target is a string, which is supported by indexOf and lastIndexOf
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
 			}
 		}
