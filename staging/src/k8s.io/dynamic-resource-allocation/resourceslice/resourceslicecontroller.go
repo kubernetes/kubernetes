@@ -816,6 +816,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	}
 
 	// Update existing slices.
+	updated := false
 	for i, currentSlice := range currentSliceForDesiredSlice {
 		if !changedDesiredSlices.Has(i) && !bumpedGeneration {
 			continue
@@ -839,6 +840,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 		logger.V(5).Info("Updated existing resource slice", "slice", klog.KObj(slice))
 		atomic.AddInt64(&c.numUpdates, 1)
+		updated = true
 		c.sliceStored(ctx, "update ResourceSlice", poolName, pool, i, slice, actualSlice)
 	}
 
@@ -906,9 +908,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	}
 
 	now := time.Now()
-	if added {
+	if added || updated {
 		c.lastAddByPool[poolName] = now
-		logger.V(5).Info("Added slices")
+		logger.V(5).Info("Added or updated slices")
 	} else if lastAdd, ok := c.lastAddByPool[poolName]; ok && start.After(lastAdd.Add(c.mutationCacheTTL)) {
 		// This sync started after the last add expired from the cache,
 		// so we are done and don't need to check again.
