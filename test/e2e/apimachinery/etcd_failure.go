@@ -74,7 +74,7 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		etcdFailTest(
 			ctx,
 			f,
-			"pgrep etcd | grep -v etcd-manager | xargs -I {} sudo kill -9 {}",
+			"sudo pkill -9 -x etcd",
 			"echo 'do nothing. monit should restart etcd.'",
 		)
 	})
