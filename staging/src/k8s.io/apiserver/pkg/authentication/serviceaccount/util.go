@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -48,6 +49,28 @@ const (
 	// NodeUIDKey is the key used in a user's "extra" to specify the node UID of
 	// the authenticating request.
 	NodeUIDKey = "authentication.kubernetes.io/node-uid"
+	// ValidatingWebhookConfigurationNameKey is the key used in a user's
+	// "extra" to specify the validating webhook configuration name of
+	// the authenticating request.
+	ValidatingWebhookConfigurationNameKey = "authentication.kubernetes.io/validatingwebhookconfiguration-name"
+	// ValidatingWebhookConfigurationUIDKey is the key used in a user's
+	// "extra" to specify the validating webhook configuration UID of
+	// the authenticating request.
+	ValidatingWebhookConfigurationUIDKey = "authentication.kubernetes.io/validatingwebhookconfiguration-uid"
+	// MutatingWebhookConfigurationNameKey is the key used in a user's
+	// "extra" to specify the mutating webhook configuration name of
+	// the authenticating request.
+	MutatingWebhookConfigurationNameKey = "authentication.kubernetes.io/mutatingwebhookconfiguration-name"
+	// MutatingWebhookConfigurationUIDKey is the key used in a user's
+	// "extra" to specify the mutating webhook configuration UID of
+	// the authenticating request.
+	MutatingWebhookConfigurationUIDKey = "authentication.kubernetes.io/mutatingwebhookconfiguration-uid"
+	// AttestationKeyPrefix is the prefix for the user info extra key used to
+	// detail attestations.
+	AttestationKeyPrefix = "attestation.authentication.kubernetes.io/"
+	// AttestationAdmissionReviewAPIGroupsKey is the key used in a user's
+	// "extra" to specify the "admissionReviewAPIGroups" claim.
+	AttestationAdmissionReviewAPIGroupsKey = AttestationKeyPrefix + authenticationv1.AttestationAdmissionReviewAPIGroups
 )
 
 // MakeUsername generates a username from the given namespace and ServiceAccount name.
@@ -123,10 +146,13 @@ func UserInfo(namespace, name, uid string) user.Info {
 }
 
 type ServiceAccountInfo struct {
-	Name, Namespace, UID string
-	PodName, PodUID      string
-	CredentialID         string
-	NodeName, NodeUID    string
+	Name, Namespace, UID                                                  string
+	PodName, PodUID                                                       string
+	CredentialID                                                          string
+	NodeName, NodeUID                                                     string
+	ValidatingWebhookConfigurationName, ValidatingWebhookConfigurationUID string
+	MutatingWebhookConfigurationName, MutatingWebhookConfigurationUID     string
+	AttestationAdmissionReviewAPIGroups                                   []string
 }
 
 func (sa *ServiceAccountInfo) UserInfo() user.Info {
@@ -158,6 +184,23 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 		if sa.NodeUID != "" {
 			info.Extra[NodeUIDKey] = []string{sa.NodeUID}
 		}
+	}
+	if sa.ValidatingWebhookConfigurationName != "" && sa.ValidatingWebhookConfigurationUID != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[ValidatingWebhookConfigurationNameKey] = []string{sa.ValidatingWebhookConfigurationName}
+		info.Extra[ValidatingWebhookConfigurationUIDKey] = []string{sa.ValidatingWebhookConfigurationUID}
+		info.Extra[AttestationAdmissionReviewAPIGroupsKey] = sa.AttestationAdmissionReviewAPIGroups
+	}
+
+	if sa.MutatingWebhookConfigurationName != "" && sa.MutatingWebhookConfigurationUID != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[MutatingWebhookConfigurationNameKey] = []string{sa.MutatingWebhookConfigurationName}
+		info.Extra[MutatingWebhookConfigurationUIDKey] = []string{sa.MutatingWebhookConfigurationUID}
+		info.Extra[AttestationAdmissionReviewAPIGroupsKey] = sa.AttestationAdmissionReviewAPIGroups
 	}
 
 	return info

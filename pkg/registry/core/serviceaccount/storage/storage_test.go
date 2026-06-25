@@ -55,7 +55,7 @@ func newTokenStorage(t *testing.T, issuer token.TokenGenerator, auds authenticat
 		ResourcePrefix:          "serviceaccounts",
 	}
 	// set issuer, podStore and secretStore to allow the token endpoint to be initialised
-	rest, err := NewREST(restOptions, issuer, auds, 0, podStorage, secretStorage, nodeStorage, false, time.Hour*9999)
+	rest, err := NewREST(restOptions, issuer, auds, nil, 0, podStorage, secretStorage, nodeStorage, nil, nil, false, time.Hour*9999)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
