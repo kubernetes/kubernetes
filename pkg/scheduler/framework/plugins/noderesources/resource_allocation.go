@@ -424,16 +424,14 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 			}
 		} else {
 			// Slow path: check device class selectors
-			driver := slice.Spec.Driver
-			pool := slice.Spec.Pool.Name
 			for _, device := range devices {
-				matches, err := r.deviceMatchesClass(ctx, device, deviceClass, driver, pool)
+				matches, err := r.deviceMatchesClass(ctx, slice, device, deviceClass)
 				if err != nil {
 					return 0, 0, err
 				}
 				if matches {
 					totalCapacity++
-					deviceID := structured.MakeDeviceID(driver.String(), pool.String(), device.Name.String())
+					deviceID := structured.DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
 					if structured.IsDeviceAllocated(deviceID, allocatedState) {
 						totalAllocated++
 					}
@@ -449,7 +447,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 // Note: This method assumes the device class has ExtendedResourceName set, as filtering
 // should be done by the caller to ensure we only process DRA resources meant for extended
 // resource scoring.
-func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, device draapi.Device, deviceClass *resourceapi.DeviceClass, driver, poolName draapi.UniqueString) (bool, error) {
+func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, slice *draapi.ResourceSlice, device draapi.Device, deviceClass *resourceapi.DeviceClass) (bool, error) {
 	// If no selectors are defined, all devices match
 	if len(deviceClass.Spec.Selectors) == 0 {
 		return true, nil
@@ -466,7 +464,7 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 		}
 
 		// TODO (?): use UniqueString
-		key := buildDeviceMatchCacheKey(selector.CEL.Expression, driver.String(), poolName.String(), device.Name.String())
+		key := buildDeviceMatchCacheKey(selector.CEL.Expression, slice.Spec.Driver.String(), slice.Spec.Pool.Name.String(), device.Name.String())
 
 		// Check if result is already cached
 		if matches, ok := r.deviceMatchCache.Load(key); ok {
@@ -480,9 +478,10 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 		// Create CEL device if we haven't already
 		if !celDeviceCreated {
 			celDevice = cel.Device{
-				Driver:     driver.String(),
-				Attributes: device.Attributes,
-				Capacity:   device.Capacity,
+				Driver:             slice.Spec.Driver.String(),
+				LookupUniqueString: slice.LookupUniqueString,
+				Attributes:         device.Attributes,
+				Capacity:           device.Capacity,
 			}
 			celDeviceCreated = true
 		}

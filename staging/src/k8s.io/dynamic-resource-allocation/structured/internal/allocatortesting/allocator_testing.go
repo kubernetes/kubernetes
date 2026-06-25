@@ -1067,6 +1067,7 @@ func TestAllocator(t *testing.T,
 		Key:      "key1",
 		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
 	}
+	u := draapi.MakeUniqueString
 
 	testcases := map[string]AllocatorTestCase{
 		"empty": {},
@@ -6525,7 +6526,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(two),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(two),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -6552,7 +6553,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(two),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(two),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -6642,7 +6643,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(two),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(two),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -6732,7 +6733,7 @@ func TestAllocator(t *testing.T,
 			},
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			claimsToAllocate: objects(
@@ -6782,7 +6783,7 @@ func TestAllocator(t *testing.T,
 			},
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			claimsToAllocate: objects(
@@ -6918,7 +6919,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -7015,7 +7016,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: ConsumedCapacityCollection{
 				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
