@@ -521,13 +521,8 @@ func newCompiler(features Features) *compiler {
 				return features.EnableListTypeAttributes
 			},
 			EnvOptions: []cel.EnvOption{
-				cel.Function("includes",
-					cel.MemberOverload("dra_includes_dyn_dyn",
-						[]*cel.Type{cel.DynType, cel.DynType},
-						cel.BoolType,
-						cel.BinaryBinding(includesFunc),
-					),
-				),
+				// TODO(https://github.com/kubernetes/kubernetes/issues/140074): Remove in 1.38 when 1.36 support is dropped and includes is natively provided by Lists(ListsVersion(1)) starting in 1.37.
+				library.IncludesOption(),
 			},
 		},
 	}
@@ -549,38 +544,6 @@ func newCompiler(features Features) *compiler {
 		envset:        envset,
 		declaredTypes: declaredTypes,
 	}
-}
-
-// includesFunc implements the "includes" function for CEL (<target>.includes(<arg>)),
-// which checks whether the target includes the argument.
-// It supports both singular values and lists.
-//
-// WARNING: includes is not applicable to lists longer than
-// resourceapi.ResourceSliceMaxAttributeValuesPerDevice. A runtime error gets
-// returned in that case to prevent unbounded execution cost.
-// The target is expected to be a scalar or list attribute, but users can
-// technically call "includes" on any value.
-func includesFunc(target, arg ref.Val) ref.Val {
-	if list, ok := target.(traits.Lister); ok {
-		i := 0
-		it := list.Iterator()
-		for it.HasNext() == types.True {
-			if i >= resourceapi.ResourceSliceMaxAttributeValuesPerDevice {
-				return types.NewErr("'includes' function cannot be applied to lists longer than %d values", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
-			}
-			item := it.Next()
-			if item.Equal(arg) == types.True {
-				return types.True
-			}
-			i++
-		}
-		return types.False
-	}
-
-	if target.Equal(arg) == types.True {
-		return types.True
-	}
-	return types.False
 }
 
 func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiservercel.DeclType {
@@ -635,15 +598,6 @@ func (e *draCostEstimator) EstimateSize(element checker.AstNode) *checker.SizeEs
 }
 
 func (e *draCostEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
-	if function == "includes" && overloadID == "dra_includes_dyn_dyn" {
-		// "<target>.includes(<arg>)" is equivalent with "<arg> in <target>"
-		// whose complexity is linear with the size of the target.
-		if target != nil {
-			targetSizeEstimate := checker.SizeEstimate{Min: 0, Max: resourceapi.ResourceSliceMaxAttributeValuesPerDevice}
-			return &checker.CallEstimate{CostEstimate: targetSizeEstimate.MultiplyByCost(checker.CostEstimate{Min: 1, Max: 1})}
-		}
-	}
-
 	return e.base.EstimateCallCost(function, overloadID, target, args)
 }
 
