@@ -117,6 +117,9 @@ type Authorizer interface {
 	//
 	// An authorizer who does not support conditions should fail closed and
 	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+	//
+	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
+	// evaluation outcome. Only the given decision and data may infuence the outcome.
 	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
 }
 
@@ -286,6 +289,9 @@ type Condition interface {
 	// might have to evaluate the condition from its serialized form using evaluateFunc in
 	// ConditionsMap.Evaluate.
 	// Evaluate must be safe to call repeatedly and concurrently.
+	//
+	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
+	// evaluation outcome. Only the condition itself and data can infuence the outcome.
 	Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult
 }
 
