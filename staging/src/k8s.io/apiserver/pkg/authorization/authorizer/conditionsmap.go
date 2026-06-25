@@ -240,9 +240,6 @@ func (c GenericCondition) GetType() string {
 func (c GenericCondition) GetDescription() string {
 	return c.Description
 }
-func (c GenericCondition) DeepCopy() Condition {
-	return c // no values passed by reference
-}
 func (c GenericCondition) Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult {
 	if c.EvaluateFunc == nil {
 		return ConditionsEvaluationResultUnevaluatable()

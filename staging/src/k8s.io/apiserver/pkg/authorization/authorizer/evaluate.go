@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"slices"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -148,8 +149,8 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 		if len(unevaluatedDenyConditions) != 0 {
 			return ConditionsAwareDecisionConditionsMap(
 				unevaluatedDenyConditions,
-				deepCopyConditions(c.noOpinionConditions),
-				deepCopyConditions(c.allowConditions))
+				slices.Clone(c.noOpinionConditions),
+				slices.Clone(c.allowConditions))
 		}
 	}
 	// If we got here, all Deny conditions could be evaluated, and evaluated to false, nil
@@ -178,7 +179,7 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 			return ConditionsAwareDecisionConditionsMap(
 				nil,
 				unevaluatedNoOpinionConditions,
-				deepCopyConditions(c.allowConditions))
+				slices.Clone(c.allowConditions))
 		}
 	}
 	// If we got here, all Deny and NoOpinion conditions could be evaluated, and evaluated to false, nil
@@ -231,14 +232,6 @@ func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalC
 	}
 	// Arguments are returned in the order that they should be considered.
 	return appliedCondReasons, errs, unevaluatedConditions
-}
-
-func deepCopyConditions(originals []Condition) []Condition {
-	copied := make([]Condition, len(originals))
-	for i, original := range originals {
-		copied[i] = original.DeepCopy()
-	}
-	return copied
 }
 
 // PartiallyEvaluateConditionsAwareDecision evaluates the ConditionsAwareDecision primarily using any conditions' own Evaluate() function,

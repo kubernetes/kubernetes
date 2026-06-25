@@ -254,6 +254,8 @@ func (d Decision) String() string {
 // Condition represents one authorization condition that is part of a ConditionsMap.
 // The effect of a condition is defined by whether it is part of the Deny/NoOpinion/Allow
 // conditions list in the ConditionsMap.
+//
+// A Condition must be immutable and thread-safe.
 type Condition interface {
 	// GetID uniquely identifies this condition within the scope of the authorizer
 	// that authored it. Validated as a Kubernetes label key.
@@ -277,15 +279,13 @@ type Condition interface {
 	// as an error message or for debugging. Optional.
 	GetDescription() string
 
-	// DeepCopy returns a deep copy of the Condition.
-	DeepCopy() Condition
-
 	// Evaluate evaluates the condition to a boolean, returns an error, or returns "unevaluatable".
 	// If an authorizer already has a pre-compiled condition, this avoids one serialization roundtrip,
 	// with potentially expensive deserialization/parsing. However, if the condition underwent a
 	// serialize/deserialize roundtrip (e.g. when the caller is an aggregated API server), the authorizer
 	// might have to evaluate the condition from its serialized form using evaluateFunc in
 	// ConditionsMap.Evaluate.
+	// Evaluate must be safe to call repeatedly and concurrently.
 	Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult
 }
 
