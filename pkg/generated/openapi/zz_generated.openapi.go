@@ -1413,6 +1413,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubecontrollermanagerconfigv1alpha1.DeploymentControllerConfiguration{}.OpenAPIModelName():                      schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerConfiguration(ref),
 		kubecontrollermanagerconfigv1alpha1.DeprecatedControllerConfiguration{}.OpenAPIModelName():                      schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerConfiguration(ref),
 		kubecontrollermanagerconfigv1alpha1.DeviceTaintEvictionControllerConfiguration{}.OpenAPIModelName():             schema_k8sio_kube_controller_manager_config_v1alpha1_DeviceTaintEvictionControllerConfiguration(ref),
+		kubecontrollermanagerconfigv1alpha1.DisruptionControllerConfiguration{}.OpenAPIModelName():                      schema_k8sio_kube_controller_manager_config_v1alpha1_DisruptionControllerConfiguration(ref),
 		kubecontrollermanagerconfigv1alpha1.EndpointControllerConfiguration{}.OpenAPIModelName():                        schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConfiguration(ref),
 		kubecontrollermanagerconfigv1alpha1.EndpointSliceControllerConfiguration{}.OpenAPIModelName():                   schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointSliceControllerConfiguration(ref),
 		kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration{}.OpenAPIModelName():          schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointSliceMirroringControllerConfiguration(ref),
@@ -67614,6 +67615,28 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DeviceTaintEvictionCon
 	}
 }
 
+func schema_k8sio_kube_controller_manager_config_v1alpha1_DisruptionControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DisruptionControllerConfiguration contains elements describing DisruptionController.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"ConcurrentDisruptionSyncs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "concurrentDisruptionSyncs is the number of PodDisruptionBudget objects that are allowed to sync concurrently. Larger number = more responsive PDB updates, but more CPU (and network) load.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"ConcurrentDisruptionSyncs"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -67957,6 +67980,13 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.DeploymentControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
+					"DisruptionController": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionControllerConfiguration holds configuration for DisruptionController related features.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(kubecontrollermanagerconfigv1alpha1.DisruptionControllerConfiguration{}.OpenAPIModelName()),
+						},
+					},
 					"StatefulSetController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "StatefulSetControllerConfiguration holds configuration for StatefulSetController related features.",
@@ -68133,11 +68163,11 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 						},
 					},
 				},
-				Required: []string{"Generic", "KubeCloudShared", "AttachDetachController", "CSRSigningController", "DaemonSetController", "DeploymentController", "StatefulSetController", "DeprecatedController", "EndpointController", "EndpointSliceController", "EndpointSliceMirroringController", "EphemeralVolumeController", "GarbageCollectorController", "HPAController", "JobController", "CronJobController", "LegacySATokenCleaner", "NamespaceController", "NodeIPAMController", "NodeLifecycleController", "PersistentVolumeBinderController", "PodGCController", "ReplicaSetController", "ReplicationController", "ResourceQuotaController", "SAController", "ServiceController", "TTLAfterFinishedController", "ValidatingAdmissionPolicyStatusController", "DeviceTaintEvictionController", "ResourceClaimController"},
+				Required: []string{"Generic", "KubeCloudShared", "AttachDetachController", "CSRSigningController", "DaemonSetController", "DeploymentController", "DisruptionController", "StatefulSetController", "DeprecatedController", "EndpointController", "EndpointSliceController", "EndpointSliceMirroringController", "EphemeralVolumeController", "GarbageCollectorController", "HPAController", "JobController", "CronJobController", "LegacySATokenCleaner", "NamespaceController", "NodeIPAMController", "NodeLifecycleController", "PersistentVolumeBinderController", "PodGCController", "ReplicaSetController", "ReplicationController", "ResourceQuotaController", "SAController", "ServiceController", "TTLAfterFinishedController", "ValidatingAdmissionPolicyStatusController", "DeviceTaintEvictionController", "ResourceClaimController"},
 			},
 		},
 		Dependencies: []string{
-			configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName(), serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName(), controllermanagerconfigv1alpha1.GenericControllerManagerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.CSRSigningControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.CronJobControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DaemonSetControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DeploymentControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DeprecatedControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DeviceTaintEvictionControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EndpointControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EndpointSliceControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EphemeralVolumeControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.GarbageCollectorControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.HPAControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.JobControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.LegacySATokenCleanerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.NamespaceControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.NodeIPAMControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.NodeLifecycleControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.PodGCControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ReplicaSetControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ReplicationControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ResourceClaimControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ResourceQuotaControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.SAControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.StatefulSetControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.TTLAfterFinishedControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ValidatingAdmissionPolicyStatusControllerConfiguration{}.OpenAPIModelName()},
+			configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName(), serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName(), controllermanagerconfigv1alpha1.GenericControllerManagerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.CSRSigningControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.CronJobControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DaemonSetControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DeploymentControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DeprecatedControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DeviceTaintEvictionControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.DisruptionControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EndpointControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EndpointSliceControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.EphemeralVolumeControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.GarbageCollectorControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.HPAControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.JobControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.LegacySATokenCleanerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.NamespaceControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.NodeIPAMControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.NodeLifecycleControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.PodGCControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ReplicaSetControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ReplicationControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ResourceClaimControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ResourceQuotaControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.SAControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.StatefulSetControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.TTLAfterFinishedControllerConfiguration{}.OpenAPIModelName(), kubecontrollermanagerconfigv1alpha1.ValidatingAdmissionPolicyStatusControllerConfiguration{}.OpenAPIModelName()},
 	}
 }
 

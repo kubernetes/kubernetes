@@ -444,7 +444,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 	return slices.Contains(expectedGroups, gv.Group), nil
 }
 
-func (dc *DisruptionController) Run(ctx context.Context) {
+func (dc *DisruptionController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	logger := klog.FromContext(ctx)
@@ -472,9 +472,11 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 		return
 	}
 
-	wg.Go(func() {
-		wait.UntilWithContext(ctx, dc.worker, time.Second)
-	})
+	for range workers {
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dc.worker, time.Second)
+		})
+	}
 	wg.Go(func() {
 		wait.Until(dc.recheckWorker, time.Second, ctx.Done())
 	})
