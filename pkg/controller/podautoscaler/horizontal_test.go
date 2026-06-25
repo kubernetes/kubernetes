@@ -1316,11 +1316,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
 	}
 	for key, sel := range tc.hpaSelectors {
-		if hpaController.hpaSelectorStore != nil {
-			hpaController.hpaSelectorStore.PutIfAbsent(key.Namespace, key, sel)
-		} else {
-			hpaController.hpaSelectors.PutSelector(key, sel)
-		}
+		hpaController.selectorTracker.PutIfAbsent(key.Namespace, key, sel)
 	}
 
 	// reset all HPA prometheus metrics
@@ -6372,9 +6368,9 @@ func newTestEnqueueController(spy *spyWorkQueue) *HorizontalController {
 		monitor: monitor.New(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
-		ctrl.hpaSelectorStore = newHPASelectorStore()
+		ctrl.selectorTracker = newHPASelectorStore()
 	} else {
-		ctrl.hpaSelectors = selectors.NewBiMultimap()
+		ctrl.selectorTracker = newBiMultimapSelectorTracker()
 	}
 	return ctrl
 }
@@ -6408,15 +6404,8 @@ func TestEnqueueHPARegistersSelectorBeforeQueueAdd(t *testing.T) {
 	expectedSelectorKey := selectors.Key{Name: "test-hpa", Namespace: "test-ns"}
 	spy.onAdd = func(item string) {
 		assert.Equal(t, expectedKey, item)
-		if ctrl.hpaSelectorStore != nil {
-			assert.False(t, ctrl.hpaSelectorStore.PutIfAbsent(expectedSelectorKey.Namespace, expectedSelectorKey, labels.Nothing()),
-				"selector registration should happen before queue.Add")
-		} else {
-			ctrl.hpaSelectorsMux.Lock()
-			defer ctrl.hpaSelectorsMux.Unlock()
-			assert.True(t, ctrl.hpaSelectors.SelectorExists(expectedSelectorKey),
-				"selector registration should happen before queue.Add")
-		}
+		assert.False(t, ctrl.selectorTracker.PutIfAbsent(expectedSelectorKey.Namespace, expectedSelectorKey, labels.Nothing()),
+			"selector registration should happen before queue.Add")
 	}
 
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
@@ -6607,9 +6596,9 @@ func newConsistencyTestController(hpaLister autoscalinglisters.HorizontalPodAuto
 		),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
-		ctrl.hpaSelectorStore = newHPASelectorStore()
+		ctrl.selectorTracker = newHPASelectorStore()
 	} else {
-		ctrl.hpaSelectors = selectors.NewBiMultimap()
+		ctrl.selectorTracker = newBiMultimapSelectorTracker()
 	}
 	return ctrl
 }

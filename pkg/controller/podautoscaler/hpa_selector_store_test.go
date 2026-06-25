@@ -17,6 +17,7 @@ limitations under the License.
 package podautoscaler
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -146,4 +147,58 @@ func TestHPASelectorStoreHPAsMatchingPodsNamespaceIsolation(t *testing.T) {
 
 	// Different namespace returns nothing for ns-1 pods.
 	assert.Empty(t, store.HPAsMatchingPods("ns-3", pods, 0))
+}
+
+func BenchmarkHPAsMatchingPodsParallel(b *testing.B) {
+	benchmarkMatchingPodsParallel(b, newHPASelectorStore())
+}
+
+// TODO: Remove once HPAOptimizedSelectorStore graduates to GA and the legacy
+// BiMultimap tracker is removed.
+func BenchmarkHPAsMatchingPodsParallelBiMultimap(b *testing.B) {
+	benchmarkMatchingPodsParallel(b, newBiMultimapSelectorTracker())
+}
+
+func benchmarkMatchingPodsParallel(b *testing.B, tracker hpaSelectorTracker) {
+	scenarios := []struct {
+		name     string
+		hpaCount int
+		podCount int
+	}{
+		{name: "100hpas_10pods", hpaCount: 100, podCount: 10},
+		{name: "1000hpas_10pods", hpaCount: 1000, podCount: 10},
+		{name: "1000hpas_100pods", hpaCount: 1000, podCount: 100},
+		{name: "10000hpas_100pods", hpaCount: 10000, podCount: 100},
+	}
+
+	const namespace = "hakuna"
+	for _, s := range scenarios {
+		b.Run(s.name, func(b *testing.B) {
+			for i := 0; i < s.hpaCount; i++ {
+				key := selectors.Key{Name: fmt.Sprintf("hpa-%d", i), Namespace: namespace}
+				sel, _ := labels.Parse(fmt.Sprintf("app=matata-%d", i))
+				tracker.PutIfAbsent(namespace, key, sel)
+			}
+
+			// Pods labels match to first HPA's selector
+			pods := make([]*v1.Pod, 0, s.podCount)
+			for i := 0; i < s.podCount; i++ {
+				pods = append(pods, &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("pod-%d", i),
+						Namespace: namespace,
+						Labels:    map[string]string{"app": "matata-0"},
+					},
+				})
+			}
+
+			b.ResetTimer()
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					tracker.HPAsMatchingPods(namespace, pods, 2)
+				}
+			})
+		})
+	}
 }

@@ -26,6 +26,23 @@ import (
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 )
 
+// hpaSelectorTracker has two implementations based on HPAOptimizedSelectorStore feature gate,
+// hpaSelectorStore (optimized) when feature gate is true
+// and biMultimapSelectorTracker when feature gate is false.
+// TODO: Remove Bimultimap implementation once HPAOptimizedSelectorStore
+// graduates to GA.
+type hpaSelectorTracker interface {
+	PutIfAbsent(namespace string, key selectors.Key, selector labels.Selector) bool
+
+	PutIfPresent(namespace string, key selectors.Key, selector labels.Selector) bool
+
+	Delete(namespace string, key selectors.Key)
+
+	HPAsMatchingPods(namespace string, pods []*v1.Pod, limit int) []selectors.Key
+}
+
+var _ hpaSelectorTracker = &hpaSelectorStore{}
+
 // hpaSelectorStore is a per-namespace store of HPA selectors that supports
 // concurrent read-only overlap detection.
 type hpaSelectorStore struct {
@@ -48,11 +65,10 @@ func (s *hpaSelectorStore) PutIfAbsent(namespace string, key selectors.Key, sele
 		if _, exists := ns[key]; exists {
 			return false
 		}
+		ns[key] = selector
+	} else {
+		s.namespaces[namespace] = map[selectors.Key]labels.Selector{key: selector}
 	}
-	if s.namespaces[namespace] == nil {
-		s.namespaces[namespace] = make(map[selectors.Key]labels.Selector)
-	}
-	s.namespaces[namespace][key] = selector
 	return true
 }
 
@@ -117,4 +133,73 @@ func (s *hpaSelectorStore) HPAsMatchingPods(namespace string, pods []*v1.Pod, li
 		}
 	}
 	return slices.Collect(maps.Keys(hpas))
+}
+
+var _ hpaSelectorTracker = &biMultimapSelectorTracker{}
+
+// biMultimapSelectorTracker is the legacy hpaSelectorTracker backed by a
+// BiMultimap. It is used when HPAOptimizedSelectorStore is disabled.
+// TODO: Remove once HPAOptimizedSelectorStore graduates to GA.
+type biMultimapSelectorTracker struct {
+	mu        sync.Mutex
+	selectors *selectors.BiMultimap
+}
+
+func newBiMultimapSelectorTracker() *biMultimapSelectorTracker {
+	return &biMultimapSelectorTracker{
+		selectors: selectors.NewBiMultimap(),
+	}
+}
+
+func (t *biMultimapSelectorTracker) PutIfAbsent(namespace string, key selectors.Key, selector labels.Selector) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.selectors.SelectorExists(key) {
+		return false
+	}
+	t.selectors.PutSelector(key, selector)
+	return true
+}
+
+func (t *biMultimapSelectorTracker) PutIfPresent(namespace string, key selectors.Key, selector labels.Selector) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.selectors.SelectorExists(key) {
+		return false
+	}
+	t.selectors.PutSelector(key, selector)
+	return true
+}
+
+func (t *biMultimapSelectorTracker) Delete(namespace string, key selectors.Key) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.selectors.DeleteSelector(key)
+}
+
+func (t *biMultimapSelectorTracker) HPAsMatchingPods(namespace string, pods []*v1.Pod, limit int) []selectors.Key {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	hpas := map[selectors.Key]struct{}{}
+	for _, p := range pods {
+		podKey := selectors.Key{Name: p.Name, Namespace: p.Namespace}
+		t.selectors.Put(podKey, p.Labels)
+
+		selectingHpas, ok := t.selectors.ReverseSelect(podKey)
+		if !ok {
+			continue
+		}
+		for _, hpa := range selectingHpas {
+			hpas[hpa] = struct{}{}
+		}
+	}
+	// Clean up all added pods.
+	t.selectors.KeepOnly([]selectors.Key{})
+
+	hpaList := []selectors.Key{}
+	for hpa := range hpas {
+		hpaList = append(hpaList, hpa)
+	}
+	return hpaList
 }
