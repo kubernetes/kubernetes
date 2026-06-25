@@ -179,7 +179,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 
 	if len(s.AlwaysAllowGroups) > 0 {
 		authorizers = append(authorizers, union.NamedAuthorizer{
-			AuthorizerName: "always-allow-groups",
+			AuthorizerName: "kubernetes.io/always-allow-groups",
 			Authorizer:     authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...),
 		})
 	}
@@ -190,7 +190,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 			return nil, err
 		}
 		authorizers = append(authorizers, union.NamedAuthorizer{
-			AuthorizerName: "always-allow-paths",
+			AuthorizerName: "kubernetes.io/always-allow-paths",
 			Authorizer:     a,
 		})
 	}
@@ -209,7 +209,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 			return nil, err
 		}
 		authorizers = append(authorizers, union.NamedAuthorizer{
-			AuthorizerName: "delegated",
+			AuthorizerName: "kubernetes.io/webhook",
 			Authorizer:     delegatedAuthorizer,
 		})
 	}

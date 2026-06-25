@@ -110,7 +110,7 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 	// Add SystemPrivilegedGroup as an authorizing group
 	superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 	authorizers = append(authorizers, union.NamedAuthorizer{
-		AuthorizerName: "system-privileged-group",
+		AuthorizerName: "kubernetes.io/system-privileged-group",
 		Authorizer:     superuserAuthorizer,
 	})
 
