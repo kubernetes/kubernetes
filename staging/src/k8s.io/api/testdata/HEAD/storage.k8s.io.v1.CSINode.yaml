@@ -40,3 +40,13 @@ spec:
     nodeID: nodeIDValue
     topologyKeys:
     - topologyKeysValue
+status:
+  storageHealth:
+  - accessModes:
+    - accessModesValue
+    lastTransitionTime: "2007-01-01T01:01:01Z"
+    message: messageValue
+    name: nameValue
+    reason: reasonValue
+    status: statusValue
+    volumeMode: volumeModeValue

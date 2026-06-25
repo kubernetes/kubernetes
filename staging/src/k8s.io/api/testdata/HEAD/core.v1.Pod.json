@@ -2165,6 +2165,19 @@
           "resourcesKey": "0"
         }
       }
+    ],
+    "volumeHealth": [
+      {
+        "name": "nameValue",
+        "conditions": [
+          {
+            "status": "statusValue",
+            "reason": "reasonValue",
+            "message": "messageValue"
+          }
+        ],
+        "lastTransitionTime": "2003-01-01T01:01:01Z"
+      }
     ]
   }
 }

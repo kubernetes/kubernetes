@@ -847,6 +847,11 @@ func (in PodTemplateSpec) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodVolumeHealth) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodVolumeHealth"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PortStatus) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PortStatus"
 }
@@ -1169,6 +1174,16 @@ func (in Volume) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in VolumeDevice) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.VolumeDevice"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeHealthCondition) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeHealthCondition"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in VolumeHealthStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.VolumeHealthStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
