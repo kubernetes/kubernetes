@@ -121,6 +121,7 @@ type CronJobSpec struct {
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// Specifies the job that will be created when executing a CronJob.
+	// +optional
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
 	// The number of successful finished jobs to retain.
