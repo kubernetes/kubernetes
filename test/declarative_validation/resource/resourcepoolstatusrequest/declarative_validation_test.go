@@ -290,6 +290,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 						Status:             metav1.ConditionTrue,
 						LastTransitionTime: now,
 						Reason:             "Reason",
+						Message:            "Message",
 					}
 				}
 				s.Conditions = conditions
