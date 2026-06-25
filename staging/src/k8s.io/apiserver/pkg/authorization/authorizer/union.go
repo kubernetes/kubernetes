@@ -136,7 +136,7 @@ func (unionMap *ConditionsAwareDecisionUnion) ToDecision() ConditionsAwareDecisi
 		return ConditionsAwareDecisionFromParts(unionMap.FailureDecision(), "failed closed", err)
 	}
 
-	// If we only have one possible decision, it can readily be evaluated without evaluation.
+	// If we only have one possible outcome, consolidate to an unconditional decision without evaluation.
 	if possibleDecisions := unionMap.PossibleDecisions(); possibleDecisions.Len() == 1 {
 		onlyPossibleDecision := possibleDecisions.UnsortedList()[0]
 		// Collect the certainly deciding decisions' reasons and errors. When the only possible

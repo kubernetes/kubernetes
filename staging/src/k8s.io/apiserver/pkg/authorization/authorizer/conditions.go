@@ -226,7 +226,7 @@ func (d ConditionsAwareDecision) ContainsUnconditionalAllowOrDeny() bool {
 
 // UnionedDecisions returns an iterator for unioned sub-decisions.
 // This iterator is non-empty if and only if IsUnion() == true.
-// The sub-decisions are iterated in their priority order.
+// Sub-decisions iteration order is preserved.
 func (d ConditionsAwareDecision) UnionedDecisions() iter.Seq2[string, ConditionsAwareDecision] {
 	return func(yield func(string, ConditionsAwareDecision) bool) {
 		for _, subDecision := range d.union.inner {

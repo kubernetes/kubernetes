@@ -59,7 +59,7 @@ func ConditionEvaluationResultError(err error) ConditionEvaluationResult {
 	if err == nil {
 		return ConditionEvaluationResult{
 			resultType: partialConditionEvaluationResultTypeError,
-			err:        errors.New("unknown evaluation error: got err == nil in ConditionEvaluationResultError"),
+			err:        errors.New("unspecified evaluation error"),
 		}
 	}
 	return ConditionEvaluationResult{
@@ -268,8 +268,7 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 			// Try evaluating or refining the leaf ConditionsMaps in this tree of decisions.
 			possiblyEvaluatedSubDecision := PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedSubDecision, data, evaluateConditionFn)
 
-			// Always preserve the indices and ordering of the decisions, as this ordering
-			// is used by the union authorizer to pair a decision with its
+			// Always preserve the ordering of the decisions
 			newDecisionChain.Add(authorizerName, possiblyEvaluatedSubDecision)
 
 			// We successfully evaluated to something, and because all previously-seen
@@ -287,14 +286,14 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 			// there is no chance of evaluating to an unconditional decision using builtinConditionsEvaluator.
 			// Thus, instead of continuing to try to evaluate later ConditionsMaps in-process,
 			// whose computation might be wasted if previous authorizer's ConditionsMaps indeed
-			// turn out to be Allow/Deny (and not NoOpinion), just short-circuit and do the webhook.
+			// turn out to be Allow/Deny (and not NoOpinion), just short-circuit and delegate to the authorizer to evaluate.
 			//
 			// collectAndShortcircuitOnly is used to preserve the tail of the union, without
 			// evaluating the suffix.
 			collectAndShortcircuitOnly = true
 		}
 		// If we got here, the first not-NoOpinion decision was Union or ConditionsMap, which means
-		// we cannot simplify it. Return a possibly refined decision chain for webhooking.
+		// we cannot simplify it. Return a possibly refined decision chain to delegate to the authorizer.
 		return newDecisionChain.ToDecision()
 	}
 
