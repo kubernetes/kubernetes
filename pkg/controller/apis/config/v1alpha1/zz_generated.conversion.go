@@ -35,6 +35,7 @@ import (
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
 	devicetaintevictionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/devicetainteviction/config/v1alpha1"
+	disruptionconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/disruption/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
 	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
@@ -157,6 +158,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := deploymentconfigv1alpha1.Convert_v1alpha1_DeploymentControllerConfiguration_To_config_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
 		return err
 	}
+	if err := disruptionconfigv1alpha1.Convert_v1alpha1_DisruptionControllerConfiguration_To_config_DisruptionControllerConfiguration(&in.DisruptionController, &out.DisruptionController, s); err != nil {
+		return err
+	}
 	if err := statefulsetconfigv1alpha1.Convert_v1alpha1_StatefulSetControllerConfiguration_To_config_StatefulSetControllerConfiguration(&in.StatefulSetController, &out.StatefulSetController, s); err != nil {
 		return err
 	}
@@ -260,6 +264,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := deploymentconfigv1alpha1.Convert_config_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
+		return err
+	}
+	if err := disruptionconfigv1alpha1.Convert_config_DisruptionControllerConfiguration_To_v1alpha1_DisruptionControllerConfiguration(&in.DisruptionController, &out.DisruptionController, s); err != nil {
 		return err
 	}
 	if err := devicetaintevictionconfigv1alpha1.Convert_config_DeviceTaintEvictionControllerConfiguration_To_v1alpha1_DeviceTaintEvictionControllerConfiguration(&in.DeviceTaintEvictionController, &out.DeviceTaintEvictionController, s); err != nil {
