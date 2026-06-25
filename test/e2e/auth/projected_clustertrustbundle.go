@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -41,6 +42,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -66,6 +68,41 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cleanup := mustInitCTBs(ctx, f, initCTBs)
 		ginkgo.DeferCleanup(cleanup)
+	})
+
+	ginkgo.Context("CRUD Tests", func() {
+		/*
+			  Release: v1.37
+			  Testname: CRUD operations for clustertrustbundles
+			  Description: kube-apiserver must support create/update/list/patch/delete operations
+						   for certificates.k8s.io/v1 ClusterTrustBundles
+		*/
+		framework.ConformanceIt("certificates.k8s.io/v1 ClusterTrustBundles", func(ctx context.Context) {
+			initialPEMBundle := mustMakeCAPEM("crud-root-initial")
+			updatedPEMBundle := mustMakeCAPEM("crud-root-updated")
+
+			updatedBundleJSON, err := json.Marshal(updatedPEMBundle)
+			framework.ExpectNoError(err, "JSON-encoding of a PEM bundle failed")
+
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*certificatesv1.ClusterTrustBundle]{
+					GVR:        certificatesv1.SchemeGroupVersion.WithResource("clustertrustbundles"),
+					Namespaced: new(false),
+					InitialSpec: &certificatesv1.ClusterTrustBundle{
+						Spec: certificatesv1.ClusterTrustBundleSpec{
+							TrustBundle: initialPEMBundle,
+						},
+					},
+					UpdateSpec: func(ctb *certificatesv1.ClusterTrustBundle) *certificatesv1.ClusterTrustBundle {
+						ctb.Spec.TrustBundle = updatedPEMBundle
+						return ctb
+					},
+					ApplyPatchSpec:          fmt.Sprintf(`{"spec": {"trustBundle": %s}}`, updatedBundleJSON),
+					StrategicMergePatchSpec: fmt.Sprintf(`{"spec": {"trustBundle": %s}}`, updatedBundleJSON),
+					JSONMergePatchSpec:      fmt.Sprintf(`{"spec": {"trustBundle": %s}}`, updatedBundleJSON),
+					JSONPatchSpec:           fmt.Sprintf(`[{"op": "replace", "path": "/spec/trustBundle", "value": %s}]`, updatedBundleJSON),
+				})
+		})
 	})
 
 	/*

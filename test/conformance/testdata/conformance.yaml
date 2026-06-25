@@ -1508,6 +1508,13 @@
     client call.
   release: v1.27
   file: test/e2e/auth/subjectreviews.go
+- testname: CRUD operations for clustertrustbundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    CRUD Tests certificates.k8s.io/v1 ClusterTrustBundles [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for certificates.k8s.io/v1 ClusterTrustBundles
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
 - testname: Mounting a single ClusterTrustBundle
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
     should be able to mount a single ClusterTrustBundle by name [Conformance]'
