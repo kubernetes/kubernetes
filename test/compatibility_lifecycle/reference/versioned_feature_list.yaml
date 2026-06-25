@@ -1619,6 +1619,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.37"
 - name: SELinuxMountReadWriteOncePod
   versionedSpecs:
   - default: false

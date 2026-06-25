@@ -870,6 +870,9 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if !slices.Contains(tc.featureGates, features.SELinuxMount) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, false)
+			}
 			for _, feature := range tc.featureGates {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
 			}
@@ -1221,6 +1224,9 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if !slices.Contains(tc.featureGates, features.SELinuxMount) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, false)
+			}
 			for _, feature := range tc.featureGates {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
 			}

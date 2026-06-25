@@ -19,6 +19,7 @@ package pod
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -4134,7 +4135,7 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// un-lock locked feature gates, if necessary
-			if !sets.New(tc.gates...).Has(features.SELinuxChangePolicy) {
+			if !slices.Contains(tc.gates, features.SELinuxChangePolicy) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
 			// Set feature gates for the test. *Disable* those that are not in tc.gates.
