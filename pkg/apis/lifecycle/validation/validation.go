@@ -221,7 +221,9 @@ func ValidateEvictionStatusRequesters(requesters, oldRequesters []lifecycle.Requ
 	}
 	for _, oldRequester := range oldRequesters {
 		if !newRequestersSet.Has(oldRequester.Name) {
-			return append(allErrs, field.Invalid(fldPath, requesters, "requesters cannot be removed"))
+			// validate.UpdateSlice covered by DV: requesters cannot be removed
+			// early return
+			return allErrs
 		}
 	}
 
@@ -271,44 +273,26 @@ func ValidateAllEvictionStatusResponderFields(status, oldStatus *lifecycle.Evict
 	allowedTimeSkew := time.Second * 30
 	allowedMaxExpectedCompletionTime := time.Hour * 24 * 365 * 10 // 10 years
 
-	// from this point we can depend on the target responders to be set
-	// define dependencies between targetResponders,and responders validation steps
-	targetResponders := status.TargetResponders
 	statusResponders := append(make([]lifecycle.ResponderStatus, 0, len(status.Responders)), status.Responders...)
 
 	// targetResponders
-	if errs := ValidateEvictionTargetResponders(status.TargetResponders, oldStatus.TargetResponders, fldPath.Child("targetResponders"), ValidateEvictionTargetRespondersOptions{
+	allErrs = append(allErrs, ValidateEvictionTargetResponders(status.TargetResponders, oldStatus.TargetResponders, fldPath.Child("targetResponders"), ValidateEvictionTargetRespondersOptions{
 		Clock:             opts.Clock,
 		IsFailed:          opts.IsFailed,
 		IsEvicted:         opts.IsEvicted,
 		StatusResponders:  statusResponders,
 		HeartbeatDeadline: heartbeatDeadline,
 		AllowedTimeSkew:   allowedTimeSkew,
-	}); len(errs) > 0 {
-		// Declarative errors are used to check if we have a valid data. Filter them as we will get them in declarative validation again.
-		allErrs = append(allErrs, filterOutDeclarativeErrors(errs)...)
-		// do not use invalid data for next validation steps
-		targetResponders = oldStatus.TargetResponders // +k8s:verify-mutation:reason=clone
-	}
+	})...)
 
 	// responders
 	allErrs = append(allErrs, ValidateEvictionStatusResponders(status.Responders, oldStatus.Responders, fldPath.Child("responders"), ValidateEvictionStatusRespondersOptions{
 		Clock:                     opts.Clock,
-		TargetResponders:          targetResponders,
+		TargetResponders:          status.TargetResponders,
 		AllowedTimeSkew:           allowedTimeSkew,
 		MaxExpectedCompletionTime: allowedMaxExpectedCompletionTime,
 	})...)
 
-	return allErrs
-}
-
-func filterOutDeclarativeErrors(errs field.ErrorList) field.ErrorList {
-	var allErrs field.ErrorList
-	for _, err := range errs {
-		if !err.CoveredByDeclarative {
-			allErrs = append(allErrs, err)
-		}
-	}
 	return allErrs
 }
 
@@ -339,14 +323,13 @@ func ValidateEvictionTargetResponders(targetResponders, oldTargetResponders []li
 	}
 
 	if len(targetResponders) > maxEvictionResponders {
-		// simulate declarative error for code flow control and further data validation
-		return append(allErrs, field.TooMany(fldPath, len(targetResponders), maxEvictionResponders).WithOrigin("maxItems").MarkCoveredByDeclarative())
+		// covered by declarative validation; exit early
+		return allErrs
 	}
 
-	// simulate declarative error for further data validation
+	// simulate declarative error for early exit
 	uniqueErrors := validate.Unique(context.TODO(), operation.Operation{}, fldPath, targetResponders, nil,
-		func(a lifecycle.TargetResponder, b lifecycle.TargetResponder) bool { return a.Name == b.Name }).MarkCoveredByDeclarative()
-	allErrs = append(allErrs, uniqueErrors...)
+		func(a lifecycle.TargetResponder, b lifecycle.TargetResponder) bool { return a.Name == b.Name })
 	if len(uniqueErrors) > 0 {
 		// does not make sense to check for state transition with duplicates
 		return allErrs
@@ -369,10 +352,11 @@ func ValidateEvictionTargetResponders(targetResponders, oldTargetResponders []li
 
 		expectedStatesReason := ""
 		switch {
+		//
 		case i < lastActiveIdx ||
-			(!hasFoundLastActive && isFinal):
+			(len(oldTargetResponders) > 0 && !hasFoundLastActive && isFinal):
 			// Processed responders must preserve their state.
-			expectedStates.Insert(responder.State)
+			expectedStates.Insert(oldTargetResponders[i].State)
 			expectedStatesReason = "final state is immutable"
 		case i == lastActiveIdx && activeChanged:
 			// If Active responder changes, it must have a final state.
@@ -386,7 +370,7 @@ func ValidateEvictionTargetResponders(targetResponders, oldTargetResponders []li
 			expectedStatesReason = "the eviction request stays active"
 			if isFinal {
 				// Last Responder must finish before setting the final condition.
-				expectedStates.Insert(lifecycle.ResponderStateInterrupted,
+				expectedStates.Clear().Insert(lifecycle.ResponderStateInterrupted,
 					lifecycle.ResponderStateCanceled,
 					lifecycle.ResponderStateCompleted)
 				expectedStatesReason = "the eviction request has finished processing"
@@ -398,7 +382,7 @@ func ValidateEvictionTargetResponders(targetResponders, oldTargetResponders []li
 			expectedStatesReason = "this responder is next in line"
 			if isFinal {
 				// Do not active next responder if we have finished.
-				expectedStates.Insert(lifecycle.ResponderStateInactive)
+				expectedStates.Clear().Insert(lifecycle.ResponderStateInactive)
 				expectedStatesReason = "the eviction request has finished processing"
 			}
 		default:
@@ -442,8 +426,7 @@ func ValidateTargetResponder(evictionResponder lifecycle.TargetResponder, fldPat
 	// name
 	namePath := fldPath.Child("name")
 	if len(evictionResponder.Name) == 0 {
-		// simulate declarative error for further data validation
-		allErrs = append(allErrs, field.Required(namePath, "")).MarkCoveredByDeclarative()
+		// covered by declarative validation
 	} else {
 		allErrs = append(allErrs, utilvalidation.IsDomainPrefixedKey(namePath, evictionResponder.Name)...)
 	}

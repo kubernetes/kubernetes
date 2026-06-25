@@ -721,6 +721,11 @@ func Validate_EvictionStatus(
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
+			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
+				func(a lifecyclev1alpha1.Requester, b lifecyclev1alpha1.Requester) bool { return a.Name == b.Name }, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}

@@ -336,6 +336,7 @@ type EvictionStatus struct {
 	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
+	// +k8s:update=NoRemoveItem
 	Requesters []Requester `json:"requesters,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,3,rep,name=requesters"`
 
 	// targetResponders reference responders that should eventually respond to this eviction

@@ -216,7 +216,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 		},
 		"duplicate condition": {
 			oldInput: mkValidEvictionRequestStatus(0),
-			input:    mkValidEvictionRequestStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, true), addCondition(clock, lifecycle.EvictionConditionTargetEvicted, true)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, metav1.ConditionTrue), addCondition(clock, lifecycle.EvictionConditionTargetEvicted, metav1.ConditionTrue)),
 			errors: []*field.Error{
 				field.Duplicate(field.NewPath("status", "conditions").Index(1), ""),
 			},
@@ -224,9 +224,23 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 
 		"required condition type": {
 			oldInput: mkValidEvictionRequestStatus(0),
-			input:    mkValidEvictionRequestStatus(1, addCondition(clock, "", true)),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, "", metav1.ConditionTrue)),
 			errors: []*field.Error{
 				field.Required(field.NewPath("status", "conditions").Index(0).Child("type"), "").MarkAlpha(),
+			},
+		},
+		"required condition status": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, "")),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "conditions").Index(0).Child("status"), "").MarkAlpha(),
+			},
+		},
+		"invalid condition status": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, "invalid")),
+			errors: []*field.Error{
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), "", []string{"False", "True", "Unknown"}).MarkAlpha(),
 			},
 		},
 		"observedGeneration condition minimum": {
@@ -339,16 +353,13 @@ func mkValidEvictionRequestStatus(responders int, tweaks ...func(obj *lifecycle.
 	}
 	return &obj
 }
-func addCondition(clock utilsclock.PassiveClock, name lifecycle.EvictionConditionType, status bool) func(obj *lifecycle.EvictionRequestStatus) {
+func addCondition(clock utilsclock.PassiveClock, name lifecycle.EvictionConditionType, status metav1.ConditionStatus) func(obj *lifecycle.EvictionRequestStatus) {
 	return func(obj *lifecycle.EvictionRequestStatus) {
 		newCond := metav1.Condition{
 			Type:               string(name),
-			Status:             metav1.ConditionFalse,
+			Status:             status,
 			Reason:             string(name) + "Reason",
 			LastTransitionTime: metav1.Time{Time: clock.Now()},
-		}
-		if status {
-			newCond.Status = metav1.ConditionTrue
 		}
 		obj.Conditions = append(obj.Conditions, newCond)
 	}
@@ -356,7 +367,7 @@ func addCondition(clock utilsclock.PassiveClock, name lifecycle.EvictionConditio
 func addConditionsCount(clock utilsclock.PassiveClock, count int) func(obj *lifecycle.EvictionRequestStatus) {
 	return func(obj *lifecycle.EvictionRequestStatus) {
 		for i := range count {
-			addCondition(clock, lifecycle.EvictionConditionType(fmt.Sprintf("Condition%d", i)), true)(obj)
+			addCondition(clock, lifecycle.EvictionConditionType(fmt.Sprintf("Condition%d", i)), metav1.ConditionTrue)(obj)
 		}
 	}
 }

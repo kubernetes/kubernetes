@@ -184,16 +184,34 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 		},
 		"duplicate condition": {
 			oldInput: mkValidEvictionStatus(0),
-			input:    mkValidEvictionStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, true), addCondition(clock, lifecycle.EvictionConditionTargetEvicted, true)),
+			input: mkValidEvictionStatus(1,
+				setStateFor(lifecycle.ResponderStateInactive, 0),
+				addCondition(clock, lifecycle.EvictionConditionTargetEvicted, metav1.ConditionTrue),
+				addCondition(clock, lifecycle.EvictionConditionTargetEvicted, metav1.ConditionTrue),
+			),
 			errors: []*field.Error{
 				field.Duplicate(field.NewPath("status", "conditions").Index(1), ""),
 			},
 		},
 		"required condition type": {
 			oldInput: mkValidEvictionStatus(0),
-			input:    mkValidEvictionStatus(1, addCondition(clock, "", true)),
+			input:    mkValidEvictionStatus(1, addCondition(clock, "", metav1.ConditionTrue)),
 			errors: []*field.Error{
 				field.Required(field.NewPath("status", "conditions").Index(0).Child("type"), "").MarkAlpha(),
+			},
+		},
+		"required condition status": {
+			oldInput: mkValidEvictionStatus(0),
+			input:    mkValidEvictionStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, "")),
+			errors: []*field.Error{
+				field.Required(field.NewPath("status", "conditions").Index(0).Child("status"), "").MarkAlpha(),
+			},
+		},
+		"invalid condition status": {
+			oldInput: mkValidEvictionStatus(0),
+			input:    mkValidEvictionStatus(1, addCondition(clock, lifecycle.EvictionConditionTargetEvicted, "invalid")),
+			errors: []*field.Error{
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), "", []string{"False", "True", "Unknown"}).MarkAlpha(),
 			},
 		},
 		"observedGeneration condition minimum": {
@@ -257,14 +275,6 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				field.NotSupported(field.NewPath("status", "requesters").Index(0).Child("intent"), "", []lifecycle.RequesterIntent{lifecycle.RequesterIntentEviction, lifecycle.RequesterIntentWithdrawn}),
 			},
 		},
-		"change to a duplicate requester": {
-			oldInput: mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "foo.example.com/baz", "foo.example.com/bay")),
-			input:    mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "foo.example.com/baz", "foo.example.com/baz")),
-			errors: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "requesters").Index(1), ""),
-				field.Invalid(field.NewPath("status", "requesters"), "", "requesters cannot be removed").MarkFromImperative(),
-			},
-		},
 		"change a valid requester to an invalid one": {
 			oldInput: mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "foo.example.com/baz")),
 			input:    mkValidEvictionStatus(0, addRequesters("Invalid", "foo.example.com/baz")),
@@ -272,21 +282,52 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				field.NotSupported(field.NewPath("status", "requesters").Index(0).Child("intent"), "", []lifecycle.RequesterIntent{lifecycle.RequesterIntentEviction, lifecycle.RequesterIntentWithdrawn}),
 			},
 		},
+		"requester with withdrawn intent cannot be removed": {
+			oldInput: mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentWithdrawn, "foo.example.com/baz")),
+			input:    mkValidEvictionStatus(0),
+			errors: []*field.Error{
+				field.Forbidden(field.NewPath("status", "requesters"), "").WithOrigin("update"),
+			},
+		},
+		"requester with eviction intent cannot be removed": {
+			oldInput: mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "foo.example.com/baz")),
+			input:    mkValidEvictionStatus(0),
+			errors: []*field.Error{
+				field.Forbidden(field.NewPath("status", "requesters"), "").WithOrigin("update"),
+			},
+		},
+		"secondary requester cannot be removed": {
+			oldInput: mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "foo.example.com/baz")),
+			input:    mkValidEvictionStatus(0),
+			errors: []*field.Error{
+				field.Forbidden(field.NewPath("status", "requesters"), "").WithOrigin("update"),
+			},
+		},
+		"change and remove a requester": {
+			oldInput: mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "foo.example.com/baz")),
+			input:    mkValidEvictionStatus(0, addRequesters(lifecycle.RequesterIntentEviction, "bar.example.com/bay")),
+			errors: field.ErrorList{
+				field.Forbidden(field.NewPath("status", "requesters"), "").WithOrigin("update"),
+			},
+		},
 		// targetResponders and responders
 		"duplicate targetResponders and responders": {
 			oldInput: mkValidEvictionStatus(0),
 			input:    mkValidEvictionStatus(0, addTargetResponders("example.com/baz", "example.com/baz"), addStatusResponders("example.com/baz", "example.com/baz")),
 			errors: []*field.Error{
-				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order").MarkFromImperative(), // triggered by fallback to oldTargetResponders
 				field.Duplicate(field.NewPath("status", "targetResponders").Index(1), ""),
 				field.Duplicate(field.NewPath("status", "responders").Index(1), ""),
 			},
 		},
 		"required targetResponder and responder name": {
 			oldInput: mkValidEvictionStatus(0),
-			input:    mkValidEvictionStatus(0, addTargetResponders(""), setStateFor(lifecycle.ResponderStateActive, 0), addStatusResponders("")),
+			input: mkValidEvictionStatus(0,
+				addTargetResponders(""),
+				setStateFor(lifecycle.ResponderStateActive, 0),
+				addStatusResponders(""),
+				setRespondersStartTime(clock, 0, 1),
+			),
 			errors: []*field.Error{
-				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order").MarkFromImperative(), // triggered by fallback to oldTargetResponders
 				field.Required(field.NewPath("status", "targetResponders").Index(0).Child("name"), ""),
 				field.Required(field.NewPath("status", "responders").Index(0).Child("name"), ""),
 			},
@@ -296,6 +337,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidEvictionStatus(0),
 			input:    mkValidEvictionStatusWithStatuses(12, 0),
 			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order").MarkFromImperative(),
 				field.TooMany(field.NewPath("status", "targetResponders"), 12, 11).WithOrigin("maxItems"),
 			},
 		},
@@ -303,7 +345,6 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidEvictionStatus(0),
 			input:    mkValidEvictionStatus(1, setStateFor("", 0)),
 			errors: []*field.Error{
-				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order").MarkFromImperative(), // triggered by fallback to oldTargetResponders
 				field.Required(field.NewPath("status", "targetResponders").Index(0).Child("state"), ""),
 				field.Invalid(field.NewPath("status", "targetResponders").Index(0).Child("state"), "", "must be one of: Canceled, Completed, Interrupted").MarkFromImperative(),
 			},
@@ -312,7 +353,6 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidEvictionStatus(0),
 			input:    mkValidEvictionStatus(1, setStateFor("Invalid", 0)),
 			errors: []*field.Error{
-				field.Invalid(field.NewPath("status", "responders"), "", "must be the same length as status.targetResponders and contain the same keys in the same order").MarkFromImperative(), // triggered by fallback to oldTargetResponders
 				field.NotSupported(field.NewPath("status", "targetResponders").Index(0).Child("state"), "", []string(nil)),
 				field.Invalid(field.NewPath("status", "targetResponders").Index(0).Child("state"), "", "must be one of: Canceled, Completed, Interrupted").MarkFromImperative(),
 			},
@@ -470,16 +510,13 @@ func mkValidEvictionStatusWithStatuses(responders, statuses int, tweaks ...func(
 	}
 	return &obj
 }
-func addCondition(clock utilsclock.PassiveClock, name lifecycle.EvictionConditionType, status bool) func(obj *lifecycle.EvictionStatus) {
+func addCondition(clock utilsclock.PassiveClock, name lifecycle.EvictionConditionType, status metav1.ConditionStatus) func(obj *lifecycle.EvictionStatus) {
 	return func(obj *lifecycle.EvictionStatus) {
 		newCond := metav1.Condition{
 			Type:               string(name),
-			Status:             metav1.ConditionFalse,
+			Status:             status,
 			Reason:             string(name) + "Reason",
 			LastTransitionTime: metav1.Time{Time: clock.Now()},
-		}
-		if status {
-			newCond.Status = metav1.ConditionTrue
 		}
 		obj.Conditions = append(obj.Conditions, newCond)
 	}
@@ -487,7 +524,7 @@ func addCondition(clock utilsclock.PassiveClock, name lifecycle.EvictionConditio
 func addConditionsCount(clock utilsclock.PassiveClock, count int) func(obj *lifecycle.EvictionStatus) {
 	return func(obj *lifecycle.EvictionStatus) {
 		for i := range count {
-			addCondition(clock, lifecycle.EvictionConditionType(fmt.Sprintf("Condition%d", i)), true)(obj)
+			addCondition(clock, lifecycle.EvictionConditionType(fmt.Sprintf("Condition%d", i)), metav1.ConditionTrue)(obj)
 		}
 	}
 }

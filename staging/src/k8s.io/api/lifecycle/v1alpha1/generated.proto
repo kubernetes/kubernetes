@@ -300,6 +300,7 @@ message EvictionStatus {
   // +k8s:optional
   // +k8s:listType=map
   // +k8s:listMapKey=name
+  // +k8s:update=NoRemoveItem
   repeated Requester requesters = 3;
 
   // targetResponders reference responders that should eventually respond to this eviction

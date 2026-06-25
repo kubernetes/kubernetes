@@ -61,6 +61,9 @@ func init() {
 			"status.observedGeneration": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status.requesters": {
+				{ErrorType: "FieldValueForbidden", Origin: "update"},
+			},
 			"status.requesters[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
