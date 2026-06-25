@@ -1065,6 +1065,7 @@ func TestAllocator(t *testing.T,
 		Key:      "key1",
 		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
 	}
+	u := draapi.MakeUniqueString
 
 	testcases := map[string]AllocatorTestCase{
 		"empty": {},
@@ -2610,6 +2611,92 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
+		},
+		// Build metadata (the "+..." suffix) has no effect on semver
+		// precedence, so two versions differing only in build metadata
+		// must still be treated as the same version by MatchAttribute.
+		"with-constraint-matching-version-attribute-differing-only-in-build-metadata": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", semver.MustParse("1.0.0+build1")),
+				device(device2).withAttribute("driverVersion", semver.MustParse("1.0.0+build2")),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// Build metadata still distinguishes the raw attribute values,
+		// but it must not matter for matching: a prerelease difference
+		// is a real difference and must still prevent a match.
+		"with-constraint-not-matching-version-attribute-differing-in-prerelease-and-build-metadata": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", semver.MustParse("1.0.0-alpha+build1")),
+				device(device2).withAttribute("driverVersion", semver.MustParse("1.0.0-beta+build2")),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		// Mirror of the MatchAttribute case above: because build metadata
+		// is ignored, two versions differing only in build metadata count
+		// as duplicates for DistinctAttribute, so only one of them can be
+		// allocated.
+		"with-constraint-distinct-version-attribute-differing-only-in-build-metadata": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", semver.MustParse("1.0.0+build1")),
+				device(device2).withAttribute("driverVersion", semver.MustParse("1.0.0+build2")),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		// Control case for the one above: a real (prerelease) version
+		// difference must still count as distinct, build metadata aside.
+		"with-constraint-distinct-version-attribute-differing-in-prerelease-and-build-metadata": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", semver.MustParse("1.0.0-alpha+build1")),
+				device(device2).withAttribute("driverVersion", semver.MustParse("1.0.0-beta+build2")),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
 		},
 		"with-constraint-for-request": {
 			claimsToAllocate: objects(claimWithRequests(
@@ -6523,7 +6610,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(two),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(two),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -6550,7 +6637,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(two),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(two),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -6640,7 +6727,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(two),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(two),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -6730,7 +6817,7 @@ func TestAllocator(t *testing.T,
 			},
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			claimsToAllocate: objects(
@@ -6780,7 +6867,7 @@ func TestAllocator(t *testing.T,
 			},
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			claimsToAllocate: objects(
@@ -6916,7 +7003,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -7013,7 +7100,7 @@ func TestAllocator(t *testing.T,
 			),
 			allocatedCapacityDevices: ConsumedCapacityCollection{
 				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
-					draapi.FullyQualifiedName{Domain: driverA, Identifier: string(capacity0)}: new(one),
+					draapi.FullyQualifiedName{Domain: u(driverA), Identifier: u(string(capacity0))}: new(one),
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -7985,6 +8072,52 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
+		// Build metadata must be ignored consistently with the scalar path
+		// (Version.Equals semantics): the lists only share "1.0.0+build1" and
+		// "1.0.0+build2", which are the same version once build metadata is
+		// dropped, so the intersection must be non-empty and devices match.
+		"list-attributes-match-constaint-list-of-version-values-common-element-differs-only-in-build-metadata": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", []semver.Version{semver.MustParse("1.0.0+build1"), semver.MustParse("2.0.0")}),
+				device(device2).withAttribute("driverVersion", []semver.Version{semver.MustParse("1.0.0+build2"), semver.MustParse("3.0.0")}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// Control case: the lists have no overlap even ignoring build
+		// metadata, so there must be no match.
+		"list-attributes-match-constaint-list-of-version-values-no-common-element-despite-build-metadata": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", []semver.Version{semver.MustParse("1.0.0+build1")}),
+				device(device2).withAttribute("driverVersion", []semver.Version{semver.MustParse("2.0.0+build2")}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
 		"list-attributes-match-constaint-with-empty-or-unknown-type": {
 			features: Features{
 				ListTypeAttributes: true,
@@ -8277,6 +8410,54 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		// Mirror of the MatchAttribute list case: the overlapping element
+		// ("1.0.0+build1" vs "1.0.0+build2") is the same version once build
+		// metadata is dropped, so device1 and device2 are not pairwise
+		// disjoint and no allocation is possible.
+		"list-attributes-distinct-constraint-list-of-version-values-common-element-differs-only-in-build-metadata": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", []semver.Version{semver.MustParse("1.0.0+build1"), semver.MustParse("2.0.0")}),
+				device(device2).withAttribute("driverVersion", []semver.Version{semver.MustParse("1.0.0+build2"), semver.MustParse("3.0.0")}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		// Control case: lists differ even ignoring build metadata, so the
+		// two devices are pairwise disjoint and can both be allocated.
+		"list-attributes-distinct-constraint-list-of-version-values-no-common-element-despite-build-metadata": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("driverVersion", []semver.Version{semver.MustParse("1.0.0+build1")}),
+				device(device2).withAttribute("driverVersion", []semver.Version{semver.MustParse("2.0.0+build2")}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
 		"list-attributes-distinct-constraint-with-empty-or-unknown-type": {

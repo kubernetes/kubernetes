@@ -227,11 +227,11 @@ func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourcea
 	for name, val := range consumedCapacity {
 		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
 		if ok {
-			key := draapi.FullyQualifiedName{Domain: deviceID.Driver.String(), Identifier: identifier}
+			key := draapi.FullyQualifiedName{Domain: deviceID.Driver, Identifier: draapi.MakeUniqueString(identifier)}
 			normalized[key] = new(val)
 			continue
 		}
-		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())
+		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver, draapi.MakeUniqueString)
 		if _, alreadySet := normalized[key]; alreadySet {
 			continue
 		}
