@@ -370,6 +370,135 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	return resultBool, details, nil
 }
 
+// EvaluateDerivedAttribute evaluates the compiled CEL expression as a derived attribute against a device,
+// returning the evaluated DeviceAttribute or an error.
+func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (*resourceapi.DeviceAttribute, *cel.EvalDetails, error) {
+	attributes := make(map[string]any)
+	for name, attr := range input.Attributes {
+		value, err := c.getAttributeValue(attr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("attribute %s: %w", name, err)
+		}
+		domain, id := parseQualifiedName(name, input.Driver)
+		if attributes[domain] == nil {
+			attributes[domain] = make(map[string]any)
+		}
+		attributes[domain].(map[string]any)[id] = value
+	}
+
+	capacity := make(map[string]any)
+	for name, cap := range input.Capacity {
+		domain, id := parseQualifiedName(name, input.Driver)
+		if capacity[domain] == nil {
+			capacity[domain] = make(map[string]apiservercel.Quantity)
+		}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+	}
+
+	variables := map[string]any{
+		deviceVar: map[string]any{
+			driverVar:     input.Driver,
+			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
+			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
+			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
+		},
+	}
+
+	result, details, err := c.Program.ContextEval(ctx, variables)
+	if err != nil {
+		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
+			return nil, details, fmt.Errorf("%w: %w", err, context.Cause(ctx))
+		}
+		return nil, details, err
+	}
+
+	attr, err := valToDeviceAttribute(result)
+	if err != nil {
+		return nil, details, err
+	}
+	return attr, details, nil
+}
+
+func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {
+	switch val.Type().TypeName() {
+	case "bool":
+		b := val.Value().(bool)
+		return &resourceapi.DeviceAttribute{BoolValue: &b}, nil
+
+	case "int":
+		i := val.Value().(int64)
+		return &resourceapi.DeviceAttribute{IntValue: &i}, nil
+
+	case "string":
+		s := val.Value().(string)
+		return &resourceapi.DeviceAttribute{StringValue: &s}, nil
+
+	case "kubernetes.Semver":
+		s := val.Value().(semver.Version).String()
+		return &resourceapi.DeviceAttribute{VersionValue: &s}, nil
+
+	case "list":
+		lister, ok := val.(traits.Lister)
+		if !ok {
+			return nil, fmt.Errorf("list value does not implement traits.Lister")
+		}
+
+		length := int(lister.Size().Value().(int64))
+		if length == 0 {
+			return &resourceapi.DeviceAttribute{StringValues: []string{}}, nil
+		}
+
+		first := lister.Get(types.Int(0))
+		switch first.Type().TypeName() {
+		case "bool":
+			vals := make([]bool, length)
+			for i := range length {
+				elemVal, err := lister.Get(types.Int(i)).ConvertToNative(reflect.TypeFor[bool]())
+				if err != nil {
+					return nil, fmt.Errorf("convert element %d to bool failed: %w", i, err)
+				}
+				vals[i] = elemVal.(bool)
+			}
+			return &resourceapi.DeviceAttribute{BoolValues: vals}, nil
+
+		case "int":
+			vals := make([]int64, length)
+			for i := range length {
+				elemVal, err := lister.Get(types.Int(i)).ConvertToNative(reflect.TypeFor[int64]())
+				if err != nil {
+					return nil, fmt.Errorf("convert element %d to int failed: %w", i, err)
+				}
+				vals[i] = elemVal.(int64)
+			}
+			return &resourceapi.DeviceAttribute{IntValues: vals}, nil
+
+		case "string":
+			vals := make([]string, length)
+			for i := range length {
+				elemVal, err := lister.Get(types.Int(i)).ConvertToNative(reflect.TypeFor[string]())
+				if err != nil {
+					return nil, fmt.Errorf("convert element %d to string failed: %w", i, err)
+				}
+				vals[i] = elemVal.(string)
+			}
+			return &resourceapi.DeviceAttribute{StringValues: vals}, nil
+
+		case "kubernetes.Semver":
+			vals := make([]string, length)
+			for i := range length {
+				vals[i] = lister.Get(types.Int(i)).Value().(semver.Version).String()
+			}
+			return &resourceapi.DeviceAttribute{VersionValues: vals}, nil
+
+		default:
+			return nil, fmt.Errorf("unsupported list element type: %s", first.Type().TypeName())
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported CEL return type: %s", val.Type().TypeName())
+	}
+}
+
 func newCompiler(features Features) *compiler {
 	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
