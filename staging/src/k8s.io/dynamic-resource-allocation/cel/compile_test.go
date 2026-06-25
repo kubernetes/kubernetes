@@ -23,11 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/google/go-cmp/cmp"
 	g "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -657,6 +659,28 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		driver:             "dra.example.com",
 		expectCompileError: `undefined field 'allowMultipleAllocations'`,
 	},
+	// The attribute map proxies must behave like a normal CEL map.
+	"attribute-map-string-format": {
+		// string.format accepts maps (cel-go checks for types.MapType).
+		expression:  `"%s".format([device.attributes["dra.example.com"]]) != ""`,
+		driver:      "dra.example.com",
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"foo": {IntValue: new(int64(1))}},
+		expectMatch: true,
+		expectCost:  14,
+	},
+	"attribute-map-equal-unknown": {
+		// An attribute without any recognized value (defensive handling
+		// of something that should not occur in practice) must not
+		// compare equal to an arbitrary value, it must cause an error.
+		expression: `device.attributes["dra.example.com"] == {"foo": 1, "unk": 2}`,
+		driver:     "dra.example.com",
+		attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"foo": {IntValue: new(int64(1))},
+			"unk": {},
+		},
+		expectMatchError: "value is invalid or its type is not supported by this version",
+		expectCost:       34,
+	},
 }
 
 func TestCEL(t *testing.T) { testCEL(ktesting.Init(t)) }
@@ -671,9 +695,26 @@ func testCEL(tCtx ktesting.TContext) {
 			tCtx.Require(result.Error).To(g.Succeed(), "unexpected compile error")
 			tCtx.Assert(result.MaxCost).To(g.Equal(scenario.expectCost), "expected CEL cost (%.0f%% of limit %d)", float64(result.MaxCost)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
 
-			match, details, err := result.DeviceMatches(tCtx, Device{
-				AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
-			})
+			in := resourceapi.ResourceSlice{
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: scenario.driver,
+					Devices: []resourceapi.Device{{
+						Attributes: scenario.attributes,
+						Capacity:   scenario.capacity,
+					}},
+				},
+			}
+			var out draapi.ResourceSlice
+			tCtx.ExpectNoError(draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(&in, &out, nil), "conversion of scenario ResourceSlice")
+			device := Device{
+				AllowMultipleAllocations: scenario.allowMultipleAllocations,
+				Attributes:               out.Spec.Devices[0].Attributes,
+				Capacity:                 out.Spec.Devices[0].Capacity,
+				Driver:                   scenario.driver,
+				LookupUniqueString:       out.MakeUniqueString,
+			}
+
+			match, details, err := result.DeviceMatches(tCtx, device)
 			// details.ActualCost can be called for nil details, no need to check.
 			actualCost := ptr.Deref(details.ActualCost(), 0)
 			if scenario.expectCost > 0 {
@@ -738,19 +779,30 @@ func testInterrupt(tCtx ktesting.TContext) {
 				tCtx = tCtx.WithCancel()
 				tCtx.Cancel("cancel test")
 			}
-			device := Device{
-				Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
+			in := resourceapi.ResourceSlice{
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: "dra.example.com",
+					Devices: []resourceapi.Device{{
+						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
+					}},
+				},
 			}
 			for i := int64(0); i < 1000; i++ {
-				device.Attributes[resourceapi.QualifiedName(fmt.Sprintf("dra.example.com/attr%d", i))] = resourceapi.DeviceAttribute{
-					IntValue: ptr.To(i),
-				}
+				in.Spec.Devices[0].Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr%d", i))] = resourceapi.DeviceAttribute{IntValue: new(i)}
 			}
+			var out draapi.ResourceSlice
+			tCtx.ExpectNoError(draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(&in, &out, nil), "conversion of scenario ResourceSlice")
+			device := Device{
+				Attributes:         out.Spec.Devices[0].Attributes,
+				Driver:             out.Spec.Driver.String(),
+				LookupUniqueString: out.MakeUniqueString,
+			}
+
 			_, _, err := result.DeviceMatches(tCtx, device)
 			if tCtx.Err() != nil {
-				tCtx.Require(err).To(g.MatchError(tCtx.Err()))
+				tCtx.Expect(err).To(g.MatchError(tCtx.Err()))
 			} else {
-				tCtx.Require(err).To(g.Succeed(), "expected no error")
+				tCtx.ExpectNoError(err)
 			}
 		})
 	}
@@ -768,16 +820,34 @@ func BenchmarkDeviceMatches(b *testing.B) {
 			if result.Error != nil {
 				b.Fatalf("unexpected compile error: %s", result.Error.Error())
 			}
+			in := resourceapi.ResourceSlice{
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: scenario.driver,
+					Devices: []resourceapi.Device{{
+						Attributes: scenario.attributes,
+						Capacity:   scenario.capacity,
+					}},
+				},
+			}
+			var out draapi.ResourceSlice
+			if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(&in, &out, nil); err != nil {
+				b.Fatalf("conversion of attributes failed: %v", err)
+			}
+			device := Device{
+				AllowMultipleAllocations: scenario.allowMultipleAllocations,
+				Attributes:               out.Spec.Devices[0].Attributes,
+				Capacity:                 out.Spec.Devices[0].Capacity,
+				Driver:                   scenario.driver,
+				LookupUniqueString:       out.MakeUniqueString,
+			}
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				// It would be nice to measure
 				// time/actual_cost, but the time as observed
 				// here also includes additional preparations
 				// in result.DeviceMatches and thus cannot be
 				// used.
-				match, _, err := result.DeviceMatches(tCtx, Device{
-					AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
-				})
+				match, _, err := result.DeviceMatches(tCtx, device)
 				if err != nil {
 					if scenario.expectMatchError == "" {
 						b.Fatalf("unexpected evaluation error: %v", err)
@@ -933,15 +1003,19 @@ func TestCompileDerivedAttributes(t *testing.T) {
 func TestEvaluateDerivedAttributes(t *testing.T) {
 	mockDevice := Device{
 		Driver: "driver-a",
-		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-			"bool-attr":      {BoolValue: new(true)},
-			"int-attr":       {IntValue: new(int64(42))},
-			"str-attr":       {StringValue: new("hello")},
-			"ver-attr":       {VersionValue: new("1.0.0")},
-			"bool-list-attr": {BoolValues: []bool{true, false}},
-			"int-list-attr":  {IntValues: []int64{1, 2, 3}},
-			"str-list-attr":  {StringValues: []string{"hello", "world"}},
-			"ver-list-attr":  {VersionValues: []string{"1.0.0", "2.0.0"}},
+		Attributes: draapi.DeviceAttributes{
+			Nested: map[draapi.UniqueString]map[draapi.UniqueString]any{
+				draapi.MakeUniqueString("driver-a"): {
+					draapi.MakeUniqueString("bool-attr"):      true,
+					draapi.MakeUniqueString("int-attr"):       int64(42),
+					draapi.MakeUniqueString("str-attr"):       "hello",
+					draapi.MakeUniqueString("ver-attr"):       semver.MustParse("1.0.0"),
+					draapi.MakeUniqueString("bool-list-attr"): []bool{true, false},
+					draapi.MakeUniqueString("int-list-attr"):  []int64{1, 2, 3},
+					draapi.MakeUniqueString("str-list-attr"):  []string{"hello", "world"},
+					draapi.MakeUniqueString("ver-list-attr"):  []semver.Version{semver.MustParse("1.0.0"), semver.MustParse("2.0.0")},
+				},
+			},
 		},
 	}
 
@@ -949,29 +1023,29 @@ func TestEvaluateDerivedAttributes(t *testing.T) {
 		name            string
 		expression      string
 		device          Device
-		expectAttr      *resourceapi.DeviceAttribute
+		expectAttr      any
 		expectEvalError string
 	}{
 		// Scalar Literal cases
 		{
 			name:       "bool-scalar-literal",
 			expression: "true",
-			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
+			expectAttr: true,
 		},
 		{
 			name:       "int-scalar-literal",
 			expression: "42",
-			expectAttr: &resourceapi.DeviceAttribute{IntValue: new(int64(42))},
+			expectAttr: int64(42),
 		},
 		{
 			name:       "string-scalar-literal",
 			expression: `"hello"`,
-			expectAttr: &resourceapi.DeviceAttribute{StringValue: new("hello")},
+			expectAttr: "hello",
 		},
 		{
 			name:       "semver-scalar-literal",
 			expression: `semver("1.0.0")`,
-			expectAttr: &resourceapi.DeviceAttribute{VersionValue: new("1.0.0")},
+			expectAttr: semver.MustParse("1.0.0"),
 		},
 
 		// Scalar Device Attribute cases
@@ -979,47 +1053,52 @@ func TestEvaluateDerivedAttributes(t *testing.T) {
 			name:       "bool-scalar-device",
 			expression: `device.attributes["driver-a"]["bool-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
+			expectAttr: true,
 		},
 		{
 			name:       "int-scalar-device",
 			expression: `device.attributes["driver-a"]["int-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{IntValue: new(int64(42))},
+			expectAttr: int64(42),
 		},
 		{
 			name:       "string-scalar-device",
 			expression: `device.attributes["driver-a"]["str-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{StringValue: new("hello")},
+			expectAttr: "hello",
 		},
 		{
 			name:       "semver-scalar-device",
 			expression: `device.attributes["driver-a"]["ver-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{VersionValue: new("1.0.0")},
+			expectAttr: semver.MustParse("1.0.0"),
 		},
 
 		// List Literal cases
 		{
 			name:       "bool-list-literal",
 			expression: `[true, false]`,
-			expectAttr: &resourceapi.DeviceAttribute{BoolValues: []bool{true, false}},
+			expectAttr: []bool{true, false},
 		},
 		{
 			name:       "int-list-literal",
 			expression: `[1, 2, 3]`,
-			expectAttr: &resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}},
+			expectAttr: []int64{1, 2, 3},
 		},
 		{
 			name:       "string-list-literal",
 			expression: `["hello", "world"]`,
-			expectAttr: &resourceapi.DeviceAttribute{StringValues: []string{"hello", "world"}},
+			expectAttr: []string{"hello", "world"},
 		},
 		{
 			name:       "semver-list-literal",
 			expression: `[semver("1.0.0"), semver("2.0.0")]`,
-			expectAttr: &resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0"}},
+			expectAttr: []semver.Version{semver.MustParse("1.0.0"), semver.MustParse("2.0.0")},
+		},
+		{
+			name:       "empty-list-literal",
+			expression: `[]`,
+			expectAttr: []string{},
 		},
 
 		// List Device Attribute cases
@@ -1027,25 +1106,25 @@ func TestEvaluateDerivedAttributes(t *testing.T) {
 			name:       "bool-list-device",
 			expression: `device.attributes["driver-a"]["bool-list-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{BoolValues: []bool{true, false}},
+			expectAttr: []bool{true, false},
 		},
 		{
 			name:       "int-list-device",
 			expression: `device.attributes["driver-a"]["int-list-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}},
+			expectAttr: []int64{1, 2, 3},
 		},
 		{
 			name:       "string-list-device",
 			expression: `device.attributes["driver-a"]["str-list-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{StringValues: []string{"hello", "world"}},
+			expectAttr: []string{"hello", "world"},
 		},
 		{
 			name:       "semver-list-device",
 			expression: `device.attributes["driver-a"]["ver-list-attr"]`,
 			device:     mockDevice,
-			expectAttr: &resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0"}},
+			expectAttr: []semver.Version{semver.MustParse("1.0.0"), semver.MustParse("2.0.0")},
 		},
 
 		// Error cases
@@ -1091,21 +1170,6 @@ func TestEvaluateDerivedAttributes(t *testing.T) {
 			device:          mockDevice,
 			expectEvalError: "unsupported CEL return type: structpb.NullValue",
 		},
-		{
-			// "bool-attr" and "driver-a/bool-attr" both resolve to the
-			// same key; the fully-qualified one must win regardless of
-			// map order.
-			name:       "conflicting-attribute-names-prefers-fully-qualified",
-			expression: `device.attributes["driver-a"]["bool-attr"]`,
-			device: Device{
-				Driver: "driver-a",
-				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					"bool-attr":          {BoolValue: new(false)},
-					"driver-a/bool-attr": {BoolValue: new(true)},
-				},
-			},
-			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
-		},
 	}
 
 	for _, tc := range testCases {
@@ -1120,7 +1184,11 @@ func TestEvaluateDerivedAttributes(t *testing.T) {
 				t.Fatalf("unexpected compile error: %v", result.Error)
 			}
 
-			attr, _, err := result.EvaluateDerivedAttribute(context.Background(), tc.device)
+			device := tc.device
+			if device.LookupUniqueString == nil {
+				device.LookupUniqueString = draapi.MakeUniqueString
+			}
+			attr, _, err := result.EvaluateDerivedAttribute(context.Background(), device)
 			if tc.expectEvalError != "" {
 				if err == nil {
 					t.Fatalf("expected evaluation error %q, got none", tc.expectEvalError)
