@@ -37,64 +37,64 @@ const (
 	partialConditionEvaluationResultTypeError
 )
 
-// PartialConditionEvaluationResult is an enum type with four variants:
+// ConditionEvaluationResult is an enum type with four variants:
 // - true and false: Evaluation was successful, and evaluated to this value
 // - error: The condition could be evaluated, but errored during eval.
 // - unevaluatable: The condition cannot readily be evaluated. This is the struct zero value.
-type PartialConditionEvaluationResult struct {
+type ConditionEvaluationResult struct {
 	resultType partialConditionEvaluationResultType
 	err        error
 }
 
 // ConditionEvaluationResultBoolean constructs an evaluation result with a boolean value.
-func ConditionEvaluationResultBoolean(evalResult bool) PartialConditionEvaluationResult {
+func ConditionEvaluationResultBoolean(evalResult bool) ConditionEvaluationResult {
 	if evalResult {
-		return PartialConditionEvaluationResult{resultType: partialConditionEvaluationResultTypeTrue}
+		return ConditionEvaluationResult{resultType: partialConditionEvaluationResultTypeTrue}
 	}
-	return PartialConditionEvaluationResult{resultType: partialConditionEvaluationResultTypeFalse}
+	return ConditionEvaluationResult{resultType: partialConditionEvaluationResultTypeFalse}
 }
 
 // ConditionEvaluationResultError indicates that the condition could be evaluated, but failed.
-func ConditionEvaluationResultError(err error) PartialConditionEvaluationResult {
+func ConditionEvaluationResultError(err error) ConditionEvaluationResult {
 	if err == nil {
-		return PartialConditionEvaluationResult{
+		return ConditionEvaluationResult{
 			resultType: partialConditionEvaluationResultTypeError,
 			err:        errors.New("unknown evaluation error: got err == nil in ConditionEvaluationResultError"),
 		}
 	}
-	return PartialConditionEvaluationResult{
+	return ConditionEvaluationResult{
 		resultType: partialConditionEvaluationResultTypeError,
 		err:        err,
 	}
 }
 
 // ConditionsEvaluationResultUnevaluatable indicates direct conditions evaluation is not possible.
-func ConditionsEvaluationResultUnevaluatable() PartialConditionEvaluationResult {
-	return PartialConditionEvaluationResult{
+func ConditionsEvaluationResultUnevaluatable() ConditionEvaluationResult {
+	return ConditionEvaluationResult{
 		resultType: partialConditionEvaluationResultTypeUnevaluatable, // == 0 (which matches the zero value of the struct)
 	}
 }
 
 // IsTrue indicates that the conditions evaluation was successful, and evaluated to true, which means it influences the ConditionsMap decision.
-func (r PartialConditionEvaluationResult) IsTrue() bool {
+func (r ConditionEvaluationResult) IsTrue() bool {
 	return r.resultType == partialConditionEvaluationResultTypeTrue
 }
 
 // IsFalse indicates that the conditions evaluation was successful, but evaluated to false, and it not thus taken into account.
-func (r PartialConditionEvaluationResult) IsFalse() bool {
+func (r ConditionEvaluationResult) IsFalse() bool {
 	return r.resultType == partialConditionEvaluationResultTypeFalse
 }
 
 // IsError indicates whether conditions evaluation failed.
-func (r PartialConditionEvaluationResult) IsError() bool {
+func (r ConditionEvaluationResult) IsError() bool {
 	return r.resultType == partialConditionEvaluationResultTypeError
 }
 
 // Error returns the evaluation error, if any.
-func (r PartialConditionEvaluationResult) Error() error { return r.err }
+func (r ConditionEvaluationResult) Error() error { return r.err }
 
 // IsUnevaluatable is true whenever none of the other variants is, that is, the zero value.
-func (r PartialConditionEvaluationResult) IsUnevaluatable() bool {
+func (r ConditionEvaluationResult) IsUnevaluatable() bool {
 	return r.resultType == partialConditionEvaluationResultTypeUnevaluatable
 }
 
@@ -103,7 +103,7 @@ func (r PartialConditionEvaluationResult) IsUnevaluatable() bool {
 func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evaluateConditionFn EvaluateConditionFunc) (Decision, string, error) {
 	// This is a translation between the generic, private function, and the interface we want to expose to callers. Because we never return "unevaluatable", the returned ConditionsAwareDecision
 	// is always one of Allow/Deny/NoOpinion, and thus can we split it into unconditionalParts
-	return partiallyEvaluateConditionsMapInternal(ctx, c, data, func(ctx context.Context, cond Condition, condData ConditionsData) PartialConditionEvaluationResult {
+	return partiallyEvaluateConditionsMapInternal(ctx, c, data, func(ctx context.Context, cond Condition, condData ConditionsData) ConditionEvaluationResult {
 		applied, err := evaluateConditionFn(ctx, cond, condData)
 		if err != nil {
 			return ConditionEvaluationResultError(err)
@@ -120,7 +120,7 @@ func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evalua
 // for conditions that the evaluator does not recognize. In the latter case, a partially evaluated, deep copied
 // ConditionsMap might be returned.
 func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap, data ConditionsData, evaluateConditionFn PartialEvaluateConditionFunc) ConditionsAwareDecision {
-	evalCond := func(cond Condition) PartialConditionEvaluationResult {
+	evalCond := func(cond Condition) ConditionEvaluationResult {
 		// First, try to use the condition's own evaluate function.
 		// Fallback to evaluateConditionFn if set and unevaluatable
 		result := cond.Evaluate(ctx, data)
@@ -205,7 +205,7 @@ func partiallyEvaluateConditionsMapInternal(ctx context.Context, c ConditionsMap
 	return ConditionsAwareDecisionNoOpinion("no conditions matched", nil)
 }
 
-func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalCond func(cond Condition) PartialConditionEvaluationResult, effect, appliedDescription string) ([]string, []error, []Condition) {
+func conditionsToAppliedErroredUnevaluated(conditions iter.Seq[Condition], evalCond func(cond Condition) ConditionEvaluationResult, effect, appliedDescription string) ([]string, []error, []Condition) {
 	errs := []error{}
 	appliedCondReasons := []string{}
 	unevaluatedConditions := []Condition{}

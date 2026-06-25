@@ -292,14 +292,14 @@ type Condition interface {
 	//
 	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
 	// evaluation outcome. Only the condition itself and data can infuence the outcome.
-	Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult
+	Evaluate(ctx context.Context, data ConditionsData) ConditionEvaluationResult
 }
 
 // EvaluateConditionFunc is a function that is able to concretely evaluate a condition to a boolean or error.
 type EvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) (bool, error)
 
 // PartialEvaluateConditionFunc allows partially evaluating a condition, returning Unevaluatable if a truth value or error cannot be assigned.
-type PartialEvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) PartialConditionEvaluationResult
+type PartialEvaluateConditionFunc func(ctx context.Context, condition Condition, data ConditionsData) ConditionEvaluationResult
 
 // ConditionsData is an enum type for various evaluation targets conditions
 // can be written against.

@@ -87,7 +87,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
 			noACRReviewer: true,
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
 			wantDecision: authorizer.DecisionDeny,
@@ -100,7 +100,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
 			noACRReviewer: true,
-			builtinConditionsEvaluator: func(_ context.Context, _ authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, _ authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(false)
 			},
 			wantDecision: authorizer.DecisionNoOpinion,
@@ -113,7 +113,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
 			noACRReviewer: true,
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
 			wantDecision: authorizer.DecisionAllow,
@@ -128,7 +128,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectAllow, "c", "c", "opaque", "all ok"),       // needs a webhook due to opaque type
 				cnd(effectDeny, "d", "d", "transparent", "very bad"), // simplified in-process
 			),
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				if condition.GetType() == "transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}
@@ -156,7 +156,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 			),
 			noACRReviewer: true,
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
 			wantDecision: authorizer.DecisionAllow,
@@ -175,7 +175,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 			),
 			noACRReviewer: true,
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
 			wantDecision: authorizer.DecisionDeny,
@@ -196,7 +196,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					cnd(effectDeny, "d", "d", "transparent", ""),
 				),
 			),
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				if condition.GetType() == "transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}
@@ -237,7 +237,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
-			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.PartialConditionEvaluationResult {
+			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				if condition.GetType() == "transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}

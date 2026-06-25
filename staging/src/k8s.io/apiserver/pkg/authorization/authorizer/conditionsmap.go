@@ -223,7 +223,7 @@ type GenericCondition struct {
 	Condition    string
 	Type         string
 	Description  string
-	EvaluateFunc func(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult
+	EvaluateFunc func(ctx context.Context, data ConditionsData) ConditionEvaluationResult
 }
 
 var _ Condition = GenericCondition{}
@@ -240,7 +240,7 @@ func (c GenericCondition) GetType() string {
 func (c GenericCondition) GetDescription() string {
 	return c.Description
 }
-func (c GenericCondition) Evaluate(ctx context.Context, data ConditionsData) PartialConditionEvaluationResult {
+func (c GenericCondition) Evaluate(ctx context.Context, data ConditionsData) ConditionEvaluationResult {
 	if c.EvaluateFunc == nil {
 		return ConditionsEvaluationResultUnevaluatable()
 	}

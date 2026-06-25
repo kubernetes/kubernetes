@@ -29,15 +29,15 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 	falseResult := ConditionEvaluationResultBoolean(false)
 	errResult := ConditionEvaluationResultError(evalErr)
 
-	cond := func(id string, result PartialConditionEvaluationResult) GenericCondition {
+	cond := func(id string, result ConditionEvaluationResult) GenericCondition {
 		return GenericCondition{
 			ID: id,
-			EvaluateFunc: func(context.Context, ConditionsData) PartialConditionEvaluationResult {
+			EvaluateFunc: func(context.Context, ConditionsData) ConditionEvaluationResult {
 				return result
 			},
 		}
 	}
-	condDesc := func(id string, desc string, result PartialConditionEvaluationResult) GenericCondition {
+	condDesc := func(id string, desc string, result ConditionEvaluationResult) GenericCondition {
 		c := cond(id, result)
 		c.Description = desc
 		return c
@@ -51,7 +51,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		denyConditions               []Condition
 		noOpinionConditions          []Condition
 		allowConditions              []Condition
-		evaluateFunc                 func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult
+		evaluateFunc                 func(context.Context, Condition, ConditionsData) ConditionEvaluationResult
 		disableConditionsMapEvaluate bool
 	}
 
@@ -124,7 +124,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 					denyConditions:      []Condition{cond("deny-1", trueResult)},
 					noOpinionConditions: []Condition{cond("nop-1", trueResult)},
 					allowConditions:     []Condition{cond("allow-1", trueResult)},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						panic("should never be called, as all conditions could readily be evaluated")
 					},
 				},
@@ -149,7 +149,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 				{
 					name:           "via evaluateFunc fallback (condition unevaluatable, evaluateFunc returns true)",
 					denyConditions: []Condition{unevalCond("deny-1")},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						return ConditionEvaluationResultBoolean(true)
 					},
 				},
@@ -393,14 +393,14 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 				{
 					name:            "via evaluateFunc fallback (condition unevaluatable, evaluateFunc errors)",
 					allowConditions: []Condition{unevalCond("allow-1")},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						return ConditionEvaluationResultError(evalErr)
 					},
 				},
 				{
 					name:            "condition errors, evaluateFunc panics (not called)",
 					allowConditions: []Condition{cond("allow-1", errResult)},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						panic("should not be called")
 					},
 				},
@@ -448,7 +448,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 				{
 					name:            "via evaluateFunc fallback (condition unevaluatable, evaluateFunc returns false)",
 					allowConditions: []Condition{unevalCond("allow-1")},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						return ConditionEvaluationResultBoolean(false)
 					},
 				},
@@ -498,14 +498,14 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 				{
 					name:            "evaluateFunc panics (not called, condition self-evaluates)",
 					allowConditions: []Condition{cond("allow-1", trueResult)},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						panic("should not be called")
 					},
 				},
 				{
 					name:            "via evaluateFunc fallback (condition unevaluatable, evaluateFunc returns true)",
 					allowConditions: []Condition{unevalCond("allow-1")},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						return ConditionEvaluationResultBoolean(true)
 					},
 				},
@@ -612,7 +612,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 					name:                         "evaluateFunc also returns unevaluatable",
 					disableConditionsMapEvaluate: true,
 					allowConditions:              []Condition{unevalCond("allow-1")},
-					evaluateFunc: func(context.Context, Condition, ConditionsData) PartialConditionEvaluationResult {
+					evaluateFunc: func(context.Context, Condition, ConditionsData) ConditionEvaluationResult {
 						return ConditionsEvaluationResultUnevaluatable()
 					},
 				},
