@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
@@ -33,12 +34,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/cpuset"
 )
@@ -47,6 +55,14 @@ type mockCPUAllocationReader struct {
 	cpumanager.Manager
 	sets            map[string]cpuset.CPUSet
 	isolationLevels map[string]cmqos.ResourceIsolationLevel
+}
+
+type fakeDeviceManager struct {
+	devicemanager.Manager
+}
+
+func (m *fakeDeviceManager) Updates() <-chan resourceupdates.Update {
+	return make(chan resourceupdates.Update)
 }
 
 func (m *mockCPUAllocationReader) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
@@ -290,6 +306,100 @@ func TestGetCapacity(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNewContainerManagerFiltersReservedMemoryNUMANodesWithMemoryManagerNone(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	machineInfo := &cadvisorapi.MachineInfo{
+		NumCores:   2,
+		NumSockets: 2,
+		Topology: []cadvisorapi.Node{
+			{
+				Id:     0,
+				Memory: 2 * 1024 * 1024 * 1024,
+				Cores: []cadvisorapi.Core{
+					{SocketID: 0, Id: 0, Threads: []int{0}},
+				},
+			},
+			{
+				Id:     1,
+				Memory: 2 * 1024 * 1024 * 1024,
+				Cores: []cadvisorapi.Core{
+					{SocketID: 1, Id: 0, Threads: []int{1}},
+				},
+			},
+		},
+	}
+
+	mockCadvisor := cadvisortest.NewMockInterface(t)
+	mockCadvisor.EXPECT().MachineInfo().Return(machineInfo, nil)
+
+	oldGetCgroupSubsystems := getCgroupSubsystems
+	oldSwapIsOn := swapIsOn
+	oldPidlimitStats := pidlimitStats
+	oldNewDeviceManager := newDeviceManager
+	defer func() {
+		getCgroupSubsystems = oldGetCgroupSubsystems
+		swapIsOn = oldSwapIsOn
+		pidlimitStats = oldPidlimitStats
+		newDeviceManager = oldNewDeviceManager
+	}()
+
+	getCgroupSubsystems = func() (*CgroupSubsystems, error) {
+		return &CgroupSubsystems{}, nil
+	}
+	swapIsOn = func() (bool, error) {
+		return false, nil
+	}
+	pidlimitStats = func() (*statsapi.RlimitStats, error) {
+		return nil, nil
+	}
+
+	var gotDeviceManagerTopology []cadvisorapi.Node
+	var gotTopologyManagerNUMANodes []int
+	newDeviceManager = func(topology []cadvisorapi.Node, store topologymanager.Store) (devicemanager.Manager, error) {
+		gotDeviceManagerTopology = append([]cadvisorapi.Node(nil), topology...)
+		gotTopologyManagerNUMANodes = append([]int(nil), store.GetNUMANodeIDs()...)
+		return &fakeDeviceManager{}, nil
+	}
+
+	nodeConfig := NodeConfig{
+		KubeletRootDir:        t.TempDir(),
+		CPUManagerPolicy:      string(cpumanager.PolicyNone),
+		MemoryManagerPolicy:   string(memorymanager.PolicyTypeNone),
+		TopologyManagerPolicy: topologymanager.PolicyNone,
+		TopologyManagerScope:  topologymanager.ContainerTopologyScope,
+		NodeAllocatableConfig: NodeAllocatableConfig{
+			SystemReserved: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		},
+		MemoryManagerReservedMemory: []kubeletconfig.MemoryReservation{
+			{
+				NumaNode: 1,
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+			},
+		},
+	}
+
+	manager, err := NewContainerManager(ctx, fakeContainerMgrMountInt(), mockCadvisor, nodeConfig, false, record.NewFakeRecorder(1), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cm := manager.(*containerManagerImpl)
+	if got := cm.topologyManager.GetNUMANodeIDs(); len(got) != 1 || got[0] != 0 {
+		t.Fatalf("expected filtered topology manager NUMA nodes [0], got %v", got)
+	}
+	if len(gotTopologyManagerNUMANodes) != 1 || gotTopologyManagerNUMANodes[0] != 0 {
+		t.Fatalf("expected device manager store NUMA nodes [0], got %v", gotTopologyManagerNUMANodes)
+	}
+	if len(gotDeviceManagerTopology) != 1 || gotDeviceManagerTopology[0].Id != 0 {
+		t.Fatalf("expected device manager to receive filtered topology [0], got %v", gotDeviceManagerTopology)
 	}
 }
 
