@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -53,6 +55,48 @@ func v1FillFuncs(codecs serializer.CodecFactory) []interface{} {
 				d.BindsToNode = new(bool)
 			}
 		},
+		// Round-tripping invalid attributes with more than one value fails
+		// because only one value is stored internally
+		// -> randomly keep one or the randomly filled values.
+		//
+		// Invalid version strings cause conversion errors
+		// -> avoid them.
+		func(v *resourceapi.DeviceAttribute, c randfill.Continue) {
+			c.FillNoCustom(v)
+			switch rand.Int32N(8) {
+			case 0:
+				*v = resourceapi.DeviceAttribute{IntValue: v.IntValue}
+			case 1:
+				*v = resourceapi.DeviceAttribute{StringValue: v.StringValue}
+			case 2:
+				*v = resourceapi.DeviceAttribute{BoolValue: v.BoolValue}
+			case 3:
+				*v = resourceapi.DeviceAttribute{VersionValue: new(randomVersion())}
+			case 4:
+				*v = resourceapi.DeviceAttribute{IntValues: v.IntValues}
+			case 5:
+				*v = resourceapi.DeviceAttribute{StringValues: v.StringValues}
+			case 6:
+				*v = resourceapi.DeviceAttribute{BoolValues: v.BoolValues}
+			case 7:
+				var versions []string
+				for range rand.Int32N(3) {
+					versions = append(versions, randomVersion())
+				}
+				*v = resourceapi.DeviceAttribute{VersionValues: versions}
+			}
+		},
+	}
+}
+
+func randomVersion() string {
+	switch rand.Int32N(3) {
+	case 0:
+		return "1.2.3"
+	case 1:
+		return "1.2.3-alpha.1"
+	default:
+		return fmt.Sprintf("%d.%d.%d", rand.Int32N(10), rand.Int32N(10), rand.Int32N(10))
 	}
 }
 
