@@ -109,6 +109,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 			return nil, err
 		}
 		storage[resource] = csiNodeStorage.CSINode
+		storage[resource+"/status"] = csiNodeStorage.Status
 	}
 
 	// register csidrivers

@@ -106,6 +106,12 @@ func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
 			pvc.Status.AllocatedResourceStatuses = nil
 		}
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		if oldPVC == nil || oldPVC.Status.HealthStatus == nil {
+			pvc.Status.HealthStatus = nil
+		}
+	}
 }
 
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {

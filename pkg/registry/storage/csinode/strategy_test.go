@@ -24,7 +24,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 	ptr "k8s.io/utils/ptr"
 )
 
@@ -356,5 +359,124 @@ func getValidCSINode(name string) *storage.CSINode {
 				},
 			},
 		},
+	}
+}
+
+func getCSINodeWithStatus() *storage.CSINode {
+	node := getValidCSINode("foo")
+	node.Status = storage.CSINodeStatus{
+		StorageHealth: []storage.StorageHealthCondition{
+			{
+				Name:   "valid-driver-name",
+				Status: storage.StorageUnreachable,
+				Reason: "BackendDown",
+			},
+		},
+	}
+	return node
+}
+
+func TestPrepareForCreate_ClearsStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CSIVolumeHealth: true,
+	})
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csinodes",
+	})
+	obj := getCSINodeWithStatus()
+	Strategy.PrepareForCreate(ctx, obj)
+	if len(obj.Status.StorageHealth) != 0 {
+		t.Errorf("expected status to be cleared on create, got %v", obj.Status)
+	}
+}
+
+func TestPrepareForUpdate_PreservesStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CSIVolumeHealth: true,
+	})
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csinodes",
+	})
+	oldObj := getCSINodeWithStatus()
+	newObj := getValidCSINode("foo")
+	Strategy.PrepareForUpdate(ctx, newObj, oldObj)
+	if !reflect.DeepEqual(newObj.Status, oldObj.Status) {
+		t.Errorf("expected status to be preserved on spec update, got %v", newObj.Status)
+	}
+}
+
+func TestStatusPrepareForUpdate_PreservesSpec(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CSIVolumeHealth: true,
+	})
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csinodes",
+	})
+	oldObj := getValidCSINode("foo")
+	newObj := getCSINodeWithStatus()
+	newObj.Spec.Drivers = nil // Try to change spec via status update
+	StatusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
+	if !reflect.DeepEqual(newObj.Spec, oldObj.Spec) {
+		t.Errorf("expected spec to be preserved on status update, got %v", newObj.Spec)
+	}
+	if len(newObj.Status.StorageHealth) == 0 {
+		t.Errorf("expected status to be set after status update")
+	}
+}
+
+func TestDropDisabledCSINodeFields_GateOff(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CSIVolumeHealth: false,
+	})
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csinodes",
+	})
+
+	tests := []struct {
+		name          string
+		newObj        *storage.CSINode
+		oldObj        *storage.CSINode
+		expectHealthy bool
+	}{
+		{
+			name:          "gate=off, old=nil; should drop",
+			newObj:        getCSINodeWithStatus(),
+			oldObj:        nil,
+			expectHealthy: false,
+		},
+		{
+			name:          "gate=off, old=no status; should drop",
+			newObj:        getCSINodeWithStatus(),
+			oldObj:        getValidCSINode("foo"),
+			expectHealthy: false,
+		},
+		{
+			name:          "gate=off, old=has status; should keep (backward compat)",
+			newObj:        getCSINodeWithStatus(),
+			oldObj:        getCSINodeWithStatus(),
+			expectHealthy: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.oldObj == nil {
+				Strategy.PrepareForCreate(ctx, tt.newObj)
+			} else {
+				StatusStrategy.PrepareForUpdate(ctx, tt.newObj, tt.oldObj)
+			}
+			hasHealth := len(tt.newObj.Status.StorageHealth) > 0
+			if hasHealth != tt.expectHealthy {
+				t.Errorf("expected storageHealth present=%v, got %v", tt.expectHealthy, hasHealth)
+			}
+		})
 	}
 }

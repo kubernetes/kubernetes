@@ -566,6 +566,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		"AllocatedResources",
 		"ObservedGeneration",
 		"Resources",
+		"VolumeHealth",
 	)
 
 	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.

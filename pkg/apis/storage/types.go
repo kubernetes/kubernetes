@@ -572,6 +572,10 @@ type CSINode struct {
 
 	// spec is the specification of CSINode
 	Spec CSINodeSpec
+
+	// status contains health and status information for the node's storage.
+	// +optional
+	Status CSINodeStatus
 }
 
 // CSINodeSpec holds information about the specification of all CSI drivers installed on a node
@@ -627,6 +631,54 @@ type VolumeNodeResources struct {
 	// If this field is not specified, then the supported number of volumes on this node is unbounded.
 	// +optional
 	Count *int32
+}
+
+// StorageHealthStatusType describes the health status category of a storage backend.
+type StorageHealthStatusType string
+
+const (
+	// StorageUnreachable indicates the storage backend is unreachable.
+	StorageUnreachable StorageHealthStatusType = "StorageUnreachable"
+	// StorageDegraded indicates the storage backend is functioning with reduced capability.
+	StorageDegraded StorageHealthStatusType = "StorageDegraded"
+)
+
+// StorageHealthCondition represents an adverse health condition reported
+// by a CSI driver for its storage backend on a node.
+type StorageHealthCondition struct {
+	// name is the CSI driver name, matching CSINodeDriver.name.
+	Name string
+	// status is the health status category.
+	// One of "StorageUnreachable", "StorageDegraded".
+	Status StorageHealthStatusType
+	// reason is a brief CamelCase machine-parseable reason.
+	// Together with name and status it forms the unique identity of a condition entry.
+	Reason string
+	// message is a human-readable description.
+	// +optional
+	Message string
+	// accessModes are the access modes affected. An empty list means all access modes are affected.
+	// +optional
+	AccessModes []api.PersistentVolumeAccessMode
+	// volumeMode is the volume mode affected. Nil means both are affected.
+	// +optional
+	VolumeMode *api.PersistentVolumeMode
+	// lastTransitionTime is when this condition first appeared at its current state.
+	// +optional
+	LastTransitionTime metav1.Time
+}
+
+// CSINodeStatus contains health and status information for storage on a node.
+type CSINodeStatus struct {
+	// storageHealth is the set of backend health reports for
+	// each CSI driver registered on the node.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +listMapKey=status
+	// +listMapKey=reason
+	// +featureGate=CSIVolumeHealth
+	StorageHealth []StorageHealthCondition
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
