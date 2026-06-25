@@ -70,7 +70,7 @@ var (
 		TopologyManagerPolicy:                  kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:                    metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods:        metav1.Duration{Duration: 10 * time.Second},
-		MemoryThrottlingFactor:                 ptr.To(0.9),
+		MemoryThrottlingFactor:                 new(float64(0.9)),
 		MemoryReservationPolicy:                kubeletconfig.NoneMemoryReservationPolicy,
 		FeatureGates: map[string]bool{
 			"GracefulNodeShutdown":       true,
@@ -549,14 +549,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: unable to parse reservedSystemCPUs (--reserved-cpus) invalid-reserved-system-cpus, error:",
-		}, {
-			name: "enable MemoryQoS without specifying MemoryThrottlingFactor",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				conf.FeatureGates = map[string]bool{"MemoryQoS": true}
-				conf.MemoryThrottlingFactor = nil
-				return conf
-			},
-			errMsg: "invalid configuration: memoryThrottlingFactor is required when MemoryQoS feature flag is enabled",
 		}, {
 			name: "invalid MemoryThrottlingFactor",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

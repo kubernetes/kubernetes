@@ -114,7 +114,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		internalLifecycle:      cm.NewFakeInternalContainerLifecycle(),
 		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
 		logManager:             logs.NewStubContainerLogManager(),
-		memoryThrottlingFactor: 0.9,
+		memoryThrottlingFactor: new(float64(0.9)),
 		podLogsDirectory:       fakePodLogsDirectory,
 		actuatedState:          state.NewStateMemory(logger, nil),
 	}

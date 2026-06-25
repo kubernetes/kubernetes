@@ -119,7 +119,8 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	expectedConfig := makeExpectedConfig(t, tCtx, m, pod, 0, false)
+	enforceMemoryQoS := utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) && isCgroup2UnifiedMode()
+	expectedConfig := makeExpectedConfig(t, tCtx, m, pod, 0, enforceMemoryQoS)
 	containerConfig, _, err := m.generateContainerConfig(tCtx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
@@ -614,12 +615,12 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	memoryNodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
 	pod1MemoryHigh := int64(math.Floor(
 		float64(podRequestMemory.Value())+
-			(float64(pod1LimitMemory.Value())-float64(podRequestMemory.Value()))*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+			(float64(pod1LimitMemory.Value())-float64(podRequestMemory.Value()))*(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
 	pod2MemoryHigh := int64(math.Floor(
 		float64(podRequestMemory.Value())+
-			(float64(memoryNodeAllocatable.Value())-float64(podRequestMemory.Value()))*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+			(float64(memoryNodeAllocatable.Value())-float64(podRequestMemory.Value()))*(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
 	pod3MemoryHigh := int64(math.Floor(
-		float64(memoryNodeAllocatable.Value())*float64(m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
+		float64(memoryNodeAllocatable.Value())*(*m.memoryThrottlingFactor))/float64(pageSize)) * pageSize
 
 	type expectedResult struct {
 		containerConfig *runtimeapi.LinuxContainerConfig
@@ -670,6 +671,43 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.low"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
 	}
+}
+
+func TestGenerateContainerConfigMemoryHighNotSetWhenThrottlingFactorNil(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
+	m.memoryThrottlingFactor = nil
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+					},
+				},
+			},
+		},
+	}
+
+	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true)
+	require.NoError(t, err)
+	unified := linuxConfig.GetResources().GetUnified()
+	assert.Equal(t, strconv.FormatInt(128*1024*1024, 10), unified["memory.low"],
+		"memory.low should still be set for burstable pod with TieredReservation")
+	_, hasMemoryHigh := unified["memory.high"]
+	assert.False(t, hasMemoryHigh, "memory.high should not be set when memoryThrottlingFactor is nil")
 }
 
 func TestGenerateContainerConfigMemoryQoSPolicyNone(t *testing.T) {
@@ -750,6 +788,20 @@ func TestMemoryHighClearedWhenMemoryQoSDisabled(t *testing.T) {
 	require.NotNil(t, disabledResources)
 	assert.Equal(t, "max", disabledResources.GetLinux().GetUnified()["memory.high"],
 		"memory.high should be 'max' when MemoryQoS is disabled on cgroup v2")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
+	reenabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NotNil(t, reenabledResources)
+	reenabledHigh := reenabledResources.GetLinux().GetUnified()["memory.high"]
+	assert.NotEmpty(t, reenabledHigh, "memory.high should be set when memoryThrottlingFactor is non-nil")
+	assert.NotEqual(t, "max", reenabledHigh)
+
+	m.memoryThrottlingFactor = nil
+	nilFactorResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NotNil(t, nilFactorResources)
+	_, hasMemoryHigh := nilFactorResources.GetLinux().GetUnified()["memory.high"]
+	assert.False(t, hasMemoryHigh,
+		"memory.high should not be set when memoryThrottlingFactor is nil")
 }
 
 func TestGetHugepageLimitsFromResources(t *testing.T) {
