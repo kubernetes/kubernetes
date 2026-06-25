@@ -288,7 +288,7 @@ func TestClaims(t *testing.T) {
 				return string(b)
 			}
 
-			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.exp, c.warnafter, c.aud)
+			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.exp, c.warnafter, c.aud, nil)
 			if err != nil && err.Error() != c.err {
 				t.Errorf("expected error %q but got: %v", c.err, err)
 			}

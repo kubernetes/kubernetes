@@ -25,11 +25,13 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -54,12 +56,15 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
-	Namespace string           `json:"namespace,omitempty"`
-	Svcacct   ref              `json:"serviceaccount,omitempty"`
-	Pod       *ref             `json:"pod,omitempty"`
-	Secret    *ref             `json:"secret,omitempty"`
-	Node      *ref             `json:"node,omitempty"`
-	WarnAfter *jwt.NumericDate `json:"warnafter,omitempty"`
+	Namespace                      string                                          `json:"namespace,omitempty"`
+	Svcacct                        ref                                             `json:"serviceaccount,omitempty"`
+	Pod                            *ref                                            `json:"pod,omitempty"`
+	Secret                         *ref                                            `json:"secret,omitempty"`
+	Node                           *ref                                            `json:"node,omitempty"`
+	ValidatingWebhookConfiguration *ref                                            `json:"validatingWebhookConfiguration,omitempty"`
+	MutatingWebhookConfiguration   *ref                                            `json:"mutatingWebhookConfiguration,omitempty"`
+	AttestationClaims              map[string]authentication.AttestationClaimValue `json:"attestationClaims,omitempty"`
+	WarnAfter                      *jwt.NumericDate                                `json:"warnafter,omitempty"`
 }
 
 type ref struct {
@@ -67,7 +72,7 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
-func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *core.Node, expirationSeconds, warnafter int64, audience []string) (*jwt.Claims, interface{}, error) {
+func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *core.Node, validating *admissionregistrationv1.ValidatingWebhookConfiguration, mutating *admissionregistrationv1.MutatingWebhookConfiguration, expirationSeconds, warnafter int64, audience []string, attestationClaims map[string]authentication.AttestationClaimValue) (*jwt.Claims, interface{}, error) {
 	now := now()
 	sc := &jwt.Claims{
 		Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
@@ -86,6 +91,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 				Name: sa.Name,
 				UID:  string(sa.UID),
 			},
+			AttestationClaims: attestationClaims,
 		},
 	}
 
@@ -119,6 +125,16 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 		pc.Kubernetes.Node = &ref{
 			Name: node.Name,
 			UID:  string(node.UID),
+		}
+	case validating != nil:
+		pc.Kubernetes.ValidatingWebhookConfiguration = &ref{
+			Name: validating.Name,
+			UID:  string(validating.UID),
+		}
+	case mutating != nil:
+		pc.Kubernetes.MutatingWebhookConfiguration = &ref{
+			Name: mutating.Name,
+			UID:  string(mutating.UID),
 		}
 	}
 
