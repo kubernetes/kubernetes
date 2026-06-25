@@ -323,6 +323,11 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
+	// The ResourceSlice tracker lags behind informers when DeviceTaintRules are enabled.
+	if !cache.WaitForCacheSync(tCtx.Done(), resourceSliceTracker.HasSynced) {
+		tCtx.Fatalf("resource slice tracker failed to sync: %v", context.Cause(tCtx))
+	}
+
 	celCache := cel.NewCache(10, cel.Features{
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
