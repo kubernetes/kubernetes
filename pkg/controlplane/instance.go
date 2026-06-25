@@ -403,6 +403,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 			IPRepairInterval:        c.Extra.RepairServicesInterval,
 		},
 		EndpointSliceGetter: c.ControlPlane.Extra.EndpointSliceGetter,
+		Authorizer:          c.ControlPlane.Generic.Authorization.Authorizer,
 	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {
 		return nil, err
