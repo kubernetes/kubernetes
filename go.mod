@@ -115,7 +115,7 @@ require (
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/streaming v0.0.0
 	k8s.io/system-validators v1.12.1
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/knftables v0.0.21
 	sigs.k8s.io/randfill v1.0.0
