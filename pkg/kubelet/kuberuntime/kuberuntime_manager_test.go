@@ -3974,7 +3974,7 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
 	}
 	// record the pre-resize resource limits as what was last actuated.
-	require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, pod.Spec.Containers[0].Name, v1.ResourceRequirements{
+	require.NoError(t, m.actuatedState.SetContainerResources(klog.FromContext(tCtx), pod.UID, pod.Spec.Containers[0].Name, v1.ResourceRequirements{
 		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 	}))
@@ -3983,7 +3983,7 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 	status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
 	status.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
 
-	t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
+	t.Cleanup(func() { _ = m.actuatedState.RemovePod(klog.FromContext(tCtx), pod.UID) })
 
 	actions := m.computePodActions(tCtx, pod, status, false)
 
@@ -4039,11 +4039,11 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 	pod.Status.ContainerStatuses = nil
 
 	// record pre-resize resource limits as what was last actuated.
-	require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, pod.Spec.InitContainers[0].Name, v1.ResourceRequirements{
+	require.NoError(t, m.actuatedState.SetContainerResources(klog.FromContext(tCtx), pod.UID, pod.Spec.InitContainers[0].Name, v1.ResourceRequirements{
 		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 	}))
-	t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
+	t.Cleanup(func() { _ = m.actuatedState.RemovePod(klog.FromContext(tCtx), pod.UID) })
 
 	actions := m.computePodActions(tCtx, pod, status, false)
 
@@ -4110,11 +4110,11 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 	})
 
 	// record pre-resize resource limits as what was last actuated.
-	require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, sidecar.Name, v1.ResourceRequirements{
+	require.NoError(t, m.actuatedState.SetContainerResources(klog.FromContext(tCtx), pod.UID, sidecar.Name, v1.ResourceRequirements{
 		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 	}))
-	t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
+	t.Cleanup(func() { _ = m.actuatedState.RemovePod(klog.FromContext(tCtx), pod.UID) })
 
 	actions := m.computePodActions(tCtx, pod, status, false)
 
