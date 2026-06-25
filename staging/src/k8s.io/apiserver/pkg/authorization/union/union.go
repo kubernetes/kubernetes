@@ -114,7 +114,7 @@ func (authzHandler unionAuthzHandler) ConditionsAwareAuthorize(ctx context.Conte
 		decisions.Add(currAuthzHandler.AuthorizerName, decision)
 
 		// If there is any Allow/Deny decision leaf, no need to walk the chain further.
-		if decision.ContainsAllowOrDeny() {
+		if decision.ContainsUnconditionalAllowOrDeny() {
 			return decisions.ToDecision()
 		}
 		// => all leaves are NoOpinion or ConditionsMap, continue to the next authorizer

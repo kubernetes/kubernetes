@@ -212,16 +212,16 @@ func (d ConditionsAwareDecision) FailureDecision() Decision {
 	return DecisionNoOpinion
 }
 
-// ContainsAllowOrDeny returns true whether there union contains at least one
+// ContainsUnconditionalAllowOrDeny returns true whether there union contains at least one
 // Allow or Deny decision within the tree of decisions.
-func (d ConditionsAwareDecision) ContainsAllowOrDeny() bool {
+func (d ConditionsAwareDecision) ContainsUnconditionalAllowOrDeny() bool {
 	if d.IsAllow() || d.IsDeny() {
 		return true
 	}
 	if d.IsNoOpinion() || d.IsConditionsMap() {
 		return false
 	}
-	return d.union.ContainsAllowOrDeny()
+	return d.union.ContainsUnconditionalAllowOrDeny()
 }
 
 // UnionedDecisions returns an iterator for unioned sub-decisions.

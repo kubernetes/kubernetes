@@ -49,13 +49,13 @@ type ConditionsAwareDecisionUnion struct {
 }
 
 // Add adds a named sub-decision to the current Union ConditionsAwareDecision builder.
-// Add is a no-op if ContainsAllowOrDeny() is true, as adding decisions after an Allow or
+// Add is a no-op if ContainsUnconditionalAllowOrDeny() is true, as adding decisions after an Allow or
 // Deny will never change the final evaluated outcome.
 // An error might be returned if the name is empty or a duplicate, the bool signifies whether
 // the Add was a no-op.
 // Add is not thread-safe.
 func (unionMap *ConditionsAwareDecisionUnion) Add(conditionalAuthorizerName string, d ConditionsAwareDecision) {
-	if unionMap.ContainsAllowOrDeny() {
+	if unionMap.ContainsUnconditionalAllowOrDeny() {
 		return // all items after the first concrete Allow or Deny aren't anyways used in evaluation, so they are not added to inner
 	}
 
@@ -68,7 +68,7 @@ func (unionMap *ConditionsAwareDecisionUnion) Add(conditionalAuthorizerName stri
 	}
 	// Once we've seen an unconditional Allow or Deny somewhere in the chain, we can stop accepting
 	// other decisions, as they won't ever apply.
-	if d.ContainsAllowOrDeny() {
+	if d.ContainsUnconditionalAllowOrDeny() {
 		unionMap.containsUnconditionalAllowOrDeny = true
 	}
 	unionMap.inner = append(unionMap.inner, namedConditionsAwareDecision{conditionalAuthorizerName: conditionalAuthorizerName, d: d})
@@ -98,10 +98,10 @@ func (unionMap *ConditionsAwareDecisionUnion) FailureDecision() Decision {
 	return DecisionNoOpinion
 }
 
-// ContainsAllowOrDeny returns true whether there union contains at least one
+// ContainsUnconditionalAllowOrDeny returns true whether there union contains at least one
 // Allow or Deny decision within the unioned decisions.
-// ContainsAllowOrDeny is not thread-safe.
-func (unionMap *ConditionsAwareDecisionUnion) ContainsAllowOrDeny() bool {
+// ContainsUnconditionalAllowOrDeny is not thread-safe.
+func (unionMap *ConditionsAwareDecisionUnion) ContainsUnconditionalAllowOrDeny() bool {
 	return unionMap.containsUnconditionalAllowOrDeny
 }
 
@@ -118,7 +118,7 @@ func (unionMap *ConditionsAwareDecisionUnion) PossibleDecisions() sets.Set[Decis
 		possibleDecisions.Insert(unionMap.subDecisionsPossibleDecisions.UnsortedList()...)
 	}
 	// When there is an Allow or Deny leaf somewhere, the default response NoOpinion won't ever be returned
-	if unionMap.ContainsAllowOrDeny() {
+	if unionMap.ContainsUnconditionalAllowOrDeny() {
 		possibleDecisions.Delete(DecisionNoOpinion)
 	}
 	return possibleDecisions

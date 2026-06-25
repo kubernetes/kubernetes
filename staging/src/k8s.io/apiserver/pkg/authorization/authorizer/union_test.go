@@ -66,7 +66,7 @@ func TestConditionsAwareDecisionUnionAdd(t *testing.T) {
 		var u authorizer.ConditionsAwareDecisionUnion
 		u.Add("0.example.com", noOp)
 		u.Add("1.example.com", allow)
-		// These additions must be silently dropped by the ContainsAllowOrDeny short-circuit.
+		// These additions must be silently dropped by the ContainsUnconditionalAllowOrDeny short-circuit.
 		u.Add("2.example.com", deny)
 		u.Add("3.example.com", condMapAllow)
 
