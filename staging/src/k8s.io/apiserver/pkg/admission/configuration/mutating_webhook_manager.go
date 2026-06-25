@@ -133,6 +133,8 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 			continue
 		}
 
+		logExcludedResourcesForMutatingWebhook(c.Name, c.Webhooks)
+
 		// webhook names are not validated for uniqueness, so we check for duplicates and
 		// add a int suffix to distinguish between them
 		names := map[string]int{}
