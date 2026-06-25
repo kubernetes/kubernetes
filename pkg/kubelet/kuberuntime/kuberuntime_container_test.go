@@ -1114,3 +1114,32 @@ func TestUpdateContainerResources(t *testing.T) {
 	// Verify container is updated
 	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
 }
+
+func TestMakeMountsBindMountOptions(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	opts := &kubecontainer.RunContainerOptions{
+		Mounts: []kubecontainer.Mount{
+			{
+				Name:             "vol",
+				ContainerPath:    "/mnt",
+				HostPath:         "/host/path",
+				BindMountOptions: []string{"noexec", "nosuid"},
+			},
+			{
+				Name:          "vol2",
+				ContainerPath: "/mnt2",
+				HostPath:      "/host/path2",
+			},
+		},
+	}
+	container := &v1.Container{Name: "test"}
+
+	result := m.makeMounts(opts, container)
+
+	assert.Len(t, result, 2)
+	assert.Equal(t, []string{"noexec", "nosuid"}, result[0].MountOptions)
+	assert.Empty(t, result[1].MountOptions)
+}
