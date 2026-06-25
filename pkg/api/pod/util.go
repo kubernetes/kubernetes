@@ -807,6 +807,24 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeBindMountOptions) && !bindMountOptionsInUse(oldPodSpec) {
+		for i := range podSpec.Containers {
+			for j := range podSpec.Containers[i].VolumeMounts {
+				podSpec.Containers[i].VolumeMounts[j].BindMountOptions = nil
+			}
+		}
+		for i := range podSpec.InitContainers {
+			for j := range podSpec.InitContainers[i].VolumeMounts {
+				podSpec.InitContainers[i].VolumeMounts[j].BindMountOptions = nil
+			}
+		}
+		for i := range podSpec.EphemeralContainers {
+			for j := range podSpec.EphemeralContainers[i].VolumeMounts {
+				podSpec.EphemeralContainers[i].VolumeMounts[j].BindMountOptions = nil
+			}
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && !setHostnameOverrideInUse(oldPodSpec) {
 		// Set HostnameOverride to nil only if feature is disabled and it is not used
 		podSpec.HostnameOverride = nil
@@ -1550,6 +1568,23 @@ func emptyDirVolumeModeInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+func bindMountOptionsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		for _, f := range c.VolumeMounts {
+			if len(f.BindMountOptions) > 0 {
+				inUse = true
+				return false
+			}
+		}
+		return true
+	})
+	return inUse
 }
 
 func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) {
