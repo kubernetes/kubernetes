@@ -866,11 +866,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if err != nil {
 		return err
 	}
-	if err := s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount); err != nil {
+	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount)
+}
+
+func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64) error {
+	if err := s.versioner.UpdateList(listObj, rev, continueValue, remainingItemCount); err != nil {
 		return err
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		opts.Predicate.SetShardInfoOnList(listObj)
+		pred.SetShardInfoOnList(listObj)
 	}
 	return nil
 }
