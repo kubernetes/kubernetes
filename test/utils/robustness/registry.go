@@ -80,16 +80,10 @@ func TriggerAfterSignal(registry *FaultRegistry, signalName string) FaultConditi
 // classic stale-read bugs, which occurrence-based conditions cannot express
 // because they count from the start of the test.
 func TriggerWindowAfterRuleHit(registry *FaultRegistry, ruleName string, window time.Duration) FaultCondition {
-	var mu sync.Mutex
-	var start time.Time
 	return func(matchCount int) bool {
-		if registry.GetHitCount(ruleName) == 0 {
-			return false
-		}
-		mu.Lock()
-		defer mu.Unlock()
+		start := registry.GetFirstHitTime(ruleName)
 		if start.IsZero() {
-			start = time.Now()
+			return false
 		}
 		return time.Since(start) < window
 	}
@@ -325,6 +319,7 @@ type FaultRule struct {
 	// Track matching metrics atomically
 	matchCount int32
 	hitCount   int32
+	firstHit   int64 // Unix nanoseconds, 0 means not hit
 }
 
 // FaultRegistry manages active fault rules and orchestrates trigger evaluations.
@@ -388,6 +383,7 @@ func (r *FaultRegistry) fire(ctx context.Context, domain faultDomain, pred func(
 		if rule.Condition == nil || !rule.Condition(int(match)) {
 			continue
 		}
+		atomic.CompareAndSwapInt64(&rule.firstHit, 0, time.Now().UnixNano())
 		atomic.AddInt32(&rule.hitCount, 1)
 		if rule.Action == nil {
 			continue
@@ -475,6 +471,29 @@ func (r *FaultRegistry) GetHitCount(ruleName string) int {
 		}
 	}
 	return total
+}
+
+// GetFirstHitTime returns the timestamp of the first time a rule with the given name triggered.
+// Returns the zero time if the rule has not triggered.
+func (r *FaultRegistry) GetFirstHitTime(ruleName string) time.Time {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var earliest int64
+	for _, ruleList := range r.rules {
+		for _, rule := range ruleList {
+			if rule.Name == ruleName {
+				hit := atomic.LoadInt64(&rule.firstHit)
+				if hit > 0 && (earliest == 0 || hit < earliest) {
+					earliest = hit
+				}
+			}
+		}
+	}
+	if earliest == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, earliest)
 }
 
 // UnmatchedRules returns the names of all registered non-optional rules whose

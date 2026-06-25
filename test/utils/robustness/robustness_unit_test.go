@@ -18,6 +18,7 @@ package robustness
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -201,7 +202,7 @@ func TestSyntheticErrorResponseContentType(t *testing.T) {
 	})
 
 	rt := NewFaultInjectingTransport(&recordingTransport{t: t}, reg, nil)
-	req, err := http.NewRequest("PUT", "https://example.test/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/target-node", nil)
+	req, err := http.NewRequest(http.MethodPut, "https://example.test/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/target-node", nil)
 	if err != nil {
 		t.Fatalf("failed to build request: %v", err)
 	}
@@ -247,8 +248,8 @@ func TestInjectedConflictIsClassified(t *testing.T) {
 		t.Errorf("apierrors.IsConflict(err) = false, want true; err = %v (%T)", err, err)
 	}
 	// The decoded Status payload only survives when Content-Type is set.
-	se, ok := err.(*apierrors.StatusError)
-	if !ok {
+	var se *apierrors.StatusError
+	if !errors.As(err, &se) {
 		t.Fatalf("err = %v (%T), want *apierrors.StatusError", err, err)
 	}
 	if got := se.ErrStatus.Message; got != "object was modified" {

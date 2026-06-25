@@ -22,29 +22,29 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-// FaultInjectingWorkQueue wraps workqueue.RateLimitingInterface to control reconciler trigger events.
+// FaultInjectingWorkQueue wraps workqueue.TypedRateLimitingInterface[any] to control reconciler trigger events.
 type FaultInjectingWorkQueue struct {
-	workqueue.RateLimitingInterface
+	workqueue.TypedRateLimitingInterface[any]
 	registry *FaultRegistry
 	name     string
 }
 
-// NewFaultInjectingWorkQueue creates a wrapped RateLimitingInterface.
-func NewFaultInjectingWorkQueue(realQueue workqueue.RateLimitingInterface, registry *FaultRegistry, name string) workqueue.RateLimitingInterface {
+// NewFaultInjectingWorkQueue creates a wrapped TypedRateLimitingInterface[any].
+func NewFaultInjectingWorkQueue(realQueue workqueue.TypedRateLimitingInterface[any], registry *FaultRegistry, name string) workqueue.TypedRateLimitingInterface[any] {
 	return &FaultInjectingWorkQueue{
-		RateLimitingInterface: realQueue,
-		registry:              registry,
-		name:                  name,
+		TypedRateLimitingInterface: realQueue,
+		registry:                   registry,
+		name:                       name,
 	}
 }
 
 func (q *FaultInjectingWorkQueue) Get() (item interface{}, shutdown bool) {
 	// Runs any blocking faults registered on this queue's get operation.
 	q.registry.ResolveQueue(context.Background(), QueueFacts{Queue: q.name, Op: "get"})
-	return q.RateLimitingInterface.Get()
+	return q.TypedRateLimitingInterface.Get()
 }
 
 func (q *FaultInjectingWorkQueue) Add(item interface{}) {
 	q.registry.ResolveQueue(context.Background(), QueueFacts{Queue: q.name, Op: "add"})
-	q.RateLimitingInterface.Add(item)
+	q.TypedRateLimitingInterface.Add(item)
 }

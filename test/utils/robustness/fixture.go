@@ -18,6 +18,7 @@ package robustness
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -74,6 +75,11 @@ type RobustnessTestFixture struct {
 }
 
 // NewFixture creates a new test fixture, initializes the APIServer, and starts continuous invariant checks.
+//
+// CONCURRENCY WARNING: This fixture mutates the global controller.ExpectationsClock
+// to inject faults. Tests using this fixture MUST NOT run in parallel with other
+// tests in the same process (do not use t.Parallel()), as this will cause
+// unpredictable clock skews and flakes in concurrent tests.
 func NewFixture(t *testing.T, testName string) *RobustnessTestFixture {
 	// Initialize API Server
 	apiCtx := testutils.InitTestAPIServer(t, testName, nil)
@@ -138,8 +144,8 @@ func (f *RobustnessTestFixture) WrapIndexer(realIndexer cache.Indexer, name stri
 	return NewFaultInjectingIndexer(realIndexer, f.registry, name)
 }
 
-// WrapQueue wraps a workqueue.RateLimitingInterface with our fault injection hook.
-func (f *RobustnessTestFixture) WrapQueue(realQueue workqueue.RateLimitingInterface, name string) workqueue.RateLimitingInterface {
+// WrapQueue wraps a workqueue.TypedRateLimitingInterface[any] with our fault injection hook.
+func (f *RobustnessTestFixture) WrapQueue(realQueue workqueue.TypedRateLimitingInterface[any], name string) workqueue.TypedRateLimitingInterface[any] {
 	return NewFaultInjectingWorkQueue(realQueue, f.registry, name)
 }
 
@@ -171,7 +177,7 @@ func (f *RobustnessTestFixture) AssertEventually(name string, fn Invariant, time
 		invErr := f.invariantErr
 		f.mu.RUnlock()
 		if invErr != nil {
-			return false, fmt.Errorf("aborted: continuous invariant was violated: %v", invErr)
+			return false, fmt.Errorf("aborted: continuous invariant was violated: %w", invErr)
 		}
 
 		if err := fn(ctx, f.AdminClientSet()); err != nil {
@@ -198,7 +204,6 @@ func (f *RobustnessTestFixture) AssertEventually(name string, fn Invariant, time
 // controllers that converge without writing should use AssertEventually instead.
 func (f *RobustnessTestFixture) WaitUntilSettled(quietWindow, timeout time.Duration) bool {
 	f.t.Helper()
-	startMutations := f.activity.mutations.Load()
 	deadline := time.Now().Add(timeout)
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
@@ -217,9 +222,9 @@ func (f *RobustnessTestFixture) WaitUntilSettled(quietWindow, timeout time.Durat
 			if invErr != nil {
 				return false
 			}
-			// Require that the controller has acted since we began waiting, then
-			// that it has been idle for the full quiet window.
-			if f.activity.mutations.Load() <= startMutations {
+			// Require that the controller has acted since the fixture started,
+			// then that it has been idle for the full quiet window.
+			if f.activity.mutations.Load() == 0 {
 				continue
 			}
 			idle := time.Since(time.Unix(0, f.activity.lastMutation.Load()))
@@ -307,6 +312,10 @@ func (f *RobustnessTestFixture) startContinuousInvariantMonitor(pollInterval tim
 				}
 
 				if err := f.checkContinuousInvariants(); err != nil {
+					// If the context was cancelled during the check (e.g. tear down), ignore the error
+					if errors.Is(err, context.Canceled) || f.ctx.Err() != nil {
+						return
+					}
 					f.mu.Lock()
 					f.invariantErr = err
 					f.mu.Unlock()
@@ -324,7 +333,7 @@ func (f *RobustnessTestFixture) checkContinuousInvariants() error {
 	defer f.mu.RUnlock()
 	for _, inv := range f.continuousInvariants {
 		if err := inv.Fn(f.ctx, f.AdminClientSet()); err != nil {
-			return fmt.Errorf("safety invariant %q failed: %v", inv.Name, err)
+			return fmt.Errorf("safety invariant %q failed: %w", inv.Name, err)
 		}
 	}
 	return nil

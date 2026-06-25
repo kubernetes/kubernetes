@@ -143,7 +143,7 @@ func synthesizeResponse(httpErr HTTPStatusError) (*http.Response, error) {
 	}
 	bodyBytes, jsonErr := json.Marshal(status)
 	if jsonErr != nil {
-		return nil, fmt.Errorf("failed to marshal injected status error: %v", jsonErr)
+		return nil, fmt.Errorf("failed to marshal injected status error: %w", jsonErr)
 	}
 
 	// Set Content-Type so client-go decodes the Status body. Note client-go

@@ -136,7 +136,6 @@ func (s *RobustnessTestSuite) Run() {
 	}
 
 	for _, scenario := range s.matrix {
-		scenario := scenario // Capture variable
 		s.t.Run(scenario.Name, func(t *testing.T) {
 			t.Logf("=== Robustness scenario %q for controller %q ===", scenario.Name, s.profile.Name)
 
