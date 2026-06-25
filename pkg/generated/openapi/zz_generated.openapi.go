@@ -16716,6 +16716,7 @@ func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback) common.OpenAPID
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -17144,6 +17145,7 @@ func schema_k8sio_api_batch_v1_JobTemplateSpec(ref common.ReferenceCallback) com
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -17591,7 +17593,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"schedule", "jobTemplate"},
+				Required: []string{"schedule"},
 			},
 		},
 		Dependencies: []string{

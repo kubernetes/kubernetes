@@ -99,6 +99,7 @@ message CronJobSpec {
   optional bool suspend = 4;
 
   // Specifies the job that will be created when executing a CronJob.
+  // +optional
   optional JobTemplateSpec jobTemplate = 5;
 
   // The number of successful finished jobs to retain.
