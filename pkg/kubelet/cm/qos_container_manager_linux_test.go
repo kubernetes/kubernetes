@@ -34,8 +34,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -142,12 +145,14 @@ func TestQoSContainerCgroup(t *testing.T) {
 	guaranteedMin := resource.MustParse("128Mi")
 
 	tests := []struct {
-		name               string
-		pods               []*v1.Pod
-		initialGuaranteed  string
-		initialBurstable   string
-		expectedGuaranteed string
-		expectedBurstable  string
+		name                               string
+		pods                               []*v1.Pod
+		draNodeAllocatableResourcesEnabled bool
+		podLevelResourcesEnabled           bool
+		initialGuaranteed                  string
+		initialBurstable                   string
+		expectedGuaranteed                 string
+		expectedBurstable                  string
 	}{
 		{
 			name:               "writes aggregated memory min",
@@ -169,6 +174,31 @@ func TestQoSContainerCgroup(t *testing.T) {
 			initialBurstable:   "",
 			expectedGuaranteed: "0",
 			expectedBurstable:  "0",
+		},
+		{
+			name: "writes zero memory min for best effort pod with DRA",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "99999999", Name: "besteffort-pod-with-dra", Namespace: "test"},
+					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "foo", Image: "busybox"}}},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "direct-claim",
+								Containers:        []string{"foo"},
+								Direct: []v1.NodeAllocatableDirectResources{
+									{Name: v1.ResourceMemory, Quantity: resource.MustParse("128Mi")},
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 "0",
+			expectedBurstable:                  "0",
 		},
 		{
 			name: "writes zero memory min for burstable pod without memory request",
@@ -201,10 +231,144 @@ func TestQoSContainerCgroup(t *testing.T) {
 			expectedGuaranteed: "0",
 			expectedBurstable:  "0",
 		},
+		{
+			name: "writes memory min including DRA allocations",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "guaranteed-pod", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "87654321", Name: "burstable-pod", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("256Mi"),
+										v1.ResourceCPU:    resource.MustParse("2"),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "direct-claim",
+								Containers:        []string{"foo"},
+								Direct: []v1.NodeAllocatableDirectResources{
+									{Name: v1.ResourceMemory, Quantity: resource.MustParse("128Mi")},
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 strconv.FormatInt(384*1024*1024, 10), // Guaranteed 128Mi + Burstable (128Mi spec + 128Mi DRA) = 384Mi
+			expectedBurstable:                  strconv.FormatInt(256*1024*1024, 10), // Burstable 128Mi spec + 128Mi DRA = 256Mi
+		},
+		{
+			name: "writes memory min with pod-level resources",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "guaranteed-pod", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "87654321", Name: "burstable-pod-pod-level", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("512Mi"),
+							},
+						},
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("256Mi"),
+										v1.ResourceCPU:    resource.MustParse("2"),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "direct-claim",
+								Containers:        []string{"foo"},
+								Direct: []v1.NodeAllocatableDirectResources{
+									{Name: v1.ResourceMemory, Quantity: resource.MustParse("128Mi")},
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			podLevelResourcesEnabled:           true,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 strconv.FormatInt(640*1024*1024, 10), // Guaranteed 128Mi + Burstable pod-level 512Mi = 640Mi
+			expectedBurstable:                  strconv.FormatInt(512*1024*1024, 10), // Burstable pod-level 512Mi
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, tc.draNodeAllocatableResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 			logger, _ := ktesting.NewTestContext(t)
 			m, err := createTestQOSContainerManager(logger)
 			require.NoError(t, err)
@@ -348,9 +512,11 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 	// depend on aggregate burstable CPU requests.
 
 	tests := []struct {
-		name                       string
-		testPods                   ActivePodsFunc
-		expectedBurstableCPUShares uint64 // Recalculation will be done only for Burstable QoS class
+		name                               string
+		testPods                           ActivePodsFunc
+		draNodeAllocatableResourcesEnabled bool
+		podLevelResourcesEnabled           bool
+		expectedBurstableCPUShares         uint64 // Recalculation will be done only for Burstable QoS class
 	}{
 		{
 			name: "guaranteed-pods-only",
@@ -551,11 +717,190 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 			},
 			expectedBurstableCPUShares: 1024,
 		},
+		{
+			name: "burstable-pods-with-dra",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "burstable-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2"),
+											v1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+						Status: v1.PodStatus{
+							NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+								{
+									ResourceClaimName: "direct-claim",
+									Containers:        []string{"foo"},
+									Direct: []v1.NodeAllocatableDirectResources{
+										{Name: v1.ResourceCPU, Quantity: resource.MustParse("500m")},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			expectedBurstableCPUShares:         1536, // 1000m container + 500m DRA claim = 1500m CPU = 1536 CPU shares
+		},
+		{
+			name: "burstable-pods-with-dra-disabled",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "burstable-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2"),
+											v1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+						Status: v1.PodStatus{
+							NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+								{
+									ResourceClaimName: "direct-claim",
+									Containers:        []string{"foo"},
+									Direct: []v1.NodeAllocatableDirectResources{
+										{Name: v1.ResourceCPU, Quantity: resource.MustParse("500m")},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			draNodeAllocatableResourcesEnabled: false,
+			expectedBurstableCPUShares:         1024, // DRA claim is ignored, only 1000m container CPU is counted
+		},
+		{
+			name: "besteffort-pods-with-dra",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "besteffort-pod",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+								},
+							},
+						},
+						Status: v1.PodStatus{
+							NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+								{
+									ResourceClaimName: "direct-claim",
+									Containers:        []string{"foo"},
+									Direct: []v1.NodeAllocatableDirectResources{
+										{Name: v1.ResourceCPU, Quantity: resource.MustParse("500m")},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			// CPU shares are not effected by DRA for best effort QOS class
+			expectedBurstableCPUShares: MinShares,
+		},
+		{
+			name: "burstable-pods-with-pod-level-resources",
+			testPods: func() []*v1.Pod {
+				return []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							UID:       types.UID(uuid.NewUUID()),
+							Name:      "burstable-pod-pod-level",
+							Namespace: "test",
+						},
+						Spec: v1.PodSpec{
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("2"),
+								},
+							},
+							Containers: []v1.Container{
+								{
+									Name:  "foo",
+									Image: "busybox",
+									Resources: v1.ResourceRequirements{
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("1"),
+											v1.ResourceMemory: resource.MustParse("128Mi"),
+										},
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("2"),
+											v1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+						Status: v1.PodStatus{
+							NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+								{
+									ResourceClaimName: "direct-claim",
+									Containers:        []string{"foo"},
+									Direct: []v1.NodeAllocatableDirectResources{
+										{Name: v1.ResourceCPU, Quantity: resource.MustParse("500m")},
+									},
+								},
+							},
+						},
+					},
+				}
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			podLevelResourcesEnabled:           true,
+			expectedBurstableCPUShares:         2048, // Pod-level CPU request = 2 CPU = 2048 shares (overrides container CPU request and DRA)
+		},
 	}
 
 	for _, testCase := range tests {
 
 		t.Run(testCase.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, testCase.draNodeAllocatableResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
 
 			logger, ctx := ktesting.NewTestContext(t)
 

@@ -126,11 +126,13 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
+	draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
-		UseStatusResources:    false,
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		UseStatusResources:                       false,
+		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
@@ -138,7 +140,8 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 		ContainerFn: func(res v1.ResourceList, containerType resourcehelper.ContainerType) {
 			if res.Cpu().IsZero() {
 				cpuLimitsDeclared = false
