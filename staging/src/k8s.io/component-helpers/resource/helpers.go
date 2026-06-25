@@ -154,22 +154,21 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		reqs = AggregateContainerRequests(pod, opts)
 	}
 
-	var overheadAlreadyIncluded map[v1.ResourceName]struct{}
-	markOverheadAlreadyIncluded := func(resourceName v1.ResourceName) {
-		if overheadAlreadyIncluded == nil {
-			overheadAlreadyIncluded = map[v1.ResourceName]struct{}{}
-		}
-		overheadAlreadyIncluded[resourceName] = struct{}{}
-	}
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 
 		var effectiveReqs v1.ResourceList
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources {
 			if pod.Status.Resources != nil {
+				statusRequests := pod.Status.Resources.Requests.DeepCopy()
+				allocatedRequests := pod.Status.AllocatedResources.DeepCopy()
+				if pod.Spec.Overhead != nil {
+					subtractResourceList(statusRequests, pod.Spec.Overhead)
+					subtractResourceList(allocatedRequests, pod.Spec.Overhead)
+				}
 				effectiveReqs = determineEffectiveRequests(pod, &ResourceState{
 					Spec:      pod.Spec.Resources.Requests,
-					Actuated:  pod.Status.Resources.Requests,
-					Allocated: pod.Status.AllocatedResources,
+					Actuated:  statusRequests,
+					Allocated: allocatedRequests,
 				})
 			}
 		}
@@ -178,18 +177,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 			if IsSupportedPodLevelResource(resourceName) {
 				reqs[resourceName] = quantity
 				if effectiveReqs != nil {
-					effectiveReq := effectiveReqs[resourceName]
-					reqs[resourceName] = effectiveReq
-					expectedWithOverhead := quantity.DeepCopy()
-					if overhead, ok := pod.Spec.Overhead[resourceName]; ok {
-						expectedWithOverhead.Add(overhead)
-					}
-					if statusReq, ok := pod.Status.Resources.Requests[resourceName]; ok && statusReq.Equal(effectiveReq) && statusReq.Cmp(expectedWithOverhead) >= 0 {
-						markOverheadAlreadyIncluded(resourceName)
-					}
-					if allocatedReq, ok := pod.Status.AllocatedResources[resourceName]; ok && allocatedReq.Equal(effectiveReq) && allocatedReq.Cmp(expectedWithOverhead) >= 0 {
-						markOverheadAlreadyIncluded(resourceName)
-					}
+					reqs[resourceName] = effectiveReqs[resourceName]
 				}
 
 			}
@@ -198,14 +186,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	// Add overhead for running a pod to the sum of requests if requested:
 	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		for name, quantity := range pod.Spec.Overhead {
-			if _, ok := overheadAlreadyIncluded[name]; ok {
-				continue
-			}
-			rk := reqs[name]
-			rk.Add(quantity)
-			reqs[name] = rk
-		}
+		addResourceList(reqs, pod.Spec.Overhead)
 	}
 
 	return reqs
@@ -502,6 +483,20 @@ func addResourceList(list, newList v1.ResourceList) {
 			list[name] = quantity.DeepCopy()
 		} else {
 			value.Add(quantity)
+			list[name] = value
+		}
+	}
+}
+
+// subtractResourceList subtracts the resources in newList from list.
+// If the subtraction results in a value less than zero, it sets it to zero.
+func subtractResourceList(list, newList v1.ResourceList) {
+	for name, quantity := range newList {
+		if value, ok := list[name]; ok {
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
 			list[name] = value
 		}
 	}

@@ -2041,6 +2041,21 @@ func TestPodLevelResourceRequestsWithStatusResourcesDoesNotDoubleCountOverhead(t
 				v1.ResourceMemory: resource.MustParse("110Mi"),
 			},
 		},
+		{
+			name: "allocated resources include stale overhead during resize",
+			statusRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1050m"),
+				v1.ResourceMemory: resource.MustParse("105Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
