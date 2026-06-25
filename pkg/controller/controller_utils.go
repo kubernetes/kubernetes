@@ -317,6 +317,11 @@ func (e *ControlleeExpectations) MarshalLog() interface{} {
 
 // ExpectationsClock is the default clock used for new controller expectations.
 // Can be overridden during testing to simulate timeouts without real-world sleep.
+//
+// CONCURRENCY WARNING: Mutating this global variable will affect all controllers
+// created in the same process. Tests that mutate this variable MUST NOT be run
+// in parallel with other tests (do not use t.Parallel()), as it will cause
+// unpredictable clock skews and test flakes.
 var ExpectationsClock clock.Clock = clock.RealClock{}
 
 // NewControllerExpectations returns a store for ControllerExpectations.
