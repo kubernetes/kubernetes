@@ -125,7 +125,7 @@ func (c *updateAny) run(tCtx ktesting.TContext) {
 
 func (c *updateAny) update(tCtx ktesting.TContext, env map[string]any) error {
 	var obj *unstructured.Unstructured
-	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
+	if _, err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
 		return fmt.Errorf("%s: parsing failed: %w", c.TemplatePath, err)
 	}
 

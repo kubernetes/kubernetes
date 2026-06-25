@@ -213,7 +213,7 @@ func (e *WorkloadExecutor) runCreatePodGroupsOp(tCtx ktesting.TContext, op *crea
 		env["Index"] = index
 
 		obj := &schedulingapi.PodGroup{}
-		if err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
+		if _, err := getSpecFromTextTemplateFile(op.TemplatePath, env, obj); err != nil {
 			return fmt.Errorf("%s: %w", op.TemplatePath, err)
 		}
 
@@ -995,7 +995,7 @@ func (n nodeTemplateWithParams) GetNodeTemplate(index, count int) (*v1.Node, err
 	env["Index"] = index
 	env["Count"] = count
 	nodeSpec := &v1.Node{}
-	if err := getSpecFromTextTemplateFile(n.path, env, nodeSpec); err != nil {
+	if _, err := getSpecFromTextTemplateFile(n.path, env, nodeSpec); err != nil {
 		return nil, fmt.Errorf("parsing Node: %w", err)
 	}
 	return nodeSpec, nil
@@ -1013,7 +1013,7 @@ func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error)
 	env["Index"] = index
 	env["Count"] = count
 	podSpec := &v1.Pod{}
-	if err := getSpecFromTextTemplateFile(p.path, env, podSpec); err != nil {
+	if _, err := getSpecFromTextTemplateFile(p.path, env, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
 

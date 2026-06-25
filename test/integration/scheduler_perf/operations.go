@@ -105,19 +105,43 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 	if c.Count != nil {
 		count = *c.Count
 	}
+	var items []string
 	for index := 0; index < count; index++ {
 		env := make(map[string]any)
 		maps.Copy(env, c.TemplateParams)
 		env["Index"] = index
 		env["Count"] = count
-		c.create(tCtx, env)
+		item := c.create(tCtx, env)
+		// Keep first and last item for reporting.
+		if index == 0 {
+			items = []string{strings.TrimSpace(item)}
+			continue
+		}
+		if index == count-1 {
+			if index > 1 {
+				// We skipped some intermediate item(s).
+				items = append(items, "\n\n...\n\n")
+			}
+			items = append(items, strings.TrimSpace(item))
+		}
 	}
+
+	params := ""
+	if len(c.TemplateParams) > 0 {
+		params = fmt.Sprintf(" with params %v", c.TemplateParams)
+	}
+	namespace := " in cluster scope"
+	if c.Namespace != "" {
+		namespace = fmt.Sprintf(" in namespace %q", c.Namespace)
+	}
+	tCtx.Logf("Created %d item(s) from %s%s%s:\n%s", count, c.TemplatePath, params, namespace, strings.Join(items, ""))
 }
 
-func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
+func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) string {
 	var obj *unstructured.Unstructured
-	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
-		tCtx.Fatalf("%s: parsing failed: %v", c.TemplatePath, err)
+	objData, err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj)
+	if err != nil {
+		tCtx.Fatalf("%s: parsing failed: %v\n%s", c.TemplatePath, err, objData)
 	}
 
 	// Not caching the discovery result isn't very efficient, but good enough when
@@ -155,31 +179,31 @@ func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
 	for {
 		err := create()
 		if err == nil {
-			return
+			return objData
 		}
 		select {
 		case <-ctx.Done():
-			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err)
+			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v\n\n%s", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err, objData)
 		case <-time.After(time.Second):
 		}
 	}
 }
 
-func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) error {
+func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	tmpl, err := template.New("object").Funcs(getTemplateFuncs()).Parse(string(content))
 	if err != nil {
-		return err
+		return "", err
 	}
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, env); err != nil {
-		return err
+		return "", err
 	}
 
-	return yaml.UnmarshalStrict(buffer.Bytes(), spec)
+	return buffer.String(), yaml.UnmarshalStrict(buffer.Bytes(), spec)
 }
 
 func restMappingFromUnstructuredObj(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
