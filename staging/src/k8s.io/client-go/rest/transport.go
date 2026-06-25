@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
 )
 
@@ -82,6 +83,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
+	metrics.EnsureRegistered()
 	conf := &transport.Config{
 		UserAgent:          c.UserAgent,
 		Transport:          c.Transport,
