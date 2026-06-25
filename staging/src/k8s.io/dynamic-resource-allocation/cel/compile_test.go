@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -921,6 +922,200 @@ func TestCompileDerivedAttributes(t *testing.T) {
 				}
 			} else if result.Error != nil {
 				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+		})
+	}
+}
+func TestEvaluateDerivedAttributes(t *testing.T) {
+	mockDevice := Device{
+		Driver: "driver-a",
+		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"bool-attr":      {BoolValue: new(true)},
+			"int-attr":       {IntValue: new(int64(42))},
+			"str-attr":       {StringValue: new("hello")},
+			"ver-attr":       {VersionValue: new("1.0.0")},
+			"bool-list-attr": {BoolValues: []bool{true, false}},
+			"int-list-attr":  {IntValues: []int64{1, 2, 3}},
+			"str-list-attr":  {StringValues: []string{"hello", "world"}},
+			"ver-list-attr":  {VersionValues: []string{"1.0.0", "2.0.0"}},
+		},
+	}
+
+	testCases := []struct {
+		name            string
+		expression      string
+		device          Device
+		expectAttr      *resourceapi.DeviceAttribute
+		expectEvalError string
+	}{
+		// Scalar Literal cases
+		{
+			name:       "bool-scalar-literal",
+			expression: "true",
+			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
+		},
+		{
+			name:       "int-scalar-literal",
+			expression: "42",
+			expectAttr: &resourceapi.DeviceAttribute{IntValue: new(int64(42))},
+		},
+		{
+			name:       "string-scalar-literal",
+			expression: `"hello"`,
+			expectAttr: &resourceapi.DeviceAttribute{StringValue: new("hello")},
+		},
+		{
+			name:       "semver-scalar-literal",
+			expression: `semver("1.0.0")`,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValue: new("1.0.0")},
+		},
+
+		// Scalar Device Attribute cases
+		{
+			name:       "bool-scalar-device",
+			expression: `device.attributes["driver-a"]["bool-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{BoolValue: new(true)},
+		},
+		{
+			name:       "int-scalar-device",
+			expression: `device.attributes["driver-a"]["int-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{IntValue: new(int64(42))},
+		},
+		{
+			name:       "string-scalar-device",
+			expression: `device.attributes["driver-a"]["str-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{StringValue: new("hello")},
+		},
+		{
+			name:       "semver-scalar-device",
+			expression: `device.attributes["driver-a"]["ver-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValue: new("1.0.0")},
+		},
+
+		// List Literal cases
+		{
+			name:       "bool-list-literal",
+			expression: `[true, false]`,
+			expectAttr: &resourceapi.DeviceAttribute{BoolValues: []bool{true, false}},
+		},
+		{
+			name:       "int-list-literal",
+			expression: `[1, 2, 3]`,
+			expectAttr: &resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}},
+		},
+		{
+			name:       "string-list-literal",
+			expression: `["hello", "world"]`,
+			expectAttr: &resourceapi.DeviceAttribute{StringValues: []string{"hello", "world"}},
+		},
+		{
+			name:       "semver-list-literal",
+			expression: `[semver("1.0.0"), semver("2.0.0")]`,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0"}},
+		},
+
+		// List Device Attribute cases
+		{
+			name:       "bool-list-device",
+			expression: `device.attributes["driver-a"]["bool-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{BoolValues: []bool{true, false}},
+		},
+		{
+			name:       "int-list-device",
+			expression: `device.attributes["driver-a"]["int-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}},
+		},
+		{
+			name:       "string-list-device",
+			expression: `device.attributes["driver-a"]["str-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{StringValues: []string{"hello", "world"}},
+		},
+		{
+			name:       "semver-list-device",
+			expression: `device.attributes["driver-a"]["ver-list-attr"]`,
+			device:     mockDevice,
+			expectAttr: &resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0"}},
+		},
+
+		// Error cases
+		{
+			name:            "runtime-error-heterogeneous-list-semver",
+			expression:      `[dyn(device.attributes["driver-a"]["ver-attr"]), dyn(device.attributes["driver-a"]["str-attr"])]`,
+			device:          mockDevice,
+			expectEvalError: "expected list element at index 1 to be semver, got string",
+		},
+		{
+			name:            "runtime-error-heterogeneous-list-bool",
+			expression:      `[dyn(device.attributes["driver-a"]["bool-attr"]), dyn(device.attributes["driver-a"]["str-attr"])]`,
+			device:          mockDevice,
+			expectEvalError: "expected list element at index 1 to be bool, got string",
+		},
+		{
+			name:            "runtime-error-heterogeneous-list-int",
+			expression:      `[dyn(device.attributes["driver-a"]["int-attr"]), dyn(device.attributes["driver-a"]["str-attr"])]`,
+			device:          mockDevice,
+			expectEvalError: "expected list element at index 1 to be int, got string",
+		},
+		{
+			name:            "runtime-error-heterogeneous-list-string",
+			expression:      `[dyn(device.attributes["driver-a"]["str-attr"]), dyn(device.attributes["driver-a"]["int-attr"])]`,
+			device:          mockDevice,
+			expectEvalError: "expected list element at index 1 to be string, got int64",
+		},
+		{
+			name:            "runtime-error-attribute-not-found",
+			expression:      `device.attributes["driver-a"]["non-existent-attr"]`,
+			device:          mockDevice,
+			expectEvalError: "no such key",
+		},
+		{
+			name:            "runtime-error-type-mismatch-op",
+			expression:      `device.attributes["driver-a"]["int-attr"] + "hello"`, // attempt to add an int and string together should fail.
+			device:          mockDevice,
+			expectEvalError: "no such overload",
+		},
+		{
+			name:            "runtime-error-null-dynamic",
+			expression:      `dyn(null)`,
+			device:          mockDevice,
+			expectEvalError: "unsupported CEL return type: structpb.NullValue",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := GetCompiler(Features{
+				EnableListTypeAttributes: true,
+			})
+			result := compiler.CompileCELExpression(tc.expression, Options{
+				DerivedAttribute: true,
+			})
+			if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+
+			attr, _, err := result.EvaluateDerivedAttribute(context.Background(), tc.device)
+			if tc.expectEvalError != "" {
+				if err == nil {
+					t.Fatalf("expected evaluation error %q, got none", tc.expectEvalError)
+				}
+				if !strings.Contains(err.Error(), tc.expectEvalError) {
+					t.Fatalf("expected evaluation error to contain %q, but got: %v", tc.expectEvalError, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected evaluation error: %v", err)
+				}
+				if diff := cmp.Diff(tc.expectAttr, attr); diff != "" {
+					t.Fatalf("unexpected attribute (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
