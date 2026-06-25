@@ -77,7 +77,7 @@ type Job struct {
 
 	// Specification of the desired behavior of a job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current status of a job.
@@ -190,6 +190,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	//   by the 'containerName' field) is not in the set of specified values.
 	// Additional values are considered to be added in the future. Clients should
 	// react to an unknown operator by assuming the requirement is not satisfied.
+	// +required
 	Operator PodFailurePolicyOnExitCodesOperator `json:"operator" protobuf:"bytes,2,req,name=operator"`
 
 	// Specifies the set of values. Each returned container exit code (might be
@@ -198,6 +199,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// and must not contain duplicates. Value '0' cannot be used for the In operator.
 	// At least one element is required. At most 255 elements are allowed.
 	// +listType=set
+	// +required
 	Values []int32 `json:"values" protobuf:"varint,3,rep,name=values"`
 }
 
@@ -206,6 +208,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 type PodFailurePolicyOnPodConditionsPattern struct {
 	// Specifies the required Pod condition type. To match a pod condition
 	// it is required that specified type equals the pod condition type.
+	// +required
 	Type corev1.PodConditionType `json:"type" protobuf:"bytes,1,req,name=type"`
 
 	// Specifies the required Pod condition status. To match a pod condition
@@ -231,6 +234,7 @@ type PodFailurePolicyRule struct {
 	//   counter towards the .backoffLimit is incremented.
 	// Additional values are considered to be added in the future. Clients should
 	// react to an unknown action by skipping the rule.
+	// +required
 	Action PodFailurePolicyAction `json:"action" protobuf:"bytes,1,req,name=action"`
 
 	// Represents the requirement on the container exit codes.
@@ -253,6 +257,7 @@ type PodFailurePolicy struct {
 	// counter of pod failures is incremented and it is checked against
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
+	// +required
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -265,6 +270,7 @@ type SuccessPolicy struct {
 	// Additionally, these rules are evaluated in order; Once the Job meets one of the rules,
 	// other rules are ignored. At most 20 elements are allowed.
 	// +listType=atomic
+	// +required
 	Rules []SuccessPolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -404,6 +410,7 @@ type JobSpec struct {
 	// Describes the pod that will be created when executing a job.
 	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
+	// +required
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -714,8 +721,10 @@ const (
 // JobCondition describes current state of a job.
 type JobCondition struct {
 	// Type of job condition, Complete or Failed.
+	// +required
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
 	// Status of the condition, one of True, False, Unknown.
+	// +required
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition was checked.
 	// +optional
@@ -741,7 +750,7 @@ type JobTemplateSpec struct {
 
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
+	// +required
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -825,6 +834,7 @@ type CronJobSpec struct {
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// Specifies the job that will be created when executing a CronJob.
+	// +required
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
 	// The number of successful finished jobs to retain. Value must be non-negative integer.
