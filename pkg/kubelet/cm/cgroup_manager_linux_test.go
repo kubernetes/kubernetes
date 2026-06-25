@@ -22,6 +22,13 @@ import (
 	"path"
 	"reflect"
 	"testing"
+
+	libcontainercgroups "github.com/opencontainers/cgroups"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/cpuset"
+	"k8s.io/utils/ptr"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -205,5 +212,177 @@ func TestCpuWeightToCPUShares(t *testing.T) {
 			t.Errorf("cpuWeight: %v, expectedCpuShares: %v, actualCpuShares: %v",
 				testCase.cpuWeight, testCase.expectedCpuShares, actual)
 		}
+	}
+}
+
+func TestCgroupCommonToResources(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	m := &cgroupCommon{
+		subsystems: &CgroupSubsystems{
+			MountPoints: map[string]string{
+				"hugetlb": "/sys/fs/cgroup/hugetlb",
+			},
+		},
+	}
+	t.Cleanup(func() {
+		m.isUnifiedOverride = nil
+	})
+
+	tests := []struct {
+		name              string
+		resourceConfig    *ResourceConfig
+		validateCgroupsV1 func(t *testing.T, res *libcontainercgroups.Resources)
+		validateCgroupsV2 func(t *testing.T, res *libcontainercgroups.Resources)
+	}{
+		{
+			name:           "nil config yields default empty resources",
+			resourceConfig: nil,
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				require.NotNil(t, res)
+				assert.True(t, res.SkipDevices)
+				assert.True(t, res.SkipFreezeOnSet)
+				assert.Equal(t, int64(0), res.Memory)
+				assert.Equal(t, uint64(0), res.CpuShares)
+				assert.Equal(t, uint64(0), res.CpuWeight)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				require.NotNil(t, res)
+				assert.True(t, res.SkipDevices)
+				assert.True(t, res.SkipFreezeOnSet)
+				assert.Equal(t, int64(0), res.Memory)
+				assert.Equal(t, uint64(0), res.CpuShares)
+				assert.Equal(t, uint64(0), res.CpuWeight)
+			},
+		},
+		{
+			name: "memory limits translation",
+			resourceConfig: &ResourceConfig{
+				Memory: ptr.To[int64](500 * 1024 * 1024),
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, int64(500*1024*1024), res.Memory)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, int64(500*1024*1024), res.Memory)
+			},
+		},
+		{
+			name: "cpu limits period and quota translation",
+			resourceConfig: &ResourceConfig{
+				CPUPeriod: ptr.To[uint64](100000),
+				CPUQuota:  ptr.To[int64](50000),
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, uint64(100000), res.CpuPeriod)
+				assert.Equal(t, int64(50000), res.CpuQuota)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, uint64(100000), res.CpuPeriod)
+				assert.Equal(t, int64(50000), res.CpuQuota)
+			},
+		},
+		{
+			name: "pids limit translation",
+			resourceConfig: &ResourceConfig{
+				PidsLimit: ptr.To[int64](1000),
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, ptr.To[int64](1000), res.PidsLimit)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, ptr.To[int64](1000), res.PidsLimit)
+			},
+		},
+		{
+			name: "cpuset translation and string serialization",
+			resourceConfig: &ResourceConfig{
+				CPUSet: cpuset.New(1, 2, 3),
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, "1-3", res.CpusetCpus)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, "1-3", res.CpusetCpus)
+			},
+		},
+		{
+			name: "cpu shares to weight non-trivial translation",
+			resourceConfig: &ResourceConfig{
+				CPUShares: ptr.To[uint64](1024),
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, uint64(1024), res.CpuShares)
+				assert.Equal(t, uint64(0), res.CpuWeight)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Equal(t, uint64(39), res.CpuWeight)
+				assert.Equal(t, uint64(0), res.CpuShares)
+			},
+		},
+		{
+			name: "unified maps translation conditionally enabled",
+			resourceConfig: &ResourceConfig{
+				Unified: map[string]string{
+					"memory.min": "104857600",
+					"memory.low": "209715200",
+				},
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				assert.Nil(t, res.Unified)
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				require.NotNil(t, res.Unified)
+				assert.Equal(t, "104857600", res.Unified["memory.min"])
+				assert.Equal(t, "209715200", res.Unified["memory.low"])
+			},
+		},
+		{
+			name: "hugepages limit conversion and host padding",
+			resourceConfig: &ResourceConfig{
+				HugePageLimit: map[int64]int64{
+					2 * 1024 * 1024: 1024 * 1024 * 1024,
+				},
+			},
+			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
+				if len(libcontainercgroups.HugePageSizes()) > 0 {
+					require.NotEmpty(t, res.HugetlbLimit)
+					found := false
+					for _, limit := range res.HugetlbLimit {
+						if limit.Pagesize == "2MB" {
+							assert.Equal(t, uint64(1024*1024*1024), limit.Limit)
+							found = true
+						}
+					}
+					assert.True(t, found, "Should have found translated 2MB hugepage limit under cgroup v1")
+				}
+			},
+			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
+				if len(libcontainercgroups.HugePageSizes()) > 0 {
+					require.NotEmpty(t, res.HugetlbLimit)
+					found := false
+					for _, limit := range res.HugetlbLimit {
+						if limit.Pagesize == "2MB" {
+							assert.Equal(t, uint64(1024*1024*1024), limit.Limit)
+							found = true
+						}
+					}
+					assert.True(t, found, "Should have found translated 2MB hugepage limit under cgroup v2")
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Validate cgroup v1 mode
+			m.isUnifiedOverride = ptr.To(false)
+			resV1 := m.toResources(logger, tc.resourceConfig)
+			tc.validateCgroupsV1(t, resV1)
+
+			// 2. Validate cgroup v2 mode	
+			m.isUnifiedOverride = ptr.To(true)
+			resV2 := m.toResources(logger, tc.resourceConfig)
+			tc.validateCgroupsV2(t, resV2)
+		})
 	}
 }

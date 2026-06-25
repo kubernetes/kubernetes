@@ -517,12 +517,28 @@ func (r *FakeRuntimeService) ContainerStatus(_ context.Context, containerID stri
 }
 
 // UpdateContainerResources returns the container resource in the FakeRuntimeService.
-func (r *FakeRuntimeService) UpdateContainerResources(context.Context, string, *runtimeapi.ContainerResources) error {
+func (r *FakeRuntimeService) UpdateContainerResources(_ context.Context, containerID string, resources *runtimeapi.ContainerResources) error {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "UpdateContainerResources")
-	return r.popError("UpdateContainerResources")
+	if err := r.popError("UpdateContainerResources"); err != nil {
+		return err
+	}
+
+	c, ok := r.Containers[containerID]
+	if !ok {
+		return fmt.Errorf("container %q not found", containerID)
+	}
+
+	if resources != nil {
+		if resources.Linux != nil {
+			c.LinuxResources = resources.Linux
+		}
+		c.Resources = resources
+	}
+
+	return nil
 }
 
 // ExecSync emulates the sync execution of a command in a container in the FakeRuntimeService.
