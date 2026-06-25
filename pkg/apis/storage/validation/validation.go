@@ -306,6 +306,49 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
 	return allErrs
 }
 
+var validStorageHealthStatusTypes = sets.New(
+	storage.StorageUnreachable,
+	storage.StorageDegraded,
+)
+
+func validateStorageHealthCondition(condition storage.StorageHealthCondition, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(condition.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(condition.Name, fldPath.Child("name"))...)
+	}
+	if !validStorageHealthStatusTypes.Has(condition.Status) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)))
+	}
+	if len(condition.Reason) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
+	} else if len(condition.Reason) > 256 {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256))
+	}
+	if len(condition.Message) > 1024 {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
+	}
+	return allErrs
+}
+
+// ValidateCSINodeStatusUpdate validates an update to the status of a CSINode.
+func ValidateCSINodeStatusUpdate(new, old *storage.CSINode) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("status")
+	seen := sets.New[string]()
+	for i, cond := range new.Status.StorageHealth {
+		key := cond.Name + "/" + string(cond.Status) + "/" + cond.Reason
+		idxPath := fldPath.Child("storageHealth").Index(i)
+		if seen.Has(key) {
+			allErrs = append(allErrs, field.Duplicate(idxPath, key))
+		}
+		seen.Insert(key)
+		allErrs = append(allErrs, validateStorageHealthCondition(cond, idxPath)...)
+	}
+	return allErrs
+}
+
 // ValidateCSINodeSpec tests that the specified CSINodeSpec has valid data.
 func validateCSINodeSpec(spec *storage.CSINodeSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

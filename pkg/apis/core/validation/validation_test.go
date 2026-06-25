@@ -22157,6 +22157,206 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateVolumeHealthStatus(t *testing.T) {
+	tests := []struct {
+		name         string
+		healthStatus *core.VolumeHealthStatus
+		isErr        bool
+		expectedErr  string
+	}{
+		{
+			name: "valid health status",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
+				},
+			},
+		},
+		{
+			name: "valid health status with multiple conditions",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
+					{Status: core.VolumeHealthInaccessible, Reason: "VolumeNotFound"},
+				},
+			},
+		},
+		{
+			name:         "nil health status is valid",
+			healthStatus: nil,
+		},
+		{
+			name: "invalid status type",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: "InvalidType", Reason: "SomeReason"},
+				},
+			},
+			isErr:       true,
+			expectedErr: "conditions[0].status",
+		},
+		{
+			name: "empty reason",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: core.VolumeHealthDegraded, Reason: ""},
+				},
+			},
+			isErr:       true,
+			expectedErr: "conditions[0].reason",
+		},
+		{
+			name: "duplicate conditions",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
+					{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
+				},
+			},
+			isErr:       true,
+			expectedErr: "conditions[1]",
+		},
+		{
+			name: "reason too long",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: core.VolumeHealthDegraded, Reason: strings.Repeat("a", 257)},
+				},
+			},
+			isErr:       true,
+			expectedErr: "conditions[0].reason",
+		},
+		{
+			name: "message too long",
+			healthStatus: &core.VolumeHealthStatus{
+				Conditions: []core.VolumeHealthCondition{
+					{Status: core.VolumeHealthDegraded, Reason: "DiskSlow", Message: strings.Repeat("a", 1025)},
+				},
+			},
+			isErr:       true,
+			expectedErr: "conditions[0].message",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateVolumeHealthStatus(tt.healthStatus, field.NewPath("healthStatus"))
+			if tt.isErr && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.isErr && len(errs) > 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+			if tt.isErr && len(errs) > 0 && tt.expectedErr != "" {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Field, tt.expectedErr) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q but got: %v", tt.expectedErr, errs)
+				}
+			}
+		})
+	}
+}
+
+func TestValidatePodVolumeHealth(t *testing.T) {
+	podSpec := &core.PodSpec{
+		Volumes: []core.Volume{
+			{Name: "vol1"},
+			{Name: "vol2"},
+		},
+	}
+	tests := []struct {
+		name         string
+		volumeHealth []core.PodVolumeHealth
+		isErr        bool
+		expectedErr  string
+	}{
+		{
+			name: "valid volume health",
+			volumeHealth: []core.PodVolumeHealth{
+				{
+					Name: "vol1",
+					Conditions: []core.VolumeHealthCondition{
+						{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
+					},
+				},
+			},
+		},
+		{
+			name: "volume name not in spec",
+			volumeHealth: []core.PodVolumeHealth{
+				{
+					Name: "nonexistent",
+					Conditions: []core.VolumeHealthCondition{
+						{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"},
+					},
+				},
+			},
+			isErr:       true,
+			expectedErr: "volumeHealth[0].name",
+		},
+		{
+			name: "duplicate volume names",
+			volumeHealth: []core.PodVolumeHealth{
+				{Name: "vol1", Conditions: []core.VolumeHealthCondition{{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"}}},
+				{Name: "vol1", Conditions: []core.VolumeHealthCondition{{Status: core.VolumeHealthInaccessible, Reason: "NotFound"}}},
+			},
+			isErr:       true,
+			expectedErr: "volumeHealth[1].name",
+		},
+		{
+			name: "empty volume name",
+			volumeHealth: []core.PodVolumeHealth{
+				{Name: "", Conditions: []core.VolumeHealthCondition{{Status: core.VolumeHealthDegraded, Reason: "DiskSlow"}}},
+			},
+			isErr:       true,
+			expectedErr: "volumeHealth[0].name",
+		},
+		{
+			name: "invalid condition status in pod volume health",
+			volumeHealth: []core.PodVolumeHealth{
+				{
+					Name: "vol1",
+					Conditions: []core.VolumeHealthCondition{
+						{Status: "BadStatus", Reason: "SomeReason"},
+					},
+				},
+			},
+			isErr:       true,
+			expectedErr: "volumeHealth[0].conditions[0].status",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validatePodVolumeHealth(tt.volumeHealth, podSpec, field.NewPath("volumeHealth"))
+			if tt.isErr && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.isErr && len(errs) > 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+			if tt.isErr && len(errs) > 0 && tt.expectedErr != "" {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Field, tt.expectedErr) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q but got: %v", tt.expectedErr, errs)
+				}
+			}
+		})
+	}
+}
+
 func TestValidateResourceQuota(t *testing.T) {
 	spec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
