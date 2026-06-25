@@ -364,7 +364,7 @@ func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (
 }
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
-// TODO: need to discuss wether to return bool and error type
+// TODO: need to discuss whether to return bool and error type
 func isNodeUntainted(logger klog.Logger, node *v1.Node) bool {
 	return isNodeUntaintedWithNonblocking(logger, node, "")
 }
@@ -482,7 +482,7 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 //     system daemons from the node's total "CPU" ( or "Memory" ) resource, upon failure is empty.
 //   - the second return value, upon success is the available portion of a node's allocatable "CPU" capacity, calculated by subtracting "CPU"
 //     ( or "Memory" ) resource reserved for node's pods from the node's allocatable "CPU" ( or "Memory" ) resource, upon failure is empty.
-//   - the third return value, upon success is nil, upon failure is the coresponding error.
+//   - the third return value, upon success is nil, upon failure is the corresponding error.
 func GetNodeAllocatableAndAvailableQuantities(ctx context.Context, c clientset.Interface, n *v1.Node, resourceName v1.ResourceName) (resource.Quantity, resource.Quantity, error) {
 	var nodeAllocatable, podAllocated, nodeAvailable resource.Quantity
 	switch resourceName {

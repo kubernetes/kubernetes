@@ -307,7 +307,7 @@ func writeFile(dir, filename string, content []byte) error {
 	return nil
 }
 
-// processDirFiles reads files in a given directory and peforms `fileAction` action on those.
+// processDirFiles reads files in a given directory and performs `fileAction` action on those.
 func processDirFiles(dirName string, fileAction func(filePath string, fileContent []byte) error) error {
 	var walkErrors []error
 	err := filepath.WalkDir(dirName, func(path string, d fs.DirEntry, err error) error {

@@ -516,7 +516,7 @@ func (h *heartbeat) start() {
 			// gorilla/websockets library docs: "The Close and WriteControl methods can
 			// be called concurrently with all other methods."
 			if err := h.conn.WriteControl(gwebsocket.PingMessage, h.message, time.Now().Add(pingReadDeadline)); err == nil {
-				h.logger.V(6).Info("Websocket Ping succeeeded")
+				h.logger.V(6).Info("Websocket Ping succeeded")
 			} else {
 				h.logger.Error(err, "Websocket Ping failed")
 				if errors.Is(err, gwebsocket.ErrCloseSent) {
