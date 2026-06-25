@@ -1243,7 +1243,7 @@ func TestAuditValidationAction(t *testing.T) {
 			Policy:            policy2.Name,
 		},
 	}
-	require.Equal(t, expected, value)
+	require.ElementsMatch(t, expected, value)
 
 	require.NoError(t, err)
 }

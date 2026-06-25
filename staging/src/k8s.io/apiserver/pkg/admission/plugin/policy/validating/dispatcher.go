@@ -317,17 +317,38 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 	return nil
 }
 
+// maxValidationFailures is the maximum number of validation failures to include in the audit annotation
+// to prevent audit logs resource exhaustion.
+// The expected size of 50 validation failures is ~10KB.
+const maxValidationFailures = 50
+
 func publishValidationFailureAnnotations(attributes admission.Attributes, failures []ValidationFailureValue) {
+	if len(failures) == 0 {
+		return
+	}
+	if len(failures) > maxValidationFailures {
+		klog.Warningf("Validation failures count %d for resource %s exceeds limit of %d; truncating audit annotation", len(failures), attributes.GetResource().String(), maxValidationFailures)
+		failures = failures[:maxValidationFailures]
+	}
+
 	key := "validation.policy.admission.k8s.io/validation_failure"
 	valueJSON, err := utiljson.Marshal(failures)
 	if err != nil {
-		klog.Warningf("Failed to marshal admission audit validation failures for key %s: %v", key, err)
+		klog.Warningf("Failed to marshal admission audit validation failures for key %s for ValidatingAdmissionPolicies and ValidatingAdmissionPolicyBindings %s: %v", key, formatPoliciesBindings(failures), err)
 		return
 	}
 	value := string(valueJSON)
 	if err := attributes.AddAnnotation(key, value); err != nil {
-		klog.Warningf("Failed to set admission audit annotation %s to %s: %v", key, value, err)
+		klog.Warningf("Failed to set admission audit annotation %s to %s for ValidatingAdmissionPolicies and ValidatingAdmissionPolicyBindings %s: %v", key, value, formatPoliciesBindings(failures), err)
 	}
+}
+
+func formatPoliciesBindings(failures []ValidationFailureValue) string {
+	var policiesBindings []string
+	for _, failure := range failures {
+		policiesBindings = append(policiesBindings, fmt.Sprintf("%s/%s", failure.Policy, failure.Binding))
+	}
+	return strings.Join(policiesBindings, ", ")
 }
 
 const maxAuditAnnotationValueLength = 10 * 1024
