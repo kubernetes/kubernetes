@@ -436,7 +436,7 @@ func doBurstablePodLevelResizeTests(f *framework.Framework) {
 	)
 }
 
-var _ = SIGDescribe("PLR Pod InPlace Resize", framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
+var _ = SIGDescribe("PLR Pod InPlace Resize", framework.WithNodeConformance(), framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-resize-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
