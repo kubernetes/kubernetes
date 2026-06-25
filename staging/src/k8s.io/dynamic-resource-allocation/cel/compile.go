@@ -18,6 +18,7 @@ package cel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -25,7 +26,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/blang/semver/v4"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/types"
@@ -35,12 +35,14 @@ import (
 
 	"k8s.io/utils/ptr"
 
+	"github.com/blang/semver/v4"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 const (
@@ -113,8 +115,9 @@ type Device struct {
 	// string attribute.
 	Driver                   string
 	AllowMultipleAllocations *bool
-	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	LookupUniqueString       func(string) draapi.UniqueString
+	Attributes               draapi.DeviceAttributes
+	Capacity                 draapi.DeviceCapacities
 }
 
 type compiler struct {
@@ -144,7 +147,7 @@ type Options struct {
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
 //
 // TODO (https://github.com/kubernetes/kubernetes/issues/125826): validate AST to detect invalid attribute names.
-func (c compiler) CompileCELExpression(expression string, options Options) CompilationResult {
+func (c *compiler) CompileCELExpression(expression string, options Options) CompilationResult {
 	resultError := func(errorString string, errType apiservercel.ErrorType) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
@@ -285,68 +288,29 @@ func (c *compiler) getDeclType(t *cel.Type) *apiservercel.DeclType {
 	return nil
 }
 
-// getAttributeValue returns the native representation of the one value that
-// should be stored in the attribute for basic types, apiservercel.Semver for
-// versions, otherwise a *types.Err (implements ref.Val).
-// Such an error is also returned when there is no supported value.
-// In all of these cases the result can be used directly as input for CEL evaluation.
-func (c CompilationResult) getAttributeValue(name resourceapi.QualifiedName, attr resourceapi.DeviceAttribute) any {
-	switch {
-	case attr.IntValues != nil:
-		return attr.IntValues
-	case attr.BoolValues != nil:
-		return attr.BoolValues
-	case attr.StringValues != nil:
-		return attr.StringValues
-	case attr.VersionValues != nil:
-		semVers := make([]apiservercel.Semver, len(attr.VersionValues))
-		for i, versionStr := range attr.VersionValues {
-			v, err := semver.Parse(versionStr)
-			if err != nil {
-				return types.NewErr("attribute %s: parse semantic version: %w", name, err)
-			}
-			semVers[i] = apiservercel.Semver{Version: v}
-		}
-		return semVers
-	case attr.IntValue != nil:
-		return *attr.IntValue
-	case attr.BoolValue != nil:
-		return *attr.BoolValue
-	case attr.StringValue != nil:
-		return *attr.StringValue
-	case attr.VersionValue != nil:
-		v, err := semver.Parse(*attr.VersionValue)
-		if err != nil {
-			return types.NewErr("attribute %s: parse semantic version: %w", name, err)
-		}
-		return apiservercel.Semver{Version: v}
-	default:
-		return types.NewErr("attribute %s: unsupported attribute value", name)
-	}
-}
-
 var boolType = reflect.TypeOf(true)
 
-func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
-	// TODO (future): avoid building these maps and instead use a proxy
-	// which wraps the underlying maps and directly looks up values.
-	//
-	// This is a bit hard to do because e.g. the top-level Size already depends
-	// on parsing all attributes. For now we only delay building these maps
-	// until they really are needed.
-	attributes := func() map[string]any {
-		return c.buildAttributes(input.Attributes, input.Driver)
+func (c *CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
+	attributes := &domainToAttributes{
+		typesFromEnv:        c.typesFromEnv,
+		adapter:             c.Environment.CELTypeAdapter(),
+		lookupUniqueStrings: input.LookupUniqueString,
+		emptyMapValue:       c.emptyMapVal,
+		attrs:               input.Attributes.Nested,
 	}
-	capacity := func() map[string]any {
-		return buildCapacity(input.Capacity, input.Driver)
+
+	capacity := &domainToCapacity{
+		lookupUniqueStrings: input.LookupUniqueString,
+		emptyMapValue:       c.emptyMapVal,
+		caps:                input.Capacity.Nested,
 	}
 
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
 			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
-			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
-			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
+			attributesVar: attributes,
+			capacityVar:   capacity,
 		},
 	}
 
@@ -371,20 +335,27 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 }
 
 // EvaluateDerivedAttribute evaluates the compiled CEL expression as a derived attribute against a device,
-// returning the evaluated DeviceAttribute or an error.
-func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (*resourceapi.DeviceAttribute, *cel.EvalDetails, error) {
-	attributes := func() map[string]any {
-		return c.buildAttributes(input.Attributes, input.Driver)
+// returning the result using the same types as the attributes in draapi.Device or an error.
+func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input Device) (any, *cel.EvalDetails, error) {
+	attributes := &domainToAttributes{
+		typesFromEnv:        c.typesFromEnv,
+		adapter:             c.Environment.CELTypeAdapter(),
+		lookupUniqueStrings: input.LookupUniqueString,
+		emptyMapValue:       c.emptyMapVal,
+		attrs:               input.Attributes.Nested,
 	}
-	capacity := func() map[string]any {
-		return buildCapacity(input.Capacity, input.Driver)
+
+	capacity := &domainToCapacity{
+		lookupUniqueStrings: input.LookupUniqueString,
+		emptyMapValue:       c.emptyMapVal,
+		caps:                input.Capacity.Nested,
 	}
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
 			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
-			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
-			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
+			attributesVar: attributes,
+			capacityVar:   capacity,
 		},
 	}
 
@@ -403,17 +374,16 @@ func (c CompilationResult) EvaluateDerivedAttribute(ctx context.Context, input D
 	return attr, details, nil
 }
 
-func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {
+func valToDeviceAttribute(val ref.Val) (any, error) {
 	switch v := val.Value().(type) {
 	case bool:
-		return &resourceapi.DeviceAttribute{BoolValue: &v}, nil
+		return v, nil
 	case int64:
-		return &resourceapi.DeviceAttribute{IntValue: &v}, nil
+		return v, nil
 	case string:
-		return &resourceapi.DeviceAttribute{StringValue: &v}, nil
+		return v, nil
 	case semver.Version:
-		s := v.String()
-		return &resourceapi.DeviceAttribute{VersionValue: &s}, nil
+		return apiservercel.Semver{Version: v}, nil
 	}
 
 	if lister, ok := val.(traits.Lister); ok {
@@ -443,7 +413,7 @@ func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {
 				}
 				vals[i] = b
 			}
-			return &resourceapi.DeviceAttribute{BoolValues: vals}, nil
+			return vals, nil
 
 		case int64:
 			vals := make([]int64, length)
@@ -455,7 +425,7 @@ func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {
 				}
 				vals[i] = v
 			}
-			return &resourceapi.DeviceAttribute{IntValues: vals}, nil
+			return vals, nil
 
 		case string:
 			vals := make([]string, length)
@@ -467,19 +437,19 @@ func valToDeviceAttribute(val ref.Val) (*resourceapi.DeviceAttribute, error) {
 				}
 				vals[i] = s
 			}
-			return &resourceapi.DeviceAttribute{StringValues: vals}, nil
+			return vals, nil
 
 		case semver.Version:
-			vals := make([]string, length)
+			vals := make([]apiservercel.Semver, length)
 			for i := range length {
 				elem := lister.Get(types.Int(i))
 				v, ok := elem.Value().(semver.Version)
 				if !ok {
 					return nil, fmt.Errorf("expected list element at index %d to be semver, got %T", i, elem.Value())
 				}
-				vals[i] = v.String()
+				vals[i] = apiservercel.Semver{Version: v}
 			}
-			return &resourceapi.DeviceAttribute{VersionValues: vals}, nil
+			return vals, nil
 
 		default:
 			return nil, fmt.Errorf("unsupported list element type: %T", first.Value())
@@ -649,160 +619,331 @@ func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiserverce
 	return &out
 }
 
-// parseQualifiedName splits into domain and identified, using the default domain
-// if the name does not contain one.
-func parseQualifiedName(name resourceapi.QualifiedName, defaultDomain string) (string, string) {
-	sep := strings.Index(string(name), "/")
-	if sep == -1 {
-		return defaultDomain, string(name)
-	}
-	return string(name[0:sep]), string(name[sep+1:])
+type domainToAttributes struct {
+	typesFromEnv
+	adapter             types.Adapter
+	emptyMapValue       ref.Val
+	lookupUniqueStrings func(string) draapi.UniqueString
+	attrs               map[draapi.UniqueString]map[draapi.UniqueString]any
 }
 
-// buildAttributes converts a device's raw, published Attributes map into the
-// nested domain -> identifier -> value form expected by CEL, with each
-// domain/identifier combination accounted for exactly once.
-//
-// A device's Attributes map is not guaranteed to be free of names that
-// resolve to the same domain and identifier: nothing prevents a device from
-// publishing both an implicit entry (e.g. "bandwidth") and one explicitly
-// qualified with its own driver as domain (e.g. "<driver>/bandwidth").
-// Iterating the map once and resolving each name while building the result
-// would then make the outcome depend on map iteration order, because
-// whichever entry is visited last would win.
-//
-// To make the result deterministic, the map is iterated twice: the first
-// pass only handles entries explicitly qualified with the driver's own
-// domain, the second pass handles all other entries and skips any that
-// would collide with one already recorded in the first pass. This mirrors
-// resolveDeviceCapacity in
-// staging/src/k8s.io/dynamic-resource-allocation/structured/internal/experimental/consumable_capacity.go.
-func (c CompilationResult) buildAttributes(rawAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, driver string) map[string]any {
-	attributes := make(map[string]any)
-	driverPrefix := driver + "/"
-	for name, attr := range rawAttributes {
-		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
-		if !ok {
-			continue
-		}
-		value := c.getAttributeValue(name, attr)
-		if attributes[driver] == nil {
-			attributes[driver] = make(map[string]any)
-		}
-		attributes[driver].(map[string]any)[identifier] = value
+func (m *domainToAttributes) Find(key ref.Val) (ref.Val, bool) {
+	strKey := key.ConvertToType(cel.StringType)
+	if strKey.Type() != cel.StringType {
+		return strKey, false
 	}
-	for name, attr := range rawAttributes {
-		if strings.HasPrefix(string(name), driverPrefix) {
-			continue // already handled above
-		}
-		domain, id := parseQualifiedName(name, driver)
-		if domain == driver {
-			if domainAttrs, ok := attributes[domain].(map[string]any); ok {
-				if _, alreadyResolved := domainAttrs[id]; alreadyResolved {
-					// An entry explicitly qualified with the driver's own domain
-					// takes precedence over this implicit one for the same identifier.
-					continue
-				}
-			}
-		}
-		value := c.getAttributeValue(name, attr)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
-	}
-	return attributes
-}
-
-// buildCapacity converts a device's raw, published Capacity map into the
-// nested domain -> identifier -> value form expected by CEL. See
-// buildAttributes for why the map is iterated twice.
-func buildCapacity(rawCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, driver string) map[string]any {
-	capacity := make(map[string]any)
-	driverPrefix := driver + "/"
-	for name, cap := range rawCapacity {
-		identifier, ok := strings.CutPrefix(string(name), driverPrefix)
-		if !ok {
-			continue
-		}
-		if capacity[driver] == nil {
-			capacity[driver] = make(map[string]apiservercel.Quantity)
-		}
-		capacity[driver].(map[string]apiservercel.Quantity)[identifier] = apiservercel.Quantity{Quantity: &cap.Value}
-	}
-	for name, cap := range rawCapacity {
-		if strings.HasPrefix(string(name), driverPrefix) {
-			continue // already handled above
-		}
-		domain, id := parseQualifiedName(name, driver)
-		if domain == driver {
-			if domainCap, ok := capacity[domain].(map[string]apiservercel.Quantity); ok {
-				if _, alreadyResolved := domainCap[id]; alreadyResolved {
-					// An entry explicitly qualified with the driver's own domain
-					// takes precedence over this implicit one for the same identifier.
-					continue
-				}
-			}
-		}
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
-		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
-	}
-	return capacity
-}
-
-// newStringInterfaceMapWithDefault is like
-// https://pkg.go.dev/github.com/google/cel-go@v0.20.1/common/types#NewStringInterfaceMap,
-// except that looking up an unknown key returns a default value.
-func newStringInterfaceMapWithDefault(adapter types.Adapter, genValue func() map[string]any, defaultValue ref.Val) traits.Mapper {
-	return &mapper{
-		adapter:      adapter,
-		genValue:     genValue,
-		defaultValue: defaultValue,
-	}
-}
-
-type mapper struct {
-	adapter      types.Adapter
-	genValue     func() map[string]any
-	defaultValue ref.Val
-	delegate     traits.Mapper
-}
-
-func (m *mapper) getDelegate() traits.Mapper {
-	if m.delegate != nil {
-		return m.delegate
-	}
-	value := m.genValue()
-	m.delegate = types.NewStringInterfaceMap(m.adapter, value)
-	return m.delegate
-}
-
-// Find wraps the mapper's Find so that a default empty map is returned when
-// the lookup did not find the entry.
-func (m *mapper) Find(key ref.Val) (ref.Val, bool) {
-	value, found := m.getDelegate().Find(key)
+	// This either returns the unique key for lookup in the device
+	// attributes or NullUniqueKey, which isn't going to be found.
+	// In that case we continue with returning the default value below,
+	// without actually converting the key (would need locking).
+	uniqueKey := m.lookupUniqueStrings(strKey.Value().(string))
+	value, found := m.attrs[uniqueKey]
 	if found {
-		return value, true
+		return &nameToAttributes{
+			typesFromEnv:         m.typesFromEnv,
+			adapter:              m.adapter,
+			makeUniqueAttrString: m.lookupUniqueStrings,
+			attrs:                value,
+		}, true
 	}
 
-	return m.defaultValue, true
+	return m.emptyMapValue, true
 }
 
-func (m *mapper) ConvertToNative(typeDesc reflect.Type) (any, error) {
-	return m.getDelegate().ConvertToNative(typeDesc)
+func (m *domainToAttributes) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	// This shouldn't be needed for evaluating CEL expressions.
+	return nil, errors.New("not implemented")
+
 }
-func (m *mapper) ConvertToType(typeValue ref.Type) ref.Val {
-	return m.getDelegate().ConvertToType(typeValue)
+
+func (m *domainToAttributes) ConvertToType(typeVal ref.Type) ref.Val {
+	switch typeVal {
+	case types.MapType:
+		return m
+	case types.TypeType:
+		return m.outerAttributesType.CelType()
+	}
+	return types.NewErr("type conversion error from '%s' to '%s'", m.outerAttributesType, typeVal)
 }
-func (m *mapper) Equal(other ref.Val) ref.Val    { return m.getDelegate().Equal(other) }
-func (m *mapper) Type() ref.Type                 { return m.getDelegate().Type() }
-func (m *mapper) Value() any                     { return m.getDelegate().Value() }
-func (m *mapper) Contains(value ref.Val) ref.Val { return m.getDelegate().Contains(value) }
-func (m *mapper) Get(index ref.Val) ref.Val      { return m.getDelegate().Get(index) }
-func (m *mapper) Iterator() traits.Iterator      { return m.getDelegate().Iterator() }
-func (m *mapper) Size() ref.Val                  { return m.getDelegate().Size() }
+
+func (m *domainToAttributes) Equal(other ref.Val) ref.Val {
+	otherMap, ok := other.(traits.Mapper)
+	if !ok {
+		return types.False
+	}
+	return equalMaps(m, otherMap)
+}
+
+func (m *domainToAttributes) Type() ref.Type { return m.outerAttributesType }
+
+func (m *domainToAttributes) Value() any {
+	return m.attrs
+}
+
+func (m *domainToAttributes) Contains(key ref.Val) ref.Val {
+	val, found := m.Find(key)
+	if val == m.emptyMapValue {
+		// Not really, it was the default.
+		found = false
+	}
+	return types.Bool(found)
+}
+
+func (m *domainToAttributes) Get(key ref.Val) ref.Val {
+	val, found := m.Find(key)
+	if !found {
+		return types.ValOrErr(val, "no such key: %v", key)
+	}
+	return val
+}
+
+func (m *domainToAttributes) Iterator() traits.Iterator {
+	return &mapIterator{
+		mapKeys: reflect.ValueOf(m.attrs).MapRange(),
+		len:     len(m.attrs),
+	}
+}
+
+func (m *domainToAttributes) Size() ref.Val {
+	return types.Int(len(m.attrs))
+}
+
+type nameToAttributes struct {
+	typesFromEnv
+	adapter              types.Adapter
+	makeUniqueAttrString func(string) draapi.UniqueString
+	attrs                map[draapi.UniqueString]any
+}
+
+func (m *nameToAttributes) Find(key ref.Val) (ref.Val, bool) {
+	strKey := key.ConvertToType(cel.StringType)
+	if strKey.Type() != cel.StringType {
+		return strKey, false
+	}
+	uniqueKey := m.makeUniqueAttrString(strKey.Value().(string))
+	value, found := m.attrs[uniqueKey]
+	if !found {
+		return nil, false
+	}
+
+	switch value := value.(type) {
+	case int64:
+		return types.Int(value), true
+	case bool:
+		return types.Bool(value), true
+	case string:
+		return types.String(value), true
+	case apiservercel.Semver:
+		return value, true
+	case []int64:
+		return types.NewDynamicList(m.adapter, value), true
+	case []bool:
+		return types.NewDynamicList(m.adapter, value), true
+	case []string:
+		return types.NewStringList(m.adapter, value), true
+	case []apiservercel.Semver:
+		return types.NewDynamicList(m.adapter, value), true
+	default:
+		return types.NewErr("internal error: missing support for value type %T", value), false
+	}
+}
+
+func (m *nameToAttributes) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	// This shouldn't be needed for evaluating CEL expressions.
+	return nil, errors.New("not implemented")
+
+}
+
+func (m *nameToAttributes) ConvertToType(typeVal ref.Type) ref.Val {
+	switch typeVal {
+	case types.MapType:
+		return m
+	case types.TypeType:
+		return m.innerAttributesType.CelType()
+	}
+	return types.NewErr("type conversion error from '%s' to '%s'", m.innerAttributesType, typeVal)
+}
+
+func (m *nameToAttributes) Equal(other ref.Val) ref.Val {
+	otherMap, ok := other.(traits.Mapper)
+	if !ok {
+		return types.False
+	}
+	return equalMaps(m, otherMap)
+}
+
+func (m *nameToAttributes) Type() ref.Type { return m.innerAttributesType }
+
+func (m *nameToAttributes) Value() any {
+	return m.attrs
+}
+
+func (m *nameToAttributes) Contains(key ref.Val) ref.Val {
+	_, found := m.Find(key)
+	return types.Bool(found)
+}
+
+func (m *nameToAttributes) Get(key ref.Val) ref.Val {
+	val, found := m.Find(key)
+	if !found {
+		return types.ValOrErr(val, "no such key: %v", key)
+	}
+	return val
+}
+
+func (m *nameToAttributes) Iterator() traits.Iterator {
+	return &mapIterator{
+		mapKeys: reflect.ValueOf(m.attrs).MapRange(),
+		len:     len(m.attrs),
+	}
+}
+
+func (m *nameToAttributes) Size() ref.Val {
+	return types.Int(len(m.attrs))
+}
+
+// domainToCapacity is a CEL map proxy for device.capacity[<domain>].
+// Lookup by domain returns a nameToCapacity for the inner name→Quantity map.
+// Lookup of an unknown domain returns emptyMapValue (an empty map).
+type domainToCapacity struct {
+	lookupUniqueStrings func(string) draapi.UniqueString
+	emptyMapValue       ref.Val
+	caps                map[draapi.UniqueString]map[draapi.UniqueString]draapi.DeviceCapacity
+}
+
+func (m *domainToCapacity) Find(key ref.Val) (ref.Val, bool) {
+	strKey := key.ConvertToType(cel.StringType)
+	if strKey.Type() != cel.StringType {
+		return strKey, false
+	}
+	uniqueKey := m.lookupUniqueStrings(strKey.Value().(string))
+	inner, found := m.caps[uniqueKey]
+	if found {
+		return &nameToCapacity{
+			lookupUniqueStrings: m.lookupUniqueStrings,
+			caps:                inner,
+		}, true
+	}
+	return m.emptyMapValue, true
+}
+
+func (m *domainToCapacity) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *domainToCapacity) ConvertToType(typeVal ref.Type) ref.Val {
+	switch typeVal {
+	case types.MapType:
+		return m
+	case types.TypeType:
+		return outerCapacityMapType.CelType()
+	}
+	return types.NewErr("type conversion error from '%s' to '%s'", outerCapacityMapType, typeVal)
+}
+
+func (m *domainToCapacity) Equal(other ref.Val) ref.Val {
+	otherMap, ok := other.(traits.Mapper)
+	if !ok {
+		return types.False
+	}
+	return equalMaps(m, otherMap)
+}
+
+func (m *domainToCapacity) Type() ref.Type { return outerCapacityMapType }
+
+func (m *domainToCapacity) Value() any { return m.caps }
+
+func (m *domainToCapacity) Contains(key ref.Val) ref.Val {
+	val, found := m.Find(key)
+	if val == m.emptyMapValue {
+		found = false
+	}
+	return types.Bool(found)
+}
+
+func (m *domainToCapacity) Get(key ref.Val) ref.Val {
+	val, found := m.Find(key)
+	if !found {
+		return types.ValOrErr(val, "no such key: %v", key)
+	}
+	return val
+}
+
+func (m *domainToCapacity) Iterator() traits.Iterator {
+	return &mapIterator{
+		mapKeys: reflect.ValueOf(m.caps).MapRange(),
+		len:     len(m.caps),
+	}
+}
+
+func (m *domainToCapacity) Size() ref.Val { return types.Int(len(m.caps)) }
+
+// nameToCapacity is a CEL map proxy for device.capacity[<domain>][<name>].
+type nameToCapacity struct {
+	lookupUniqueStrings func(string) draapi.UniqueString
+	caps                map[draapi.UniqueString]draapi.DeviceCapacity
+}
+
+func (m *nameToCapacity) Find(key ref.Val) (ref.Val, bool) {
+	strKey := key.ConvertToType(cel.StringType)
+	if strKey.Type() != cel.StringType {
+		return strKey, false
+	}
+	uniqueKey := m.lookupUniqueStrings(strKey.Value().(string))
+	cap, found := m.caps[uniqueKey]
+	if !found {
+		return nil, false
+	}
+	return cap.Value, true
+}
+
+func (m *nameToCapacity) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *nameToCapacity) ConvertToType(typeVal ref.Type) ref.Val {
+	switch typeVal {
+	case types.MapType:
+		return m
+	case types.TypeType:
+		return innerCapacityMapType.CelType()
+	}
+	return types.NewErr("type conversion error from '%s' to '%s'", innerCapacityMapType, typeVal)
+}
+
+func (m *nameToCapacity) Equal(other ref.Val) ref.Val {
+	otherMap, ok := other.(traits.Mapper)
+	if !ok {
+		return types.False
+	}
+	return equalMaps(m, otherMap)
+}
+
+func (m *nameToCapacity) Type() ref.Type { return innerCapacityMapType }
+
+func (m *nameToCapacity) Value() any { return m.caps }
+
+func (m *nameToCapacity) Contains(key ref.Val) ref.Val {
+	_, found := m.Find(key)
+	return types.Bool(found)
+}
+
+func (m *nameToCapacity) Get(key ref.Val) ref.Val {
+	val, found := m.Find(key)
+	if !found {
+		return types.ValOrErr(val, "no such key: %v", key)
+	}
+	return val
+}
+
+func (m *nameToCapacity) Iterator() traits.Iterator {
+	return &mapIterator{
+		mapKeys: reflect.ValueOf(m.caps).MapRange(),
+		len:     len(m.caps),
+	}
+}
+
+func (m *nameToCapacity) Size() ref.Val { return types.Int(len(m.caps)) }
 
 // sizeEstimator tells the cost estimator the maximum size of maps, strings, or lists accessible through the `device` variable.
 // Without this, the maximum string size of e.g. `device.attributes["dra.example.com"].services` would be unknown.
@@ -928,4 +1069,67 @@ func (c compiler) isAllowedDerivedAttributeElementType(t *cel.Type) bool {
 		t.IsExactType(cel.AnyType) ||
 		t.IsExactType(cel.DynType) ||
 		t.IsExactType(apiservercel.SemverType)
+}
+
+func equalMaps(a, b traits.Mapper) ref.Val {
+	if a.Size() != b.Size() {
+		return types.False
+	}
+	it := a.Iterator()
+	for it.HasNext() == types.True {
+		key := it.Next()
+		thisVal, _ := a.Find(key)
+		otherVal, found := b.Find(key)
+		if !found {
+			return types.False
+		}
+		valEq := types.Equal(thisVal, otherVal)
+		if valEq == types.False {
+			return types.False
+		}
+	}
+	return types.True
+}
+
+// mapIterator iterates over a Go map with draapi.UniqueString as keys via reflection.
+// It's based on baseIterator and mapIterator:
+// - https://github.com/cel-expr/cel-go/blob/a4d0d643deeea6408654de2ec9944895d23f36a5/common/types/iterator.go#L30-L55
+// - https://github.com/cel-expr/cel-go/blob/a82c68b770ac0cb67f7b4f76166827c14b145eb8/common/types/map.go#L922-L943
+type mapIterator struct {
+	mapKeys *reflect.MapIter
+	cursor  int
+	len     int
+}
+
+func (*mapIterator) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	return nil, fmt.Errorf("type conversion on iterators not supported")
+}
+
+func (*mapIterator) ConvertToType(typeVal ref.Type) ref.Val {
+	return types.NewErr("no such overload")
+}
+
+func (*mapIterator) Equal(other ref.Val) ref.Val {
+	return types.NewErr("no such overload")
+}
+
+func (*mapIterator) Type() ref.Type {
+	return types.IteratorType
+}
+
+func (*mapIterator) Value() any {
+	return nil
+}
+
+func (it *mapIterator) HasNext() ref.Val {
+	return types.Bool(it.cursor < it.len)
+}
+
+func (it *mapIterator) Next() ref.Val {
+	if it.HasNext() == types.True && it.mapKeys.Next() {
+		it.cursor++
+		refKey := it.mapKeys.Key()
+		return types.String(refKey.Interface().(draapi.UniqueString).String())
+	}
+	return nil
 }

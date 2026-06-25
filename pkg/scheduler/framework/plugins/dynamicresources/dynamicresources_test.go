@@ -5933,7 +5933,7 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 					tCtx.Errorf("expected aggregated capacity of %s, got nil", deviceID)
 					return
 				}
-				name := draapi.MakeFullyQualifiedName(capacityName, driver)
+				name := draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(driver), Identifier: draapi.MakeUniqueString(string(capacityName))}
 				value := capacity[name]
 				if value == nil {
 					tCtx.Errorf("expected value of %s, got nil", name)

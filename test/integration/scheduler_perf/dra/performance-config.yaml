@@ -275,7 +275,6 @@
       measurePods: 10
       steadyState: true
       duration: 10s
-      selectors:
       numRequests: 5
       numPCIRoots: 2
       constraints:

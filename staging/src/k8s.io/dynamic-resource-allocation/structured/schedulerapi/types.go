@@ -230,13 +230,13 @@ func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourcea
 		if !ok {
 			continue
 		}
-		normalized[draapi.FullyQualifiedName{Domain: deviceID.Driver.String(), Identifier: identifier}] = new(val)
+		normalized[draapi.FullyQualifiedName{Domain: deviceID.Driver, Identifier: draapi.MakeUniqueString(identifier)}] = new(val)
 	}
 	for name, val := range consumedCapacity {
 		if strings.HasPrefix(string(name), driverPrefix) {
 			continue // already handled above
 		}
-		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver.String())
+		key := draapi.MakeFullyQualifiedName(name, deviceID.Driver, draapi.MakeUniqueString)
 		if _, alreadyResolved := normalized[key]; alreadyResolved {
 			// An entry explicitly qualified with the driver's own domain takes
 			// precedence over this implicit one for the same identifier.

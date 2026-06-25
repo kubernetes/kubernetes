@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
@@ -166,7 +167,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		node:                   node,
 		claimsToAllocate:       claims,
 		deviceMatchesRequest:   make(map[matchKey]bool),
-		derivedAttributesCache: make(map[deviceExprKey]*resourceapi.DeviceAttribute),
+		derivedAttributesCache: make(map[deviceExprKey]any),
 		constraints:            make([][]constraint, len(claims)),
 		consumedCounters:       make(map[PoolID]counterSets),
 
@@ -290,31 +291,33 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
-				matchAttribute := resourceapi.FullyQualifiedName(*constraint.MatchAttribute)
+				matchAttribute := string(*constraint.MatchAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
 					logger = klog.LoggerWithValues(logger, "matchAttribute", matchAttribute)
 				}
+				domain, id, _ := strings.Cut(matchAttribute, "/")
 				m := &matchAttributeConstraint{
 					logger:            logger,
 					requestNames:      sets.New(constraint.Requests...),
-					attributeName:     matchAttribute,
+					attributeName:     draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
 					features:          a.features,
 					attributeProvider: alloc,
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
-				distinctAttribute := resourceapi.FullyQualifiedName(*constraint.DistinctAttribute)
+				distinctAttribute := string(*constraint.DistinctAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "distinctAttributeConstraint")
 					logger = klog.LoggerWithValues(logger, "distinctAttribute", distinctAttribute)
 				}
+				domain, id, _ := strings.Cut(distinctAttribute, "/")
 				m := &distinctAttributeConstraint{
 					logger:            logger,
 					requestNames:      sets.New(constraint.Requests...),
-					attributeName:     distinctAttribute,
+					attributeName:     draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
 					features:          a.features,
 					attributeProvider: alloc,
 				}
@@ -673,7 +676,7 @@ type allocator struct {
 	// device. It is keyed by deviceExprKey (DeviceID + exact CEL expression)
 	// to avoid re-evaluating identical expressions on the same device,
 	// regardless of which derived attribute name or subrequest uses it.
-	derivedAttributesCache map[deviceExprKey]*resourceapi.DeviceAttribute
+	derivedAttributesCache map[deviceExprKey]any
 	constraints            [][]constraint // one list of constraints per claim
 	// consumedCounters keeps track of the counters consumed by all devices
 	// that are in the process of being allocated.
@@ -894,37 +897,40 @@ func (s *deviceAttributeListAsSet) intersection(other *deviceAttributeListAsSet)
 // For scalar values, creates a single-element set.
 // For list values, creates a set from all elements.
 // Returns nil if the attribute type is unknown or empty.
-func attributeAsSet(attribute *resourceapi.DeviceAttribute) *deviceAttributeListAsSet {
+func attributeAsSet(attribute any) *deviceAttributeListAsSet {
 	if attribute == nil {
 		return nil
 	}
 
 	result := &deviceAttributeListAsSet{}
 
-	switch {
-	case len(attribute.IntValues) > 0:
-		result.intValue = sets.New(attribute.IntValues...)
+	switch attribute := attribute.(type) {
+	case []int64:
+		result.intValue = sets.New(attribute...)
 		return result
-	case len(attribute.BoolValues) > 0:
-		result.boolValue = sets.New(attribute.BoolValues...)
+	case []bool:
+		result.boolValue = sets.New(attribute...)
 		return result
-	case len(attribute.StringValues) > 0:
-		result.stringValue = sets.New(attribute.StringValues...)
+	case []string:
+		result.stringValue = sets.New(attribute...)
 		return result
-	case len(attribute.VersionValues) > 0:
-		result.versionValue = sets.New(attribute.VersionValues...)
+	case []apiservercel.Semver:
+		result.versionValue = sets.New[string]()
+		for _, ver := range attribute {
+			result.versionValue.Insert(ver.String())
+		}
 		return result
-	case attribute.IntValue != nil:
-		result.intValue = sets.New(*attribute.IntValue)
+	case int64:
+		result.intValue = sets.New(attribute)
 		return result
-	case attribute.BoolValue != nil:
-		result.boolValue = sets.New(*attribute.BoolValue)
+	case bool:
+		result.boolValue = sets.New(attribute)
 		return result
-	case attribute.StringValue != nil:
-		result.stringValue = sets.New(*attribute.StringValue)
+	case string:
+		result.stringValue = sets.New(attribute)
 		return result
-	case attribute.VersionValue != nil:
-		result.versionValue = sets.New(*attribute.VersionValue)
+	case apiservercel.Semver:
+		result.versionValue = sets.New(attribute.String())
 		return result
 	default:
 		return nil
@@ -941,12 +947,12 @@ func attributeAsSet(attribute *resourceapi.DeviceAttribute) *deviceAttributeList
 type matchAttributeConstraint struct {
 	logger            klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames      sets.Set[string]
-	attributeName     resourceapi.FullyQualifiedName
+	attributeName     draapi.FullyQualifiedName
 	features          Features
 	attributeProvider attributeProvider
 
 	// For scalar values (existing behavior)
-	attribute *resourceapi.DeviceAttribute
+	attribute any
 
 	// For list values (when DRAListTypeAttributes feature gate is enabled).
 	// intersectionStack[len-1] is the current intersection; each add() pushes and each remove() pops,
@@ -986,11 +992,11 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 			m.intersectionStack = append(m.intersectionStack, first)
 		} else {
 			// Scalar attribute: use existing behavior
-			switch {
-			case attribute.StringValue != nil:
-			case attribute.IntValue != nil:
-			case attribute.BoolValue != nil:
-			case attribute.VersionValue != nil:
+			switch attribute.(type) {
+			case string:
+			case int64:
+			case bool:
+			case apiservercel.Semver:
 			default:
 				// Unknown value type, cannot match.
 				m.logger.V(7).Info("Match attribute type unknown")
@@ -1020,29 +1026,45 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 		// Push a narrowed copy so remove() can pop back to the previous intersection.
 		m.intersectionStack = append(m.intersectionStack, narrowed)
 	} else {
-		// Scalar matching: use existing behavior
-		switch {
-		case attribute.StringValue != nil:
-			if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
-				m.logger.V(7).Info("String values different")
+		switch existing := m.attribute.(type) {
+		case string:
+			candidate, ok := attribute.(string)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
 				return false, nil
 			}
-		case attribute.IntValue != nil:
-			if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
-				m.logger.V(7).Info("Int values different")
+			if existing != candidate {
+				m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
 				return false, nil
 			}
-		case attribute.BoolValue != nil:
-			if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
-				m.logger.V(7).Info("Bool values different")
+		case int64:
+			candidate, ok := attribute.(int64)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
 				return false, nil
 			}
-		case attribute.VersionValue != nil:
-			// semver 2.0.0 requires that version strings are in their
-			// minimal form (in particular, no leading zeros). Therefore a
-			// strict "exact equal" check can do a string comparison.
-			if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
-				m.logger.V(7).Info("Version values different")
+			if existing != candidate {
+				m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+				return false, nil
+			}
+		case bool:
+			candidate, ok := attribute.(bool)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				return false, nil
+			}
+			if existing != candidate {
+				m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+				return false, nil
+			}
+		case apiservercel.Semver:
+			candidate, ok := attribute.(apiservercel.Semver)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+				return false, nil
+			}
+			if !existing.Version.Equals(candidate.Version) {
+				m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
 				return false, nil
 			}
 		default:
@@ -1082,35 +1104,6 @@ func (m *matchAttributeConstraint) matches(request *requestData) bool {
 	}
 }
 
-// lookupStaticAttribute performs a lookup of a static device attribute
-// published directly by the driver on the candidate Device object.
-// It handles fully-qualified domain name matching and fallback to
-// unqualified attribute names if the driver domain matches.
-func lookupStaticAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
-	// Fully-qualified match?
-	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
-		return &attr
-	}
-	index := strings.Index(string(attributeName), "/")
-	if index < 0 {
-		// Should not happen for a valid fully qualified name.
-		return nil
-	}
-
-	if string(attributeName[0:index]) != deviceID.Driver.String() {
-		// Not an attribute of the driver and not found above,
-		// so it is not available.
-		return nil
-	}
-
-	// Domain matches the driver, so let's check just the ID.
-	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName[index+1:])]; ok {
-		return &attr
-	}
-
-	return nil
-}
-
 // lookupAttribute is the unified entry point for attribute resolution
 // in the experimental allocator. It implements the lookup precedence:
 //  1. If the attribute is defined as a derived attribute on the request,
@@ -1118,7 +1111,10 @@ func lookupStaticAttribute(device *draapi.Device, deviceID DeviceID, attributeNa
 //     request scope, and returns the synthesized virtual attribute.
 //  2. Otherwise, it falls back to looking up the static attribute on
 //     the Device object.
-func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) (*resourceapi.DeviceAttribute, error) {
+//
+// The returned value uses the same types as the attributes in draapi.Device.
+func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attribute draapi.FullyQualifiedName) (any, error) {
+	attributeName := resourceapi.FullyQualifiedName(attribute.Domain.String() + "/" + attribute.Identifier.String())
 	if targetExpr, found := request.derivedAttributes[attributeName]; found {
 		cacheKey := deviceExprKey{DeviceID: deviceID, expr: targetExpr}
 		if attr, found := alloc.derivedAttributesCache[cacheKey]; found {
@@ -1135,6 +1131,7 @@ func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Dev
 			AllowMultipleAllocations: device.AllowMultipleAllocations,
 			Attributes:               device.Attributes,
 			Capacity:                 device.Capacity,
+			LookupUniqueString:       draapi.MakeUniqueString, // TODO (?): can we use the per-slice cache?
 		})
 		if err != nil {
 			return nil, fmt.Errorf("evaluate derived attribute %s on device %s failed: %w", attributeName, deviceID, err)
@@ -1144,7 +1141,7 @@ func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Dev
 		return evaluatedAttr, nil
 	}
 
-	return lookupStaticAttribute(device, deviceID, attributeName), nil
+	return device.Attributes.Lookup(attribute), nil
 }
 
 // allocateOne iterates over all eligible devices (not in use, match selector,
@@ -1467,7 +1464,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if requestData.class != nil {
-		match, err := alloc.selectorsMatch(r, device, deviceID, requestData.class, requestData.class.Spec.Selectors)
+		match, err := alloc.selectorsMatch(r, slice, device, deviceID, requestData.class, requestData.class.Spec.Selectors)
 		if err != nil {
 			return false, err
 		}
@@ -1478,7 +1475,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	request := requestData.request
-	match, err := alloc.selectorsMatch(r, device, deviceID, nil, request.selectors())
+	match, err := alloc.selectorsMatch(r, slice, device, deviceID, nil, request.selectors())
 	if err != nil {
 		return false, err
 	}
@@ -1513,7 +1510,7 @@ func (alloc *allocator) cmpRequestOverCapacity(request requestAccessor, device d
 	return cmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange)
 }
 
-func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
+func (alloc *allocator) selectorsMatch(r requestIndices, slice *draapi.ResourceSlice, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
 		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
 		if expr.Error != nil {
@@ -1528,13 +1525,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 			return false, fmt.Errorf("claim %s: selector #%d: CEL compile error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, expr.Error)
 		}
 
-		// If this conversion turns out to be expensive, the CEL package could be converted
-		// to use unique strings.
-		var d resourceapi.Device
-		if err := draapi.Convert_api_Device_To_v1_Device(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert Device %s: %w", deviceID, err)
-		}
-		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), AllowMultipleAllocations: d.AllowMultipleAllocations, Attributes: d.Attributes, Capacity: d.Capacity})
+		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), AllowMultipleAllocations: device.AllowMultipleAllocations, Attributes: device.Attributes, Capacity: device.Capacity, LookupUniqueString: slice.LookupUniqueString})
 		if class != nil {
 			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 		} else {
