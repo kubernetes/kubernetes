@@ -376,7 +376,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	t.Run("with declarative validation (Beta enabled)", func(t *testing.T) {
 		validationmetrics.ResetValidationMetricsInstance()
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: true,
 		})
 		errs := runValidations(ctx)
@@ -395,7 +394,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	t.Run("with declarative validation (Beta disabled)", func(t *testing.T) {
 		validationmetrics.ResetValidationMetricsInstance()
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: false,
 		})
 		errs := runValidations(ctx)
@@ -419,7 +417,6 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		// We don't strictly need to set feature gates here as the context override should force enforcement,
 		// but setting them ensures a consistent environment.
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.DeclarativeValidation:     true,
 			features.DeclarativeValidationBeta: true,
 		})
 		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
