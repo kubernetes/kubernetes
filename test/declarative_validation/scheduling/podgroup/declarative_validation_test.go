@@ -647,6 +647,34 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 	meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &scheduling.PodGroup{}, registry.NewStatusStrategy(registry.NewStrategy()), func(obj *scheduling.PodGroup, c []metav1.Condition) {
 		*obj = mkValidPodGroup(setResourceVersion("1"), func(pg *scheduling.PodGroup) { pg.Status.Conditions = c })
 	})
+	extraConditionTestCases := []meta.ConditionTestCase{
+		{
+			Name: "invalid type format not a k8s label key",
+			Conditions: []metav1.Condition{
+				meta.MkCondition(
+					meta.TweakType("INVALID TYPE"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("status", "conditions").Index(0).Child("type"),
+					"INVALID TYPE",
+					"name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+	}
+
+	for _, tc := range extraConditionTestCases {
+		t.Run("conditions: "+tc.Name, func(t *testing.T) {
+			obj := mkValidPodGroup(setResourceVersion("1"), func(pg *scheduling.PodGroup) {
+				pg.Status.Conditions = tc.Conditions
+			})
+			old := mkValidPodGroup(setResourceVersion("1"))
+			strategy := registry.NewStatusStrategy(registry.NewStrategy())
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &obj, &old, strategy, tc.ExpectedErrs)
+		})
+	}
 }
 
 // mkValidPodGroup produces a PodGroup which passes validation with no tweaks.

@@ -128,6 +128,50 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	extraTestCases := []meta.ConditionTestCase{
+		{
+			Name: "invalid type format not a k8s label key",
+			Conditions: []metav1.Condition{
+				meta.MkCondition(
+					meta.TweakType("INVALID TYPE"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("status", "conditions").Index(0).Child("type"),
+					"INVALID TYPE",
+					"name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+	}
+
+	for _, tc := range extraTestCases {
+		t.Run("conditions: "+tc.Name, func(t *testing.T) {
+			obj := &resource.DeviceTaintRule{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-rule", ResourceVersion: "2"},
+				Spec: resource.DeviceTaintRuleSpec{
+					Taint: resource.DeviceTaint{
+						Key:    "example.com/tainted",
+						Effect: resource.DeviceTaintEffectNoExecute,
+					},
+				},
+				Status: resource.DeviceTaintRuleStatus{
+					Conditions: tc.Conditions,
+				},
+			}
+			old := &resource.DeviceTaintRule{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-rule", ResourceVersion: "1"},
+				Spec: resource.DeviceTaintRuleSpec{
+					Taint: resource.DeviceTaint{
+						Key:    "example.com/tainted",
+						Effect: resource.DeviceTaintEffectNoExecute,
+					},
+				},
+			}
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, obj, old, registry.StatusStrategy, tc.ExpectedErrs)
+		})
+	}
 }
 
 func mkValidDeviceTaintRule(tweaks ...func(*resource.DeviceTaintRule)) resource.DeviceTaintRule {
