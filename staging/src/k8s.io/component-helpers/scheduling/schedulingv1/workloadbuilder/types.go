@@ -78,12 +78,10 @@ type ResourceClaim struct {
 // default/user merge, typically for controller defaulting (e.g. gang MinCount).
 type WorkloadItemFunc func(*WorkloadItem)
 
-// WorkloadItem is a node in a controller's logical workload tree. A leaf (no
-// children) compiles to one PodGroupTemplate; a node with children is a
-// structural group whose descendants contribute the leaf templates.
+// WorkloadItem is a node in a controller's logical workload.
 type WorkloadItem struct {
-	// Name identifies this component. Leaf names become PodGroupTemplate names
-	// and must be unique across the tree.
+	// Name identifies this component. It becomes the PodGroupTemplate name and
+	// must be non-empty.
 	Name string
 
 	// DefaultConfig is the controller's default config for this node, used for
@@ -100,9 +98,6 @@ type WorkloadItem struct {
 	// ResolvedConfig is the merged config, populated by Build before Callbacks
 	// run. Callers do not set it.
 	ResolvedConfig *SchedulingConfig
-
-	// Children, when non-empty, mark this node as a structural group.
-	Children []*WorkloadItem
 }
 
 // DeepCopy returns a deep copy of c, or nil if c is nil. Build copies configs

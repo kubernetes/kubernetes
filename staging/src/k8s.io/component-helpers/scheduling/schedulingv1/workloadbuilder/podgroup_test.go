@@ -67,12 +67,12 @@ func TestNewPodGroup(t *testing.T) {
 		t.Errorf("expected 2 owner references, got %d", len(pg.OwnerReferences))
 	}
 
-	ref := pg.Spec.PodGroupTemplateRef
-	if ref == nil || ref.Workload == nil {
+	ref := pg.Spec.WorkloadRef
+	if ref == nil || ref.WorkloadName == "" {
 		t.Fatal("expected podGroupTemplateRef.workload to be set")
 	}
-	if ref.Workload.WorkloadName != "job-abc" || ref.Workload.PodGroupTemplateName != "workers" {
-		t.Errorf("unexpected template ref: %+v", ref.Workload)
+	if ref.WorkloadName != "job-abc" || ref.TemplateName != "workers" {
+		t.Errorf("unexpected template ref: %+v", ref)
 	}
 
 	if pg.Spec.SchedulingPolicy.Gang == nil || pg.Spec.SchedulingPolicy.Gang.MinCount != 4 {

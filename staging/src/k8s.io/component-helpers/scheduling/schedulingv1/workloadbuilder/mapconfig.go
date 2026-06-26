@@ -25,17 +25,8 @@ import (
 // non-nil config, leaving a field nil when its input is nil so resolveConfig can
 // fall back to defaults field-by-field.
 //
-// TODO: Implement MapCompositeGroupConfig once the WorkloadCompositePodGroup*
-// types and CompositePodGroup resource are added to scheduling.k8s.io/v1alpha3.
-//
-// func MapCompositeGroupConfig(
-//	policy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy,
-//	constraints *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints,
-//	disruption *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode,
-//	) *SchedulingConfig {
-//		cfg := &SchedulingConfig{}
-//	}
-
+// TODO: Add MapCompositeGroupConfig once the WorkloadCompositePodGroup* types
+// and CompositePodGroup resource are added to scheduling.k8s.io/v1alpha3.
 func MapPodGroupConfig(
 	policy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy,
 	constraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints,
@@ -45,13 +36,19 @@ func MapPodGroupConfig(
 	cfg := &SchedulingConfig{}
 
 	if policy != nil {
-		cfg.Policy = mapSchedulingPolicy(policy)
+		if p := mapSchedulingPolicy(policy); p != nil {
+			cfg.Policy = p
+		}
 	}
 	if constraints != nil {
-		cfg.Constraints = mapTopologyConstraints(constraints)
+		if c := mapTopologyConstraints(constraints); c != nil {
+			cfg.Constraints = c
+		}
 	}
 	if disruption != nil {
-		cfg.DisruptionMode = mapDisruptionMode(disruption)
+		if d := mapDisruptionMode(disruption); d != nil {
+			cfg.DisruptionMode = d
+		}
 	}
 	if len(claims) > 0 {
 		cfg.ResourceClaims = mapResourceClaims(claims)
@@ -60,20 +57,23 @@ func MapPodGroupConfig(
 	return cfg
 }
 
+// mapSchedulingPolicy returns nil for an empty policy so resolveSchedulingConfig
+// falls back to the controller default instead of treating an unset user block
+// as an explicit override.
 func mapSchedulingPolicy(p *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) *SchedulingPolicy {
-	sp := &SchedulingPolicy{}
 	switch {
 	case p.Basic != nil:
-		sp.Basic = &BasicSchedulingPolicy{}
+		return &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}
 	case p.Gang != nil:
-		sp.Gang = &GangSchedulingPolicy{MinCount: p.Gang.MinCount}
+		return &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: p.Gang.MinCount}}
+	default:
+		return nil
 	}
-	return sp
 }
 
 func mapTopologyConstraints(c *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints) *SchedulingConstraints {
 	if len(c.Topology) == 0 {
-		return &SchedulingConstraints{}
+		return nil
 	}
 	topology := make([]schedulingv1alpha3.TopologyConstraint, len(c.Topology))
 	copy(topology, c.Topology)
@@ -81,14 +81,14 @@ func mapTopologyConstraints(c *schedulingv1alpha3.WorkloadPodGroupSchedulingCons
 }
 
 func mapDisruptionMode(d *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) *DisruptionMode {
-	dm := &DisruptionMode{}
 	switch {
 	case d.Single != nil:
-		dm.Single = &SingleDisruptionMode{}
+		return &DisruptionMode{Single: &SingleDisruptionMode{}}
 	case d.All != nil:
-		dm.All = &AllDisruptionMode{}
+		return &DisruptionMode{All: &AllDisruptionMode{}}
+	default:
+		return nil
 	}
-	return dm
 }
 
 func mapResourceClaims(claims []schedulingv1alpha3.WorkloadPodGroupResourceClaim) []ResourceClaim {
