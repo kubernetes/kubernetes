@@ -82,7 +82,7 @@ func (c *client) Connect(ctx context.Context) (err error) {
 		if err == nil {
 			return
 		}
-		logger.Error(err, "Failed to connect to device plugin", "resource", c.resource)
+		logger.Error(err, "Unable to connect to device plugin client with socket path", "path", c.socket)
 		c.mutex.Lock()
 		if c.grpc != nil {
 			c.grpc.Close()
