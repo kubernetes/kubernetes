@@ -573,6 +573,9 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 		return nil, fmt.Errorf("parentObject does not have ObjectMeta, %v", err)
 	}
 	prefix := getPodsPrefix(accessor.GetName())
+	topControllerName, topControllerResourceType := topController(accessor, controllerRef)
+	desiredAnnotations[v1.TopControllerName] = topControllerName
+	desiredAnnotations[v1.TopControllerResourceType] = topControllerResourceType
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -587,6 +590,16 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	}
 	pod.Spec = *template.Spec.DeepCopy()
 	return pod, nil
+}
+
+func topController(object metav1.Object, controllerRef *metav1.OwnerReference) (string, string) {
+	if controllerRef := metav1.GetControllerOfNoCopy(object); controllerRef != nil && controllerRef.Name != "" {
+		return controllerRef.Name, controllerRef.Kind
+	}
+	if controllerRef != nil {
+		return object.GetName(), controllerRef.Kind
+	}
+	return object.GetName(), ""
 }
 
 func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object, controllerRef *metav1.OwnerReference) error {
