@@ -135,6 +135,14 @@ const (
 	// This annotation is beta-level and is only honored when PodDeletionCost feature is enabled.
 	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
 
+	// TopControllerName represents the name of the top-level controller that
+	// caused a pod to be created.
+	TopControllerName = "controller.kubernetes.io/top-controller-name"
+
+	// TopControllerResourceType represents the resource type of the top-level
+	// controller that caused a pod to be created.
+	TopControllerResourceType = "controller.kubernetes.io/top-controller-resource-type"
+
 	// DeprecatedAnnotationTopologyAwareHints can be used to enable or disable
 	// Topology Aware Hints for a Service. This may be set to "Auto" or
 	// "Disabled". Any other value is treated as "Disabled". This annotation has

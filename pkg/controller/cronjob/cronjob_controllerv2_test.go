@@ -1373,6 +1373,12 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 						t.Errorf("%s: controllerRef.Controller is not set to true", name)
 					}
 				}
+				if got := job.Annotations[v1.TopControllerName]; got != cj.Name {
+					t.Errorf("%s: expected %s annotation to be %q, got %q", name, v1.TopControllerName, cj.Name, got)
+				}
+				if got := job.Annotations[v1.TopControllerResourceType]; got != "CronJob" {
+					t.Errorf("%s: expected %s annotation to be %q, got %q", name, v1.TopControllerResourceType, "CronJob", got)
+				}
 			}
 
 			expectedDeletes := 0
