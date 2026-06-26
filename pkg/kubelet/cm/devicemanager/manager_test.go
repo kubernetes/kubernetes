@@ -48,6 +48,7 @@ import (
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -1197,7 +1198,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 			required:                 1,
 			reusableDevices:          sets.New[string](),
 			expectedAllocatedDevices: nil,
-			expErr:                   fmt.Errorf("cannot allocate unregistered device %s", resourceName2),
+			expErr:                   admission.NewDeviceNotReadyError(fmt.Errorf("cannot allocate unregistered device %s", resourceName2)),
 		},
 		{
 			description:              "Admission error in case resource not devices previously allocated no longer healthy",
@@ -2207,4 +2208,30 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 	require.Empty(t, manager.endpoints)
 	require.Empty(t, manager.healthyDevices)
 	require.Empty(t, manager.unhealthyDevices)
+}
+
+func TestDevicesToAllocateUnregisteredDeviceReturnsDeviceNotReadyError(t *testing.T) {
+	as := assert.New(t)
+	_, tCtx := ktesting.NewTestContext(t)
+
+	resourceName := "domain1.com/unregistered"
+	testManager := &ManagerImpl{
+		endpoints:        make(map[string]endpointInfo),
+		healthyDevices:   make(map[string]sets.Set[string]),
+		unhealthyDevices: make(map[string]sets.Set[string]),
+		allocatedDevices: make(map[string]sets.Set[string]),
+		podDevices:       newPodDevices(),
+		sourcesReady:     &sourcesReadyStub{},
+	}
+
+	// The resource has not been registered (no entry in healthyDevices), so the
+	// device plugin is considered not yet registered and allocation must return a
+	// deferrable DeviceNotReadyError.
+	_, err := testManager.devicesToAllocate(tCtx, "pod1", "con1", resourceName, 1, sets.New[string]())
+	require.Error(t, err)
+
+	var devErr *admission.DeviceNotReadyError
+	require.ErrorAs(t, err, &devErr, "expected a *admission.DeviceNotReadyError for an unregistered device")
+	as.Equal(admission.ErrorReasonDeviceNotReady, admission.GetPodAdmitResult(err).Reason)
+	as.True(admission.GetPodAdmitResult(err).Defer, "unregistered device error should be deferrable")
 }

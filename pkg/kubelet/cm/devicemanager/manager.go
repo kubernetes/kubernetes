@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -649,7 +650,11 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	// Note: we need to check the device health and registration status *before* we check how many devices are needed, doing otherwise caused issue #109595
 	// Note: if the scheduler is bypassed, we fall back in scenario 1, so we still need these checks.
 	if !hasRegistered {
-		return nil, fmt.Errorf("cannot allocate unregistered device %s", resource)
+		// Wrap with DeviceNotReadyError so that admission defers (retries) the
+		// pod instead of permanently rejecting it. The device plugin may not
+		// have registered yet (e.g. on node reboot, or when the plugin pod
+		// starts after the workload pod is admitted).
+		return nil, admission.NewDeviceNotReadyError(fmt.Errorf("cannot allocate unregistered device %s", resource))
 	}
 
 	// Check if registered resource has healthy devices

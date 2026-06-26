@@ -18,6 +18,7 @@ package admission
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -83,5 +84,43 @@ func TestAdmissionErrors(t *testing.T) {
 		if h.Reason != ErrorReasonUnexpected {
 			t.Errorf("expected PodAdmitResult.Reason = %v, got %v", ErrorReasonUnexpected, h.Reason)
 		}
+	}
+}
+
+func TestDeviceNotReadyError(t *testing.T) {
+	innerErr := fmt.Errorf("cannot allocate unregistered device example.com/gpu")
+	devErr := NewDeviceNotReadyError(innerErr)
+
+	// It must satisfy the Error interface with the expected type.
+	if devErr.Type() != ErrorReasonDeviceNotReady {
+		t.Errorf("expected Type() = %q, got %q", ErrorReasonDeviceNotReady, devErr.Type())
+	}
+	if devErr.Error() != innerErr.Error() {
+		t.Errorf("expected Error() = %q, got %q", innerErr.Error(), devErr.Error())
+	}
+
+	// errors.As should find the DeviceNotReadyError even when wrapped.
+	wrapped := fmt.Errorf("admission failed: %w", devErr)
+	var asErr *DeviceNotReadyError
+	if !errors.As(wrapped, &asErr) {
+		t.Fatalf("expected errors.As to find *DeviceNotReadyError in wrapped error")
+	}
+
+	// GetPodAdmitResult must set Defer: true for a device-not-ready error.
+	result := GetPodAdmitResult(devErr)
+	if result.Admit {
+		t.Errorf("expected PodAdmitResult.Admit = false")
+	}
+	if !result.Defer {
+		t.Errorf("expected PodAdmitResult.Defer = true for DeviceNotReadyError")
+	}
+	if result.Reason != ErrorReasonDeviceNotReady {
+		t.Errorf("expected PodAdmitResult.Reason = %q, got %q", ErrorReasonDeviceNotReady, result.Reason)
+	}
+
+	// A non-deferrable error must not set Defer.
+	otherResult := GetPodAdmitResult(errors.New("some other error"))
+	if otherResult.Defer {
+		t.Errorf("expected PodAdmitResult.Defer = false for non-device error")
 	}
 }

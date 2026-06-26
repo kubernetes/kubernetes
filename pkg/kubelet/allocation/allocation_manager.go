@@ -81,11 +81,15 @@ type Manager interface {
 
 	// AddPod checks if a pod can be admitted. If so, it admits the pod and updates the allocation.
 	// The function returns a boolean value indicating whether the pod
-	// can be admitted, a brief single-word reason and a message explaining why
-	// the pod cannot be admitted.
+	// can be admitted, whether admission has been deferred (should be retried
+	// later rather than rejected), a brief single-word reason and a message
+	// explaining why the pod cannot be admitted.
+	// When deferred is true, ok is false and the caller should keep the pod
+	// Pending rather than rejecting it; the caller is responsible for tracking
+	// the deferral, retrying admission, and rejecting the pod if it times out.
 	// allocatedPods should represent the pods that have already been admitted, along with their
 	// admitted (allocated) resources.
-	AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
+	AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (ok bool, deferred bool, reason, message string)
 
 	// RemovePod removes any stored state for the given pod UID.
 	RemovePod(logger klog.Logger, uid types.UID)
@@ -499,7 +503,7 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	}
 }
 
-func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (bool, bool, string, string) {
 	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
@@ -512,7 +516,15 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
+	ok, deferAdmission, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
+
+	if !ok && deferAdmission {
+		// Admission failed but is deferrable (e.g. a device plugin has not yet
+		// registered). Keep the pod Pending instead of rejecting it; the caller
+		// tracks the deferral and retries admission.
+		logger.V(4).Info("Pod admission deferred; caller will retry", "pod", klog.KObj(pod), "reason", reason, "message", message)
+		return false, true, reason, message
+	}
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
@@ -522,7 +534,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 		}
 	}
 
-	return ok, reason, message
+	return ok, false, reason, message
 }
 
 func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {
@@ -546,7 +558,9 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	// Deferral only applies to pod additions (device plugin not yet registered),
+	// so the deferral signal is ignored for resizes.
+	fit, _, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
@@ -585,7 +599,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 // the pod cannot be admitted.
 // allocatedPods should represent the pods that have already been admitted, along with their
 // admitted (allocated) resources.
-func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
+func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (ok bool, deferAdmission bool, reason string, message string) {
 	logger := klog.FromContext(ctx)
 	// Filter out the pod being evaluated.
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
@@ -594,12 +608,12 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
-			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
-			return false, result.Reason, result.Message
+			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation, "defer", result.Defer)
+			return false, result.Defer, result.Reason, result.Message
 		}
 	}
 
-	return true, "", ""
+	return true, false, "", ""
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
