@@ -2044,7 +2044,7 @@ func describeContainerEnvFrom(container corev1.Container, resolverFn EnvVarResol
 
 // DescribeProbe is exported for consumers in other API groups that have probes
 func DescribeProbe(probe *corev1.Probe) string {
-	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds #success=%d #failure=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
+	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds successThreshold=%d failureThreshold=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
 	switch {
 	case probe.Exec != nil:
 		return fmt.Sprintf("exec %v %s", probe.Exec.Command, attrs)
