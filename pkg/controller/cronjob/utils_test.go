@@ -92,7 +92,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			expectedScheduledTime: func() time.Time {
 				return scheduledTime
 			},
-			expectedNumberOfAnnotations: 2,
+			expectedNumberOfAnnotations: 4,
 		},
 		{
 			name:             "nil timezone and one annotation",
@@ -101,7 +101,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			expectedScheduledTime: func() time.Time {
 				return scheduledTime
 			},
-			expectedNumberOfAnnotations: 2,
+			expectedNumberOfAnnotations: 4,
 		},
 		{
 			name:             "correct timezone and multiple annotation",
@@ -111,7 +111,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 				location, _ := time.LoadLocation(timeZoneCorrect)
 				return scheduledTime.In(location)
 			},
-			expectedNumberOfAnnotations: 3,
+			expectedNumberOfAnnotations: 5,
 		},
 	}
 
@@ -133,6 +133,12 @@ func TestGetJobFromTemplate2(t *testing.T) {
 			}
 			if len(job.ObjectMeta.Annotations) != tt.expectedNumberOfAnnotations {
 				t.Errorf("Wrong number of annotations")
+			}
+			if got := job.ObjectMeta.Annotations[v1.TopControllerName]; got != cj.Name {
+				t.Errorf("expected %s annotation to be %q, got %q", v1.TopControllerName, cj.Name, got)
+			}
+			if got := job.ObjectMeta.Annotations[v1.TopControllerResourceType]; got != "CronJob" {
+				t.Errorf("expected %s annotation to be %q, got %q", v1.TopControllerResourceType, "CronJob", got)
 			}
 
 			scheduledAnnotation := job.ObjectMeta.Annotations[batchv1.CronJobScheduledTimestampAnnotation]

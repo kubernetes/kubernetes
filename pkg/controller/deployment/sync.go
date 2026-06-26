@@ -199,6 +199,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 	// Add podTemplateHash label to selector.
 	newRSSelector := labelsutil.CloneSelectorAndAddLabel(d.Spec.Selector, apps.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
+	annotations := controller.SetTopControllerAnnotations(nil, d, metav1.NewControllerRef(d, controllerKind))
 
 	// Create new ReplicaSet
 	newRS := apps.ReplicaSet{
@@ -208,6 +209,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 			Labels:          newRSTemplate.Labels,
+			Annotations:     annotations,
 		},
 		Spec: apps.ReplicaSetSpec{
 			Replicas:        new(int32),

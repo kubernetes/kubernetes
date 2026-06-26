@@ -23,6 +23,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -644,12 +645,14 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 			return
 		}
 
+		var createdRS *apps.ReplicaSet
 		rsName := ""
 		for _, action := range fake.Actions() {
 			if createAction, ok := action.(testclient.CreateAction); ok {
-				if createdRS, ok := createAction.GetObject().(*apps.ReplicaSet); ok {
-					if createdRS.Name != "" {
-						rsName = createdRS.Name
+				if rs, ok := createAction.GetObject().(*apps.ReplicaSet); ok {
+					if rs.Name != "" {
+						createdRS = rs
+						rsName = rs.Name
 						break
 					}
 				}
@@ -658,6 +661,15 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 
 		if len(rsName) > validation.DNS1123SubdomainMaxLength {
 			t.Errorf("ReplicaSet name length %d, want <= %d", len(rsName), validation.DNS1123SubdomainMaxLength)
+		}
+		if createdRS == nil {
+			t.Fatalf("expected ReplicaSet create action")
+		}
+		if got := createdRS.Annotations[v1.TopControllerName]; got != d.Name {
+			t.Errorf("expected %s annotation to be %q, got %q", v1.TopControllerName, d.Name, got)
+		}
+		if got := createdRS.Annotations[v1.TopControllerResourceType]; got != "Deployment" {
+			t.Errorf("expected %s annotation to be %q, got %q", v1.TopControllerResourceType, "Deployment", got)
 		}
 
 		parts := strings.Split(rsName, "-")
