@@ -6059,3 +6059,112 @@ func TestOnPodSandboxReadyTiming(t *testing.T) {
 	assert.Len(t, fakeRuntime.Sandboxes, 1, "final sandbox count")
 	assert.Len(t, fakeRuntime.Containers, 1, "final container count")
 }
+
+func TestSysctlFiltering(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DefaultPodSysctls, true)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	assert.NoError(t, err)
+	m.defaultPodSysctls = map[string]string{
+		"net.somaxconn":     "1024",
+		"kernel.msgmax":     "true",
+		"fs.mqueue.msg_max": "1024",
+		"kernel.domainname": "my-name",
+		"kernel.hostname":   "my-name",
+		"non.whitelisted":   "true",
+	}
+
+	createTestPodFunc := func(hostNetwork, hostIPC bool, hostUsers *bool) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
+			},
+			Spec: v1.PodSpec{
+				HostNetwork: hostNetwork,
+				HostIPC:     hostIPC,
+				HostUsers:   hostUsers,
+				Containers: []v1.Container{
+					{
+						Name:            "foo1",
+						Image:           "busybox",
+						ImagePullPolicy: v1.PullIfNotPresent,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name            string
+		hostNetwork     bool
+		hostIPC         bool
+		hostUsers       *bool
+		expectedSysctls map[string]string
+	}{
+		{
+			name: "default",
+			expectedSysctls: map[string]string{
+				"net.somaxconn":     "1024",
+				"kernel.msgmax":     "true",
+				"fs.mqueue.msg_max": "1024",
+				"kernel.domainname": "my-name",
+			},
+		},
+		{
+			name:        "hostNetwork",
+			hostNetwork: true,
+			expectedSysctls: map[string]string{
+				"kernel.msgmax":     "true",
+				"fs.mqueue.msg_max": "1024",
+			},
+		},
+		{
+			name:    "hostIPC",
+			hostIPC: true,
+			expectedSysctls: map[string]string{
+				"net.somaxconn":     "1024",
+				"kernel.domainname": "my-name",
+			},
+		},
+		{
+			name:            "hostNetwork and hostIPC",
+			hostNetwork:     true,
+			hostIPC:         true,
+			expectedSysctls: map[string]string{},
+		},
+		{
+			name:      "pod uses userNS",
+			hostUsers: ptr.To(false),
+			expectedSysctls: map[string]string{
+				"net.somaxconn":     "1024",
+				"kernel.msgmax":     "true",
+				"fs.mqueue.msg_max": "1024",
+				"kernel.domainname": "my-name",
+			},
+		},
+		{
+			name:      "pod uses hostUsers",
+			hostUsers: ptr.To(true),
+			expectedSysctls: map[string]string{
+				"net.somaxconn":     "1024",
+				"kernel.msgmax":     "true",
+				"fs.mqueue.msg_max": "1024",
+				"kernel.domainname": "my-name",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			pod := createTestPodFunc(test.hostNetwork, test.hostIPC, test.hostUsers)
+			config, err := m.generatePodSandboxLinuxConfig(tCtx, pod)
+			assert.NoError(t, err)
+			if !reflect.DeepEqual(test.expectedSysctls, config.Sysctls) {
+				t.Errorf("Expected sysctls %v, got %v", test.expectedSysctls, config.Sysctls)
+			}
+		})
+	}
+}

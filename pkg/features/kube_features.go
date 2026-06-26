@@ -301,6 +301,12 @@ const (
 	// Deployments and replica sets can now also track terminating pods via .status.terminatingReplicas.
 	DeploymentReplicaSetTerminatingReplicas featuregate.Feature = "DeploymentReplicaSetTerminatingReplicas"
 
+	// owner: @VeraQin
+	// kep: https://kep.k8s.io/5996
+	//
+	// Enables support for DefaultPodSysctls in Kubelet Configuration.
+	DefaultPodSysctls featuregate.Feature = "DefaultPodSysctls"
+
 	// owner: @aojea
 	//
 	// The apiservers with the MultiCIDRServiceAllocator feature enable, in order to support live migration from the old bitmap ClusterIP
@@ -1347,6 +1353,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DefaultPodSysctls: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DisableAllocatorDualWrite: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
@@ -2300,6 +2310,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
 
 	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
+
+	DefaultPodSysctls: {},
 
 	DeploymentReplicaSetTerminatingReplicas: {},
 

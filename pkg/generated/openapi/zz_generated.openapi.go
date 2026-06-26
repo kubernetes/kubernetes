@@ -71963,6 +71963,21 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
+					"defaultPodSysctls": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DefaultPodSysctls is a set of default sysctls that will be applied to all pods.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"volumePluginDir": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumePluginDir is the full path of the directory in which to search for additional third party volume plugins. Default: \"/usr/libexec/kubernetes/kubelet-plugins/volume/exec/\"",

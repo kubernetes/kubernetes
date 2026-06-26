@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -797,6 +798,79 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.ImageMinimumGCAge = metav1.Duration{Duration: 1 * time.Nanosecond}
 				return conf
 			},
+		}, {
+			name: "DefaultPodSysctls configured with feature gate disabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip_forward": "1"}
+				return conf
+			},
+			errMsg: "invalid configuration: DefaultPodSysctls feature gate is required for Kubelet configuration option defaultPodSysctls",
+		}, {
+			name: "DefaultPodSysctls configured with feature gate enabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = true
+				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip_forward": "1"}
+				return conf
+			},
+			errMsg: "",
+		}, {
+			name: "DefaultPodSysctls with invalid sysctl name (uppercase)",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = true
+				conf.DefaultPodSysctls = map[string]string{"Invalid.Sysctl": "1"}
+				return conf
+			},
+			errMsg: `invalid configuration: "Invalid.Sysctl" is not a valid sysctl name for defaultPodSysctls`,
+		}, {
+			name: "DefaultPodSysctls with invalid sysctl name (invalid char)",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = true
+				conf.DefaultPodSysctls = map[string]string{"net.ipv4.ip@forward": "1"}
+				return conf
+			},
+			errMsg: `invalid configuration: "net.ipv4.ip@forward" is not a valid sysctl name for defaultPodSysctls`,
+		}, {
+			name: "DefaultPodSysctls with invalid sysctl name (too long)",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = true
+				conf.DefaultPodSysctls = map[string]string{strings.Repeat("a", 254): "1"}
+				return conf
+			},
+			errMsg: "is not a valid sysctl name for defaultPodSysctls",
+		}, {
+			name: "DefaultPodSysctls with valid sysctl name containing slashes",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = true
+				conf.DefaultPodSysctls = map[string]string{"net/ipv4/ip_forward": "1"}
+				return conf
+			},
+			errMsg: "",
+		}, {
+			name: "DefaultPodSysctls with non-namespaced sysctl",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				if conf.FeatureGates == nil {
+					conf.FeatureGates = make(map[string]bool)
+				}
+				conf.FeatureGates[string(features.DefaultPodSysctls)] = true
+				conf.DefaultPodSysctls = map[string]string{"kernel.printk": "7"}
+				return conf
+			},
+			errMsg: `invalid configuration: "kernel.printk" is not known to be namespaced for defaultPodSysctls`,
 		},
 	}
 

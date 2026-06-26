@@ -723,6 +723,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.KubeReservedCgroup = in.KubeReservedCgroup
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
+	out.DefaultPodSysctls = *(*map[string]string)(unsafe.Pointer(&in.DefaultPodSysctls))
 	out.VolumePluginDir = in.VolumePluginDir
 	out.ProviderID = in.ProviderID
 	out.KernelMemcgNotification = in.KernelMemcgNotification
@@ -926,6 +927,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	}
 	out.ConfigMapAndSecretChangeDetectionStrategy = configv1beta1.ResourceChangeDetectionStrategy(in.ConfigMapAndSecretChangeDetectionStrategy)
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
+	out.DefaultPodSysctls = *(*map[string]string)(unsafe.Pointer(&in.DefaultPodSysctls))
 	out.KernelMemcgNotification = in.KernelMemcgNotification
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
