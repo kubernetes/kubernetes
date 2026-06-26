@@ -25,8 +25,10 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/statefulset"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -40,11 +42,40 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
 		APIGroup:          "apps",
 		APIVersion:        apiVersion,
 		Resource:          "statefulsets",
 		IsResourceRequest: true,
 		Verb:              "create",
+	})
+
+	obj := mkValidStatefulSet()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+
+	t.Run("volumeClaimTemplates_metadata_name_empty", func(t *testing.T) {
+		objWithEmptyVCTName := mkValidStatefulSet(func(o *apps.StatefulSet) {
+			o.Spec.VolumeClaimTemplates = []api.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "",
+					},
+					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						Resources: api.VolumeResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceStorage: resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+			}
+		})
+		expectedErrs := field.ErrorList{
+			field.Required(field.NewPath("spec", "template", "spec", "volumes").Index(0).Child("name"), "").MarkFromImperative(),
+			field.Required(field.NewPath("spec", "template", "spec", "volumes").Index(0).Child("persistentVolumeClaim", "claimName"), "").MarkFromImperative(),
+		}
+		apitesting.VerifyValidationEquivalence(t, ctx, &objWithEmptyVCTName, registry.Strategy, expectedErrs)
 	})
 
 	testCases := map[string]struct {
@@ -91,6 +122,19 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "apps",
+		APIVersion:        apiVersion,
+		Resource:          "statefulsets",
+		Name:              "valid-statefulset",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+	obj := mkValidStatefulSet()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+
 	testCases := map[string]struct {
 		oldObj       apps.StatefulSet
 		updateObj    apps.StatefulSet

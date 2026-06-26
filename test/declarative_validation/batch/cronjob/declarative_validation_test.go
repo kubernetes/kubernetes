@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/batch/cronjob"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -38,8 +39,12 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "batch",
-		APIVersion: apiVersion,
+		APIPrefix:         "apis",
+		APIGroup:          "batch",
+		APIVersion:        apiVersion,
+		Resource:          "cronjobs",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input        batch.CronJob
@@ -84,6 +89,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkCronJob()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -94,8 +102,13 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "batch",
-		APIVersion: apiVersion,
+		APIPrefix:         "apis",
+		APIGroup:          "batch",
+		APIVersion:        apiVersion,
+		Resource:          "cronjobs",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	testCases := map[string]struct {
 		old          batch.CronJob
@@ -122,9 +135,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkCronJob()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkCronJob(mutators ...func(*batch.CronJob)) batch.CronJob {
+func mkCronJob(tweaks ...func(*batch.CronJob)) batch.CronJob {
 	job := batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-class",
@@ -133,8 +148,8 @@ func mkCronJob(mutators ...func(*batch.CronJob)) batch.CronJob {
 		Spec: validCronjobSpec,
 	}
 
-	for _, mutate := range mutators {
-		mutate(&job)
+	for _, tweak := range tweaks {
+		tweak(&job)
 	}
 
 	return job

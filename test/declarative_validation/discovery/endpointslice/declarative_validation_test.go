@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
 		APIGroup:          "discovery.k8s.io",
 		APIVersion:        apiVersion,
 		Resource:          "endpointslices",
@@ -87,6 +89,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidEndpointSlice()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -98,6 +102,15 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "discovery.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "endpointslices",
+		Name:              "valid-endpointslice",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	testCases := map[string]struct {
 		oldObj       discovery.EndpointSlice
 		updateObj    discovery.EndpointSlice
@@ -137,20 +150,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "discovery.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "endpointslices",
-				Name:              "valid-endpointslice",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidEndpointSlice()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidEndpointSlice(tweaks ...func(obj *discovery.EndpointSlice)) discovery.EndpointSlice {

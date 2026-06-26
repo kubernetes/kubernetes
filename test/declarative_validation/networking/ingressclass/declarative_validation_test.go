@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/ingressclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidateParameter(t *testing.T) {
@@ -33,6 +34,7 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
 					APIGroup:          "networking.k8s.io",
 					APIVersion:        apiVersion,
 					Resource:          "ingressclasses",
@@ -80,6 +82,8 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 					)
 				})
 			}
+			obj := mkValidIngressClass()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -135,20 +139,20 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 				},
 			}
 
+			ctx := genericapirequest.WithRequestInfo(
+				genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
+					APIGroup:          "networking.k8s.io",
+					APIVersion:        apiVersion,
+					Resource:          "ingressclasses",
+					Name:              "valid-ingress-class",
+					IsResourceRequest: true,
+					Verb:              "update",
+				},
+			)
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "ingressclasses",
-							Name:              "valid-ingress-class",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
@@ -159,6 +163,9 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 					)
 				})
 			}
+
+			updateObj := mkValidIngressClass()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }

@@ -28,10 +28,23 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/deployment"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-func mkDeployment(tolerations ...api.Toleration) *apps.Deployment {
-	return &apps.Deployment{
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*apps.Deployment) {
+	return func(deploy *apps.Deployment) {
+		pod := &api.Pod{
+			Spec: deploy.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		deploy.Spec.Template.Spec = pod.Spec
+	}
+}
+
+func mkDeployment(tweaks ...func(*apps.Deployment)) *apps.Deployment {
+	deploy := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "abc"}},
@@ -44,10 +57,14 @@ func mkDeployment(tolerations ...api.Toleration) *apps.Deployment {
 			},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"name": "abc"}},
-				Spec:       podtest.MakePodSpec(podtest.SetTolerations(tolerations...)),
+				Spec:       podtest.MakePodSpec(),
 			},
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(deploy)
+	}
+	return deploy
 }
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -64,13 +81,13 @@ func TestDeclarativeValidate(t *testing.T) {
 				input: mkDeployment(),
 			},
 			"valid toleration key": {
-				input: mkDeployment(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}),
+				input: mkDeployment(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists}))),
 			},
 			"valid toleration key without prefix": {
-				input: mkDeployment(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}),
+				input: mkDeployment(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists}))),
 			},
 			"invalid toleration key format": {
-				input: mkDeployment(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}),
+				input: mkDeployment(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
 					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 				},
@@ -82,5 +99,24 @@ func TestDeclarativeValidate(t *testing.T) {
 					apitesting.WithSkipGroupVersions("extensions/v1beta1"))
 			})
 		}
+		meta.RunObjectMetaTestCases(t, ctx, mkDeployment(), registry.Strategy,
+			meta.WithStringentFinalizerValidation(),
+			meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")),
+		)
+	}
+}
+
+func TestDeclarativeValidateUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIGroup:   "apps",
+			APIVersion: apiVersion,
+			Name:       "abc",
+			Verb:       "update",
+		})
+		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDeployment(), registry.Strategy,
+			meta.WithStringentFinalizerValidation(),
+			meta.WithValidationConfig(apitesting.WithSkipGroupVersions("extensions/v1beta1")),
+		)
 	}
 }

@@ -32,8 +32,32 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
-func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context, baseObj T, strategy rest.RESTCreateStrategy, options ...apitesting.ValidationTestConfig) {
+type Option func(*runOptions)
+
+type runOptions struct {
+	// TODO: Remove this after ensuring consistency between ObjectMeta finalizer validations for all types.
+	stringentFinalizerValidation bool
+	validationConfigs            []apitesting.ValidationTestConfig
+}
+
+func WithStringentFinalizerValidation() Option {
+	return func(o *runOptions) {
+		o.stringentFinalizerValidation = true
+	}
+}
+
+func WithValidationConfig(configs ...apitesting.ValidationTestConfig) Option {
+	return func(o *runOptions) {
+		o.validationConfigs = append(o.validationConfigs, configs...)
+	}
+}
+
+func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context, baseObj T, strategy rest.RESTCreateStrategy, opts ...Option) {
 	t.Helper()
+	o := &runOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
 	fldPath := field.NewPath("metadata")
 	trueVar := true
 
@@ -185,9 +209,15 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			Modify: func(meta metav1.Object) {
 				meta.SetFinalizers([]string{strings.Repeat("a", 317)})
 			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
-			},
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+				}
+				if o.stringentFinalizerValidation {
+					errs = append(errs, field.Invalid(fldPath.Child("finalizers").Index(0), strings.Repeat("a", 317), "name is neither a standard finalizer name nor is it fully qualified").MarkFromImperative())
+				}
+				return errs
+			}(),
 		},
 		{
 			Name: "managedFields: invalid operation",
@@ -364,13 +394,17 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 			} else {
 				t.Fatalf("failed to get accessor: %v", err)
 			}
-			apitesting.VerifyValidationEquivalence(t, ctx, obj, strategy, tc.ExpectedErrs, options...)
+			apitesting.VerifyValidationEquivalence(t, ctx, obj, strategy, tc.ExpectedErrs, o.validationConfigs...)
 		})
 	}
 }
 
-func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Context, baseObj T, strategy rest.RESTUpdateStrategy, options ...apitesting.ValidationTestConfig) {
+func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Context, baseObj T, strategy rest.RESTUpdateStrategy, opts ...Option) {
 	t.Helper()
+	o := &runOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
 	fldPath := field.NewPath("metadata")
 	t1 := metav1.NewTime(time.Unix(1000, 0).UTC())
 	t2 := metav1.NewTime(time.Unix(2000, 0).UTC())
@@ -488,9 +522,15 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			Modify: func(old, new metav1.Object) {
 				new.SetFinalizers([]string{strings.Repeat("a", 317)})
 			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
-			},
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("finalizers"), "", "").MarkFromImperative(),
+				}
+				if o.stringentFinalizerValidation {
+					errs = append(errs, field.Invalid(fldPath.Child("finalizers").Index(0), strings.Repeat("a", 317), "name is neither a standard finalizer name nor is it fully qualified").MarkFromImperative())
+				}
+				return errs
+			}(),
 		},
 		{
 			Name: "update: managedFields: subresource too long",
@@ -577,7 +617,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			oldAcc.SetResourceVersion("1")
 			newAcc.SetResourceVersion("2")
 			tc.Modify(oldAcc, newAcc)
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, currNew, currOld, strategy, tc.ExpectedErrs, options...)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, currNew, currOld, strategy, tc.ExpectedErrs, o.validationConfigs...)
 		})
 	}
 }
