@@ -74,8 +74,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidIngress() networking.Ingress {
-	return networking.Ingress{
+func mkValidIngress(tweaks ...func(ing *networking.Ingress)) networking.Ingress {
+	ing := networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-obj",
 			Namespace: metav1.NamespaceDefault,
@@ -91,4 +91,8 @@ func mkValidIngress() networking.Ingress {
 			},
 		},
 	}
+	for _, tweak := range tweaks {
+		tweak(&ing)
+	}
+	return ing
 }

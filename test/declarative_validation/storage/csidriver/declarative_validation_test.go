@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servicecidr
+package csidriver
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	registry "k8s.io/kubernetes/pkg/registry/networking/servicecidr"
+	storage "k8s.io/kubernetes/pkg/apis/storage"
+	registry "k8s.io/kubernetes/pkg/registry/storage/csidriver"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
@@ -46,45 +46,49 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "csidrivers",
 		IsResourceRequest: true,
 		Verb:              "create",
-	}), metav1.NamespaceDefault)
+	})
 
-	obj := mkValidServiceCIDR()
+	obj := mkCSIDriver()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "csidrivers",
 		Name:              "valid-obj",
 		IsResourceRequest: true,
 		Verb:              "update",
-	}), metav1.NamespaceDefault)
+	})
 
-	updateObj := mkValidServiceCIDR()
+	updateObj := mkCSIDriver()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
-	cidr := networking.ServiceCIDR{
+func mkCSIDriver(tweaks ...func(csi *storage.CSIDriver)) storage.CSIDriver {
+	falsePtr := false
+	csi := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-obj",
 		},
-		Spec: networking.ServiceCIDRSpec{
-			CIDRs: []string{"10.0.0.0/24"},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired:  &falsePtr,
+			PodInfoOnMount:  &falsePtr,
+			StorageCapacity: &falsePtr,
+			SELinuxMount:    &falsePtr,
 		},
 	}
 	for _, tweak := range tweaks {
-		tweak(&cidr)
+		tweak(&csi)
 	}
-	return cidr
+	return csi
 }

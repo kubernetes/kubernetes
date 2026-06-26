@@ -14,20 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servicecidr
+package storageversion
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	registry "k8s.io/kubernetes/pkg/registry/networking/servicecidr"
+	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
+	_ "k8s.io/kubernetes/pkg/apis/apiserverinternal/install"
+	registry "k8s.io/kubernetes/pkg/registry/apiserverinternal/storageversion"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 // TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1beta1"}
+var apiVersions = []string{"v1alpha1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -46,45 +47,38 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "internal.apiserver.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "storageversions",
 		IsResourceRequest: true,
 		Verb:              "create",
-	}), metav1.NamespaceDefault)
+	})
 
-	obj := mkValidServiceCIDR()
+	obj := mkValidStorageVersion()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "internal.apiserver.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
-		Name:              "valid-obj",
+		Resource:          "storageversions",
+		Name:              "group.resource",
 		IsResourceRequest: true,
 		Verb:              "update",
-	}), metav1.NamespaceDefault)
+	})
 
-	updateObj := mkValidServiceCIDR()
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	updateObj := mkValidStorageVersion()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy)
 }
 
-func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
-	cidr := networking.ServiceCIDR{
+func mkValidStorageVersion() apiserverinternal.StorageVersion {
+	return apiserverinternal.StorageVersion{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-obj",
-		},
-		Spec: networking.ServiceCIDRSpec{
-			CIDRs: []string{"10.0.0.0/24"},
+			Name: "group.resource",
 		},
 	}
-	for _, tweak := range tweaks {
-		tweak(&cidr)
-	}
-	return cidr
 }

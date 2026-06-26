@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/workload"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 
 	// Ensure all API groups are registered with the scheme
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -326,6 +327,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidWorkload()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -588,6 +592,15 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 	}
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "scheduling.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "workloads",
+		Name:              "valid-workload",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -595,18 +608,12 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
 				features.DRAWorkloadResourceClaims:       tc.enableDRAWorkloadResourceClaims,
 			})
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "scheduling.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "workloads",
-				Name:              "valid-workload",
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidWorkload(setResourceVersion("1"))
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidWorkload(tweaks ...func(obj *scheduling.Workload)) scheduling.Workload {

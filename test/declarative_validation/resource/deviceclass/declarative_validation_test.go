@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	registry "k8s.io/kubernetes/pkg/registry/resource/deviceclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
@@ -36,9 +37,11 @@ func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "resource.k8s.io",
-				APIVersion: apiVersion,
-				Resource:   "deviceclasses",
+				APIGroup:          "resource.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "deviceclasses",
+				IsResourceRequest: true,
+				Verb:              "create",
 			})
 
 			strategy := registry.Strategy
@@ -170,6 +173,9 @@ func TestDeclarativeValidate(t *testing.T) {
 					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 				})
 			}
+
+			obj := mkDeviceClass()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -178,9 +184,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "resource.k8s.io",
-				APIVersion: apiVersion,
-				Resource:   "deviceclasses",
+				APIGroup:          "resource.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "deviceclasses",
+				IsResourceRequest: true,
+				Verb:              "update",
 			})
 
 			strategy := registry.Strategy
@@ -275,6 +283,9 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs)
 				})
 			}
+
+			updateObj := mkDeviceClass()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }

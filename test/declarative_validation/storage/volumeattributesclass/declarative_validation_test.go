@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servicecidr
+package volumeattributesclass
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	registry "k8s.io/kubernetes/pkg/registry/networking/servicecidr"
+	storage "k8s.io/kubernetes/pkg/apis/storage"
+	registry "k8s.io/kubernetes/pkg/registry/storage/volumeattributesclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 // TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1beta1"}
+var apiVersions = []string{"v1", "v1beta1", "v1alpha1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -46,45 +46,44 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "volumeattributesclasses",
 		IsResourceRequest: true,
 		Verb:              "create",
-	}), metav1.NamespaceDefault)
+	})
 
-	obj := mkValidServiceCIDR()
+	obj := mkVolumeAttributesClass()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "volumeattributesclasses",
 		Name:              "valid-obj",
 		IsResourceRequest: true,
 		Verb:              "update",
-	}), metav1.NamespaceDefault)
+	})
 
-	updateObj := mkValidServiceCIDR()
+	updateObj := mkVolumeAttributesClass()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
-	cidr := networking.ServiceCIDR{
+func mkVolumeAttributesClass(tweaks ...func(class *storage.VolumeAttributesClass)) storage.VolumeAttributesClass {
+	class := storage.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-obj",
 		},
-		Spec: networking.ServiceCIDRSpec{
-			CIDRs: []string{"10.0.0.0/24"},
-		},
+		DriverName: "foo",
+		Parameters: map[string]string{"foo": "bar"},
 	}
 	for _, tweak := range tweaks {
-		tweak(&cidr)
+		tweak(&class)
 	}
-	return cidr
+	return class
 }

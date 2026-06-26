@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	registry "k8s.io/kubernetes/pkg/registry/rbac/role"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -39,8 +40,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(
 		genericapirequest.NewDefaultContext(),
 		&genericapirequest.RequestInfo{
-			APIGroup:   "rbac.authorization.k8s.io",
-			APIVersion: apiVersion,
+			APIGroup:          "rbac.authorization.k8s.io",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
 		},
 	)
 
@@ -71,6 +74,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidRole()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -85,8 +91,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(
 		genericapirequest.NewDefaultContext(),
 		&genericapirequest.RequestInfo{
-			APIGroup:   "rbac.authorization.k8s.io",
-			APIVersion: apiVersion,
+			APIGroup:          "rbac.authorization.k8s.io",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "update",
 		},
 	)
 
@@ -115,6 +123,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidRole()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidRole(tweaks ...func(*rbac.Role)) rbac.Role {

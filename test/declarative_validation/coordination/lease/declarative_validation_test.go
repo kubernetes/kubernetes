@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servicecidr
+package lease
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	registry "k8s.io/kubernetes/pkg/registry/networking/servicecidr"
+	coordination "k8s.io/kubernetes/pkg/apis/coordination"
+	registry "k8s.io/kubernetes/pkg/registry/coordination/lease"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
@@ -48,43 +48,37 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "coordination.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "leases",
 		IsResourceRequest: true,
 		Verb:              "create",
 	}), metav1.NamespaceDefault)
 
-	obj := mkValidServiceCIDR()
-	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	obj := mkValidLease()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy)
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "coordination.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "leases",
 		Name:              "valid-obj",
 		IsResourceRequest: true,
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
-	updateObj := mkValidServiceCIDR()
-	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	updateObj := mkValidLease()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy)
 }
 
-func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
-	cidr := networking.ServiceCIDR{
+func mkValidLease() coordination.Lease {
+	return coordination.Lease{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "valid-obj",
-		},
-		Spec: networking.ServiceCIDRSpec{
-			CIDRs: []string{"10.0.0.0/24"},
+			Name:      "valid-obj",
+			Namespace: metav1.NamespaceDefault,
 		},
 	}
-	for _, tweak := range tweaks {
-		tweak(&cidr)
-	}
-	return cidr
 }

@@ -54,9 +54,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "resourceclaims",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaims",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
@@ -507,6 +509,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
+
+	obj := mkValidResourceClaim()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func tweakDevicesConfigs(items int) func(*resource.ResourceClaim) {
@@ -714,9 +719,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "resourceclaims",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaims",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	fakeClient := fake.NewClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
@@ -825,6 +832,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
+
+	updateObj := mkValidResourceClaim()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
@@ -842,10 +852,12 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 	strategy := registry.NewStatusStrategy(Strategy)
 
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:    "resource.k8s.io",
-		APIVersion:  apiVersion,
-		Resource:    "resourceclaims",
-		Subresource: "status",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaims",
+		Subresource:       "status",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test-user"})
 

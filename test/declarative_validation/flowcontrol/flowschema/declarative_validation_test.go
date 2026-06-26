@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servicecidr
+package flowschema
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	registry "k8s.io/kubernetes/pkg/registry/networking/servicecidr"
+	flowcontrol "k8s.io/kubernetes/pkg/apis/flowcontrol"
+	registry "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 // TODO: remove this apiVersions variable once coverage tests are generated for this package.
-var apiVersions = []string{"v1", "v1beta1"}
+var apiVersions = []string{"v1", "v1beta3"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -46,45 +46,44 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "flowcontrol.apiserver.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "flowschemas",
 		IsResourceRequest: true,
 		Verb:              "create",
-	}), metav1.NamespaceDefault)
+	})
 
-	obj := mkValidServiceCIDR()
+	obj := mkValidFlowSchema()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "flowcontrol.apiserver.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "flowschemas",
 		Name:              "valid-obj",
 		IsResourceRequest: true,
 		Verb:              "update",
-	}), metav1.NamespaceDefault)
+	})
 
-	updateObj := mkValidServiceCIDR()
+	updateObj := mkValidFlowSchema()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
-	cidr := networking.ServiceCIDR{
+func mkValidFlowSchema() flowcontrol.FlowSchema {
+	return flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-obj",
 		},
-		Spec: networking.ServiceCIDRSpec{
-			CIDRs: []string{"10.0.0.0/24"},
+		Spec: flowcontrol.FlowSchemaSpec{
+			MatchingPrecedence: 1000,
+			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+				Name: "valid-priority-level",
+			},
 		},
 	}
-	for _, tweak := range tweaks {
-		tweak(&cidr)
-	}
-	return cidr
 }

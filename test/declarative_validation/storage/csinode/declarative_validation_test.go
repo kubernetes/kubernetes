@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package servicecidr
+package csinode
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	registry "k8s.io/kubernetes/pkg/registry/networking/servicecidr"
+	storage "k8s.io/kubernetes/pkg/apis/storage"
+	registry "k8s.io/kubernetes/pkg/registry/storage/csinode"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
@@ -46,45 +46,50 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "csinodes",
 		IsResourceRequest: true,
 		Verb:              "create",
-	}), metav1.NamespaceDefault)
+	})
 
-	obj := mkValidServiceCIDR()
+	obj := mkCSINode()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIPrefix:         "apis",
-		APIGroup:          "networking.k8s.io",
+		APIGroup:          "storage.k8s.io",
 		APIVersion:        apiVersion,
-		Resource:          "servicecidrs",
+		Resource:          "csinodes",
 		Name:              "valid-obj",
 		IsResourceRequest: true,
 		Verb:              "update",
-	}), metav1.NamespaceDefault)
+	})
 
-	updateObj := mkValidServiceCIDR()
+	updateObj := mkCSINode()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
-func mkValidServiceCIDR(tweaks ...func(cidr *networking.ServiceCIDR)) networking.ServiceCIDR {
-	cidr := networking.ServiceCIDR{
+func mkCSINode(tweaks ...func(node *storage.CSINode)) storage.CSINode {
+	node := storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-obj",
 		},
-		Spec: networking.ServiceCIDRSpec{
-			CIDRs: []string{"10.0.0.0/24"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{
+					Name:   "foo",
+					NodeID: "bar",
+				},
+			},
 		},
 	}
 	for _, tweak := range tweaks {
-		tweak(&cidr)
+		tweak(&node)
 	}
-	return cidr
+	return node
 }
