@@ -49,6 +49,7 @@ import (
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -1222,7 +1223,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 			required:                 1,
 			reusableDevices:          sets.New[string](),
 			expectedAllocatedDevices: nil,
-			expErr:                   fmt.Errorf("cannot allocate unregistered device %s", resourceName2),
+			expErr:                   admission.NewDeviceNotReadyError(fmt.Errorf("cannot allocate unregistered device %s", resourceName2)),
 		},
 		{
 			description:              "Admission error in case resource not devices previously allocated no longer healthy",
@@ -2478,4 +2479,83 @@ func TestLifecycleAllocatePod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDevicesToAllocateUnregisteredDeviceReturnsDeviceNotReadyError(t *testing.T) {
+	as := assert.New(t)
+	_, tCtx := ktesting.NewTestContext(t)
+
+	resourceName := "domain1.com/unregistered"
+	testManager := &ManagerImpl{
+		endpoints:        make(map[string]endpointInfo),
+		healthyDevices:   make(map[string]sets.Set[string]),
+		unhealthyDevices: make(map[string]sets.Set[string]),
+		allocatedDevices: make(map[string]sets.Set[string]),
+		podDevices:       newPodDevices(),
+		sourcesReady:     &sourcesReadyStub{},
+	}
+
+	// The resource has not been registered (no entry in healthyDevices), so the
+	// device plugin is considered not yet registered and allocation must return a
+	// deferrable DeviceNotReadyError.
+	_, err := testManager.devicesToAllocate(tCtx, "pod1", "con1", resourceName, 1, sets.New[string]())
+	require.Error(t, err)
+
+	var devErr *admission.DeviceNotReadyError
+	require.ErrorAs(t, err, &devErr, "expected a *admission.DeviceNotReadyError for an unregistered device")
+	as.Equal(admission.ErrorReasonDeviceNotReady, admission.GetPodAdmitResult(err).Reason)
+	as.True(admission.GetPodAdmitResult(err).Defer, "unregistered device error should be deferrable")
+}
+
+func TestDevicesToAllocateStoppedEndpointReturnsDeviceNotReadyError(t *testing.T) {
+	as := assert.New(t)
+	_, tCtx := ktesting.NewTestContext(t)
+
+	resourceName := "domain1.com/gpu"
+	// Simulate kubelet restart: checkpoint restored, endpoint is stopped,
+	// healthyDevices has an empty set for the resource (device plugin has not
+	// re-registered yet).
+	testManager := &ManagerImpl{
+		endpoints: map[string]endpointInfo{
+			resourceName: {e: newStoppedEndpointImpl(resourceName), opts: nil},
+		},
+		healthyDevices:   map[string]sets.Set[string]{resourceName: sets.New[string]()},
+		unhealthyDevices: map[string]sets.Set[string]{resourceName: sets.New[string]()},
+		allocatedDevices: make(map[string]sets.Set[string]),
+		podDevices:       newPodDevices(),
+		sourcesReady:     &sourcesReadyStub{},
+	}
+
+	_, err := testManager.devicesToAllocate(tCtx, "pod1", "con1", resourceName, 1, sets.New[string]())
+	require.Error(t, err)
+
+	var devErr *admission.DeviceNotReadyError
+	require.ErrorAs(t, err, &devErr, "expected DeviceNotReadyError when endpoint is stopped with no healthy devices")
+	as.Equal(admission.ErrorReasonDeviceNotReady, admission.GetPodAdmitResult(err).Reason)
+	as.True(admission.GetPodAdmitResult(err).Defer, "stopped endpoint error should be deferrable")
+}
+
+func TestDevicesToAllocateRunningEndpointNoHealthyDevicesReturnsRegularError(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+
+	resourceName := "domain1.com/gpu"
+	// Simulate steady state: plugin is running but all devices are unhealthy.
+	// The endpoint is NOT stopped, so the error should NOT be deferrable.
+	testManager := &ManagerImpl{
+		endpoints: map[string]endpointInfo{
+			resourceName: {e: &MockEndpoint{}, opts: nil},
+		},
+		healthyDevices:   map[string]sets.Set[string]{resourceName: sets.New[string]()},
+		unhealthyDevices: map[string]sets.Set[string]{resourceName: sets.New[string]("dev1")},
+		allocatedDevices: make(map[string]sets.Set[string]),
+		podDevices:       newPodDevices(),
+		sourcesReady:     &sourcesReadyStub{},
+	}
+
+	_, err := testManager.devicesToAllocate(tCtx, "pod1", "con1", resourceName, 1, sets.New[string]())
+	require.Error(t, err)
+
+	var devErr *admission.DeviceNotReadyError
+	require.NotErrorAs(t, err, &devErr, "running endpoint with no healthy devices should NOT return DeviceNotReadyError")
+	require.False(t, admission.GetPodAdmitResult(err).Defer, "running endpoint error should not be deferrable")
 }

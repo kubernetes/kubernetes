@@ -18,6 +18,7 @@ package allocation
 
 import (
 	"context"
+	"maps"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -60,6 +61,22 @@ const (
 	triggerReasonPeriodic = "periodic_retry"
 )
 
+// AdmitResult holds the outcome of a pod admission check.
+type AdmitResult struct {
+	// Admit is true when the pod was successfully admitted.
+	Admit bool
+	// Defer is true when admission failed but should be retried later rather
+	// than permanently rejected (e.g. a device plugin has not yet registered).
+	// Only meaningful when Admit is false.
+	Defer bool
+	// Reason is a brief single-word reason explaining why the pod was not
+	// admitted. Empty when Admit is true.
+	Reason string
+	// Message is a human-readable message explaining why the pod was not
+	// admitted. Empty when Admit is true.
+	Message string
+}
+
 // AllocationManager tracks pod resource allocations.
 type Manager interface {
 	// GetContainerResourceAllocation returns the AllocatedResources value for the container
@@ -80,13 +97,13 @@ type Manager interface {
 	// TODO: See if we can remove this and just add them in the allocation manager constructor.
 	AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers)
 
-	// AddPod checks if a pod can be admitted. If so, it admits the pod and updates the allocation.
-	// The function returns a boolean value indicating whether the pod
-	// can be admitted, a brief single-word reason and a message explaining why
-	// the pod cannot be admitted.
-	// allocatedPods should represent the pods that have already been admitted, along with their
-	// admitted (allocated) resources.
-	AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
+	// AddPod checks if a pod can be admitted. If so, it admits the pod and
+	// updates the allocation. The returned AdmitResult indicates whether the
+	// pod was admitted, whether admission should be deferred, and any
+	// rejection reason/message.
+	// activePods should represent the pods that have already been admitted,
+	// along with their admitted (allocated) resources.
+	AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) AdmitResult
 
 	// RemovePod removes any stored state for the given pod UID.
 	RemovePod(logger klog.Logger, uid types.UID)
@@ -109,6 +126,26 @@ type Manager interface {
 
 	// HasPodAllocatedResources returns whether a pod has been allocated resources.
 	HasPodAllocatedResources(podUID types.UID) bool
+
+	// MarkPodAdmissionDeferred records that the given pod's admission has been
+	// deferred. The first-seen time is preserved across repeated calls so the
+	// deferral timeout is measured from when the pod first entered the deferred state.
+	MarkPodAdmissionDeferred(uid types.UID)
+
+	// ClearDeferredAdmission removes any deferred-admission state for the given pod.
+	ClearDeferredAdmission(uid types.UID)
+
+	// IsPodAdmissionDeferred reports whether the given pod's admission is
+	// currently deferred (kept Pending and awaiting retry).
+	IsPodAdmissionDeferred(uid types.UID) bool
+
+	// RemoveOrphanedDeferredAdmissions prunes deferred-admission entries for
+	// pods that are no longer present in the given set of remaining pods.
+	RemoveOrphanedDeferredAdmissions(remainingPods sets.Set[types.UID])
+
+	// SnapshotDeferredAdmissions returns a copy of the deferred-admission map.
+	// The caller may iterate over it without holding the lock.
+	SnapshotDeferredAdmissions() map[types.UID]time.Time
 }
 
 type manager struct {
@@ -125,6 +162,12 @@ type manager struct {
 
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
+
+	// deferredAdmissionLock guards podsWithDeferredAdmission.
+	deferredAdmissionLock sync.Mutex
+	// podsWithDeferredAdmission maps a pod UID to the time it first entered
+	// the deferred admission state.
+	podsWithDeferredAdmission map[types.UID]time.Time
 
 	recorder record.EventRecorderLogger
 }
@@ -559,7 +602,7 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	}
 }
 
-func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) AdmitResult {
 	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
@@ -572,9 +615,17 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
+	result := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
 
-	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if !result.Admit && result.Defer {
+		// Admission failed but is deferrable (e.g. a device plugin has not yet
+		// registered). Keep the pod Pending instead of rejecting it; the caller
+		// tracks the deferral and retries admission.
+		logger.V(4).Info("Pod admission deferred; caller will retry", "pod", klog.KObj(pod), "reason", result.Reason, "message", result.Message)
+		return result
+	}
+
+	if result.Admit && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
@@ -582,7 +633,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 		}
 	}
 
-	return ok, reason, message
+	return result
 }
 
 func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {
@@ -596,6 +647,51 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	m.allocated.RemoveOrphanedPods(remainingPods)
 }
 
+func (m *manager) MarkPodAdmissionDeferred(uid types.UID) {
+	m.deferredAdmissionLock.Lock()
+	defer m.deferredAdmissionLock.Unlock()
+	if m.podsWithDeferredAdmission == nil {
+		m.podsWithDeferredAdmission = make(map[types.UID]time.Time)
+	}
+	if _, alreadyTracked := m.podsWithDeferredAdmission[uid]; !alreadyTracked {
+		m.podsWithDeferredAdmission[uid] = time.Now()
+	}
+}
+
+func (m *manager) ClearDeferredAdmission(uid types.UID) {
+	m.deferredAdmissionLock.Lock()
+	defer m.deferredAdmissionLock.Unlock()
+	delete(m.podsWithDeferredAdmission, uid)
+}
+
+func (m *manager) IsPodAdmissionDeferred(uid types.UID) bool {
+	m.deferredAdmissionLock.Lock()
+	defer m.deferredAdmissionLock.Unlock()
+	_, deferred := m.podsWithDeferredAdmission[uid]
+	return deferred
+}
+
+func (m *manager) RemoveOrphanedDeferredAdmissions(remainingPods sets.Set[types.UID]) {
+	m.deferredAdmissionLock.Lock()
+	defer m.deferredAdmissionLock.Unlock()
+	for uid := range m.podsWithDeferredAdmission {
+		if !remainingPods.Has(uid) {
+			delete(m.podsWithDeferredAdmission, uid)
+		}
+	}
+}
+
+func (m *manager) SnapshotDeferredAdmissions() map[types.UID]time.Time {
+	m.deferredAdmissionLock.Lock()
+	defer m.deferredAdmissionLock.Unlock()
+	if len(m.podsWithDeferredAdmission) == 0 {
+		return nil
+	}
+	snapshot := make(map[types.UID]time.Time, len(m.podsWithDeferredAdmission))
+	maps.Copy(snapshot, m.podsWithDeferredAdmission)
+	return snapshot
+}
+
 func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bool, error) {
 	logger := klog.FromContext(ctx)
 	_, updated := m.UpdatePodFromAllocation(pod)
@@ -606,8 +702,11 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
-	if fit {
+	// Deferral only applies to pod additions (device plugin not yet registered),
+	// so the deferral signal is ignored for resizes.
+	resizeResult := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	reason, message := resizeResult.Reason, resizeResult.Message
+	if resizeResult.Admit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			return false, err
@@ -645,7 +744,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 // the pod cannot be admitted.
 // allocatedPods should represent the pods that have already been admitted, along with their
 // admitted (allocated) resources.
-func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) (bool, string, string) {
+func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod, operation lifecycle.Operation) AdmitResult {
 	logger := klog.FromContext(ctx)
 	// Filter out the pod being evaluated.
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
@@ -654,12 +753,12 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods, Operation: operation}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
-			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
-			return false, result.Reason, result.Message
+			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation, "defer", result.Defer)
+			return AdmitResult{Admit: false, Defer: result.Defer, Reason: result.Reason, Message: result.Message}
 		}
 	}
 
-	return true, "", ""
+	return AdmitResult{Admit: true}
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {

@@ -182,6 +182,15 @@ const (
 	// Period for performing global cleanup tasks.
 	housekeepingPeriod = time.Second * 2
 
+	// deferredAdmissionTimeout bounds how long a pod may remain in the deferred
+	// admission queue before being permanently rejected. Once a pod has been
+	// continuously deferred for longer than this timeout (measured from when it
+	// first entered the deferred state), the next retry rejects it with PodFailed
+	// status, matching the existing immediate-rejection behavior. Because retries
+	// run on the periodic retry cadence, the actual rejection happens on the
+	// first retry after the timeout elapses, not exactly at the timeout.
+	deferredAdmissionTimeout = 1 * time.Minute
+
 	// Duration at which housekeeping failed to satisfy the invariant that
 	// housekeeping should be fast to avoid blocking pod config (while
 	// housekeeping is running no new pods are started or deleted).
@@ -2649,6 +2658,83 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
+// retryDeferredAdmissions re-runs admission for every pod whose admission was
+// previously deferred. Pods that can now be admitted are dispatched to the pod
+// workers with SyncPodCreate; pods still deferred and within the timeout are
+// kept; pods that have exceeded the deferral timeout (or now fail for a
+// non-deferrable reason) are permanently rejected.
+func (kl *Kubelet) retryDeferredAdmissions(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+
+	deferred := kl.allocationManager.SnapshotDeferredAdmissions()
+	if len(deferred) == 0 {
+		return
+	}
+
+	now := kl.clock.Now()
+
+	for uid, firstDeferred := range deferred {
+		pod, found := kl.podManager.GetPodByUID(uid)
+		if !found {
+			logger.V(4).Info("Deferred pod not found; removing from deferred admissions", "podUID", uid)
+			kl.allocationManager.ClearDeferredAdmission(uid)
+			continue
+		}
+
+		// A pod that has since been requested for termination or has reached a
+		// terminal phase must not be admitted. Drop it from the deferred set.
+		if kl.podWorkers.IsPodTerminationRequested(uid) || podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+			logger.V(4).Info("Deferred pod is terminating or terminal; dropping from deferred admissions", "pod", klog.KObj(pod))
+			kl.allocationManager.ClearDeferredAdmission(uid)
+			continue
+		}
+
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if pod == nil || wasMirror {
+			logger.V(2).Info("Programmer error, deferred pod was a mirror pod but should never be", "podUID", uid)
+			kl.allocationManager.ClearDeferredAdmission(uid)
+			continue
+		}
+
+		result := kl.allocationManager.AddPod(ctx, kl.GetActivePods(), pod)
+		switch {
+		case result.Admit:
+			// Admission now succeeds; dispatch the pod to the pod workers.
+			kl.allocationManager.ClearDeferredAdmission(uid)
+			logger.V(2).Info("Deferred pod admission succeeded; dispatching pod", "pod", klog.KObj(pod))
+			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
+				Pod:        pod,
+				MirrorPod:  mirrorPod,
+				UpdateType: kubetypes.SyncPodCreate,
+				StartTime:  now,
+			})
+		case result.Defer && now.Sub(firstDeferred) <= deferredAdmissionTimeout:
+			// Still deferred and within the timeout; keep waiting.
+			logger.V(4).Info("Pod admission still deferred; will retry", "pod", klog.KObj(pod), "reason", result.Reason)
+		default:
+			// Either the deferral timed out, or admission now fails for a
+			// non-deferrable reason. Reject the pod.
+			kl.allocationManager.ClearDeferredAdmission(uid)
+			reason, message := result.Reason, result.Message
+			if !result.Defer {
+				logger.V(4).Info("Deferred pod admission now failing for a non-deferrable reason; rejecting", "pod", klog.KObj(pod), "reason", reason)
+			} else {
+				// The deferral timed out while still waiting on the device
+				// plugin. Use a synthetic reason only when the handler did not
+				// provide one, so a genuine non-deferrable reason is never
+				// mislabeled as a timeout.
+				if reason == "" {
+					reason = "DeferredAdmissionTimeout"
+				}
+				logger.V(2).Info("Deferred pod admission timed out; rejecting", "pod", klog.KObj(pod), "timeout", deferredAdmissionTimeout)
+				message = "deferred admission timed out: " + message
+			}
+			kl.rejectPod(ctx, pod, reason, message)
+			recordAdmissionRejection(reason)
+		}
+	}
+}
+
 // rejectPod records an event about the pod with the given reason and message,
 // and updates the pod to the failed phase in the status manager.
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
@@ -2858,6 +2944,10 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			// We do not apply the optimization by updating the status directly, but can do it later
 			handler.HandlePodSyncs(ctx, pods)
 		}
+		// A container manager update (e.g. a device plugin registering) may make a
+		// previously-deferred pod admissible, so retry deferred admissions eagerly
+		// rather than waiting for the next periodic sweep.
+		kl.retryDeferredAdmissions(ctx)
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
@@ -2869,6 +2959,10 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			if err := handler.HandlePodCleanups(ctx); err != nil {
 				logger.Error(err, "Failed cleaning pods")
 			}
+			// Periodically retry admission for pods whose admission was deferred
+			// (e.g. waiting on a device plugin to register), admitting or
+			// rejecting them as appropriate.
+			kl.retryDeferredAdmissions(ctx)
 			duration := time.Since(start)
 			if duration > housekeepingWarningDuration {
 				logger.Error(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than expected", "expected", housekeepingWarningDuration, "actual", duration.Round(time.Millisecond))
@@ -2934,15 +3028,33 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			// Check if we can admit the pod; if not, reject it.
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
-			if ok, reason, message := kl.allocationManager.AddPod(ctx, kl.GetActivePods(), pod); !ok {
-				kl.rejectPod(ctx, pod, reason, message)
+			if result := kl.allocationManager.AddPod(ctx, kl.GetActivePods(), pod); !result.Admit {
+				if result.Defer {
+					// Admission failed but is deferrable (e.g. a device plugin has
+					// not yet registered). Keep the pod Pending instead of failing
+					// it: do not reject it, and do not dispatch it to the pod
+					// workers. Track the deferral so retryDeferredAdmissions
+					// re-attempts admission and rejects the pod if it eventually
+					// times out.
+					kl.allocationManager.MarkPodAdmissionDeferred(pod.UID)
+					logger.V(2).Info("Pod admission deferred; keeping pod pending until it can be admitted or times out", "pod", klog.KObj(pod), "reason", result.Reason, "message", result.Message)
+					continue
+				}
+				// The pod is being rejected, so it is no longer deferred. Clear
+				// any previous deferral state.
+				kl.allocationManager.ClearDeferredAdmission(pod.UID)
+				kl.rejectPod(ctx, pod, result.Reason, result.Message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.
 				// Instead, we record the metric here in HandlePodAdditions for new pods
 				// and capture resize events separately.
-				recordAdmissionRejection(reason)
+				recordAdmissionRejection(result.Reason)
 				continue
 			}
+
+			// The pod was admitted, so it is no longer deferred. Clear any
+			// previous deferral state.
+			kl.allocationManager.ClearDeferredAdmission(pod.UID)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have
@@ -3035,6 +3147,14 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 
+		// A pod whose admission is deferred must not be dispatched to the pod
+		// workers. retryDeferredAdmissions will dispatch it once it is admitted
+		// (or reject it on timeout). We still update the pod manager above so
+		// that the latest spec is available when admission is retried.
+		if kl.allocationManager.IsPodAdmissionDeferred(pod.UID) {
+			logger.V(4).Info("Skipping update for pod with deferred admission", "pod", klog.KObj(pod))
+			continue
+		}
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
@@ -3147,6 +3267,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 		kl.podCertificateManager.ForgetPod(ctx, pod)
 		kl.podManager.RemovePod(pod)
 		kl.allocationManager.RemovePod(logger, pod.UID)
+		kl.allocationManager.ClearDeferredAdmission(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -3249,6 +3370,13 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// be different than Sync, or if there is a better place for it. For instance, we have
 		// needsReconcile in kubelet/config, here, and in status_manager.
 		if status.NeedToReconcilePodReadiness(pod) {
+			// A pod whose admission is deferred must not be dispatched to the
+			// pod workers. retryDeferredAdmissions will dispatch it once it is
+			// admitted (or reject it on timeout).
+			if kl.allocationManager.IsPodAdmissionDeferred(pod.UID) {
+				logger.V(4).Info("Skipping reconcile for pod with deferred admission", "pod", klog.KObj(pod))
+				continue
+			}
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
@@ -3292,6 +3420,13 @@ func (kl *Kubelet) HandlePodSyncs(ctx context.Context, pods []*v1.Pod) {
 			// batch notify all pending work. We should make it impossible to double sync,
 			// but for now log a programmer error to prevent accidental introduction.
 			logger.V(3).Info("Programmer error, HandlePodSyncs does not expect to receive mirror pods", "podUID", pod.UID, "mirrorPodUID", mirrorPod.UID)
+			continue
+		}
+		// A pod whose admission is deferred has not been admitted and must not be
+		// dispatched to the pod workers by a stale relist or sync. retryDeferredAdmissions
+		// will dispatch it once it is admitted (or reject it on timeout).
+		if kl.allocationManager.IsPodAdmissionDeferred(pod.UID) {
+			logger.V(4).Info("Skipping sync for pod with deferred admission", "pod", klog.KObj(pod))
 			continue
 		}
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
