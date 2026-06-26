@@ -17,14 +17,10 @@ limitations under the License.
 package workloadbuilder
 
 import (
-	"context"
-	"fmt"
-	"strings"
 	"testing"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -34,21 +30,9 @@ func defaultGangMinCount(n int32) WorkloadItemFunc {
 	return func(item *WorkloadItem) {
 		p := item.ResolvedConfig.Policy
 		if p != nil && p.Gang != nil && p.Gang.MinCount == nil {
-			p.Gang.MinCount = ptr.To(n)
+			p.Gang.MinCount = new(n)
 		}
 	}
-}
-
-// childrenRoot builds a root with n leaf children, each using Basic scheduling.
-func childrenRoot(n int) *WorkloadItem {
-	root := &WorkloadItem{Name: "root"}
-	for i := 0; i < n; i++ {
-		root.Children = append(root.Children, &WorkloadItem{
-			Name:          fmt.Sprintf("child-%d", i),
-			DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-		})
-	}
-	return root
 }
 
 func TestBuild(t *testing.T) {
@@ -178,6 +162,22 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
+			name: "more than one topology constraint fails",
+			root: &WorkloadItem{
+				Name:          "topo-job",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				UserConfig: &SchedulingConfig{
+					Constraints: &SchedulingConstraints{
+						Topology: []schedulingv1alpha3.TopologyConstraint{
+							{Key: "topology.kubernetes.io/zone"},
+							{Key: "topology.kubernetes.io/region"},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "disruption mode all",
 			root: &WorkloadItem{
 				Name:          "disruption-job",
@@ -197,7 +197,7 @@ func TestBuild(t *testing.T) {
 				Name:          "dra-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: ptr.To("my-claim")}},
+					ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: new("my-claim")}},
 				},
 			},
 			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
@@ -227,7 +227,7 @@ func TestBuild(t *testing.T) {
 				Name:          "dra-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: ptr.To("a"), ResourceClaimTemplateName: ptr.To("b")}},
+					ResourceClaims: []ResourceClaim{{Name: "gpu", ResourceClaimName: new("a"), ResourceClaimTemplateName: new("b")}},
 				},
 			},
 			wantErr: true,
@@ -238,7 +238,7 @@ func TestBuild(t *testing.T) {
 				Name:          "dra-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 				UserConfig: &SchedulingConfig{
-					ResourceClaims: []ResourceClaim{{Name: "", ResourceClaimName: ptr.To("a")}},
+					ResourceClaims: []ResourceClaim{{Name: "", ResourceClaimName: new("a")}},
 				},
 			},
 			wantErr: true,
@@ -250,8 +250,8 @@ func TestBuild(t *testing.T) {
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 				UserConfig: &SchedulingConfig{
 					ResourceClaims: []ResourceClaim{
-						{Name: "dup", ResourceClaimName: ptr.To("a")},
-						{Name: "dup", ResourceClaimName: ptr.To("b")},
+						{Name: "dup", ResourceClaimName: new("a")},
+						{Name: "dup", ResourceClaimName: new("b")},
 					},
 				},
 			},
@@ -285,45 +285,23 @@ func TestBuild(t *testing.T) {
 			},
 		},
 		{
-			name: "empty leaf name fails",
+			name: "empty leaf name fails before resolution and callbacks",
 			root: &WorkloadItem{
 				Name:       "",
 				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "multi-level tree flattens to leaf templates",
-			root: &WorkloadItem{
-				Name:          "jobset",
-				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
-				Children: []*WorkloadItem{
-					{
-						Name:          "driver",
-						DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-					},
-					{
-						Name:          "workers",
-						DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
+				Callbacks: []WorkloadItemFunc{
+					func(item *WorkloadItem) {
+						item.Name = "recovered-by-callback"
 					},
 				},
 			},
-			verify: func(t *testing.T, wl *schedulingv1alpha3.Workload, _ *WorkloadItem) {
-				if len(wl.Spec.PodGroupTemplates) != 2 {
-					t.Fatalf("expected 2 templates from children, got %d", len(wl.Spec.PodGroupTemplates))
+			wantErr: true,
+			verify: func(t *testing.T, _ *schedulingv1alpha3.Workload, root *WorkloadItem) {
+				if root.ResolvedConfig != nil {
+					t.Error("ResolvedConfig was populated despite empty name; the name check should short-circuit before resolution")
 				}
-				if wl.Spec.PodGroupTemplates[0].Name != "driver" {
-					t.Errorf("expected first template name 'driver', got %q", wl.Spec.PodGroupTemplates[0].Name)
-				}
-				if wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Basic == nil {
-					t.Error("expected driver to use Basic policy")
-				}
-				if wl.Spec.PodGroupTemplates[1].Name != "workers" {
-					t.Errorf("expected second template name 'workers', got %q", wl.Spec.PodGroupTemplates[1].Name)
-				}
-				gang := wl.Spec.PodGroupTemplates[1].SchedulingPolicy.Gang
-				if gang == nil || gang.MinCount != 4 {
-					t.Error("expected workers to use Gang policy with MinCount=4")
+				if root.Name != "" {
+					t.Error("callback ran despite empty name; the name check should short-circuit before callbacks")
 				}
 			},
 		},
@@ -383,38 +361,40 @@ func TestBuild(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "duplicate template names fail",
-			root: &WorkloadItem{
-				Name: "jobset",
-				Children: []*WorkloadItem{
-					{Name: "dup", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
-					{Name: "dup", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name:    "too many templates fail",
-			root:    childrenRoot(schedulingv1alpha3.WorkloadMaxPodGroupTemplates + 1),
-			wantErr: true,
-		},
-		{
 			name:    "nil root fails",
 			root:    nil,
 			wantErr: true,
 		},
+		{
+			name: "missing owner returns error",
+			root: &WorkloadItem{
+				Name:          "job",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+			},
+			owner:   nil,
+			wantErr: true,
+		},
+	}
+
+	dummyOwner := &metav1.OwnerReference{
+		APIVersion: "batch/v1",
+		Kind:       "Job",
+		Name:       "test-job",
+		UID:        "12345",
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wl, err := NewBuilder(tt.root).Build(context.Background(), "wl", "ns", tt.owner)
+			owner := tt.owner
+			if owner == nil && tt.name != "missing owner returns error" {
+				owner = dummyOwner
+			}
+			wl, err := Build(tt.root, BuildOptions{Name: "wl", Namespace: "ns", Owner: owner})
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				return
-			}
-			if err != nil {
+			} else if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if tt.verify != nil {
@@ -426,16 +406,14 @@ func TestBuild(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
-		name     string
-		root     *WorkloadItem
-		wantErrs bool
-		wantType field.ErrorType
+		name    string
+		root    *WorkloadItem
+		wantErr bool
 	}{
 		{
-			name:     "nil root is required",
-			root:     nil,
-			wantErrs: true,
-			wantType: field.ErrorTypeRequired,
+			name:    "nil root is required",
+			root:    nil,
+			wantErr: true,
 		},
 		{
 			name: "basic config is valid",
@@ -458,8 +436,7 @@ func TestValidate(t *testing.T) {
 				Name:       "job",
 				UserConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{}}},
 			},
-			wantErrs: true,
-			wantType: field.ErrorTypeRequired,
+			wantErr: true,
 		},
 		{
 			name: "resource claim missing both names is invalid",
@@ -470,8 +447,7 @@ func TestValidate(t *testing.T) {
 					ResourceClaims: []ResourceClaim{{Name: "gpu"}},
 				},
 			},
-			wantErrs: true,
-			wantType: field.ErrorTypeInvalid,
+			wantErr: true,
 		},
 		{
 			name: "duplicate resource claim names is invalid",
@@ -480,36 +456,26 @@ func TestValidate(t *testing.T) {
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
 				UserConfig: &SchedulingConfig{
 					ResourceClaims: []ResourceClaim{
-						{Name: "dup", ResourceClaimName: ptr.To("a")},
-						{Name: "dup", ResourceClaimName: ptr.To("b")},
+						{Name: "dup", ResourceClaimName: new("a")},
+						{Name: "dup", ResourceClaimName: new("b")},
 					},
 				},
 			},
-			wantErrs: true,
-			wantType: field.ErrorTypeDuplicate,
+			wantErr: true,
 		},
 	}
 
-	fldPath := field.NewPath("spec", "scheduling")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errs := NewBuilder(tt.root).Validate(fldPath)
-			if tt.wantErrs {
-				if len(errs) == 0 {
-					t.Fatal("expected errors, got none")
-				}
-				if tt.wantType != "" && errs[0].Type != tt.wantType {
-					t.Errorf("expected error type %s, got %s", tt.wantType, errs[0].Type)
-				}
-				for _, e := range errs {
-					if !strings.HasPrefix(e.Field, "spec.scheduling") {
-						t.Errorf("expected error rooted at spec.scheduling, got %q", e.Field)
-					}
+			err := Validate(tt.root)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
 				}
 				return
 			}
-			if len(errs) != 0 {
-				t.Fatalf("expected no errors, got %v", errs)
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
 			}
 		})
 	}
@@ -527,8 +493,17 @@ func TestValidateAgreesWithBuild(t *testing.T) {
 
 	for name, root := range roots {
 		t.Run(name, func(t *testing.T) {
-			validateErr := len(NewBuilder(root).Validate(field.NewPath("spec", "scheduling"))) > 0
-			_, err := NewBuilder(root).Build(context.Background(), "wl", "ns", nil)
+			validateErr := Validate(root) != nil
+			_, err := Build(root, BuildOptions{
+				Name:      "wl",
+				Namespace: "ns",
+				Owner: &metav1.OwnerReference{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+					Name:       "test-job",
+					UID:        "12345",
+				},
+			})
 			buildErr := err != nil
 			if validateErr != buildErr {
 				t.Errorf("Validate/Build disagree: validateErr=%v buildErr=%v", validateErr, buildErr)

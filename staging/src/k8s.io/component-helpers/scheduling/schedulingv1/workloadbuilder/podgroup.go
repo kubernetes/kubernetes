@@ -25,7 +25,7 @@ import (
 
 // NewPodGroup materializes a runtime PodGroup from the named PodGroupTemplate,
 // which Build does not create. The template's scheduling fields are deep-copied
-// into the spec, podGroupTemplateRef points back at the template, and the 
+// into the spec, podGroupTemplateRef points back at the template, and the
 // PodGroup lands in the workload's namespace. Owners are caller-supplied
 // because they differ by case (e.g. a parent-owned Workload gets no ownerRef).
 func NewPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupName string, owners []metav1.OwnerReference) (*schedulingv1alpha3.PodGroup, error) {
@@ -39,11 +39,9 @@ func NewPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupNa
 	}
 
 	spec := schedulingv1alpha3.PodGroupSpec{
-		PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
-			Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
-				WorkloadName:         workload.Name,
-				PodGroupTemplateName: tmpl.Name,
-			},
+		WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+			WorkloadName: workload.Name,
+			TemplateName: tmpl.Name,
 		},
 		SchedulingPolicy:      *tmpl.SchedulingPolicy.DeepCopy(),
 		SchedulingConstraints: tmpl.SchedulingConstraints.DeepCopy(),

@@ -17,6 +17,8 @@ limitations under the License.
 package workloadbuilder
 
 import (
+	"slices"
+
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -60,13 +62,13 @@ func ValidateSchedulingPolicy(
 
 	if policy.Basic != nil {
 		count++
-		if !hasSchedulingPolicy(allowed, BasicPolicy) {
+		if !slices.Contains(allowed, BasicPolicy) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("basic"), "basic scheduling policy is not supported by this controller"))
 		}
 	}
 	if policy.Gang != nil {
 		count++
-		if !hasSchedulingPolicy(allowed, GangPolicy) {
+		if !slices.Contains(allowed, GangPolicy) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("gang"), "gang scheduling policy is not supported by this controller"))
 		}
 		if policy.Gang.MinCount != nil && *policy.Gang.MinCount < 1 {
@@ -100,13 +102,13 @@ func ValidateDisruptionMode(
 
 	if mode.Single != nil {
 		count++
-		if !hasDisruptionMode(allowed, SingleMode) {
+		if !slices.Contains(allowed, SingleMode) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("single"), "single disruption mode is not supported by this controller"))
 		}
 	}
 	if mode.All != nil {
 		count++
-		if !hasDisruptionMode(allowed, AllMode) {
+		if !slices.Contains(allowed, AllMode) {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("all"), "all disruption mode is not supported by this controller"))
 		}
 	}
@@ -119,22 +121,4 @@ func ValidateDisruptionMode(
 	}
 
 	return allErrs
-}
-
-func hasSchedulingPolicy(opts []SchedulingPolicyOption, target SchedulingPolicyOption) bool {
-	for _, o := range opts {
-		if o == target {
-			return true
-		}
-	}
-	return false
-}
-
-func hasDisruptionMode(opts []DisruptionModeOption, target DisruptionModeOption) bool {
-	for _, o := range opts {
-		if o == target {
-			return true
-		}
-	}
-	return false
 }

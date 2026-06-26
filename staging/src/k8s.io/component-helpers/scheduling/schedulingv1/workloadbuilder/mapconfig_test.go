@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
@@ -37,6 +38,33 @@ func TestMapPodGroupConfig(t *testing.T) {
 			check: func(t *testing.T, cfg *SchedulingConfig) {
 				if cfg.Policy != nil || cfg.Constraints != nil || cfg.DisruptionMode != nil || cfg.ResourceClaims != nil {
 					t.Errorf("expected all fields nil, got %+v", cfg)
+				}
+			},
+		},
+		{
+			name:   "empty policy maps to nil so the default survives",
+			policy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy != nil {
+					t.Errorf("expected nil policy for empty input, got %+v", cfg.Policy)
+				}
+			},
+		},
+		{
+			name:        "empty constraints maps to nil so the default survives",
+			constraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Constraints != nil {
+					t.Errorf("expected nil constraints for empty input, got %+v", cfg.Constraints)
+				}
+			},
+		},
+		{
+			name:       "empty disruption maps to nil so the default survives",
+			disruption: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.DisruptionMode != nil {
+					t.Errorf("expected nil disruption for empty input, got %+v", cfg.DisruptionMode)
 				}
 			},
 		},
@@ -170,7 +198,16 @@ func TestMapPodGroupConfigEndToEnd(t *testing.T) {
 		Callbacks:     []WorkloadItemFunc{defaultGangMinCount(4)},
 	}
 
-	wl, err := NewBuilder(root).Build(t.Context(), "job", "ns", nil)
+	wl, err := Build(root, BuildOptions{
+		Name:      "job",
+		Namespace: "ns",
+		Owner: &metav1.OwnerReference{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+			Name:       "test-job",
+			UID:        "12345",
+		},
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
