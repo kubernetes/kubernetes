@@ -78,6 +78,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
+	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -560,7 +561,8 @@ func TestGenericStorageProviders(t *testing.T) {
 			schedulingrest.RESTStorageProvider,
 			storagerest.RESTStorageProvider,
 			appsrest.StorageProvider,
-			resourcerest.RESTStorageProvider:
+			resourcerest.RESTStorageProvider,
+			lifecyclerest.RESTStorageProvider:
 			// all these are non-generic, but kube specific
 			continue
 		default:

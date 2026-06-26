@@ -432,6 +432,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowRestartAllContainers:                               utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
+		SchedulingGroupInUse:                                    podSpec != nil && podSpec.SchedulingGroup != nil,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -729,6 +730,7 @@ func dropDisabledFields(
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
+	dropDisabledEvictionResponders(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1921,4 +1923,20 @@ func DropInitContainerAnnotations(annotations map[string]string) {
 	for k := range initContainerAnnotations {
 		delete(annotations, k)
 	}
+}
+
+// dropDisabledEvictionResponders removes eviction responders from its spec
+// unless it is already used by the old pod spec.
+func dropDisabledEvictionResponders(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) && !evictionRespondersInUse(oldPodSpec) {
+		podSpec.EvictionResponders = nil
+	}
+}
+
+func evictionRespondersInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return len(podSpec.EvictionResponders) > 0
 }

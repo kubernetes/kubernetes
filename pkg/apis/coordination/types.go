@@ -32,6 +32,15 @@ const (
 	OldestEmulationVersion CoordinatedLeaseStrategy = "OldestEmulationVersion"
 )
 
+// KubernetesEvictionResponderName is the name identifying a core in-tree responder.
+type KubernetesEvictionResponderName string
+
+const (
+	// EvictionResponderImperativeEviction is a default responder that will evict pods using the imperative
+	// Eviction API (/evict endpoint) with a backoff.
+	EvictionResponderImperativeEviction KubernetesEvictionResponderName = "imperative-eviction.k8s.io/evictor"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Lease defines a lease concept.
