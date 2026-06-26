@@ -32,6 +32,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -986,4 +987,38 @@ func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
 	}
+}
+
+// bindingStrategy implements behavior for Pod binding
+type bindingStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+// BindingStrategy is the default logic that applies when creating a Binding
+var BindingStrategy = bindingStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+
+// NamespaceScoped is true for Bindings.
+func (bindingStrategy) NamespaceScoped() bool {
+	return true
+}
+
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (bindingStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+}
+
+// Validate validates a new Binding.
+func (bindingStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	binding := obj.(*api.Binding)
+	allErrs := corevalidation.ValidatePodBinding(binding)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, binding, nil, allErrs, operation.Create)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (bindingStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
+// Canonicalize normalizes the object after validation.
+func (bindingStrategy) Canonicalize(obj runtime.Object) {
 }
