@@ -317,8 +317,8 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 		if err != nil {
 			return err
 		}
-		// destination is created with source perm (before umask)
-		err = os.WriteFile(destination, data, sourceInfo.Mode().Perm())
+		// destination created with source perm, but never executable, and subject to umask
+		err = os.WriteFile(destination, data, sourceInfo.Mode().Perm()&0666)
 		if err != nil {
 			return err
 		}
