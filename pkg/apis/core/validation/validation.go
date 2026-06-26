@@ -6422,15 +6422,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Disable InPlaceResize if a pod is using DRA resource claims for node-allocatable resources.
-	// TODO(KEP-5517) - Handle in place resize with node-allocatable resource claims.
-	// Currently, the presence of any node-allocatable resource claim blocks resizing for all resources, irrespective of whether
-	// ResourceClaim is used for the same resource.
-	if len(oldPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		allErrs = append(allErrs, field.Forbidden(specPath, "pods with node allocatable resource claims cannot be resized"))
-	}
-
-	// Part 4: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
 	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
 	// newPod.Spec.InitContainers[].Resources are allowed.
 
