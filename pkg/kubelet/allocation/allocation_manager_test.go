@@ -557,8 +557,8 @@ func TestUpdatePodFromAllocationMigratedFromV1(t *testing.T) {
 	assert.Equal(t, "2", desired.Spec.Containers[0].Resources.Requests.Cpu().String(), "the pod must not be modified")
 
 	// Adding the pod stores it as a whole, with the resources it had been allocated.
-	admitted, reason, message := m.AddPod(ctx, nil, desired)
-	require.True(t, admitted, "%s: %s", reason, message)
+	result := m.AddPod(ctx, nil, desired)
+	require.True(t, result.Admit, "%s: %s", result.Reason, result.Message)
 	stored, found := m.allocated.GetPod("uid1")
 	require.True(t, found)
 	assert.False(t, state.IsMigratedFromV1(stored))
@@ -2444,10 +2444,10 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
-			require.Equal(t, tc.expectAdmit, ok)
-			require.Equal(t, tc.admissionFailureReason, reason)
-			require.Equal(t, tc.admissionFailureMessage, message)
+			result := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
+			require.Equal(t, tc.expectAdmit, result.Admit)
+			require.Equal(t, tc.admissionFailureReason, result.Reason)
+			require.Equal(t, tc.admissionFailureMessage, result.Message)
 
 			for podUID, resources := range tc.expectedAllocatedResourcesState {
 				pod := podForAllocation(podUID, resources)
@@ -2703,10 +2703,10 @@ func TestAllocationManagerAddPod(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
-			require.Equal(t, tc.expectAdmit, ok)
-			require.Equal(t, tc.admissionFailureReason, reason)
-			require.Equal(t, tc.admissionFailureMessage, message)
+			result := allocationManager.AddPod(tCtx, tc.currentActivePods, tc.podToAdd)
+			require.Equal(t, tc.expectAdmit, result.Admit)
+			require.Equal(t, tc.admissionFailureReason, result.Reason)
+			require.Equal(t, tc.admissionFailureMessage, result.Message)
 
 			for podUID, resources := range tc.expectedAllocatedResourcesState {
 				pod := podForAllocation(podUID, resources)
@@ -3286,8 +3286,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{test.pod}, nil)
 
 			// Admit the Pod
-			ok, reason, message := allocationManager.AddPod(tCtx, []*v1.Pod{test.pod}, test.pod)
-			require.True(t, ok, "admit should succeed: reason=%s, msg=%s", reason, message)
+			result := allocationManager.AddPod(tCtx, []*v1.Pod{test.pod}, test.pod)
+			require.True(t, result.Admit, "admit should succeed: reason=%s, msg=%s", result.Reason, result.Message)
 
 			// Verify state memory has the correct emptyDir allocation
 			memoryStore := allocationManager.(*manager).allocated
@@ -4117,8 +4117,8 @@ func TestNonAllocatedPodsExcludedFromCapacity_AddPod(t *testing.T) {
 
 	// If pendingPod was incorrectly included in capacity calculations,
 	// AddPod would fail (500m + 1000m + 10000m > 4000m allocatable).
-	ok, reason, message := allocationManager.AddPod(tCtx, []*v1.Pod{runningPod, pendingPod}, newPod)
-	assert.True(t, ok, "AddPod should succeed: reason=%s message=%s", reason, message)
+	result := allocationManager.AddPod(tCtx, []*v1.Pod{runningPod, pendingPod}, newPod)
+	assert.True(t, result.Admit, "AddPod should succeed: reason=%s message=%s", result.Reason, result.Message)
 
 	newAlloc, found := allocationManager.GetContainerResourceAllocation(newPod.UID, "c1")
 	require.True(t, found)

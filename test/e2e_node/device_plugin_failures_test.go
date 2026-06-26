@@ -373,4 +373,73 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		// after the graceful period devices capacity will reset to zero
 		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
 	})
+
+	ginkgo.It("defers admission, keeping the pod Pending until the device plugin registers, then runs it", func(ctx context.Context) {
+		// randomizing so tests can run in parallel
+		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
+		node := getLocalNode(ctx, f)
+
+		// The device plugin has not registered yet, so the resource is absent.
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
+
+		// Create a pod requesting the device, binding it directly to the node to
+		// bypass the scheduler. Because the device plugin has not registered, the
+		// kubelet must defer admission (rather than rejecting the pod) and keep it
+		// Pending instead of failing it.
+		pod := createPod(resourceName, 1)
+		pod.Spec.NodeName = node.Name
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+
+		ginkgo.By("pod stays Pending (not Failed) while the device plugin is unregistered")
+		gomega.Consistently(func() v1.PodPhase {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.Succeed())
+			return p.Status.Phase
+		}, 10*time.Second, f.Timeouts.Poll).Should(gomega.Equal(v1.PodPending))
+
+		ginkgo.By("registering the device plugin")
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		plugin := testdeviceplugin.NewDevicePlugin(nil)
+		time.Sleep(time.Second) // wait for the unix socket to be open
+		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
+		defer plugin.Stop()
+		gomega.Expect(err).To(gomega.Succeed())
+
+		ginkgo.By("pod is admitted and becomes Running once the device plugin registers")
+		gomega.Expect(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)).To(gomega.Succeed())
+	})
+
+	ginkgo.It("rejects a deferred pod with Failed after the admission timeout elapses if the device plugin never registers", func(ctx context.Context) {
+		// randomizing so tests can run in parallel
+		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
+		node := getLocalNode(ctx, f)
+
+		// The device plugin is never registered for this resource.
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
+
+		// Bind the pod directly to the node to bypass the scheduler.
+		pod := createPod(resourceName, 1)
+		pod.Spec.NodeName = node.Name
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+
+		// The pod must first be deferred (kept Pending), not rejected immediately:
+		// this distinguishes the deferral behavior from the pre-feature behavior
+		// of failing the pod right away. The window stays under the 1-minute
+		// deferral timeout.
+		ginkgo.By("pod stays Pending (deferred) before the admission timeout elapses")
+		gomega.Consistently(func() v1.PodPhase {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.Succeed())
+			return p.Status.Phase
+		}, 30*time.Second, f.Timeouts.Poll).Should(gomega.Equal(v1.PodPending))
+
+		ginkgo.By("pod is permanently rejected with Failed after the deferred admission timeout")
+		gomega.Eventually(func() v1.PodPhase {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.Succeed())
+			return p.Status.Phase
+		}, 3*time.Minute, f.Timeouts.Poll).Should(gomega.Equal(v1.PodFailed))
+	})
 })
