@@ -1244,33 +1244,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: request_concurrency_in_use
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Concurrency (number of seats) occupied by the currently executing (initial
-    stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
-    subsystem
-  type: Gauge
-  deprecatedVersion: 1.31.0
-  stabilityLevel: ALPHA
-  labels:
-  - flow_schema
-  - priority_level
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: request_concurrency_limit
-  subsystem: flowcontrol
-  namespace: apiserver
-  help: Nominal number of execution seats configured for each priority level
-  type: Gauge
-  deprecatedVersion: 1.30.0
-  stabilityLevel: ALPHA
-  labels:
-  - priority_level
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: request_dispatch_no_accommodation_total
   subsystem: flowcontrol
   namespace: apiserver
@@ -1779,47 +1752,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: request_slo_duration_seconds
-  subsystem: apiserver
-  help: Response latency distribution (not counting webhook duration and priority
-    & fairness queue wait times) in seconds for each verb, group, version, resource,
-    subresource, scope and component.
-  type: Histogram
-  deprecatedVersion: 1.27.0
-  stabilityLevel: ALPHA
-  labels:
-  - component
-  - group
-  - resource
-  - scope
-  - subresource
-  - verb
-  - version
-  buckets:
-  - 0.05
-  - 0.1
-  - 0.2
-  - 0.4
-  - 0.6
-  - 0.8
-  - 1
-  - 1.25
-  - 1.5
-  - 2
-  - 3
-  - 4
-  - 5
-  - 6
-  - 8
-  - 10
-  - 15
-  - 20
-  - 30
-  - 45
-  - 60
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: request_terminations_total
   subsystem: apiserver
   help: Number of requests which apiserver terminated in self-defense.
@@ -1953,17 +1885,6 @@
   help: Total number of failed data encryption key(DEK) generation operations.
   type: Counter
   stabilityLevel: ALPHA
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: storage_db_total_size_in_bytes
-  subsystem: apiserver
-  help: Total size of the storage database file physically allocated in bytes.
-  type: Gauge
-  deprecatedVersion: 1.28.0
-  stabilityLevel: ALPHA
-  labels:
-  - endpoint
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
