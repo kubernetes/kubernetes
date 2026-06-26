@@ -11,7 +11,7 @@ require (
 	github.com/moby/spdystream v0.5.1
 	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 )
 
 require github.com/go-logr/logr v1.4.3 // indirect
