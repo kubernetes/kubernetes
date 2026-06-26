@@ -93,7 +93,7 @@ func modifySpecDeviceRequestWithCapacityRequests(resourceClaim *resource.Resourc
 func addDistinctAttribute(resourceClaim *resource.ResourceClaim) {
 	distinctConstraint := resource.DeviceConstraint{
 		Requests:          []string{"req-0"},
-		DistinctAttribute: ptr.To(resource.FullyQualifiedName("driver-a/attr")),
+		DistinctAttribute: ptr.To(resource.QualifiedName("driver-a/attr")),
 	}
 	resourceClaim.Spec.Devices.Constraints = append(resourceClaim.Spec.Devices.Constraints, distinctConstraint)
 }

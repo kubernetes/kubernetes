@@ -1674,11 +1674,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						Constraints: []resourceapi.DeviceConstraint{
 							{
 								Requests:       []string{"request-1", "request-2"},
-								MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("dra.example.com/version")),
+								MatchAttribute: ptr.To(resourceapi.QualifiedName("dra.example.com/version")),
 							},
 							{
 								Requests:       []string{"request-1/sub-request-1", "request-2"},
-								MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("dra.example.com/pcieRoot")),
+								MatchAttribute: ptr.To(resourceapi.QualifiedName("dra.example.com/pcieRoot")),
 							},
 						},
 						Config: []resourceapi.DeviceClaimConfiguration{

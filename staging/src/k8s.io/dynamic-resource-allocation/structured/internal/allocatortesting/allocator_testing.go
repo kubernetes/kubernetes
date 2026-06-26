@@ -934,11 +934,11 @@ func TestAllocator(t *testing.T,
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)) {
-	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
-	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
-	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
-	versionAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "driverVersion")
-	intAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "numa")
+	nonExistentAttribute := resourceapi.QualifiedName(driverA + "/" + "NonExistentAttribute")
+	boolAttribute := resourceapi.QualifiedName(driverA + "/" + "boolAttribute")
+	stringAttribute := resourceapi.QualifiedName(driverA + "/" + "stringAttribute")
+	versionAttribute := resourceapi.QualifiedName(driverA + "/" + "driverVersion")
+	intAttribute := resourceapi.QualifiedName(driverA + "/" + "numa")
 	taintKey := "taint-key"
 	taintValue := "taint-value"
 	taintValue2 := "taint-value-2"

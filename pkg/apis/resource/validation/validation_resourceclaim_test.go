@@ -275,10 +275,10 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{claim.Spec.Devices.Requests[0].Name, badName},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						MatchAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("")),
+						MatchAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute: nil,
@@ -309,17 +309,17 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{claim.Spec.Devices.Requests[0].Name, badName},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						MatchAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("")),
+						MatchAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute: nil,
 					},
 				}
 				for i := len(claim.Spec.Devices.Constraints); i < resource.DeviceConstraintsMaxSize+1; i++ {
-					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.FullyQualifiedName("foo/bar"))})
+					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.QualifiedName("foo/bar"))})
 				}
 				claim.Spec.Devices.Config = []resource.DeviceClaimConfiguration{{
 					Requests: []string{claim.Spec.Devices.Requests[0].Name, badName},
@@ -364,10 +364,10 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:          []string{claim.Spec.Devices.Requests[0].Name},
-						DistinctAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						DistinctAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						DistinctAttribute: ptr.To(resource.FullyQualifiedName("")),
+						DistinctAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute:    nil,
@@ -382,7 +382,7 @@ func TestValidateClaim(t *testing.T) {
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				for i := len(claim.Spec.Devices.Constraints); i < resource.DeviceConstraintsMaxSize; i++ {
-					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.FullyQualifiedName("foo/bar"))})
+					claim.Spec.Devices.Constraints = append(claim.Spec.Devices.Constraints, resource.DeviceConstraint{MatchAttribute: ptr.To(resource.QualifiedName("foo/bar"))})
 				}
 				for i := len(claim.Spec.Devices.Config); i < resource.DeviceConfigMaxSize; i++ {
 					claim.Spec.Devices.Config = append(claim.Spec.Devices.Config, resource.DeviceClaimConfiguration{
@@ -421,10 +421,10 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{claim.Spec.Devices.Requests[0].Name, badName},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+						MatchAttribute: ptr.To(resource.QualifiedName("missing-domain")),
 					},
 					{
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("")),
+						MatchAttribute: ptr.To(resource.QualifiedName("")),
 					},
 					{
 						MatchAttribute: nil,
@@ -778,7 +778,7 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{"foo/bar"},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/driverVersion")),
+						MatchAttribute: ptr.To(resource.QualifiedName("dra.example.com/driverVersion")),
 					},
 				}
 				return claim
@@ -791,7 +791,7 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{"foo"},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/driverVersion")),
+						MatchAttribute: ptr.To(resource.QualifiedName("dra.example.com/driverVersion")),
 					},
 				}
 				return claim
@@ -804,7 +804,7 @@ func TestValidateClaim(t *testing.T) {
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
 					{
 						Requests:       []string{"foo/baz"},
-						MatchAttribute: ptr.To(resource.FullyQualifiedName("dra.example.com/driverVersion")),
+						MatchAttribute: ptr.To(resource.QualifiedName("dra.example.com/driverVersion")),
 					},
 				}
 				return claim

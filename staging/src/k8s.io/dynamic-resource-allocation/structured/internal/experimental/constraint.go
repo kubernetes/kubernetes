@@ -35,7 +35,7 @@ import (
 type distinctAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName resourceapi.FullyQualifiedName
+	attributeName resourceapi.QualifiedName
 	features      Features
 
 	attributes map[string]resourceapi.DeviceAttribute

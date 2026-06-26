@@ -367,9 +367,9 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 		},
 		stringKey, fldPath.Child("requests"), sizeCovered, uniquenessCovered)...)
 	if constraint.MatchAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
+		allErrs = append(allErrs, validateQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
 	} else if constraint.DistinctAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
+		allErrs = append(allErrs, validateQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`))
 	} else {
@@ -1242,16 +1242,6 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 	return allErrs
 }
 
-func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateQualifiedName(resource.QualifiedName(name), fldPath)...)
-	// validateQualifiedName checks that both parts are valid.
-	// What we need to enforce here is that there really is a domain.
-	if !strings.Contains(string(name), "/") {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, "a fully qualified name must be a domain and a name separated by a slash"))
-	}
-	return allErrs.WithOrigin("format=k8s-resource-fully-qualified-name")
-}
 
 func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList

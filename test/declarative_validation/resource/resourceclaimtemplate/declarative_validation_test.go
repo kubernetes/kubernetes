@@ -514,7 +514,7 @@ func mkDeviceClaimConfiguration() resource.DeviceClaimConfiguration {
 func mkDeviceConstraint() resource.DeviceConstraint {
 	return resource.DeviceConstraint{
 		Requests:       []string{"req-0"},
-		MatchAttribute: pointer.To(resource.FullyQualifiedName("foo/bar")),
+		MatchAttribute: pointer.To(resource.QualifiedName("foo/bar")),
 	}
 }
 
@@ -717,9 +717,9 @@ func tweakFirstAvailableTolerations(tolerations []resource.DeviceToleration) fun
 
 func tweakMatchAttribute(val string) func(*resource.ResourceClaimTemplate) {
 	return func(rct *resource.ResourceClaimTemplate) {
-		fullyQualifiedName := resource.FullyQualifiedName(val)
+		qualifiedName := resource.QualifiedName(val)
 		rct.Spec.Spec.Devices.Constraints = []resource.DeviceConstraint{
-			{MatchAttribute: &fullyQualifiedName},
+			{MatchAttribute: &qualifiedName},
 		}
 	}
 }
