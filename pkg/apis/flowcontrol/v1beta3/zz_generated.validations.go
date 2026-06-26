@@ -39,6 +39,21 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type FlowSchema
+	scheme.AddValidationFunc(
+		(*flowcontrolv1beta3.FlowSchema)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_FlowSchema(
+					ctx, op, nil, /* fldPath */
+					obj.(*flowcontrolv1beta3.FlowSchema),
+					safe.Cast[*flowcontrolv1beta3.FlowSchema](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type PriorityLevelConfiguration
 	scheme.AddValidationFunc(
 		(*flowcontrolv1beta3.PriorityLevelConfiguration)(nil),
@@ -55,6 +70,86 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 			}
 		})
 	return nil
+}
+
+// Validate_FlowSchema validates an instance of FlowSchema according
+// to declarative validation rules in the API schema.
+func Validate_FlowSchema(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.FlowSchema) (errs field.ErrorList) {
+
+	// field flowcontrolv1beta3.FlowSchema.TypeMeta has no validation
+	// field flowcontrolv1beta3.FlowSchema.ObjectMeta has no validation
+
+	{ // field flowcontrolv1beta3.FlowSchema.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.FlowSchemaSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_FlowSchemaSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.FlowSchema) *flowcontrolv1beta3.FlowSchemaSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	// field flowcontrolv1beta3.FlowSchema.Status has no validation
+	return errs
+}
+
+// Validate_FlowSchemaSpec validates an instance of FlowSchemaSpec according
+// to declarative validation rules in the API schema.
+func Validate_FlowSchemaSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.FlowSchemaSpec) (errs field.ErrorList) {
+
+	// field flowcontrolv1beta3.FlowSchemaSpec.PriorityLevelConfiguration has no validation
+	// field flowcontrolv1beta3.FlowSchemaSpec.MatchingPrecedence has no validation
+	// field flowcontrolv1beta3.FlowSchemaSpec.DistinguisherMethod has no validation
+
+	{ // field flowcontrolv1beta3.FlowSchemaSpec.Rules
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []flowcontrolv1beta3.PolicyRulesWithSubjects,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRulesWithSubjects); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.FlowSchemaSpec) []flowcontrolv1beta3.PolicyRulesWithSubjects {
+				return oldObj.Rules
+			})
+		errs = append(errs, fn(fldPath.Child("rules"), obj.Rules, oldVal, oldObj != nil)...)
+	}
+
+	return errs
 }
 
 // Validate_LimitResponse validates an instance of LimitResponse according
@@ -186,6 +281,50 @@ func Validate_LimitedPriorityLevelConfiguration(
 
 	// field flowcontrolv1beta3.LimitedPriorityLevelConfiguration.LendablePercent has no validation
 	// field flowcontrolv1beta3.LimitedPriorityLevelConfiguration.BorrowingLimitPercent has no validation
+	return errs
+}
+
+// Validate_PolicyRulesWithSubjects validates an instance of PolicyRulesWithSubjects according
+// to declarative validation rules in the API schema.
+func Validate_PolicyRulesWithSubjects(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.PolicyRulesWithSubjects) (errs field.ErrorList) {
+
+	{ // field flowcontrolv1beta3.PolicyRulesWithSubjects.Subjects
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []flowcontrolv1beta3.Subject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.PolicyRulesWithSubjects) []flowcontrolv1beta3.Subject {
+				return oldObj.Subjects
+			})
+		errs = append(errs, fn(fldPath.Child("subjects"), obj.Subjects, oldVal, oldObj != nil)...)
+	}
+
+	// field flowcontrolv1beta3.PolicyRulesWithSubjects.ResourceRules has no validation
+	// field flowcontrolv1beta3.PolicyRulesWithSubjects.NonResourceRules has no validation
 	return errs
 }
 
@@ -379,6 +518,132 @@ func Validate_PriorityLevelConfigurationSpec(
 				return oldObj.Exempt
 			})
 		errs = append(errs, fn(fldPath.Child("exempt"), obj.Exempt, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var unionMembershipFor_k8s_io_api_flowcontrol_v1beta3_Subject_ = validate.NewDiscriminatedUnionMembership("kind", validate.NewDiscriminatedUnionMember("user", "User"))
+
+// Validate_Subject validates an instance of Subject according
+// to declarative validation rules in the API schema.
+func Validate_Subject(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.Subject) (errs field.ErrorList) {
+
+	if e := validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_flowcontrol_v1beta3_Subject_,
+		func(obj *flowcontrolv1beta3.Subject) string {
+			if obj == nil {
+				return ""
+			}
+			return string(obj.Kind)
+		},
+		func(obj *flowcontrolv1beta3.Subject) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.User != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field flowcontrolv1beta3.Subject.Kind
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.SubjectKind,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.SubjectKind {
+				return &oldObj.Kind
+			})
+		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
+	}
+
+	{ // field flowcontrolv1beta3.Subject.User
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.UserSubject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_UserSubject(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.UserSubject {
+				return oldObj.User
+			})
+		errs = append(errs, fn(fldPath.Child("user"), obj.User, oldVal, oldObj != nil)...)
+	}
+
+	// field flowcontrolv1beta3.Subject.Group has no validation
+	// field flowcontrolv1beta3.Subject.ServiceAccount has no validation
+	return errs
+}
+
+// Validate_UserSubject validates an instance of UserSubject according
+// to declarative validation rules in the API schema.
+func Validate_UserSubject(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.UserSubject) (errs field.ErrorList) {
+
+	{ // field flowcontrolv1beta3.UserSubject.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.UserSubject) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
 	return errs
