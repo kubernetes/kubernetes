@@ -1333,5 +1333,8 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	// Resource version is included here to prevent an update during binding
+	// setting the PodScheduled=False condition from overwriting a
+	// PodScheduled=True update if a subsequent retry succeeds first.
+	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, pod.ResourceVersion, &pod.Status, podStatusCopy)
 }
