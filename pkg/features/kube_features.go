@@ -302,6 +302,12 @@ const (
 	// Enables support for reserving and replicating templated ResourceClaims for an entire PodGroup.
 	DRAWorkloadResourceClaims featuregate.Feature = "DRAWorkloadResourceClaims"
 
+	// owner: @VeraQin
+	// kep: https://kep.k8s.io/5996
+	//
+	// Enables support for DefaultPodSysctls in Kubelet Configuration.
+	DefaultPodSysctls featuregate.Feature = "DefaultPodSysctls"
+
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
@@ -1427,6 +1433,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DefaultPodSysctls: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2442,6 +2452,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
 
 	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
+
+	DefaultPodSysctls: {},
 
 	DeploymentReplicaSetTerminatingReplicas: {},
 

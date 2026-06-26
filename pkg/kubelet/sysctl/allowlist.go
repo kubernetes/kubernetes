@@ -73,10 +73,10 @@ func NewAllowlist(patterns []string) (*patternAllowlist, error) {
 // to be namespaced by the Linux kernel. Note that being allowlisted is required, but not
 // sufficient: the container runtime might have a stricter check and refuse to launch a pod.
 //
-// The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
+// The parameters hostNet, hostIPC, and hostUsers are used to forbid sysctls for pod sharing the
 // respective namespaces with the host. This check is only possible for sysctls on
 // the static default allowlist, not those on the custom allowlist provided by the admin.
-func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
+func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC, hostUsers bool) error {
 	sysctl = utilsysctl.NormalizeName(sysctl)
 	nsErrorFmt := "%q not allowed with host %s enabled"
 	if ns, found := w.sysctls[sysctl]; found {
@@ -84,6 +84,9 @@ func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
 		if ns == utilsysctl.NetNamespace && hostNet {
+			return fmt.Errorf(nsErrorFmt, sysctl, ns)
+		}
+		if ns == utilsysctl.UserNamespace && hostUsers {
 			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
 		return nil
@@ -94,6 +97,9 @@ func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
 			if ns == utilsysctl.NetNamespace && hostNet {
+				return fmt.Errorf(nsErrorFmt, sysctl, ns)
+			}
+			if ns == utilsysctl.UserNamespace && hostUsers {
 				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
 			return nil
@@ -112,8 +118,9 @@ func (w *patternAllowlist) Admit(_ context.Context, attrs *lifecycle.PodAdmitAtt
 		}
 	}
 
+	hostUsers := pod.Spec.HostUsers != nil && *pod.Spec.HostUsers
 	for _, s := range pod.Spec.SecurityContext.Sysctls {
-		if err := w.validateSysctl(s.Name, pod.Spec.HostNetwork, pod.Spec.HostIPC); err != nil {
+		if err := w.validateSysctl(s.Name, pod.Spec.HostNetwork, pod.Spec.HostIPC, hostUsers); err != nil {
 			return lifecycle.PodAdmitResult{
 				Admit:   false,
 				Reason:  ForbiddenReason,

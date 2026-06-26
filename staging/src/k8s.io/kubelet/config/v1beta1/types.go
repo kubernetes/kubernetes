@@ -772,6 +772,12 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// DefaultPodSysctls is a set of default sysctls that will be applied to all pods.
+	// It can be overridden by sysctls set in pod spec.securityContext.sysctls.
+	// Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`.
+	// For example: {"net.ipv4.ip_forward": "1", "kernel.shmall": "1048576"}
+	// +optional
+	DefaultPodSysctls map[string]string `json:"defaultPodSysctls,omitempty"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins.
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"

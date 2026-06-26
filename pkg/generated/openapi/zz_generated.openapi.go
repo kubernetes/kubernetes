@@ -74570,6 +74570,21 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
+					"defaultPodSysctls": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DefaultPodSysctls is a set of default sysctls that will be applied to all pods. It can be overridden by sysctls set in pod spec.securityContext.sysctls. Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`. For example: {\"net.ipv4.ip_forward\": \"1\", \"kernel.shmall\": \"1048576\"}",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"volumePluginDir": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumePluginDir is the full path of the directory in which to search for additional third party volume plugins. Default: \"/usr/libexec/kubernetes/kubelet-plugins/volume/exec/\"",
