@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -288,7 +289,7 @@ func TestRequestWatchProgressEtcdPermissionDenied(t *testing.T) {
 	supported, err := endpointSupportsRequestWatchProgress(context.Background(),
 		&MockEtcdClient{EndpointVersion: []mockEndpointVersion{
 			{Endpoint: "localhost:2390", Error: permErr}}}, "localhost:2390")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, supported, "PermissionDenied should be treated as supported, not disabled")
 
 	// End-to-end through the checker: feature ends up Supported, no error surfaced.
@@ -296,7 +297,7 @@ func TestRequestWatchProgressEtcdPermissionDenied(t *testing.T) {
 	mockClient := &MockEtcdClient{EndpointVersion: []mockEndpointVersion{
 		{Endpoint: "localhost:2390", Error: permErr}}}
 	for _, ep := range mockClient.Endpoints() {
-		assert.NoError(t, f.clientSupportsRequestWatchProgress(context.Background(), mockClient, ep))
+		require.NoError(t, f.clientSupportsRequestWatchProgress(context.Background(), mockClient, ep))
 	}
 	assert.True(t, f.Supports(storage.RequestWatchProgress))
 }
