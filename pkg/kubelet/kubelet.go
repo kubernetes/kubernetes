@@ -2230,7 +2230,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets := kl.getPullSecretsForPod(logger, pod)
+	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
 
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
@@ -2286,6 +2286,21 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
 				}
 			}
+		}
+	}
+
+	// If there are named pull secrets which couldn't be found and this sync had any image pull errors, emit an event because it may be useful for debugging a configuration error.
+	if len(missingPullSecretNames) > 0 {
+		hasPullFailures := false
+		for _, r := range result.SyncResults {
+			// This only triggers if the sync actually attempted a pull - if the sync didn't pull due to a backoff it won't trigger again.
+			if errors.Is(r.Error, images.ErrImagePull) {
+				hasPullFailures = true
+				break
+			}
+		}
+		if hasPullFailures {
+			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(missingPullSecretNames, ", "))
 		}
 	}
 
