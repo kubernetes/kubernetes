@@ -43,8 +43,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
-	"k8s.io/kubernetes/test/e2e_node/criproxy"
-	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
+	"k8s.io/kubernetes/test/e2e_node_windows/criproxy"
 	"k8s.io/kubernetes/test/e2e_node_windows/services"
 
 	// define and freeze constants
@@ -96,7 +95,6 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flags.StringVar(&framework.TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
 	flags.StringVar(&framework.TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
 	flags.Var(cliflag.NewMapStringString(&framework.TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-	flags.StringVar(&framework.TestContext.SriovdpConfigMapFile, "sriovdp-configmap-file", "", "The name of the SRIOV device plugin Config Map to load.")
 	flag.StringVar(&framework.TestContext.ClusterDNSDomain, "dns-domain", "", "The DNS Domain of the cluster.")
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
@@ -109,7 +107,6 @@ func registerNodeFlags(flags *flag.FlagSet) {
 func init() {
 	// Enable embedded FS file lookup as fallback
 	e2etestfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
-	e2etestfiles.AddFileSource(e2enodetestingmanifests.GetE2ENodeTestingManifestsFS())
 }
 
 func TestMain(m *testing.M) {
@@ -166,6 +163,7 @@ func TestE2eNode(t *testing.T) {
 	if *systemValidateMode {
 		// If system-validate-mode is specified, only run system validation in current process.
 		klog.Warningf("system spec validation is not supported on platform other than linux yet")
+		return
 	}
 
 	// We're not running in a special mode so lets run tests.
