@@ -221,7 +221,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -234,7 +234,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -247,7 +247,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 0,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -260,7 +260,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     true,
 			expectMinReplicasLower: 0,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -274,7 +274,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -287,7 +287,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -300,7 +300,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -313,7 +313,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -326,7 +326,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -340,7 +340,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -353,7 +353,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -366,7 +366,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -379,7 +379,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: true,
@@ -392,7 +392,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -408,7 +408,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
