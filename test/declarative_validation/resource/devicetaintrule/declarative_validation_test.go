@@ -38,9 +38,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "devicetaintrules",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "devicetaintrules",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 
 	testCases := map[string]struct {
@@ -89,9 +91,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "devicetaintrules",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "devicetaintrules",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 
 	testCases := map[string]struct {

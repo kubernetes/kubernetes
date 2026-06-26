@@ -90,18 +90,6 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(
-				genericapirequest.NewDefaultContext(),
-				&genericapirequest.RequestInfo{
-					APIPrefix:         "apis",
-					APIGroup:          "networking.k8s.io",
-					APIVersion:        apiVersion,
-					Resource:          "ipaddresses",
-					Name:              "valid-obj",
-					IsResourceRequest: true,
-					Verb:              "update",
-				},
-			)
 			testCases := map[string]struct {
 				oldObj       networking.IPAddress
 				updateObj    networking.IPAddress

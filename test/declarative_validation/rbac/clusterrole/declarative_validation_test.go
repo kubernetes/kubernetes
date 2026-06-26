@@ -36,8 +36,10 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
+		APIGroup:          "rbac.authorization.k8s.io",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input        rbac.ClusterRole
@@ -78,8 +80,10 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
+		APIGroup:          "rbac.authorization.k8s.io",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	testCases := map[string]struct {
 		old          rbac.ClusterRole

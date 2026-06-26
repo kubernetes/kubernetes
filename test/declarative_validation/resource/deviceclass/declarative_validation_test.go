@@ -37,9 +37,11 @@ func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "resource.k8s.io",
-				APIVersion: apiVersion,
-				Resource:   "deviceclasses",
+				APIGroup:          "resource.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "deviceclasses",
+				IsResourceRequest: true,
+				Verb:              "create",
 			})
 
 			strategy := registry.Strategy
@@ -182,9 +184,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIGroup:   "resource.k8s.io",
-				APIVersion: apiVersion,
-				Resource:   "deviceclasses",
+				APIGroup:          "resource.k8s.io",
+				APIVersion:        apiVersion,
+				Resource:          "deviceclasses",
+				IsResourceRequest: true,
+				Verb:              "update",
 			})
 
 			strategy := registry.Strategy

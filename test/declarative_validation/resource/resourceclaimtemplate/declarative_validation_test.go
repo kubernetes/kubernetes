@@ -44,9 +44,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "resourceclaimtemplates",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaimtemplates",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	fakeClient := fake.NewClientset()
 	nsClient := fakeClient.CoreV1().Namespaces()
@@ -423,9 +425,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "resourceclaimtemplates",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaimtemplates",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	fakeClient := fake.NewClientset()
 	nsClient := fakeClient.CoreV1().Namespaces()

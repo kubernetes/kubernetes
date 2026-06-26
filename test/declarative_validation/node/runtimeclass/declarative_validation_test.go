@@ -49,8 +49,10 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
-					APIGroup:   "node.k8s.io",
-					APIVersion: apiVersion,
+					APIGroup:          "node.k8s.io",
+					APIVersion:        apiVersion,
+					IsResourceRequest: true,
+					Verb:              "create",
 				},
 			)
 
@@ -146,8 +148,10 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
-					APIGroup:   "node.k8s.io",
-					APIVersion: apiVersion,
+					APIGroup:          "node.k8s.io",
+					APIVersion:        apiVersion,
+					IsResourceRequest: true,
+					Verb:              "update",
 				},
 			)
 

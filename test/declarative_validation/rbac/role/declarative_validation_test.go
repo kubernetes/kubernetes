@@ -40,8 +40,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(
 		genericapirequest.NewDefaultContext(),
 		&genericapirequest.RequestInfo{
-			APIGroup:   "rbac.authorization.k8s.io",
-			APIVersion: apiVersion,
+			APIGroup:          "rbac.authorization.k8s.io",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "create",
 		},
 	)
 
@@ -89,8 +91,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(
 		genericapirequest.NewDefaultContext(),
 		&genericapirequest.RequestInfo{
-			APIGroup:   "rbac.authorization.k8s.io",
-			APIVersion: apiVersion,
+			APIGroup:          "rbac.authorization.k8s.io",
+			APIVersion:        apiVersion,
+			IsResourceRequest: true,
+			Verb:              "update",
 		},
 	)
 
