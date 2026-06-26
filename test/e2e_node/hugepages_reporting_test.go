@@ -24,6 +24,8 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -59,6 +61,13 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 		return available
 	}
 
+	getNodeMemoryCapacity := func(ctx context.Context) int64 {
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		cap := node.Status.Capacity[v1.ResourceMemory]
+		return cap.Value()
+	}
+
 	ginkgo.Context("with feature gate enabled", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
@@ -72,6 +81,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 				e2eskipper.Skipf("skipping: 2Mi hugepages not supported on this node")
 			}
 
+			capacityBefore := getNodeMemoryCapacity(ctx)
 			availableBefore := getAvailableMemory(ctx)
 
 			ginkgo.By(fmt.Sprintf("Allocating %d x 2Mi hugepages", hugepageCount))
@@ -81,6 +91,10 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 			ginkgo.By("Restarting kubelet to pick up hugepage allocation")
 			restartKubelet(ctx, true)
 			waitForHugepages(f, ctx, hugepages)
+
+			capacityAfter := getNodeMemoryCapacity(ctx)
+			gomega.Expect(capacityAfter).To(gomega.Equal(capacityBefore),
+				"node memory capacity must not change")
 
 			availableAfter := getAvailableMemory(ctx)
 
