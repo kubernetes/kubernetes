@@ -30477,7 +30477,6 @@ func TestValidateWorkloadReference(t *testing.T) {
 	}
 }
 
-
 func TestValidatePodBinding(t *testing.T) {
 	testCases := []struct {
 		name        string
@@ -30614,4 +30613,3 @@ func TestValidatePodBinding(t *testing.T) {
 		})
 	}
 }
-
