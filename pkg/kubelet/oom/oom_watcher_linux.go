@@ -26,12 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-
-	"github.com/google/cadvisor/lib/utils/oomparser"
+	"k8s.io/kubernetes/third_party/forked/cadvisor/oomparser"
 )
 
 type streamer interface {
-	StreamOoms(chan<- *oomparser.OomInstance)
+	StreamOoms(ctx context.Context, outStream chan<- *oomparser.OomInstance)
 }
 
 var _ streamer = &oomparser.OomParser{}
@@ -43,8 +42,8 @@ type realWatcher struct {
 
 var _ Watcher = &realWatcher{}
 
-// NewWatcher creates and initializes a OOMWatcher backed by Cadvisor as
-// the oom streamer.
+// NewWatcher creates and initializes an OOMWatcher backed by the kernel log
+// (/dev/kmsg) oom streamer.
 func NewWatcher(recorder record.EventRecorderLogger) (Watcher, error) {
 	// for test purpose
 	_, ok := recorder.(*record.FakeRecorder)
@@ -73,13 +72,17 @@ const (
 // Start watches for system oom's and records an event for every system oom encountered.
 func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error {
 	outStream := make(chan *oomparser.OomInstance, 10)
-	go ow.oomStreamer.StreamOoms(outStream)
+	go ow.oomStreamer.StreamOoms(ctx, outStream)
 
 	go func() {
 		logger := klog.FromContext(ctx)
 		defer runtime.HandleCrashWithContext(ctx)
 
 		for event := range outStream {
+			// Count every OOM kill per container to back the
+			// container_oom_events_total metric.
+			recordOOMKill(event.ContainerName)
+
 			if event.VictimContainerName == recordEventContainerName {
 				logger.V(1).Info("Got sys oom event", "event", event)
 				eventMsg := "System OOM encountered"

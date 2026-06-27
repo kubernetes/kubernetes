@@ -68,7 +68,6 @@ func (t *atomicTime) Time() time.Time {
 }
 
 type containerData struct {
-	oomEvents                uint64
 	handler                  container.ContainerHandler
 	info                     containerInfo
 	memoryCache              *memory.InMemoryCache
@@ -470,8 +469,6 @@ func (cd *containerData) updateStats() error {
 			stats.Cpu.LoadDAverage = int32(cd.loadDAvg * 1000)
 		}
 	}
-
-	stats.OOMEvents = atomic.LoadUint64(&cd.oomEvents)
 
 	if cd.summaryReader != nil {
 		if err := cd.summaryReader.AddSample(*stats); err != nil {

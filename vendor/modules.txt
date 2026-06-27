@@ -136,9 +136,6 @@ github.com/dustin/go-humanize
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
-# github.com/euank/go-kmsg-parser v2.0.0+incompatible
-## explicit
-github.com/euank/go-kmsg-parser/kmsgparser
 # github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f
 ## explicit; go 1.15
 github.com/exponent-io/jsonpath
@@ -261,7 +258,7 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.1.3
 ## explicit; go 1.18
 github.com/google/btree
-# github.com/google/cadvisor/lib v0.60.2
+# github.com/google/cadvisor/lib v0.60.3
 ## explicit; go 1.24.0
 github.com/google/cadvisor/lib/cache/memory
 github.com/google/cadvisor/lib/cadvisorflags
@@ -299,7 +296,6 @@ github.com/google/cadvisor/lib/model
 github.com/google/cadvisor/lib/stats
 github.com/google/cadvisor/lib/storage
 github.com/google/cadvisor/lib/utils
-github.com/google/cadvisor/lib/utils/oomparser
 github.com/google/cadvisor/lib/utils/sysfs
 github.com/google/cadvisor/lib/utils/sysinfo
 github.com/google/cadvisor/lib/version
