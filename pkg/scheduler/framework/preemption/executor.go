@@ -223,6 +223,8 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
 
 	errCh := parallelize.NewResultChannel[error]()
+	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
+	preemptedLastVictimInMemory := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -241,9 +243,9 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		defer func() {
-			if result == metrics.GoroutineResultError {
-				// When API call isn't successful, the preemptor's Pods may get stuck in the unschedulable pod pool in the worst case.
-				// So, we should move the preemptor's Pods to the activeQ.
+			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
+				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
+				// Pods may get stuck in the unschedulable pod pool in the worst case.
 				e.fh.Activate(logger, preemptor.Pods())
 			}
 		}()
@@ -290,9 +292,12 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
+			mayPreemptLastVictimInMemory := e.fh.GetWaitingPod(lastVictim.UID) != nil || e.fh.GetPodInPreBind(lastVictim.UID) != nil
 			if err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
+			} else if mayPreemptLastVictimInMemory {
+				preemptedLastVictimInMemory = true
 			}
 		}
 		e.mu.Lock()
