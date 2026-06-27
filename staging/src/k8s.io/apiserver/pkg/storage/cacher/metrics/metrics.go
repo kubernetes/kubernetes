@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -28,8 +29,10 @@ import (
 )
 
 const (
-	namespace = "apiserver"
-	subsystem = "watch_cache"
+	namespace                 = "apiserver"
+	subsystem                 = "watch_cache"
+	dispatchOutcomeDelivered  = "delivered"
+	dispatchOutcomeTerminated = "terminated"
 )
 
 /*
@@ -234,6 +237,16 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+
+	dispatchDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_dispatch_duration_seconds",
+			Help:           "Histogram of time spent dispatching an event to a specific watcher, broken by resource type and outcome.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource", "outcome"})
 )
 
 var registerMetrics sync.Once
@@ -263,6 +276,7 @@ func Register() {
 			legacyregistry.MustRegister(WatchShardsTotal)
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
+		legacyregistry.MustRegister(dispatchDuration)
 	})
 }
 
@@ -304,4 +318,46 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+type WatcherMetricsObservers struct {
+	deliveredDuration  compbasemetrics.ObserverMetric
+	terminatedDuration compbasemetrics.ObserverMetric
+}
+
+// NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
+func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
+	return &WatcherMetricsObservers{
+		deliveredDuration:  dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeDelivered),
+		terminatedDuration: dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeTerminated),
+	}
+}
+
+func (d *WatcherMetricsObservers) ObserveDelivered(duration time.Duration) {
+	observe(d.deliveredDuration, duration)
+}
+
+func (d *WatcherMetricsObservers) ObserveTerminated(duration time.Duration) {
+	observe(d.terminatedDuration, duration)
+}
+
+func observe(m compbasemetrics.ObserverMetric, duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	m.Observe(duration.Seconds())
+}
+
+type noopObserver struct{}
+
+func (noopObserver) Observe(float64) {}
+
+var noopObs noopObserver
+
+// NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
+func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
+	return &WatcherMetricsObservers{
+		deliveredDuration:  noopObs,
+		terminatedDuration: noopObs,
+	}
 }

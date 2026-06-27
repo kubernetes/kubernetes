@@ -63,6 +63,7 @@ type cacheWatcher struct {
 	deadline            time.Time
 	allowWatchBookmarks bool
 	groupResource       schema.GroupResource
+	watcherMetrics      *metrics.WatcherMetricsObservers
 
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
@@ -95,6 +96,7 @@ func newCacheWatcher(
 	deadline time.Time,
 	allowWatchBookmarks bool,
 	groupResource schema.GroupResource,
+	watcherMetrics *metrics.WatcherMetricsObservers,
 	identifier string,
 ) *cacheWatcher {
 	return &cacheWatcher{
@@ -108,6 +110,7 @@ func newCacheWatcher(
 		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
 		groupResource:       groupResource,
+		watcherMetrics:      watcherMetrics,
 		identifier:          identifier,
 	}
 }
@@ -200,6 +203,9 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 			defer c.stateMutex.Unlock()
 			return c.state == cacheWatcherBookmarkReceived
 		}()
+		if !event.RecordTime.IsZero() {
+			c.watcherMetrics.ObserveTerminated(time.Since(event.RecordTime))
+		}
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result), graceful)
 		c.forget(graceful)
 	}
@@ -401,7 +407,7 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (sentAt time.Time) {
 	watchEvent := c.convertToWatchEvent(event)
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
@@ -429,8 +435,10 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
+		sentAt = time.Now()
 	case <-c.done:
 	}
+	return
 }
 
 func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
@@ -536,10 +544,19 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				c.sendWatchCacheEvent(event)
+				sentAt := c.sendWatchCacheEvent(event)
+				if !sentAt.IsZero() {
+					c.recordLifecycleMetrics(event, sentAt)
+				}
 			}
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, sentAt time.Time) {
+	if !sentAt.IsZero() && !event.RecordTime.IsZero() {
+		c.watcherMetrics.ObserveDelivered(sentAt.Sub(event.RecordTime))
 	}
 }
