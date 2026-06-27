@@ -247,6 +247,16 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		}, []string{"group", "resource", "outcome"})
+
+	WatchCacheQueueDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "queue_duration_seconds",
+			Help:           "Histogram of time spent in the cacher's incoming channel before fan-out.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource"})
 )
 
 var registerMetrics sync.Once
@@ -277,6 +287,7 @@ func Register() {
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
 		legacyregistry.MustRegister(dispatchDuration)
+		legacyregistry.MustRegister(WatchCacheQueueDuration)
 	})
 }
 

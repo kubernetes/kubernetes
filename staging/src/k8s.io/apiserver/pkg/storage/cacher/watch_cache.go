@@ -66,7 +66,18 @@ type watchCacheEvent struct {
 	PrevObjFields   fields.Set
 	Key             string
 	ResourceVersion uint64
-	RecordTime      time.Time
+
+	// RecordTime represents when the watch cache first received the event
+	// from the storage layer (etcd)
+	RecordTime time.Time
+
+	// WatchCacheEnqueuedAt represents when the event was added to the watch
+	// cache's ring buffer. Stored as Unix nanoseconds.
+	WatchCacheEnqueuedAt int64
+
+	// WatchCacheDispatchedAt represents when the dispatcher picked the event
+	// up from the incoming channel for fan-out. Stored as Unix nanoseconds.
+	WatchCacheDispatchedAt int64
 }
 
 // watchCache implements a Store interface.
@@ -248,6 +259,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		w.Lock()
 		defer w.Unlock()
 
+		wcEvent.WatchCacheEnqueuedAt = w.config.clock.Now().UnixNano()
 		w.history.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()

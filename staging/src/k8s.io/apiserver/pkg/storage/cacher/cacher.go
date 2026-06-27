@@ -972,6 +972,12 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
 
+	dispatchedAt := c.clock.Now()
+	event.WatchCacheDispatchedAt = dispatchedAt.UnixNano()
+	if event.WatchCacheEnqueuedAt > 0 {
+		metrics.WatchCacheQueueDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(dispatchedAt.Sub(time.Unix(0, event.WatchCacheEnqueuedAt)).Seconds())
+	}
+
 	// Since add() can block, we explicitly add when cacher is unlocked.
 	// Dispatching event in nonblocking way first, which make faster watchers
 	// not be blocked by slower ones.
