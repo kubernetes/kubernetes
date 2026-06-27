@@ -1135,6 +1135,32 @@ type ExactDeviceRequest struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,7,opt,name=capacity"`
+
+	// DerivedAttributes defines a set of virtual attributes computed via CEL expressions
+	// for each candidate device. These virtual attributes can be referenced in
+	// `.devices.constraints` to align and match different devices (e.g., co-allocating
+	// a GPU and a NIC on the same NUMA node) even if their drivers publish different
+	// attributes. Derived attributes are not available via `device.attributes`
+	// in the CEL environment when evaluating selector expressions.
+	//
+	// Derived attributes allow you to extract, transform, or normalize topology
+	// information (such as extracting a NUMA index from a complex topology string or
+	// renaming a vendor-specific attribute) into a common virtual attribute name at
+	// scheduling time. The scheduler then evaluates these virtual attributes exactly
+	// like static attributes when matching constraints.
+	//
+	// The maximum number of derived attributes is 32.
+	//
+	// This is an alpha field and requires enabling the DRADerivedAttributes
+	// feature gate.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRADerivedAttributes
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:maxItems=32
+	DerivedAttributes []DeviceDerivedAttribute `json:"derivedAttributes,omitempty" protobuf:"bytes,8,rep,name=derivedAttributes"`
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -1252,6 +1278,32 @@ type DeviceSubRequest struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,7,opt,name=capacity"`
+
+	// DerivedAttributes defines a set of virtual attributes computed via CEL expressions
+	// for each candidate device. These virtual attributes can be referenced in
+	// `.devices.constraints` to align and match different devices (e.g., co-allocating
+	// a GPU and a NIC on the same NUMA node) even if their drivers publish different
+	// attributes. Derived attributes are not available via `device.attributes`
+	// in the CEL environment when evaluating selector expressions.
+	//
+	// Derived attributes allow you to extract, transform, or normalize topology
+	// information (such as extracting a NUMA index from a complex topology string or
+	// renaming a vendor-specific attribute) into a common virtual attribute name at
+	// scheduling time. The scheduler then evaluates these virtual attributes exactly
+	// like static attributes when matching constraints.
+	//
+	// The maximum number of derived attributes is 32.
+	//
+	// This is an alpha field and requires enabling the DRADerivedAttributes
+	// feature gate.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +featureGate=DRADerivedAttributes
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:maxItems=32
+	DerivedAttributes []DeviceDerivedAttribute `json:"derivedAttributes,omitempty" protobuf:"bytes,8,rep,name=derivedAttributes"`
 }
 
 // CapacityRequirements defines the capacity requirements for a specific device request.
@@ -1287,6 +1339,7 @@ const (
 	DeviceSelectorsMaxSize             = 32
 	FirstAvailableDeviceRequestMaxSize = 8
 	DeviceTolerationsMaxLength         = 16
+	DeviceDerivedAttributesMaxSize     = 32
 )
 
 // +enum
@@ -1384,6 +1437,54 @@ type CELDeviceSelector struct {
 	Expression string `json:"expression" protobuf:"bytes,1,name=expression"`
 }
 
+// DeviceDerivedAttribute defines a derived attribute computed via CEL.
+type DeviceDerivedAttribute struct {
+	// Name is the identifier for this derived attribute, used in constraints.
+	//
+	// It must be either a C identifier (e.g. "numaNode") or a DNS
+	// subdomain followed by a slash ("/") followed by a C identifier
+	// (e.g. "example.com/numaNode").
+	//
+	// If the chosen name matches an existing physical attribute from a driver,
+	// the derived attribute's expression will shadow the physical attribute,
+	// and its evaluated value will be used in constraints instead.
+	//
+	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	Name QualifiedName `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Expression is a CEL expression evaluated against each candidate device.
+	// The expression must evaluate to a primitive scalar (string, integer,
+	// boolean, or semver) or a list of these scalars ([]string, []int64,
+	// []bool, []semver) to act as a virtual grouping key. Any other return type
+	// is an error and causes CEL evaluation for the device to fail.
+	//
+	// The expression's input is an object named "device", which carries the
+	// same properties as in a CELDeviceSelector.
+	//
+	// When pod scheduling encounters CEL runtime errors (such as looking
+	// up an attribute that isn't defined) for some devices, it will abort
+	// allocation and fail scheduling for the Pod. Surfacing evaluation
+	// errors immediately prevents silent topology matching failures that are
+	// extremely hard to detect. A robust expression should, for example, check
+	// for the existence of attributes before referencing them to avoid
+	// runtime evaluation errors.
+	//
+	// The expression gets evaluated after a device has passed the other
+	// selector expressions for the request in which this expression is used.
+	// This allows writing expressions that are tailored towards the specific
+	// devices being requested (for example, by assuming the device is from a
+	// certain vendor and skipping those checks).
+	//
+	// The length of the expression must be smaller or equal to 10 Ki. The
+	// cost of evaluating it is also limited based on the estimated number
+	// of logical steps.
+	//
+	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	Expression string `json:"expression" protobuf:"bytes,2,name=expression"`
+}
+
 // CELSelectorExpressionMaxCost specifies the cost limit for a single CEL selector
 // evaluation.
 //
@@ -1448,13 +1549,15 @@ type DeviceConstraint struct {
 	// match when the intersection across all devices is non-empty.
 	// Scalar values are treated as single-element lists for backward compatibility.
 	//
-	// Must include the domain qualifier.
+	// If the DRADerivedAttributes feature gate is enabled and the domain
+	// prefix is omitted, the name refers to a derived attribute and must
+	// match the name of a derived attribute defined in the claim's requests.
+	// Otherwise, the domain prefix is required.
 	//
 	// +optional
 	// +oneOf=ConstraintType
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:format=k8s-resource-fully-qualified-name
-	MatchAttribute *FullyQualifiedName `json:"matchAttribute,omitempty" protobuf:"bytes,2,opt,name=matchAttribute"`
+	MatchAttribute *QualifiedName `json:"matchAttribute,omitempty" protobuf:"bytes,2,opt,name=matchAttribute"`
 
 	// Potential future extension, not part of the current design:
 	// A CEL expression which compares different devices and returns
@@ -1482,10 +1585,15 @@ type DeviceConstraint struct {
 	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
 	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
 	//
+	// If the DRADerivedAttributes feature gate is enabled and the domain
+	// prefix is omitted, the name refers to a derived attribute and must
+	// match the name of a derived attribute defined in the claim's requests.
+	// Otherwise, the domain prefix is required.
+	//
 	// +optional
 	// +oneOf=ConstraintType
 	// +featureGate=DRAConsumableCapacity
-	DistinctAttribute *FullyQualifiedName `json:"distinctAttribute,omitempty" protobuf:"bytes,3,opt,name=distinctAttribute"`
+	DistinctAttribute *QualifiedName `json:"distinctAttribute,omitempty" protobuf:"bytes,3,opt,name=distinctAttribute"`
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
