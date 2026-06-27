@@ -389,7 +389,7 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 		testEMClient,
 	)
 
-	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(testClient, 1*time.Second)
 
 	tCtx := ktesting.Init(t)
 
@@ -402,7 +402,7 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 		metricsClient,
 		informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
 		informerFactory.Core().V1().Pods(),
-		100*time.Millisecond,
+		1*time.Second,
 		5*time.Minute,
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
@@ -1677,6 +1677,12 @@ func TestScaleCPU(t *testing.T) {
 
 			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+			// Register the HPA in the selector tracker. In production this is done by
+			// enqueueHPA before the worker calls reconcileAutoscaler, but this test
+			// calls reconcileAutoscaler directly, bypassing the queue.
+			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+			setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
 
 			beforeReconciliationsTotal, err := metricstestutil.GetCounterMetricValue(
 				monitor.ReconciliationsTotal.WithLabelValues(string(tt.expectedActionLabel), string(monitor.ErrorLabelNone)))
