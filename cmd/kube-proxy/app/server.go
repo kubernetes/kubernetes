@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -582,11 +583,23 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	labelSelectorNoProxyName := labels.NewSelector().Add(*noProxyName)
 	labelSelectorNoHeadlessEndpoints := labels.NewSelector().Add(*noHeadlessEndpoints)
 
+	// kube-proxy never needs the managed fields metadata, so strip it from all
+	// cached objects to reduce memory usage.
+	trimManagedFields := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			accessor.SetManagedFields(nil)
+		}
+		return obj, nil
+	}
+
 	// Make informer that contains no filters
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+		informers.WithTransform(trimManagedFields),
+	)
 
 	// Make informers that filter out objects that do not contain a service.kubernetes.io/headless label
 	endpointSliceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+		informers.WithTransform(trimManagedFields),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelectorNoHeadlessEndpoints.String()
 		}))
@@ -597,6 +610,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// are registered yet.
 	// don't watch headless services for kube-proxy, they are proxied by DNS.
 	serviceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+		informers.WithTransform(trimManagedFields),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelectorNoProxyName.String()
 			options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", v1.ClusterIPNone).String()

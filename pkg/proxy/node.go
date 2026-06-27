@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -76,6 +77,14 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 ) (*NodeManager, error) {
 	// make an informer that selects for the given node
 	thisNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(client, resyncInterval,
+		informers.WithTransform(func(obj interface{}) (interface{}, error) {
+			// kube-proxy never needs the managed fields metadata, so strip it
+			// from all cached objects to reduce memory usage.
+			if accessor, err := meta.Accessor(obj); err == nil {
+				accessor.SetManagedFields(nil)
+			}
+			return obj, nil
+		}),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", nodeName).String()
 		}))
