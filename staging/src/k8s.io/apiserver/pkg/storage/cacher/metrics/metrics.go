@@ -257,6 +257,15 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 		}, []string{"group", "resource"})
+
+	watcherQueueDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Name:           "watcher_queue_duration_seconds",
+			Help:           "Histogram of time spent waiting in a specific watcher's input channel.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource"})
 )
 
 var registerMetrics sync.Once
@@ -288,6 +297,7 @@ func Register() {
 		}
 		legacyregistry.MustRegister(dispatchDuration)
 		legacyregistry.MustRegister(WatchCacheQueueDuration)
+		legacyregistry.MustRegister(watcherQueueDuration)
 	})
 }
 
@@ -332,6 +342,7 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 }
 
 type WatcherMetricsObservers struct {
+	queueDuration      compbasemetrics.ObserverMetric
 	deliveredDuration  compbasemetrics.ObserverMetric
 	terminatedDuration compbasemetrics.ObserverMetric
 }
@@ -339,9 +350,14 @@ type WatcherMetricsObservers struct {
 // NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
 func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
 	return &WatcherMetricsObservers{
+		queueDuration:      watcherQueueDuration.WithLabelValues(groupResource.Group, groupResource.Resource),
 		deliveredDuration:  dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeDelivered),
 		terminatedDuration: dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeTerminated),
 	}
+}
+
+func (d *WatcherMetricsObservers) ObserveQueueDuration(duration time.Duration) {
+	observe(d.queueDuration, duration)
 }
 
 func (d *WatcherMetricsObservers) ObserveDelivered(duration time.Duration) {
@@ -368,6 +384,7 @@ var noopObs noopObserver
 // NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
 func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
 	return &WatcherMetricsObservers{
+		queueDuration:      noopObs,
 		deliveredDuration:  noopObs,
 		terminatedDuration: noopObs,
 	}

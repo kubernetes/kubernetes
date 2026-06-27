@@ -48,10 +48,17 @@ const (
 	cacheWatcherBookmarkSent
 )
 
+// inputEvent is what travels through a cacheWatcher's input channel; the event
+// pointer along with the enqueue timestamp as Unix nanoseconds.
+type inputEvent struct {
+	event      *watchCacheEvent
+	enqueuedAt int64
+}
+
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input     chan *watchCacheEvent
+	input     chan inputEvent
 	result    chan watch.Event
 	done      chan struct{}
 	filter    filterWithAttrsFunc
@@ -100,7 +107,7 @@ func newCacheWatcher(
 	identifier string,
 ) *cacheWatcher {
 	return &cacheWatcher{
-		input:               make(chan *watchCacheEvent, chanSize),
+		input:               make(chan inputEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
 		done:                make(chan struct{}),
 		filter:              filter,
@@ -157,7 +164,7 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 		return false
 	}
 	select {
-	case c.input <- event:
+	case c.input <- inputEvent{event: event, enqueuedAt: time.Now().UnixNano()}:
 		c.markBookmarkAfterRvAsReceived(event)
 		return true
 	default:
@@ -217,7 +224,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 
 	// OK, block sending, but only until timer fires.
 	select {
-	case c.input <- event:
+	case c.input <- inputEvent{event: event, enqueuedAt: time.Now().UnixNano()}:
 		return true
 	case <-timer.C:
 		closeFunc()
@@ -536,17 +543,23 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 
 	for {
 		select {
-		case event, ok := <-c.input:
+		case ie, ok := <-c.input:
 			if !ok {
 				return
 			}
+			event := ie.event
 			// only send events newer than resourceVersion
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
+				dequeuedAt := time.Now()
 				sentAt := c.sendWatchCacheEvent(event)
 				if !sentAt.IsZero() {
-					c.recordLifecycleMetrics(event, sentAt)
+					var enqueuedAt time.Time
+					if ie.enqueuedAt > 0 {
+						enqueuedAt = time.Unix(0, ie.enqueuedAt)
+					}
+					c.recordLifecycleMetrics(event, enqueuedAt, dequeuedAt, sentAt)
 				}
 			}
 		case <-ctx.Done():
@@ -555,7 +568,10 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	}
 }
 
-func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, sentAt time.Time) {
+func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, enqueuedAt, dequeuedAt, sentAt time.Time) {
+	if !enqueuedAt.IsZero() && !dequeuedAt.IsZero() {
+		c.watcherMetrics.ObserveQueueDuration(dequeuedAt.Sub(enqueuedAt))
+	}
 	if !sentAt.IsZero() && !event.RecordTime.IsZero() {
 		c.watcherMetrics.ObserveDelivered(sentAt.Sub(event.RecordTime))
 	}
