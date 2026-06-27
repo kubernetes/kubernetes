@@ -1788,22 +1788,22 @@ type CELDeviceSelector struct {
 // However, this depends on how fast the machine is.
 const CELSelectorExpressionMaxCost = 1000000
 
-// DeviceClaimDerivedAttributeCELMaxCost is the maximum combined execution cost 
+// DeviceClaimDerivedAttributeCELMaxCost is the maximum combined execution cost
 // allowed for all derived attribute CEL expressions within a single DeviceClaim.
 //
 // During validation, the API server computes the estimated execution cost of each
-// derived attribute expression. The sum of these costs across all requests in the 
+// derived attribute expression. The sum of these costs across all requests in the
 // claim must not exceed this budget. If it does, the claim is rejected.
 //
-// To stay within the budget, consumers should simplify their CEL expressions, 
-// avoid computationally expensive operations like deep nesting or iterations 
-// (such as `.all()` or `.exists()`), and minimize the total number of derived 
+// To stay within the budget, consumers should simplify their CEL expressions,
+// avoid computationally expensive operations like deep nesting or iterations
+// (such as `.all()` or `.exists()`), and minimize the total number of derived
 // attributes in a claim.
 //
 // This shared budget prevents excessively complex claims from degrading the
-// performance of the kube-scheduler. The limit is set to 1,000,000 instruction 
-// executions (roughly 0.1 seconds of evaluation time), tying the collective 
-// cost of all derived attributes to the maximum cost allowed for a single 
+// performance of the kube-scheduler. The limit is set to 1,000,000 instruction
+// executions (roughly 0.1 seconds of evaluation time), tying the collective
+// cost of all derived attributes to the maximum cost allowed for a single
 // CEL selector.
 const DeviceClaimDerivedAttributeCELMaxCost = 1000000
 

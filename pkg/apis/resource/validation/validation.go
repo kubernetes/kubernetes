@@ -207,7 +207,7 @@ func gatherConstraintAttributes(constraints []resource.DeviceConstraint) map[str
 func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	requestNames := gatherRequestNames(deviceClaim)
-	
+
 	var totalDerivedAttrCost uint64
 	opts := deviceValidationOptions{
 		stored:               stored,
