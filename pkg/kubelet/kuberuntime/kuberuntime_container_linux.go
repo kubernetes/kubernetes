@@ -153,7 +153,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
 
-	draAllocations := getContainerDRAAllocations(pod, container.Name)
+	draAllocations := make(v1.ResourceList)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
+		draAllocations = resourcehelper.GetContainerDRAAllocations(pod, container.Name)
+	}
 	memoryLimit := getMemoryLimit(pod, container, draAllocations)
 	cpuLimit := getCPULimit(pod, container, draAllocations)
 
@@ -308,52 +311,6 @@ func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(san
 		Overhead:     m.convertOverheadToLinuxResources(pod),
 		Resources:    convertResourceConfigToLinuxContainerResources(podResourcesWithoutOverhead),
 	}
-}
-
-func getContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceList {
-	draAllocations := make(v1.ResourceList)
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
-		return draAllocations
-	}
-
-	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-		referenced := false
-		for _, name := range claimStatus.Containers {
-			if name == containerName {
-				referenced = true
-				break
-			}
-		}
-		if !referenced {
-			continue
-		}
-
-		// Add Direct resources
-		for _, direct := range claimStatus.Direct {
-			q := draAllocations[direct.Name]
-			q.Add(direct.Quantity)
-			draAllocations[direct.Name] = q
-		}
-
-		// Add Overhead resources
-		for _, overhead := range claimStatus.Overhead {
-			var quantity resource.Quantity
-			if overhead.PerPod != nil {
-				// PerPod overhead is included in the limit of every container referencing the claim.
-				// This allows any container to utilize the overhead individually. However, if multiple containers
-				// attempt to use it simultaneously, the resource is capped at the parent pod-level cgroup limit,
-				// where the overhead is counted exactly once.
-				quantity.Add(*overhead.PerPod)
-			}
-			if overhead.PerContainer != nil {
-				quantity.Add(*overhead.PerContainer)
-			}
-			q := draAllocations[overhead.Name]
-			q.Add(quantity)
-			draAllocations[overhead.Name] = q
-		}
-	}
-	return draAllocations
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
