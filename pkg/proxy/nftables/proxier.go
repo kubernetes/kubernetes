@@ -179,6 +179,13 @@ type Proxier struct {
 	// staleChains contains information about chains to be deleted later
 	staleChains map[string]time.Time
 
+	// committedChains and committedAffinitySets are the service-related chains
+	// and affinity sets that kube-proxy believes are committed in nftables after
+	// the last successful sync. Incremental syncs use these instead of calling
+	// ListAll to discover existing objects for cleanup.
+	committedChains       sets.Set[string]
+	committedAffinitySets sets.Set[string]
+
 	// serviceCIDRs is a comma separated list of ServiceCIDRs belonging to the IPFamily
 	// which proxier is operating on, can be directly consumed by knftables.
 	serviceCIDRs string
@@ -1160,16 +1167,27 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	var existingChains sets.Set[string]
 	var existingAffinitySets sets.Set[string]
-	if allObjects, err := proxier.nftables.ListAll(context.TODO()); err == nil {
-		existingChains = sets.New(allObjects["chain"]...)
-		existingAffinitySets = sets.New[string]()
-		for _, set := range allObjects["set"] {
-			if isAffinitySetName(set) {
-				existingAffinitySets.Insert(set)
+	if doFullSync {
+		// On a full sync, discover the actual table contents so we can clean up
+		// any stale chains/sets left over from a previous kube-proxy run.
+		if allObjects, err := proxier.nftables.ListAll(context.TODO()); err == nil {
+			existingChains = sets.New(allObjects["chain"]...)
+			existingAffinitySets = sets.New[string]()
+			for _, set := range allObjects["set"] {
+				if isAffinitySetName(set) {
+					existingAffinitySets.Insert(set)
+				}
 			}
+		} else {
+			proxier.logger.Error(err, "Failed to list existing nftables objects")
 		}
 	} else {
-		proxier.logger.Error(err, "Failed to list existing nftables objects")
+		// On incremental syncs use the committed in-memory state, avoiding the
+		// expensive table-wide nft list that grows O(n) with Service count.
+		// Include stale chains so the loop below can un-stale them if their
+		// endpoints come back before the grace period expires.
+		existingChains = proxier.committedChains.Union(sets.KeySet(proxier.staleChains))
+		existingAffinitySets = proxier.committedAffinitySets
 	}
 
 	// Accumulate service/endpoint chains and affinity sets to keep.
@@ -1693,7 +1711,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 		}
 	}
-
 	// OTOH, we can immediately delete any stale affinity sets
 	for set := range existingAffinitySets {
 		if !activeAffinitySets.Has(set) {
@@ -1735,6 +1752,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 	success = true
 	proxier.needFullSync = false
+	proxier.committedChains = activeChains
+	proxier.committedAffinitySets = activeAffinitySets
 
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
