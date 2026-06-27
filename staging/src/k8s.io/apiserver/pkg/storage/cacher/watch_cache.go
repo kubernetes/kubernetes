@@ -191,6 +191,16 @@ func (w *watchCache) Delete(obj interface{}) error {
 	return w.processEvent(event, resourceVersion)
 }
 
+// ProcessWatchEvent takes a watch.Event as an argument and processes it.
+// This implements the WatchEventReceiver interface.
+func (w *watchCache) ProcessWatchEvent(event watch.Event) error {
+	_, resourceVersion, err := w.objectToVersionedRuntimeObject(event.Object)
+	if err != nil {
+		return err
+	}
+	return w.processEvent(event, resourceVersion)
+}
+
 func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Object, uint64, error) {
 	object, ok := obj.(runtime.Object)
 	if !ok {
@@ -218,6 +228,11 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		return err
 	}
 
+	recordTime := event.RecordTime
+	if recordTime.IsZero() {
+		recordTime = w.config.clock.Now()
+	}
+
 	wcEvent := &watchCacheEvent{
 		Type:            event.Type,
 		Object:          elem.Object,
@@ -225,7 +240,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		ObjFields:       elem.Fields,
 		Key:             key,
 		ResourceVersion: resourceVersion,
-		RecordTime:      w.config.clock.Now(),
+		RecordTime:      recordTime,
 	}
 
 	// We can call w.storage.Get() outside of a critical section,

@@ -166,6 +166,7 @@ func testCheckResultFunc(t *testing.T, w watch.Interface, check func(actualEvent
 		if co, ok := obj.(runtime.CacheableObject); ok {
 			res.Object = co.GetObject()
 		}
+		res.RecordTime = time.Time{}
 		check(res)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
@@ -181,6 +182,7 @@ func testCheckResultWithIgnoreFunc(t *testing.T, w watch.Interface, expectedEven
 			if co, ok := obj.(runtime.CacheableObject); ok {
 				event.Object = co.GetObject()
 			}
+			event.RecordTime = time.Time{}
 			if ignore != nil && ignore(event) {
 				continue
 			}
