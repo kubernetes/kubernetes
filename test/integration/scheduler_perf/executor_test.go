@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -957,9 +956,6 @@ func verifyObj(expectedObj any) verifyFunc {
 				return fmt.Errorf("failed to list namespaces: %w", listErr)
 			}
 			gotNamespaces := namespacesList.Items
-			sort.Slice(gotNamespaces, func(i, j int) bool {
-				return gotNamespaces[i].Name < gotNamespaces[j].Name
-			})
 
 			if opDetails.Count < 0 {
 				return fmt.Errorf("opDetails.Count must be non-negative, got %d", opDetails.Count)
