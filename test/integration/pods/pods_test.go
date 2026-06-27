@@ -1811,4 +1811,15 @@ func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
 	if diff := cmp.Diff(wantStatuses, updated.Status.ResourceClaimStatuses); diff != "" {
 		t.Errorf("ResourceClaimStatuses changed after old-client UpdateStatus (-want,+got):\n%s", diff)
 	}
+
+	// An explicit empty list remains a valid way for a field-aware client to
+	// clear a slice field.
+	clearPatch := []byte(`{"status":{"resourceClaimStatuses":[]}}`)
+	cleared, err := client.CoreV1().Pods(ns.Name).Patch(ctx, pod.Name, types.MergePatchType, clearPatch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		t.Fatalf("clear ResourceClaimStatuses: %v", err)
+	}
+	if len(cleared.Status.ResourceClaimStatuses) != 0 {
+		t.Errorf("ResourceClaimStatuses not cleared: %v", cleared.Status.ResourceClaimStatuses)
+	}
 }

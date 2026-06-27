@@ -26,6 +26,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -432,13 +433,18 @@ func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.
 }
 
 func (pl *DynamicResources) clearNodeAllocatableResourceClaimStatus(ctx context.Context, pod *v1.Pod) {
+	if len(pod.Status.NodeAllocatableResourceClaimStatuses) == 0 {
+		return
+	}
+
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Clearing NodeAllocatableResourceClaimStatuses on Unreserve", "pod", klog.KObj(pod))
 
-	targetStatus := pod.Status.DeepCopy()
-	targetStatus.NodeAllocatableResourceClaimStatuses = nil
-
-	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, "", &pod.Status, targetStatus); err != nil {
+	// An explicit empty list distinguishes an intentional clear from an old
+	// client omitting a field that it does not know about. PatchPodStatus cannot
+	// preserve that distinction because the field has an omitempty JSON tag.
+	patch := []byte(`{"status":{"nodeAllocatableResourceClaimStatuses":[]}}`)
+	if _, err := pl.clientset.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
 		logger.Error(err, "Failed to clear NodeAllocatableResourceClaimStatuses on Unreserve", "pod", klog.KObj(pod))
 	} else {
 		logger.V(5).Info("Cleared NodeAllocatableResourceClaimStatuses", "pod", klog.KObj(pod))
