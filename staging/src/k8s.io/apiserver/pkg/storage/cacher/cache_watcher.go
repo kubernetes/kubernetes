@@ -223,10 +223,13 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	}
 
 	// OK, block sending, but only until timer fires.
+	blockStart := time.Now()
 	select {
-	case c.input <- inputEvent{event: event, enqueuedAt: time.Now().UnixNano()}:
+	case c.input <- inputEvent{event: event, enqueuedAt: blockStart.UnixNano()}:
+		c.watcherMetrics.AddDispatchBlockedSeconds(time.Since(blockStart))
 		return true
 	case <-timer.C:
+		c.watcherMetrics.AddDispatchBlockedSeconds(time.Since(blockStart))
 		closeFunc()
 		return false
 	}
@@ -439,10 +442,12 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (sentAt time.
 	default:
 	}
 
+	handoffStart := time.Now()
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
 		sentAt = time.Now()
+		c.watcherMetrics.AddHandoffBlockedSeconds(sentAt.Sub(handoffStart))
 	case <-c.done:
 	}
 	return
