@@ -598,6 +598,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
+	auditID, _ := audit.AuditIDFrom(ctx)
 	watcher := newCacheWatcher(
 		chanSize,
 		filterWithAttrsAndPrefixFunction(key, pred, c.groupResource),
@@ -608,6 +609,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.groupResource,
 		c.watcherMetrics,
 		identifier,
+		auditID,
 	)
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
