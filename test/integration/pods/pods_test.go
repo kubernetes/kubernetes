@@ -1749,13 +1749,10 @@ func TestPodResizeValidation(t *testing.T) {
 	}
 }
 
-// TestDRAStatusPreservedOnTerminatingPod verifies that apiserver preserves
-// ResourceClaimStatuses when a DRA-unaware client (e.g. Multus CNI using an
-// old client-go) overwrites pod status on a terminating pod, clearing the
-// fields it does not know about. Without the fix in PrepareForUpdate, kubelet
-// would see empty resourceClaimStatuses and fail with "ResourceClaim not
-// created yet" while unpreparing resources (issue #139772).
-func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
+// TestDRAStatusPreservedOnStatusUpdate verifies that the apiserver preserves
+// ResourceClaimStatuses when a DRA-unaware client overwrites the status of a
+// running pod and omits fields that it does not know about.
+func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -1771,12 +1768,6 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "dra-pod",
 			Namespace: ns.Name,
-			// Finalizer prevents immediate hard-deletion for unscheduled pods.
-			// Without NodeName, CheckGracefulDelete forces grace period=0 which
-			// removes the pod from etcd synchronously before DeletionTimestamp
-			// can be observed. The finalizer ensures Delete sets DeletionTimestamp
-			// while keeping the pod in etcd until we clean up below.
-			Finalizers: []string{"test/delay-deletion"},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
@@ -1794,38 +1785,16 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 	}
 
 	// Simulate DRA controller writing resourceClaimStatuses.
-	pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+	wantStatuses := []v1.PodResourceClaimStatus{
 		{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
 	}
+	pod.Status.ResourceClaimStatuses = wantStatuses
 	pod, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("set ResourceClaimStatuses: %v", err)
 	}
 	if len(pod.Status.ResourceClaimStatuses) == 0 {
 		t.Fatal("ResourceClaimStatuses not persisted after initial UpdateStatus")
-	}
-
-	// Mark pod as terminating (sets DeletionTimestamp).
-	gracePeriod := int64(30)
-	if err := client.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{
-		GracePeriodSeconds: &gracePeriod,
-	}); err != nil {
-		t.Fatalf("delete pod: %v", err)
-	}
-
-	// Wait for DeletionTimestamp to appear.
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
-		p, err := client.CoreV1().Pods(ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		if p.DeletionTimestamp != nil {
-			pod = p
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
-		t.Fatalf("pod did not become terminating: %v", err)
 	}
 
 	// Simulate an old DRA-unaware client (e.g. Multus using k8s.io/client-go v0.29)
@@ -1839,16 +1808,7 @@ func TestDRAStatusPreservedOnTerminatingPod(t *testing.T) {
 		t.Fatalf("old-client UpdateStatus: %v", err)
 	}
 
-	if len(updated.Status.ResourceClaimStatuses) == 0 {
-		t.Error("ResourceClaimStatuses were cleared by old-client UpdateStatus on terminating pod — fix not working")
-	} else {
-		t.Logf("ResourceClaimStatuses preserved correctly: %v", updated.Status.ResourceClaimStatuses)
-	}
-
-	// Remove the test finalizer so the pod can be cleaned up by namespace deletion.
-	toClean := updated.DeepCopy()
-	toClean.Finalizers = nil
-	if _, err := client.CoreV1().Pods(ns.Name).Update(ctx, toClean, metav1.UpdateOptions{}); err != nil {
-		t.Logf("cleanup: remove test finalizer: %v", err)
+	if diff := cmp.Diff(wantStatuses, updated.Status.ResourceClaimStatuses); diff != "" {
+		t.Errorf("ResourceClaimStatuses changed after old-client UpdateStatus (-want,+got):\n%s", diff)
 	}
 }

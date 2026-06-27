@@ -4308,7 +4308,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "allow intentional removal of ResourceClaimStatuses on non-terminating pod",
+			description: "preserve old ResourceClaimStatuses when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DynamicResourceAllocation: true,
 			},
@@ -4326,16 +4326,20 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Status:     api.PodStatus{},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{
+						{Name: "my-claim", ResourceClaimName: new("pod-my-claim")},
+					},
+				},
 			},
 		},
 		{
-			description: "allow explicit empty-slice removal of ResourceClaimStatuses on terminating pod",
+			description: "allow explicit empty-slice removal of ResourceClaimStatuses on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DynamicResourceAllocation: true,
 			},
 			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
 					ResourceClaimStatuses: []api.PodResourceClaimStatus{
 						{Name: "my-claim", ResourceClaimName: new("pod-my-claim")},
@@ -4382,7 +4386,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "allow intentional removal of ExtendedResourceClaimStatus on non-terminating pod",
+			description: "preserve old ExtendedResourceClaimStatus when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRAExtendedResource: true,
 			},
@@ -4400,7 +4404,11 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Status:     api.PodStatus{},
+				Status: api.PodStatus{
+					ExtendedResourceClaimStatus: &api.PodExtendedResourceClaimStatus{
+						ResourceClaimName: "pod-ext-claim",
+					},
+				},
 			},
 		},
 		{
@@ -4430,7 +4438,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "allow intentional removal of NodeAllocatableResourceClaimStatuses on non-terminating pod",
+			description: "preserve old NodeAllocatableResourceClaimStatuses when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
@@ -4448,16 +4456,20 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Status:     api.PodStatus{},
+				Status: api.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+						{ResourceClaimName: "pod-node-claim"},
+					},
+				},
 			},
 		},
 		{
-			description: "allow explicit empty-slice removal of NodeAllocatableResourceClaimStatuses on terminating pod",
+			description: "allow explicit empty-slice removal of NodeAllocatableResourceClaimStatuses on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
 					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
 						{ResourceClaimName: "pod-node-claim"},
