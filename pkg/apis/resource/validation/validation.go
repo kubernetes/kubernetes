@@ -1242,7 +1242,6 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 	return allErrs
 }
 
-
 func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(id) > resource.DeviceMaxIDLength {

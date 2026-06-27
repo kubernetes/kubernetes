@@ -47,9 +47,6 @@ func init() {
 			"spec.spec.devices.constraints": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
-			"spec.spec.devices.constraints[*].matchAttribute": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
-			},
 			"spec.spec.devices.constraints[*].requests": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -65,6 +62,15 @@ func init() {
 			"spec.spec.devices.requests[*].allocationMode": {
 				{ErrorType: "FieldValueNotSupported"},
 			},
+			"spec.spec.devices.requests[*].derivedAttributes": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.spec.devices.requests[*].derivedAttributes[*].expression": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.spec.devices.requests[*].derivedAttributes[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.spec.devices.requests[*].firstAvailable": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -73,6 +79,15 @@ func init() {
 			},
 			"spec.spec.devices.requests[*].firstAvailable[*].allocationMode": {
 				{ErrorType: "FieldValueNotSupported"},
+			},
+			"spec.spec.devices.requests[*].firstAvailable[*].derivedAttributes": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.spec.devices.requests[*].firstAvailable[*].derivedAttributes[*].expression": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.spec.devices.requests[*].firstAvailable[*].derivedAttributes[*].name": {
+				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.spec.devices.requests[*].firstAvailable[*].deviceClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},

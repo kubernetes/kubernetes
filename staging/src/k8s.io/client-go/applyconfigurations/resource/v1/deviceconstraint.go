@@ -53,8 +53,11 @@ type DeviceConstraintApplyConfiguration struct {
 	// match when the intersection across all devices is non-empty.
 	// Scalar values are treated as single-element lists for backward compatibility.
 	//
-	// Must include the domain qualifier.
-	MatchAttribute *resourcev1.FullyQualifiedName `json:"matchAttribute,omitempty"`
+	// If the DRADerivedAttributes feature gate is enabled and the domain
+	// prefix is omitted, the name refers to a derived attribute and must
+	// match the name of a derived attribute defined in the claim's requests.
+	// Otherwise, the domain prefix is required.
+	MatchAttribute *resourcev1.QualifiedName `json:"matchAttribute,omitempty"`
 	// DistinctAttribute requires that all devices in question have this
 	// attribute and that its type and value are unique across those devices.
 	//
@@ -70,7 +73,12 @@ type DeviceConstraintApplyConfiguration struct {
 	//
 	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
 	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
-	DistinctAttribute *resourcev1.FullyQualifiedName `json:"distinctAttribute,omitempty"`
+	//
+	// If the DRADerivedAttributes feature gate is enabled and the domain
+	// prefix is omitted, the name refers to a derived attribute and must
+	// match the name of a derived attribute defined in the claim's requests.
+	// Otherwise, the domain prefix is required.
+	DistinctAttribute *resourcev1.QualifiedName `json:"distinctAttribute,omitempty"`
 }
 
 // DeviceConstraintApplyConfiguration constructs a declarative configuration of the DeviceConstraint type for use with
@@ -92,7 +100,7 @@ func (b *DeviceConstraintApplyConfiguration) WithRequests(values ...string) *Dev
 // WithMatchAttribute sets the MatchAttribute field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MatchAttribute field is set to the value of the last call.
-func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value resourcev1.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
+func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value resourcev1.QualifiedName) *DeviceConstraintApplyConfiguration {
 	b.MatchAttribute = &value
 	return b
 }
@@ -100,7 +108,7 @@ func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value resourcev1
 // WithDistinctAttribute sets the DistinctAttribute field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DistinctAttribute field is set to the value of the last call.
-func (b *DeviceConstraintApplyConfiguration) WithDistinctAttribute(value resourcev1.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
+func (b *DeviceConstraintApplyConfiguration) WithDistinctAttribute(value resourcev1.QualifiedName) *DeviceConstraintApplyConfiguration {
 	b.DistinctAttribute = &value
 	return b
 }
