@@ -1111,7 +1111,10 @@ func TestAllocator(t *testing.T,
 		// on the same counter set is still allocated. This is the version-skew
 		// "Devices skipped" behavior and is verified across all allocator variants.
 		"compatibility-groups-disabled-skips-grouped-device": {
-			features: Features{PartitionableDevices: true},
+			// CompatibilityGroups is set explicitly to false so this case keeps
+			// exercising the feature-disabled path unchanged after the feature
+			// graduates to on-by-default.
+			features: Features{PartitionableDevices: true, CompatibilityGroups: false},
 			claimsToAllocate: objects(claim(claim0).withRequests(
 				deviceRequest(req0, classA, 1),
 			)),
