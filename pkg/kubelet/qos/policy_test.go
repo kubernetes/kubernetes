@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/utils/ptr"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -650,13 +651,104 @@ type lowHighOOMScoreAdjTest struct {
 	highOOMScoreAdj int
 }
 type oomTest struct {
-	pod                             *v1.Pod
-	memoryCapacity                  int64
-	lowHighOOMScoreAdj              map[string]lowHighOOMScoreAdjTest // [container-name] : min and max oom_score_adj score the container should be assigned.
-	podLevelResourcesFeatureEnabled bool
+	pod                               *v1.Pod
+	memoryCapacity                    int64
+	lowHighOOMScoreAdj                map[string]lowHighOOMScoreAdjTest // [container-name] : min and max oom_score_adj score the container should be assigned.
+	podLevelResourcesFeatureEnabled   bool
+	enableDRANodeAllocatableResources bool
+}
+
+type draMemAllocation struct {
+	containers           []string
+	direct               string
+	perContainerOverhead string
+	perPodOverhead       string
 }
 
 func TestGetContainerOOMScoreAdjust(t *testing.T) {
+	makeTestPodForDRA := func(
+		c1Mem, c2Mem, sidecarMem, podLevelMem string,
+		draAlloc draMemAllocation,
+	) *v1.Pod {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse(c1Mem),
+							},
+						},
+					},
+				},
+			},
+		}
+
+		if c2Mem != "" {
+			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+				Name: "c2",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse(c2Mem),
+					},
+				},
+			})
+		}
+
+		if sidecarMem != "" {
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, v1.Container{
+				Name: "s1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse(sidecarMem),
+					},
+				},
+				RestartPolicy: &restartPolicyAlways,
+			})
+		}
+
+		if podLevelMem != "" {
+			pod.Spec.Resources = &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(podLevelMem),
+				},
+			}
+		}
+
+		if len(draAlloc.containers) > 0 {
+			status := v1.NodeAllocatableResourceClaimStatus{
+				ResourceClaimName: "dra-claim",
+				Containers:        draAlloc.containers,
+			}
+			if draAlloc.direct != "" {
+				status.Direct = []v1.NodeAllocatableDirectResources{
+					{
+						Name:     v1.ResourceMemory,
+						Quantity: resource.MustParse(draAlloc.direct),
+					},
+				}
+			}
+			var overheads []v1.NodeAllocatableOverheadResources
+			if draAlloc.perContainerOverhead != "" {
+				overheads = append(overheads, v1.NodeAllocatableOverheadResources{
+					Name:         v1.ResourceMemory,
+					PerContainer: ptr.To(resource.MustParse(draAlloc.perContainerOverhead)),
+				})
+			}
+			if draAlloc.perPodOverhead != "" {
+				overheads = append(overheads, v1.NodeAllocatableOverheadResources{
+					Name:   v1.ResourceMemory,
+					PerPod: ptr.To(resource.MustParse(draAlloc.perPodOverhead)),
+				})
+			}
+			status.Overhead = overheads
+			pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{status}
+		}
+
+		return pod
+	}
+
 	oomTests := map[string]oomTest{
 		"cpu-limit": {
 			pod:            &cpuLimit,
@@ -845,10 +937,147 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			memoryCapacity:                  4000000000,
 			podLevelResourcesFeatureEnabled: true,
 		},
+		"burstable-pod-with-dra-disabled": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "500Mi",
+				/*c2Mem=*/ "",
+				/*sidecarMem=*/ "",
+				/*podLevelMem=*/ "",
+				draMemAllocation{
+					containers:           []string{"c1"},
+					perContainerOverhead: "500Mi",
+				},
+			),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * 500Mi Spec / 4GB) = 869
+				"c1": {lowOOMScoreAdj: 869, highOOMScoreAdj: 869},
+			},
+			enableDRANodeAllocatableResources: false,
+		},
+		"burstable-pod-with-dra-enabled": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "500Mi",
+				/*c2Mem=*/ "",
+				/*sidecarMem=*/ "",
+				/*podLevelMem=*/ "",
+				draMemAllocation{
+					containers:           []string{"c1"},
+					perContainerOverhead: "500Mi",
+				},
+			),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 500Mi DRA) / 4GB) = 738
+				"c1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-shared-dra-claim": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "500Mi",
+				/*c2Mem=*/ "500Mi",
+				/*sidecarMem=*/ "",
+				/*podLevelMem=*/ "",
+				draMemAllocation{
+					containers:     []string{"c1", "c2"},
+					perPodOverhead: "1000Mi",
+				},
+			),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 1000Mi DRA / 2 references) / 4GB) = 738
+				"c1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+				"c2": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-plr-and-dra-claim": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "1Gi",
+				/*c2Mem=*/ "",
+				/*sidecarMem=*/ "",
+				/*podLevelMem=*/ "5Gi",
+				draMemAllocation{
+					containers:           []string{"c1"},
+					perContainerOverhead: "2Gi",
+				},
+			),
+			memoryCapacity: 8000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// PLR Remaining Request = (5Gi Pod - 1Gi c1 Spec - 2Gi c1 DRA) = 2Gi
+				// OOMScoreAdj = 1000 - (1000 * (1Gi Spec + 2Gi DRA + 2Gi PLR remaining) / 8GB) = 329
+				"c1": {lowOOMScoreAdj: 329, highOOMScoreAdj: 329},
+			},
+			podLevelResourcesFeatureEnabled:   true,
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-plr-and-shared-dra-claim": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "1Gi",
+				/*c2Mem=*/ "1Gi",
+				/*sidecarMem=*/ "",
+				/*podLevelMem=*/ "6Gi",
+				draMemAllocation{
+					containers:     []string{"c1", "c2"},
+					perPodOverhead: "2Gi",
+				},
+			),
+			memoryCapacity: 8000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// c1, c2 effective request = 1Gi Spec + 2Gi DRA / 2 refs = 2Gi
+				// PLR Remaining Request = (6Gi Pod - 4Gi sum of effective requests) = 2Gi
+				// Per-container PLR share = 2Gi / 2 containers = 1Gi
+				// OOMScoreAdj = 1000 - (1000 * (2Gi effective + 1Gi PLR share) / 8GB) = 598
+				"c1": {lowOOMScoreAdj: 598, highOOMScoreAdj: 598},
+				"c2": {lowOOMScoreAdj: 598, highOOMScoreAdj: 598},
+			},
+			podLevelResourcesFeatureEnabled:   true,
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-dra-direct-device": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "500Mi",
+				/*c2Mem=*/ "",
+				/*sidecarMem=*/ "",
+				/*podLevelMem=*/ "",
+				draMemAllocation{
+					containers: []string{"c1"},
+					direct:     "500Mi",
+				},
+			),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 500Mi direct DRA) / 4GB) = 738
+				"c1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
+		"burstable-pod-with-sidecar-and-dra-enabled": {
+			pod: makeTestPodForDRA(
+				/*c1Mem=*/ "500Mi",
+				/*c2Mem=*/ "",
+				/*sidecarMem=*/ "200Mi",
+				/*podLevelMem=*/ "",
+				draMemAllocation{
+					containers:           []string{"c1"},
+					perContainerOverhead: "500Mi",
+				},
+			),
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// c1 OOMScoreAdj = 1000 - (1000 * (500Mi Spec + 500Mi DRA) / 4GB) = 738
+				"c1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+				// s1 OOMScoreAdj = 1000 - (1000 * 200Mi Spec / 4GB) = 948 capped to min regular container score (738)
+				"s1": {lowOOMScoreAdj: 738, highOOMScoreAdj: 738},
+			},
+			enableDRANodeAllocatableResources: true,
+		},
 	}
 	for name, test := range oomTests {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesFeatureEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 			listContainers := test.pod.Spec.InitContainers
 			listContainers = append(listContainers, test.pod.Spec.Containers...)
 			for _, container := range listContainers {
