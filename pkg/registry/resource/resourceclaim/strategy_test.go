@@ -1569,9 +1569,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-compatibility-groups": {
-			// adminAccess avoids the 1.35 emulation pin so the 1.37 alpha gate is settable.
-			adminAccess: true,
-			oldObj:      obj,
+			oldObj: obj,
 			newObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addStatusAllocationDevicesResultsWithCompatibilityGroups(obj, testDriver, testPool, testDevice, req0, map[string]resource.CompatibilityGroupList{"pool-1": {Groups: []string{"mig"}}})
@@ -1590,8 +1588,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-compatibility-groups-disabled-feature": {
-			adminAccess: true,
-			oldObj:      obj,
+			oldObj: obj,
 			newObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addStatusAllocationDevicesResultsWithCompatibilityGroups(obj, testDriver, testPool, testDevice, req0, map[string]resource.CompatibilityGroupList{"pool-1": {Groups: []string{"mig"}}})
@@ -1755,21 +1752,32 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			if !tc.adminAccess {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
+			// DRADeviceCompatibilityGroups is alpha and only exists from 1.37, so a
+			// case that exercises it must emulate that release for the gate to be
+			// settable.
+			if tc.deviceCompatibilityGroupsFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			effectiveVersion := utilfeature.DefaultMutableFeatureGate.EmulationVersion()
+
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:               tc.adminAccess,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatusFeatureGate,
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 			})
+			// Only toggle DRAAdminAccess where it is not yet locked-to-default.
+			if effectiveVersion.LessThan(version.MustParse("1.36")) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAAdminAccess: tc.adminAccess,
+				})
+			}
 			klog.InfoS("Testing strategy", "adminAccess", tc.adminAccess, "bindingConditions", tc.bindingConditions, "deviceStatus", tc.deviceStatusFeatureGate)
 
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAConsumableCapacity: tc.consumableCapacityFeatureGate,
 				features.DRAPrioritizedList:    tc.prioritizedListFeatureGate,
 			})
-			// DRADeviceCompatibilityGroups is alpha in 1.37, so it can only be
-			// toggled when the emulation version is not pinned to an earlier
-			// release (which only happens for the adminAccess cases here).
-			if tc.adminAccess {
+			// Only toggle DRADeviceCompatibilityGroups where it exists.
+			if effectiveVersion.AtLeast(version.MustParse("1.37")) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.DRADeviceCompatibilityGroups: tc.deviceCompatibilityGroupsFeatureGate,
 				})
