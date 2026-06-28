@@ -6175,10 +6175,15 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 		return allErrs
 	}
 
+	seenClaims := sets.New[string]()
 	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
 		statusFldPath := fldPath.Index(i)
 		if nodeAllocatableStatus.ResourceClaimName == "" {
 			allErrs = append(allErrs, field.Required(statusFldPath.Child("resourceClaimName"), "must not be empty"))
+		} else if seenClaims.Has(nodeAllocatableStatus.ResourceClaimName) {
+			allErrs = append(allErrs, field.Duplicate(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName))
+		} else {
+			seenClaims.Insert(nodeAllocatableStatus.ResourceClaimName)
 		}
 
 		// First check the podSpec to see if the ResourceClaim is directly referenced.
@@ -6203,28 +6208,67 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
 		}
 
-		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
-		// This is pending on defining kubelet cgroup enforcement.
-		if len(nodeAllocatableStatus.Containers) == 0 {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
-		}
-
-		directFldPath := statusFldPath.Child("direct")
-		if len(nodeAllocatableStatus.Direct) == 0 {
-			allErrs = append(allErrs, field.Required(directFldPath, "must not be empty"))
-		}
-
-		for i, direct := range nodeAllocatableStatus.Direct {
-			itemPath := directFldPath.Index(i)
-			if !v1helper.IsNativeResource(v1.ResourceName(direct.Name)) {
-				allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), direct.Name, "must be a node allocatable resource name"))
-			}
-			if direct.Quantity.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), direct.Quantity.String(), "must be non-negative"))
-			}
+		// Exactly one of direct or overhead must be set.
+		if len(nodeAllocatableStatus.Direct) == 0 && len(nodeAllocatableStatus.Overhead) == 0 {
+			allErrs = append(allErrs, field.Required(statusFldPath, "exactly one of direct or overhead must be set"))
+		} else if len(nodeAllocatableStatus.Direct) > 0 && len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, field.Invalid(statusFldPath, "", "direct and overhead are mutually exclusive"))
+		} else if len(nodeAllocatableStatus.Direct) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableDirectResources(nodeAllocatableStatus.Direct, statusFldPath.Child("direct"))...)
+		} else if len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
 		}
 	}
 
+	return allErrs
+}
+
+// validateNodeAllocatableDirectResources validates a list of direct-mapped node allocatable resources
+func validateNodeAllocatableDirectResources(direct []core.NodeAllocatableDirectResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	seenResources := sets.New[core.ResourceName]()
+	for i, item := range direct {
+		itemPath := fldPath.Index(i)
+		if seenResources.Has(item.Name) {
+			allErrs = append(allErrs, field.Duplicate(itemPath.Child("name"), item.Name))
+		} else {
+			seenResources.Insert(item.Name)
+		}
+		if !v1helper.IsNativeResource(v1.ResourceName(item.Name)) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.Quantity.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), item.Quantity.String(), "must be non-negative"))
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadResources validates a list of overhead node allocatable resources
+func validateNodeAllocatableOverheadResources(overhead []core.NodeAllocatableOverheadResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	seenResources := sets.New[core.ResourceName]()
+	for i, item := range overhead {
+		itemPath := fldPath.Index(i)
+		if seenResources.Has(item.Name) {
+			allErrs = append(allErrs, field.Duplicate(itemPath.Child("name"), item.Name))
+		} else {
+			seenResources.Insert(item.Name)
+		}
+		if !v1helper.IsNativeResource(v1.ResourceName(item.Name)) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.PerPod == nil && item.PerContainer == nil {
+			allErrs = append(allErrs, field.Invalid(itemPath, "", "at least one of perPod or perContainer must be set"))
+		} else {
+			if item.PerPod != nil && item.PerPod.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perPod"), item.PerPod.String(), "must be non-negative"))
+			}
+			if item.PerContainer != nil && item.PerContainer.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perContainer"), item.PerContainer.String(), "must be non-negative"))
+			}
+		}
+	}
 	return allErrs
 }
 

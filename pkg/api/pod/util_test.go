@@ -947,6 +947,39 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 	}
 
+	podWithDRANodeAllocatableResourceStatusOverhead := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Resources: api.ResourceRequirements{
+						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+					},
+				},
+			},
+			InitContainers:      []api.Container{{}},
+			EphemeralContainers: []api.EphemeralContainer{{}},
+			ResourceClaims: []api.PodResourceClaim{
+				{
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
+				},
+			},
+		},
+		Status: api.PodStatus{
+			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: "node-allocatable-claim",
+					Overhead: []api.NodeAllocatableOverheadResources{
+						{
+							Name:   api.ResourceMemory,
+							PerPod: ptr.To(resource.MustParse("100Mi")),
+						},
+					},
+				},
+			},
+		},
+	}
+
 	podWithoutDRANodeAllocatableResourceStatus := &api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -1138,6 +1171,38 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
 			newPod:                           podWithDRANodeAllocatableResourceStatus,
 			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources (overhead) / no old pod / new with DRA node allocatable resource (overhead) / disabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: false,
+			oldPod:                           noPod,
+			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
+			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources (overhead) / no old pod / new with DRA node allocatable resource (overhead) / enabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: true,
+			oldPod:                           noPod,
+			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
+			wantPod:                          podWithDRANodeAllocatableResourceStatusOverhead,
+		},
+		{
+			description:                      "DRA node allocatable resources (overhead) / old without node allocatable resource status / new with node allocatable resource (overhead) status / disabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: false,
+			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
+			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+		},
+		{
+			description:                      "DRA node allocatable resources (overhead) / old without node allocatable resource status / new with node allocatable resource (overhead) status / enabled",
+			enabled:                          true,
+			enableDRANodeAllocatableResouces: true,
+			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
+			wantPod:                          podWithDRANodeAllocatableResourceStatusOverhead,
 		},
 	}
 

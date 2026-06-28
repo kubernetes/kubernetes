@@ -194,7 +194,9 @@ var sliceWithNodeAllocatableResources = func() *resource.ResourceSlice {
 	instanceQuantity := k8sresource.MustParse("1")
 	obj.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
 		v1.ResourceCPU: {
-			AllocationMultiplier: &instanceQuantity,
+			Direct: &resource.NodeAllocatableDirectMapping{
+				AllocationMultiplier: &instanceQuantity,
+			},
 		},
 	}
 	return obj
@@ -444,16 +446,17 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                *resource.ResourceSlice
-		newObj                *resource.ResourceSlice
-		deviceTaints          bool
-		partitionableDevices  bool
-		deviceStatus          bool
-		bindingConditions     bool
-		consumableCapacity    bool
-		listTypeAttributes    bool
-		expectValidationError bool
-		expectObj             *resource.ResourceSlice
+		oldObj                      *resource.ResourceSlice
+		newObj                      *resource.ResourceSlice
+		deviceTaints                bool
+		partitionableDevices        bool
+		deviceStatus                bool
+		bindingConditions           bool
+		consumableCapacity          bool
+		listTypeAttributes          bool
+		draNodeAllocatableResources bool
+		expectValidationError       bool
+		expectObj                   *resource.ResourceSlice
 	}{
 		"no-changes-okay": {
 			oldObj: slice,
@@ -863,6 +866,49 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-existing-fields-node-allocatable-dra-claims": {
+			oldObj: sliceWithNodeAllocatableResources,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			draNodeAllocatableResources: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-node-allocatable-dra-claims-disabled-feature": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			draNodeAllocatableResources: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-node-allocatable-dra-claims-disabled-feature": {
+			oldObj: sliceWithNodeAllocatableResources,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			draNodeAllocatableResources: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
@@ -874,6 +920,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
 				features.DRAListTypeAttributes:        tc.listTypeAttributes,
+				features.DRANodeAllocatableResources:  tc.draNodeAllocatableResources,
 			})
 
 			oldObj := tc.oldObj.DeepCopy()

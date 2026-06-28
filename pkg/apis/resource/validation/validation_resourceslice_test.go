@@ -1445,6 +1445,103 @@ func TestValidateResourceSlice(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
 			},
 		},
+		"bad-node-allocatable-resource-mappings-both-direct-and-overhead-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)), "", "direct and overhead are mutually exclusive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {
+						Direct: &resourceapi.NodeAllocatableDirectMapping{
+							AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						},
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-neither-set": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)), "exactly one of direct or overhead must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-overhead-neither-perpod-nor-percontainer-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)).Child("overhead"), "", "at least one of perPod or perContainer must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-overhead-negative-perpod": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)).Child("overhead").Child("perPod"), "-1Gi", "must be non-negative"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("-1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resource-mappings-overhead-negative-percontainer": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)).Child("overhead").Child("perContainer"), "-500Mi", "must be non-negative"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerContainer: ptr.To(resource.MustParse("-500Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"good-node-allocatable-resource-mappings-overhead": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod:       ptr.To(resource.MustParse("1Gi")),
+							PerContainer: ptr.To(resource.MustParse("500Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
 	}
 
 	for name, scenario := range scenarios {
