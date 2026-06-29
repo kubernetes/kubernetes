@@ -81,29 +81,46 @@ func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.Capacity
 // If no requestVal, fill the quantity by fillEmptyRequest function
 // Otherwise, use requestPolicy to calculate the consumed capacity from request if applicable.
 func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourceapi.DeviceCapacity) resource.Quantity {
-	if requestedVal == nil {
-		return fillEmptyRequest(capacity)
-	}
-	if capacity.RequestPolicy == nil {
-		return requestedVal.DeepCopy()
-	}
-	switch {
-	case capacity.RequestPolicy.ValidRange != nil && capacity.RequestPolicy.ValidRange.Min != nil:
-		return roundUpRange(requestedVal, capacity.RequestPolicy.ValidRange)
-	case capacity.RequestPolicy.ValidValues != nil:
-		return roundUpValidValues(requestedVal, capacity.RequestPolicy.ValidValues)
-	}
-	return *requestedVal
+	return calculateConsumedQuantity(requestedVal, capacity.Value, capacity.RequestPolicy)
 }
 
 // fillEmptyRequest
 // return requestPolicy.default if defined.
 // Otherwise, return capacity value.
 func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
-	if capacity.RequestPolicy != nil && capacity.RequestPolicy.Default != nil {
-		return capacity.RequestPolicy.Default.DeepCopy()
+	return fillEmptyRequestQuantity(capacity.Value, capacity.RequestPolicy)
+}
+
+// calculateConsumedCounter returns the consumed amount for a shared counter.
+func calculateConsumedCounter(requestedVal *resource.Quantity, counter resourceapi.Counter) resource.Quantity {
+	return calculateConsumedQuantity(requestedVal, counter.Value, counter.RequestPolicy)
+}
+
+// calculateConsumedQuantity returns valid consumed amount for a request,
+// according to the advertised quantity and optional request policy.
+func calculateConsumedQuantity(requestedVal *resource.Quantity, total resource.Quantity, requestPolicy *resourceapi.CapacityRequestPolicy) resource.Quantity {
+	if requestedVal == nil {
+		return fillEmptyRequestQuantity(total, requestPolicy)
 	}
-	return capacity.Value.DeepCopy()
+	if requestPolicy == nil {
+		return requestedVal.DeepCopy()
+	}
+	switch {
+	case requestPolicy.ValidRange != nil && requestPolicy.ValidRange.Min != nil:
+		return roundUpRange(requestedVal, requestPolicy.ValidRange)
+	case requestPolicy.ValidValues != nil:
+		return roundUpValidValues(requestedVal, requestPolicy.ValidValues)
+	}
+	return *requestedVal
+}
+
+// fillEmptyRequestQuantity returns the default request quantity if defined,
+// otherwise it returns the full advertised quantity.
+func fillEmptyRequestQuantity(total resource.Quantity, requestPolicy *resourceapi.CapacityRequestPolicy) resource.Quantity {
+	if requestPolicy != nil && requestPolicy.Default != nil {
+		return requestPolicy.Default.DeepCopy()
+	}
+	return total.DeepCopy()
 }
 
 // roundUpRange rounds the requestedVal up to fit within the specified validRange.

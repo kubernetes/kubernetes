@@ -660,13 +660,14 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 
 func AllocatorFeatures(fts feature.Features) structured.Features {
 	return structured.Features{
-		AdminAccess:            fts.EnableDRAAdminAccess,
-		PrioritizedList:        fts.EnableDRAPrioritizedList,
-		PartitionableDevices:   fts.EnableDRAPartitionableDevices,
-		DeviceTaints:           fts.EnableDRADeviceTaints,
-		DeviceBindingAndStatus: fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
-		ConsumableCapacity:     fts.EnableDRAConsumableCapacity,
-		ListTypeAttributes:     fts.EnableDRAListTypeAttributes,
+		AdminAccess:              fts.EnableDRAAdminAccess,
+		PrioritizedList:          fts.EnableDRAPrioritizedList,
+		PartitionableDevices:     fts.EnableDRAPartitionableDevices,
+		DeviceTaints:             fts.EnableDRADeviceTaints,
+		DeviceBindingAndStatus:   fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
+		ConsumableCapacity:       fts.EnableDRAConsumableCapacity,
+		ListTypeAttributes:       fts.EnableDRAListTypeAttributes,
+		SharedConsumableCapacity: fts.EnableDRASharedConsumableCapacity,
 	}
 }
 
