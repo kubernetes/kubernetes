@@ -1905,7 +1905,10 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	podUID := "test-pod-uid"
 	containerName := "test-container"
+	initContainerName := "test-init-container"
+	regularInitContainerName := "test-regular-init-container"
 	resourceName := "test-resource"
+	restartAlways := v1.ContainerRestartPolicyAlways
 
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	if err != nil {
@@ -1940,18 +1943,49 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
 		),
 	)
+	testManager.podDevices.insert(podUID, initContainerName, resourceName,
+		constructDevices([]string{"dev3"}),
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev3": "/dev/r1dev3"}),
+			withMounts(map[string]string{"/home/r1lib3": "/usr/r1lib3"}),
+		),
+	)
+	testManager.podDevices.insert(podUID, regularInitContainerName, resourceName,
+		constructDevices([]string{"dev4"}),
+		newContainerAllocateResponse(
+			withDevices(map[string]string{"/dev/r1dev4": "/dev/r1dev4"}),
+			withMounts(map[string]string{"/home/r1lib4": "/usr/r1lib4"}),
+		),
+	)
 
 	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
 		{ID: "dev1", Health: pluginapi.Healthy},
 		{ID: "dev2", Health: pluginapi.Unhealthy},
+		{ID: "dev3", Health: pluginapi.Healthy},
+		{ID: "dev4", Health: pluginapi.Healthy},
 	})
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: types.UID(podUID),
 		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{Name: regularInitContainerName},
+				{Name: initContainerName, RestartPolicy: &restartAlways},
+			},
+			Containers: []v1.Container{{Name: containerName}},
+		},
 	}
 	status := &v1.PodStatus{
+		InitContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: regularInitContainerName,
+			},
+			{
+				Name: initContainerName,
+			},
+		},
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				Name: containerName,
@@ -1973,6 +2007,24 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			},
 		},
 	}
+	expectedInitStatus := v1.ResourceStatus{
+		Name: v1.ResourceName(resourceName),
+		Resources: []v1.ResourceHealth{
+			{
+				ResourceID: "dev3",
+				Health:     pluginapi.Healthy,
+			},
+		},
+	}
+	expectedInitContainerStatuses := []v1.ContainerStatus{
+		{
+			Name: regularInitContainerName,
+		},
+		{
+			Name:                     initContainerName,
+			AllocatedResourcesStatus: []v1.ResourceStatus{expectedInitStatus},
+		},
+	}
 	expectedContainerStatuses := []v1.ContainerStatus{
 		{
 			Name:                     containerName,
@@ -1981,9 +2033,14 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	}
 
 	// Sort the resources for the expected status and actual status
+	sortContainerStatuses(status.InitContainerStatuses)
+	sortContainerStatuses(expectedInitContainerStatuses)
 	sortContainerStatuses(status.ContainerStatuses)
 	sortContainerStatuses(expectedContainerStatuses)
 
+	if !reflect.DeepEqual(status.InitContainerStatuses, expectedInitContainerStatuses) {
+		t.Errorf("UpdateAllocatedResourcesStatus failed for init containers, expected: %v, got: %v", expectedInitContainerStatuses, status.InitContainerStatuses)
+	}
 	if !reflect.DeepEqual(status.ContainerStatuses, expectedContainerStatuses) {
 		t.Errorf("UpdateAllocatedResourcesStatus failed, expected: %v, got: %v", expectedContainerStatuses, status.ContainerStatuses)
 	}

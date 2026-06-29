@@ -81,17 +81,10 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 		}
 
 		pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
-		for _, container := range pod.Spec.InitContainers {
-			if !podutil.IsRestartableInitContainer(&container) {
-				continue
-			}
-
-			pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, &container))
-		}
-
-		for _, container := range pod.Spec.Containers {
-			pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, &container))
-		}
+		podutil.VisitContainersWithResourceHealthStatus(&pod.Spec, func(container *v1.Container, _ podutil.ContainerType) bool {
+			pRes.Containers = append(pRes.Containers, p.getContainerResources(pod, container))
+			return true
+		})
 		podResources[i] = &pRes
 	}
 
@@ -133,17 +126,10 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 	}
 
 	podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
-	for _, container := range pod.Spec.InitContainers {
-		if !podutil.IsRestartableInitContainer(&container) {
-			continue
-		}
-
-		podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, &container))
-	}
-
-	for _, container := range pod.Spec.Containers {
-		podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, &container))
-	}
+	podutil.VisitContainersWithResourceHealthStatus(&pod.Spec, func(container *v1.Container, _ podutil.ContainerType) bool {
+		podResources.Containers = append(podResources.Containers, p.getContainerResources(pod, container))
+		return true
+	})
 
 	response := &podresourcesv1.GetPodResourcesResponse{
 		PodResources: podResources,
