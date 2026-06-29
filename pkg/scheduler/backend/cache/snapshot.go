@@ -36,7 +36,7 @@ type placementNodes struct {
 	// This is useful for quickly returning the entire list to the caller.
 	nodeInfoList []fwk.NodeInfo
 	// nodeInfoSet contains the set of nodes in the placement.
-	// This is useful for quickly checking if a node belongs the the placement.
+	// This is useful for quickly checking if a node belongs to the placement.
 	nodeInfoSet sets.Set[string]
 }
 

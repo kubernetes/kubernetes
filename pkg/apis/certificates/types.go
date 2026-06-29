@@ -377,7 +377,7 @@ type PodCertificateRequestSpec struct {
 	// Version 2.0](https://www.secg.org/sec1-v2.pdf) (as implemented by the
 	// golang library function crypto/ecdsa.SignASN1)
 	//
-	// If the key is an ED25519 key, the the signature is as described by the
+	// If the key is an ED25519 key, then the signature is as described by the
 	// [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by the
 	// golang library crypto/ed25519.Sign).
 	//
