@@ -127,9 +127,8 @@ type compiler struct {
 	deviceType *apiservercel.DeclType
 	envset     *environment.EnvSet
 
-	// A variant of AnyType = https://github.com/kubernetes/kubernetes/blob/ec2e0de35a298363872897e5904501b029817af3/staging/src/k8s.io/apiserver/pkg/cel/types.go#L550:
-	// unknown actual type (could be bool, int, string, etc.) but with a known maximum size.
-	// If DRAListTypeAttributes is enabled, this also applies to list attributes, so that the cost estimator can take into account the size of the list.
+	// attributeType is used for cost estimation of attributes with unknown
+	// actual type, including list attributes.
 	attributeType *apiservercel.DeclType
 
 	features Features
@@ -187,7 +186,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	expectedReturnType := cel.BoolType
 	if ast.OutputType() == expectedReturnType ||
 		ast.OutputType() == cel.AnyType ||
-		c.features.EnableListTypeAttributes && ast.OutputType() == cel.DynType {
+		ast.OutputType() == cel.DynType {
 		// Okay, is one of the acceptable types.
 	} else {
 		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
@@ -242,35 +241,24 @@ func (c *compiler) newCostEstimator() checker.CostEstimator {
 // getAttributeValue returns the native representation of the one value that
 // should be stored in the attribute, otherwise an error. An error is
 // also returned when there is no supported value.
-//
-// If the DRAListTypeAttributes feature  is disabled and an attribute
-// contains a list value, then we fall through to returning the
-// "unsupported attribute value" error below.
-// This failure then aborts scheduling until ResourceSlices get updated.
-// This is better than incorrectly scheduling a pod
-// because that is harder to correct.
 func (c CompilationResult) getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
-	if c.features.EnableListTypeAttributes {
-		switch {
-		case attr.IntValues != nil:
-			return attr.IntValues, nil
-		case attr.BoolValues != nil:
-			return attr.BoolValues, nil
-		case attr.StringValues != nil:
-			return attr.StringValues, nil
-		case attr.VersionValues != nil:
-			semVers := make([]apiservercel.Semver, len(attr.VersionValues))
-			for i, versionStr := range attr.VersionValues {
-				v, err := semver.Parse(versionStr)
-				if err != nil {
-					return nil, fmt.Errorf("parse semantic version: %w", err)
-				}
-				semVers[i] = apiservercel.Semver{Version: v}
-			}
-			return semVers, nil
-		}
-	}
 	switch {
+	case attr.IntValues != nil:
+		return attr.IntValues, nil
+	case attr.BoolValues != nil:
+		return attr.BoolValues, nil
+	case attr.StringValues != nil:
+		return attr.StringValues, nil
+	case attr.VersionValues != nil:
+		semVers := make([]apiservercel.Semver, len(attr.VersionValues))
+		for i, versionStr := range attr.VersionValues {
+			v, err := semver.Parse(versionStr)
+			if err != nil {
+				return nil, fmt.Errorf("parse semantic version: %w", err)
+			}
+			semVers[i] = apiservercel.Semver{Version: v}
+		}
+		return semVers, nil
 	case attr.IntValue != nil:
 		return *attr.IntValue, nil
 	case attr.BoolValue != nil:
@@ -357,20 +345,13 @@ func newCompiler(features Features) *compiler {
 		return result
 	}
 
-	attributeType := withMaxElements(apiservercel.AnyType, resourceapi.DeviceAttributeMaxValueLength)
-	if features.EnableListTypeAttributes {
-		attributeType = withMaxElements(
-			// use DynType instead of AnyType so that iterate functions can work(e.g., exists, all, etc.)
-			apiservercel.DynType,
-			// When DRAListTypeAttributes feature gate is enabled, we cannot
-			// determine statically whether an attribute will be a scalar or a list
-			// at compile time. MaxElements should describe
-			// - the max number of items when it's a list.
-			// - the max length of the string representation when it's a scalar.
-			// Thus, we set it to the larger one of the two cases.
-			uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
-		)
-	}
+	attributeType := withMaxElements(
+		// Use DynType so that iterate functions can work (e.g. exists, all)
+		// for list type attributes.
+		apiservercel.DynType,
+		// At compile time we don't know whether an attribute will be a scalar or list.
+		uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+	)
 	// Each map is bound by the maximum number of different attributes.
 	innerAttributesMapType := apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
 	outerAttributesMapType := apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
