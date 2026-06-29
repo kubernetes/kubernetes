@@ -1057,8 +1057,9 @@ func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStat
 // or true when the resize call is skipped.
 func (m *kubeGenericRuntimeManager) markInitContainerForRestart(ctx context.Context, pod *v1.Pod, index int, container *v1.Container, status *kubecontainer.Status, changes *podActions) bool {
 	changes.InitContainersToStart = append(changes.InitContainersToStart, index)
-	if podutil.IsRestartableInitContainer(container) ||
-		utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
+	if !changes.UpdatePodResources &&
+		(podutil.IsRestartableInitContainer(container) ||
+			utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)) {
 		return m.computePodResizeAction(ctx, pod, index, true, status, changes)
 	}
 	return true
