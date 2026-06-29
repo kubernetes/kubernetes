@@ -623,7 +623,7 @@
     version: "1.35"
 - name: EtcdRangeStream
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
