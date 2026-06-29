@@ -524,8 +524,36 @@ type DeviceCapacity struct {
 type Counter struct {
 	// Value defines how much of a certain device counter is available.
 	//
-	// +required
+	// When used in sharedCounters, this is the total amount available.
+	// When used in consumesCounters, this is the statically consumed amount.
+	//
+	// Either Value or ValueFrom must be specified in consumesCounters.
+	//
+	// +optional
 	Value resource.Quantity
+
+	// RequestPolicy defines how this Counter must be consumed when used
+	// as a shared counter and referenced through ValueFrom.
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	RequestPolicy *CapacityRequestPolicy
+
+	// ValueFrom maps a capacity.requests key from a ResourceClaim to this
+	// counter, making device counter consumption request-driven.
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	ValueFrom *CounterValueFrom
+}
+
+// CounterValueFrom maps a ResourceClaim capacity request to a counter.
+type CounterValueFrom struct {
+	// CapacityKey is the capacity.requests key from the ResourceClaim
+	// that feeds into this counter.
+	//
+	// +required
+	CapacityKey QualifiedName
 }
 
 // CapacityRequestPolicyDiscreteMaxOptions limits the number of discrete capacity values allowed in a requestPolicy.

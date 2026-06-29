@@ -163,11 +163,35 @@ var sliceWithPartitionableDevicesSharedCounters = &resource.ResourceSlice{
 	},
 }
 
+var sliceWithSharedConsumableSharedCounters = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+	obj.Spec.SharedCounters[0].Counters["memory"] = resource.Counter{
+		Value: k8sresource.MustParse("40Gi"),
+		RequestPolicy: &resource.CapacityRequestPolicy{
+			Default: ptr.To(k8sresource.MustParse("1Gi")),
+			ValidRange: &resource.CapacityRequestPolicyRange{
+				Min: ptr.To(k8sresource.MustParse("1Gi")),
+			},
+		},
+	}
+	return obj
+}()
+
 var sliceWithCapacity = func() *resource.ResourceSlice {
 	obj := slice.DeepCopy()
 	obj.Spec.Devices[0].Capacity = map[resource.QualifiedName]resource.DeviceCapacity{
 		"memory": {
 			Value: k8sresource.MustParse("40Gi"),
+		},
+	}
+	return obj
+}()
+
+var sliceWithSharedConsumableConsumesCounters = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.Devices[0].ConsumesCounters[0].Counters["memory"] = resource.Counter{
+		ValueFrom: &resource.CounterValueFrom{
+			CapacityKey: "dra.example.com/memory",
 		},
 	}
 	return obj
@@ -225,6 +249,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		obj                         *resource.ResourceSlice
 		deviceTaints                bool
 		partitionableDevices        bool
+		sharedConsumableCapacity    bool
 		bindingConditions           bool
 		deviceStatus                bool
 		consumableCapacity          bool
@@ -328,6 +353,49 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"drop-fields-shared-consumable-capacity-shared-counters": {
+			obj:                      sliceWithSharedConsumableSharedCounters,
+			partitionableDevices:     true,
+			sharedConsumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-shared-consumable-capacity-shared-counters": {
+			obj:                      sliceWithSharedConsumableSharedCounters,
+			partitionableDevices:     true,
+			consumableCapacity:       true,
+			sharedConsumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-shared-consumable-capacity-consumes-counters": {
+			obj:                      sliceWithSharedConsumableConsumesCounters,
+			partitionableDevices:     true,
+			sharedConsumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				obj.Spec.Devices[0].ConsumesCounters = []resource.DeviceCounterConsumption{}
+				return obj
+			}(),
+		},
+		"keep-fields-shared-consumable-capacity-consumes-counters": {
+			obj:                      sliceWithSharedConsumableConsumesCounters,
+			partitionableDevices:     true,
+			consumableCapacity:       true,
+			sharedConsumableCapacity: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 		"drop-fields-binding-conditions": {
 			obj:               sliceWithBindingConditions,
 			bindingConditions: false,
@@ -415,6 +483,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRADeviceTaints:              tc.deviceTaints,
 				features.DRAPartitionableDevices:      tc.partitionableDevices,
+				features.DRASharedConsumableCapacity:  tc.sharedConsumableCapacity,
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
@@ -444,16 +513,17 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                *resource.ResourceSlice
-		newObj                *resource.ResourceSlice
-		deviceTaints          bool
-		partitionableDevices  bool
-		deviceStatus          bool
-		bindingConditions     bool
-		consumableCapacity    bool
-		listTypeAttributes    bool
-		expectValidationError bool
-		expectObj             *resource.ResourceSlice
+		oldObj                   *resource.ResourceSlice
+		newObj                   *resource.ResourceSlice
+		deviceTaints             bool
+		partitionableDevices     bool
+		sharedConsumableCapacity bool
+		deviceStatus             bool
+		bindingConditions        bool
+		consumableCapacity       bool
+		listTypeAttributes       bool
+		expectValidationError    bool
+		expectObj                *resource.ResourceSlice
 	}{
 		"no-changes-okay": {
 			oldObj: slice,
@@ -701,6 +771,69 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"drop-fields-shared-consumable-capacity-shared-counters-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices:     true,
+			sharedConsumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-shared-consumable-capacity-shared-counters-disabled-feature": {
+			oldObj: sliceWithSharedConsumableSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices:     true,
+			sharedConsumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-shared-consumable-capacity-consumes-counters-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices:     true,
+			sharedConsumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				obj.Spec.Devices[0].ConsumesCounters = []resource.DeviceCounterConsumption{}
+				return obj
+			}(),
+		},
+		"keep-existing-fields-shared-consumable-capacity-consumes-counters-disabled-feature": {
+			oldObj: sliceWithSharedConsumableConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			partitionableDevices:     true,
+			sharedConsumableCapacity: false,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
 		"drop-fields-binding-conditions": {
 			oldObj: slice,
 			newObj: func() *resource.ResourceSlice {
@@ -870,6 +1003,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRADeviceTaints:              tc.deviceTaints,
 				features.DRAPartitionableDevices:      tc.partitionableDevices,
+				features.DRASharedConsumableCapacity:  tc.sharedConsumableCapacity,
 				features.DRADeviceBindingConditions:   tc.bindingConditions,
 				features.DRAResourceClaimDeviceStatus: tc.deviceStatus,
 				features.DRAConsumableCapacity:        tc.consumableCapacity,
