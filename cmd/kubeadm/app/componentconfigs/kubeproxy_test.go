@@ -124,63 +124,45 @@ func TestKubeProxyDefault(t *testing.T) {
 	}
 }
 
-func TestKubeProxyBindAddressFamilyMismatch(t *testing.T) {
+func TestKubeProxyDefaultBindAddress(t *testing.T) {
 	tests := []struct {
-		name             string
-		bindAddress      string
-		advertiseAddress string
-		expectMismatch   bool
+		name     string
+		address  string
+		expected string
 	}{
 		{
-			name:             "matching IPv4 families",
-			bindAddress:      kubeadmapiv1.DefaultProxyBindAddressv4,
-			advertiseAddress: "1.2.3.4",
-			expectMismatch:   false,
+			name:     "IPv4 address",
+			address:  "1.2.3.4",
+			expected: kubeadmapiv1.DefaultProxyBindAddressv4,
 		},
 		{
-			name:             "matching IPv6 families",
-			bindAddress:      kubeadmapiv1.DefaultProxyBindAddressv6,
-			advertiseAddress: "fd00::1",
-			expectMismatch:   false,
+			name:     "IPv6 address",
+			address:  "fd00::1",
+			expected: kubeadmapiv1.DefaultProxyBindAddressv6,
 		},
 		{
-			name:             "IPv6 bindAddress on IPv4 advertise address",
-			bindAddress:      kubeadmapiv1.DefaultProxyBindAddressv6,
-			advertiseAddress: "1.2.3.4",
-			expectMismatch:   true,
+			name:     "empty address",
+			address:  "",
+			expected: kubeadmapiv1.DefaultProxyBindAddressv6,
 		},
 		{
-			name:             "IPv4 bindAddress on IPv6 advertise address",
-			bindAddress:      kubeadmapiv1.DefaultProxyBindAddressv4,
-			advertiseAddress: "fd00::1",
-			expectMismatch:   true,
-		},
-		{
-			name:             "unparseable bindAddress is not a mismatch",
-			bindAddress:      "not-an-ip",
-			advertiseAddress: "1.2.3.4",
-			expectMismatch:   false,
-		},
-		{
-			name:             "unset advertise address is not a mismatch",
-			bindAddress:      kubeadmapiv1.DefaultProxyBindAddressv6,
-			advertiseAddress: "",
-			expectMismatch:   false,
+			name:     "unparseable address",
+			address:  "not-an-ip",
+			expected: kubeadmapiv1.DefaultProxyBindAddressv6,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := kubeProxyBindAddressFamilyMismatch(test.bindAddress, test.advertiseAddress)
-			if got != test.expectMismatch {
-				t.Fatalf("kubeProxyBindAddressFamilyMismatch(%q, %q) = %v, want %v",
-					test.bindAddress, test.advertiseAddress, got, test.expectMismatch)
+			if got := kubeProxyDefaultBindAddress(test.address); got != test.expected {
+				t.Fatalf("kubeProxyDefaultBindAddress(%q) = %q, want %q",
+					test.address, got, test.expected)
 			}
 		})
 	}
 }
 
-func TestIsKubeProxyDefaultBindAddress(t *testing.T) {
+func TestIsWildcardBindAddress(t *testing.T) {
 	tests := []struct {
 		bindAddress string
 		expect      bool
@@ -194,8 +176,8 @@ func TestIsKubeProxyDefaultBindAddress(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.bindAddress, func(t *testing.T) {
-			if got := isKubeProxyDefaultBindAddress(test.bindAddress); got != test.expect {
-				t.Fatalf("isKubeProxyDefaultBindAddress(%q) = %v, want %v",
+			if got := isWildcardBindAddress(test.bindAddress); got != test.expect {
+				t.Fatalf("isWildcardBindAddress(%q) = %v, want %v",
 					test.bindAddress, got, test.expect)
 			}
 		})

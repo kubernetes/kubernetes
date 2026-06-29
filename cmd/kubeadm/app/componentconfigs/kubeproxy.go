@@ -83,31 +83,17 @@ func (kp *kubeProxyConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 }
 
 func kubeProxyDefaultBindAddress(address string) string {
-	ip := netutils.ParseIPSloppy(address)
-	if ip.To4() != nil {
+	if ip := netutils.ParseIPSloppy(address); ip != nil && ip.To4() != nil {
 		return kubeadmapiv1.DefaultProxyBindAddressv4
 	}
 	return kubeadmapiv1.DefaultProxyBindAddressv6
 }
 
-// isKubeProxyDefaultBindAddress reports whether the given bindAddress is one of
-// the recommended wildcard defaults (0.0.0.0 for IPv4 or :: for IPv6).
-func isKubeProxyDefaultBindAddress(bindAddress string) bool {
+// isWildcardBindAddress reports whether the given bindAddress is one of the
+// recommended wildcard defaults (0.0.0.0 for IPv4 or :: for IPv6).
+func isWildcardBindAddress(bindAddress string) bool {
 	return bindAddress == kubeadmapiv1.DefaultProxyBindAddressv4 ||
 		bindAddress == kubeadmapiv1.DefaultProxyBindAddressv6
-}
-
-// kubeProxyBindAddressFamilyMismatch reports whether the kube-proxy bindAddress
-// uses a different IP family than the API server advertise address. It returns
-// false when either value cannot be parsed, since the family cannot be
-// determined in that case.
-func kubeProxyBindAddressFamilyMismatch(bindAddress, advertiseAddress string) bool {
-	bindIP := netutils.ParseIPSloppy(bindAddress)
-	advertiseIP := netutils.ParseIPSloppy(advertiseAddress)
-	if bindIP == nil || advertiseIP == nil {
-		return false
-	}
-	return (bindIP.To4() != nil) != (advertiseIP.To4() != nil)
 }
 
 func (kp *kubeProxyConfig) Get() interface{} {
@@ -130,20 +116,15 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 
 	if kp.config.BindAddress == "" {
 		kp.config.BindAddress = kubeProxyDefaultBindAddress(localAPIEndpoint.AdvertiseAddress)
+	} else if isWildcardBindAddress(kp.config.BindAddress) {
+		// 0.0.0.0 and :: are both valid explicit wildcard binds.
+	} else if netutils.ParseIPSloppy(kp.config.BindAddress) == nil {
+		klog.Warningf("The bindAddress %q in %q is not a valid IP address", kp.config.BindAddress, kind)
 	} else {
-		// Warn if the user-provided bindAddress uses a different IP family than
-		// the API server advertise address; a single-stack cluster would not be
-		// reachable on the other family.
-		if kubeProxyBindAddressFamilyMismatch(kp.config.BindAddress, localAPIEndpoint.AdvertiseAddress) {
-			klog.Warningf("The bindAddress %q in %q uses a different IP family than the API server advertise address %q",
-				kp.config.BindAddress, kind, localAPIEndpoint.AdvertiseAddress)
-		}
 		// Warn if the bindAddress is not the recommended wildcard default for its
 		// own IP family (0.0.0.0 for IPv4 or :: for IPv6).
-		if !isKubeProxyDefaultBindAddress(kp.config.BindAddress) {
-			warnDefaultComponentConfigValue(kind, "bindAddress",
-				kubeProxyDefaultBindAddress(kp.config.BindAddress), kp.config.BindAddress)
-		}
+		warnDefaultComponentConfigValue(kind, "bindAddress",
+			kubeProxyDefaultBindAddress(kp.config.BindAddress), kp.config.BindAddress)
 	}
 
 	if kp.config.ClusterCIDR == "" && cfg.Networking.PodSubnet != "" {
