@@ -84,10 +84,10 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 
 	wasUntolerated := true
 	if originalNode != nil {
-		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+		_, wasUntolerated, _ = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
 	}
 
-	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+	_, isUntolerated, _ := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
 
 	if wasUntolerated && !isUntolerated {
 		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -103,9 +103,12 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
+	taint, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
 		helper.DoNotScheduleTaintsFilterFunc(),
 		pl.enableTaintTolerationComparisonOperators)
+	if err != nil {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
+	}
 	if !isUntolerated {
 		return nil
 	}
@@ -167,7 +170,8 @@ func (pl *TaintToleration) countIntolerableTaintsPreferNoSchedule(logger klog.Lo
 			continue
 		}
 
-		if !v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators) {
+		tolerated, _ := v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators)
+		if !tolerated {
 			intolerableTaints++
 		}
 	}
