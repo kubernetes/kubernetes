@@ -64,9 +64,12 @@ func NodeShouldRunDaemonPodWithPrecomputed(logger klog.Logger, node *v1.Node, ds
 
 	if !fitsTaints {
 		// Scheduled daemon pods should continue running if they tolerate NoExecute taint.
-		_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
+		_, hasUntoleratedTaint, err := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoExecute
 		}, enableTaintTolerationComparisonOperators)
+		if err != nil {
+			logger.Error(err, "Failed to match daemon pod tolerations against NoExecute taints", "node", klog.KObj(node), "daemonSet", klog.KObj(ds))
+		}
 		return false, !hasUntoleratedTaint
 	}
 
@@ -79,9 +82,12 @@ func NodeShouldRunDaemonPodWithPrecomputed(logger klog.Logger, node *v1.Node, ds
 func predicates(logger klog.Logger, node *v1.Node, taints []v1.Taint, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity, enableTaintTolerationComparisonOperators bool) (fitsNodeAffinity, fitsTaints bool) {
 	// Ignore parsing errors for backwards compatibility.
 	fitsNodeAffinity, _ = requiredNodeAffinity.Match(node)
-	_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
+	_, hasUntoleratedTaint, err := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
 	}, enableTaintTolerationComparisonOperators)
+	if err != nil {
+		logger.Error(err, "Failed to match pod tolerations against node taints", "node", klog.KObj(node))
+	}
 	fitsTaints = !hasUntoleratedTaint
 	return
 }
