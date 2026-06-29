@@ -107,7 +107,7 @@ func TestValidateScale(t *testing.T) {
 				Replicas: 1,
 			},
 		},
-		msg: "metadata.managedFields[0].operation: Invalid value",
+		msg: "metadata.managedFields[0].operation: Unsupported value",
 	}}
 
 	for _, c := range errorCases {

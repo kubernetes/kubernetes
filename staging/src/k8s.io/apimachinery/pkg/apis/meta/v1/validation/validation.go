@@ -273,9 +273,11 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 	for i, fields := range fieldsList {
 		fldPath := fldPath.Index(i)
 		switch fields.Operation {
+		case "":
+			allErrs = append(allErrs, field.Required(fldPath.Child("operation"), "must not be empty").MarkCoveredByDeclarative())
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`"))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("operation"), fields.Operation, []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate}).MarkCoveredByDeclarative())
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
