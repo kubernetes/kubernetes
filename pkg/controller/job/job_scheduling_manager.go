@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	// Workload.spec.controllerRef and PodGroup.spec.podGroupTemplateRef
+	// Workload.spec.controllerRef and PodGroup.spec.workloadRef
 	// carry only names (no UIDs), so these indexes use namespace/name as
 	// the key. Callers must still verify ownership via ownerRef UID checks
 	// before acting on results.
@@ -230,7 +230,7 @@ func (jm *Controller) listWorkloadsForJob(job *batch.Job) ([]*schedulingv1alpha3
 }
 
 // listPodGroupsForWorkload returns all PodGroups in the Workload's namespace
-// whose spec.podGroupTemplateRef references the given Workload.
+// whose spec.workloadRef references the given Workload.
 func (jm *Controller) listPodGroupsForWorkload(workload *schedulingv1alpha3.Workload) ([]*schedulingv1alpha3.PodGroup, error) {
 	if jm.podGroupIndexer == nil {
 		return nil, fmt.Errorf("podgroup indexer is not configured")
@@ -329,11 +329,9 @@ func (jm *Controller) createPodGroupForWorkload(ctx context.Context, job *batch.
 			},
 		},
 		Spec: schedulingv1alpha3.PodGroupSpec{
-			PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
-				Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
-					WorkloadName:         workload.Name,
-					PodGroupTemplateName: template.Name,
-				},
+			WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+				WorkloadName: workload.Name,
+				TemplateName: template.Name,
 			},
 			SchedulingPolicy: *template.SchedulingPolicy.DeepCopy(),
 		},
@@ -444,14 +442,13 @@ func workloadControllerRefJobName(wl *schedulingv1alpha3.Workload) string {
 }
 
 // podGroupWorkloadName returns the workload name from the PodGroup's
-// spec.podGroupTemplateRef, or "" if the reference is not set.
+// spec.workloadRef, or "" if the reference is not set.
 func podGroupWorkloadName(pg *schedulingv1alpha3.PodGroup) string {
-	if pg.Spec.PodGroupTemplateRef == nil ||
-		pg.Spec.PodGroupTemplateRef.Workload == nil ||
-		pg.Spec.PodGroupTemplateRef.Workload.WorkloadName == "" {
+	if pg.Spec.WorkloadRef == nil ||
+		pg.Spec.WorkloadRef.WorkloadName == "" {
 		return ""
 	}
-	return pg.Spec.PodGroupTemplateRef.Workload.WorkloadName
+	return pg.Spec.WorkloadRef.WorkloadName
 }
 
 func workloadByJobNameIndexFunc(obj interface{}) ([]string, error) {
