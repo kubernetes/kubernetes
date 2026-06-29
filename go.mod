@@ -29,7 +29,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/jsonreference v0.21.4
 	github.com/godbus/dbus/v5 v5.2.2
-	github.com/google/cadvisor/lib v0.60.2
+	github.com/google/cadvisor/lib v0.60.3
 	github.com/google/cel-go v0.27.0
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
@@ -142,7 +142,6 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/euank/go-kmsg-parser v2.0.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

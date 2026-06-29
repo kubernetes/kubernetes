@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/cadvisor/lib/cache/memory"
@@ -35,7 +34,6 @@ import (
 	"github.com/google/cadvisor/lib/machine"
 	info "github.com/google/cadvisor/lib/model"
 	"github.com/google/cadvisor/lib/stats"
-	"github.com/google/cadvisor/lib/utils/oomparser"
 	"github.com/google/cadvisor/lib/utils/sysfs"
 	"github.com/google/cadvisor/lib/version"
 	"github.com/google/cadvisor/lib/watcher"
@@ -149,9 +147,9 @@ type Manager interface {
 	// Get the list of processes running in a container.
 	GetProcessList(containerName string, options info.RequestOptions) ([]info.ProcessInfo, error)
 
-	// SetEventSink wires the sink that receives container lifecycle and OOM
-	// events. The full binary injects its events manager; the kubelet does not
-	// call this (no events are emitted). See events.go.
+	// SetEventSink wires the sink that receives container lifecycle events. The
+	// full binary injects its events manager; the kubelet does not call this (no
+	// events are emitted). See events.go.
 	SetEventSink(sink EventSink)
 }
 
@@ -338,11 +336,6 @@ func (m *manager) Start() error {
 		return err
 	}
 	m.containerWatchers = append(m.containerWatchers, rawWatcher)
-
-	// Watch for OOMs.
-	if err := m.watchForNewOoms(); err != nil {
-		klog.Warningf("Could not configure a source for OOM detection, disabling OOM events: %v", err)
-	}
 
 	// If there are no factories, don't start any housekeeping and serve the information we do have.
 	if !container.HasFactories() {
@@ -644,52 +637,6 @@ func (m *manager) GetRequestedContainersInfo(containerName string, options info.
 		containersMap[name] = info
 	}
 	return containersMap, errs.OrNil()
-}
-
-// watchForNewOoms feeds a per-container OOM-kill counter from the kernel log via
-// oomparser. It is an engine-level async router (NOT a per-tick StatsAugmenter):
-// OOM events arrive keyed by container name and are matched to the registry here.
-// No event stream — only the counter that backs container_oom_events_total.
-func (m *manager) watchForNewOoms() error {
-	outStream := make(chan *oomparser.OomInstance, 10)
-	oomLog, err := oomparser.New()
-	if err != nil {
-		return err
-	}
-	go oomLog.StreamOoms(outStream)
-
-	go func() {
-		for oomInstance := range outStream {
-			// Surface OOM and OOM-kill events to the sink (no-op if unset).
-			m.addEvent(&info.Event{
-				ContainerName: oomInstance.ContainerName,
-				Timestamp:     oomInstance.TimeOfDeath,
-				EventType:     info.EventOom,
-			})
-			m.addEvent(&info.Event{
-				ContainerName: oomInstance.VictimContainerName,
-				Timestamp:     oomInstance.TimeOfDeath,
-				EventType:     info.EventOomKill,
-				EventData: info.EventData{
-					OomKill: &info.OomKillEventData{
-						Pid:         oomInstance.Pid,
-						ProcessName: oomInstance.ProcessName,
-						Constraint:  oomInstance.Constraint,
-					},
-				},
-			})
-
-			// Count OOM events for later collection by prometheus.
-			conts, err := m.getRequestedContainers(oomInstance.ContainerName, info.RequestOptions{IdType: info.TypeName, Count: 1})
-			if err != nil || len(conts) != 1 {
-				continue
-			}
-			for _, cont := range conts {
-				atomic.AddUint64(&cont.oomEvents, 1)
-			}
-		}
-	}()
-	return nil
 }
 
 func (m *manager) getRequestedContainers(containerName string, options info.RequestOptions) (map[string]*containerData, error) {

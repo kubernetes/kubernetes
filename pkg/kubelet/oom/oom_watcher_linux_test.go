@@ -17,6 +17,7 @@ limitations under the License.
 package oom
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -24,8 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/third_party/forked/cadvisor/oomparser"
 
-	"github.com/google/cadvisor/lib/utils/oomparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,9 +35,9 @@ type fakeStreamer struct {
 	oomInstancesToStream []*oomparser.OomInstance
 }
 
-func (fs *fakeStreamer) StreamOoms(outStream chan<- *oomparser.OomInstance) {
-	for _, oomInstance := range fs.oomInstancesToStream {
-		outStream <- oomInstance
+func (fs *fakeStreamer) StreamOoms(_ context.Context, outStream chan<- *oomparser.OomInstance) {
+	for _, oi := range fs.oomInstancesToStream {
+		outStream <- oi
 	}
 }
 
