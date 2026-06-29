@@ -127,8 +127,7 @@ type compiler struct {
 	deviceType *apiservercel.DeclType
 	envset     *environment.EnvSet
 
-	// attributeType is used for cost estimation of attributes with unknown
-	// actual type, including list attributes.
+	// attributeType is the latest attribute type, used for cost estimation.
 	attributeType *apiservercel.DeclType
 
 	features Features
@@ -165,7 +164,8 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		}
 	}
 
-	env, err := c.envset.Env(ptr.Deref(options.EnvType, environment.StoredExpressions))
+	envType := ptr.Deref(options.EnvType, environment.StoredExpressions)
+	env, err := c.envset.Env(envType)
 	if err != nil {
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
@@ -175,18 +175,16 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
 	}
 
-	// When the DRAListTypeAttributes feature is enabled,
-	// we use DynType instead of AnyType for the attributes
-	// so that standard iterate functions(e.g., exists, all etc.)
-	// and overridden includes function can work (See newCompiler() for details).
-	// Thus, the unknown return type can also be DynType, not just AnyType as before.
-	//
+	attributeReturnType, err := attributeTypeFromEnv(env)
+	if err != nil {
+		return resultError("unexpected error loading CEL environment: "+err.Error(), apiservercel.ErrorTypeInternal)
+	}
+
 	// This has to be valid because the end result of a CEL expression might be
-	// a boolean attribute, which then has AnyType/DynType.
+	// a boolean type, which then has the attribute type of this environment.
 	expectedReturnType := cel.BoolType
-	if ast.OutputType() == expectedReturnType ||
-		ast.OutputType() == cel.AnyType ||
-		ast.OutputType() == cel.DynType {
+	if ast.OutputType().IsExactType(expectedReturnType) ||
+		ast.OutputType().IsExactType(attributeReturnType) {
 		// Okay, is one of the acceptable types.
 	} else {
 		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
@@ -236,6 +234,53 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 func (c *compiler) newCostEstimator() checker.CostEstimator {
 	base := &library.CostEstimator{SizeEstimator: &sizeEstimator{compiler: c}}
 	return &draCostEstimator{base: base}
+}
+
+// deviceFieldTypeFromEnv resolves a device field type from the actual CEL environment.
+// This is needed so NewExpressions uses the device type selected by VersionedOptions
+// and feature gates instead of the compiler's latest device type.
+func deviceFieldTypeFromEnv(env *cel.Env, field string) (*cel.Type, bool, error) {
+	var deviceType *cel.Type
+	for _, variable := range env.Variables() {
+		if variable.Name() == deviceVar {
+			deviceType = variable.Type()
+			break
+		}
+	}
+	if deviceType == nil {
+		return nil, false, fmt.Errorf("%q variable is not declared", deviceVar)
+	}
+
+	fieldType, ok := env.CELTypeProvider().FindStructFieldType(deviceType.TypeName(), field)
+	if !ok {
+		return nil, false, nil
+	}
+	if fieldType.Type == nil {
+		return nil, true, fmt.Errorf("%q field has no type", field)
+	}
+	return fieldType.Type, true, nil
+}
+
+// attributeTypeFromEnv resolves the attribute value type from the actual CEL environment.
+// This keeps return-type validation aligned with the VersionedOptions selection,
+// including NewExpressions environments where feature gates affect the device type.
+func attributeTypeFromEnv(env *cel.Env) (*cel.Type, error) {
+	attributesType, ok, err := deviceFieldTypeFromEnv(env, attributesVar)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("%q variable does not declare %q field", deviceVar, attributesVar)
+	}
+	outerMapParams := attributesType.Parameters()
+	if len(outerMapParams) != 2 {
+		return nil, fmt.Errorf("%q field should be a map, got %s", attributesVar, attributesType.String())
+	}
+	innerMapParams := outerMapParams[1].Parameters()
+	if len(innerMapParams) != 2 {
+		return nil, fmt.Errorf("%q field values should be maps, got %s", attributesVar, outerMapParams[1].String())
+	}
+	return innerMapParams[1], nil
 }
 
 // getAttributeValue returns the native representation of the one value that
@@ -345,7 +390,11 @@ func newCompiler(features Features) *compiler {
 		return result
 	}
 
-	attributeType := withMaxElements(
+	attributeTypeV131 := withMaxElements(
+		apiservercel.AnyType,
+		resourceapi.DeviceAttributeMaxValueLength,
+	)
+	attributeTypeV136ListTypeAttributes := withMaxElements(
 		// Use DynType so that iterate functions can work (e.g. exists, all)
 		// for list type attributes.
 		apiservercel.DynType,
@@ -353,12 +402,18 @@ func newCompiler(features Features) *compiler {
 		uint64(max(resourceapi.DeviceAttributeMaxValueLength, resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
 	)
 	// Each map is bound by the maximum number of different attributes.
-	innerAttributesMapType := apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
-	outerAttributesMapType := apiservercel.NewMapType(domainType, innerAttributesMapType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+	innerAttributesMapTypeV131 := apiservercel.NewMapType(idType, attributeTypeV131, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+	outerAttributesMapTypeV131 := apiservercel.NewMapType(domainType, innerAttributesMapTypeV131, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
+	innerAttributesMapTypeV136ListTypeAttributes := apiservercel.NewMapType(
+		idType, attributeTypeV136ListTypeAttributes, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice,
+	)
+	outerAttributesMapTypeV136ListTypeAttributes := apiservercel.NewMapType(
+		domainType, innerAttributesMapTypeV136ListTypeAttributes, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice,
+	)
 
 	fieldsV131 := []*apiservercel.DeclField{
 		field(driverVar, driverType, true),
-		field(attributesVar, outerAttributesMapType, true),
+		field(attributesVar, outerAttributesMapTypeV131, true),
 		field(capacityVar, outerCapacityMapType, true),
 	}
 	deviceTypeV131 := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV131...))
@@ -367,6 +422,17 @@ func newCompiler(features Features) *compiler {
 	fieldsV134ConsumableCapacity := []*apiservercel.DeclField{field(multiAllocVar, multiAllocType, true)}
 	fieldsV134ConsumableCapacity = append(fieldsV134ConsumableCapacity, fieldsV131...)
 	deviceTypeV134ConsumableCapacity := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV134ConsumableCapacity...))
+
+	fieldsV136ListTypeAttributes := []*apiservercel.DeclField{
+		field(driverVar, driverType, true),
+		field(attributesVar, outerAttributesMapTypeV136ListTypeAttributes, true),
+		field(capacityVar, outerCapacityMapType, true),
+	}
+	deviceTypeV136ListTypeAttributes := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV136ListTypeAttributes...))
+
+	fieldsV136ConsumableCapacityListTypeAttributes := []*apiservercel.DeclField{field(multiAllocVar, multiAllocType, true)}
+	fieldsV136ConsumableCapacityListTypeAttributes = append(fieldsV136ConsumableCapacityListTypeAttributes, fieldsV136ListTypeAttributes...)
+	deviceTypeV136ConsumableCapacityListTypeAttributes := apiservercel.NewObjectType("kubernetes.DRADevice", fields(fieldsV136ConsumableCapacityListTypeAttributes...))
 
 	versioned := []environment.VersionedOptions{
 		{
@@ -381,12 +447,13 @@ func newCompiler(features Features) *compiler {
 				ext.Bindings(ext.BindingsVersion(0)),
 			},
 		},
-		// deviceTypeV131 and deviceTypeV134ConsumableCapacity are complimentary and picked
-		// based on the feature gate.
+		// NewExpressions selects one of these device declarations with FeatureEnabled.
+		// StoredExpressions ignores FeatureEnabled; the DeclTypeProvider keeps the
+		// last declaration for a shared type name, so keep these ordered oldest to newest.
 		{
 			IntroducedVersion: version.MajorMinor(1, 31),
 			FeatureEnabled: func() bool {
-				return !features.EnableConsumableCapacity
+				return !features.EnableConsumableCapacity && !features.EnableListTypeAttributes
 			},
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceTypeV131.CelType()),
@@ -398,13 +465,41 @@ func newCompiler(features Features) *compiler {
 		{
 			IntroducedVersion: version.MajorMinor(1, 34),
 			FeatureEnabled: func() bool {
-				return features.EnableConsumableCapacity
+				return features.EnableConsumableCapacity && !features.EnableListTypeAttributes
 			},
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceTypeV134ConsumableCapacity.CelType()),
 			},
 			DeclTypes: []*apiservercel.DeclType{
 				deviceTypeV134ConsumableCapacity,
+			},
+		},
+		{
+			// This type was added in 1.37, but 1.36 already behaved like this type
+			// when ListTypeAttributes was enabled and ConsumableCapacity was disabled.
+			IntroducedVersion: version.MajorMinor(1, 36),
+			FeatureEnabled: func() bool {
+				return !features.EnableConsumableCapacity && features.EnableListTypeAttributes
+			},
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(deviceVar, deviceTypeV136ListTypeAttributes.CelType()),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				deviceTypeV136ListTypeAttributes,
+			},
+		},
+		{
+			// This type was added in 1.37, but 1.36 already behaved like this type
+			// when both ListTypeAttributes and ConsumableCapacity was enabled.
+			IntroducedVersion: version.MajorMinor(1, 36),
+			FeatureEnabled: func() bool {
+				return features.EnableConsumableCapacity && features.EnableListTypeAttributes
+			},
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(deviceVar, deviceTypeV136ConsumableCapacityListTypeAttributes.CelType()),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				deviceTypeV136ConsumableCapacityListTypeAttributes,
 			},
 		},
 		{
@@ -428,7 +523,12 @@ func newCompiler(features Features) *compiler {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
 	// return with newest deviceType
-	return &compiler{envset: envset, deviceType: deviceTypeV134ConsumableCapacity, features: features, attributeType: attributeType}
+	return &compiler{
+		envset:        envset,
+		deviceType:    deviceTypeV136ConsumableCapacityListTypeAttributes,
+		features:      features,
+		attributeType: attributeTypeV136ListTypeAttributes,
+	}
 }
 
 // includesFunc implements the "includes" function for CEL (<target>.includes(<arg>)),

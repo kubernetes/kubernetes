@@ -685,6 +685,181 @@ func TestCEL(t *testing.T) {
 	}
 }
 
+// TestCEL's main table focuses on expression behavior. This covers the env x feature
+// matrix explicitly with small expressions tied to each feature-dependent declaration.
+func TestCELFeatureCombinations(t *testing.T) {
+	// compileExpectations lists which feature-dependent expression categories should
+	// compile for one environment and feature-gate combination.
+	type compileExpectations struct {
+		// scalarAttribute covers expressions that access a scalar attribute.
+		scalarAttribute bool
+		// listTypeAttributes covers list-valued attribute access.
+		listTypeAttributes bool
+		// includesFunc covers the includes function introduced by DRAListTypeAttributes.
+		includesFunc bool
+		// multipleAllocations covers fields introduced by DRAConsumableCapacity.
+		multipleAllocations bool
+	}
+
+	type expressionTest struct {
+		expression     string
+		device         Device
+		expectsCompile bool
+	}
+
+	// StoredExpressions ignores FeatureEnabled() in VersionedOptions,
+	// so it always compiles all expressions that are valid in the current version
+	storedExpressionsCompileExpectations := compileExpectations{
+		scalarAttribute:     true,
+		listTypeAttributes:  true,
+		includesFunc:        true,
+		multipleAllocations: true,
+	}
+
+	tests := map[string]struct {
+		envType        environment.Type
+		features       Features
+		expectsCompile compileExpectations
+	}{
+		"stored-expressions-no-features": {
+			envType:        environment.StoredExpressions,
+			expectsCompile: storedExpressionsCompileExpectations,
+		},
+		"stored-expressions-consumable-capacity": {
+			envType:        environment.StoredExpressions,
+			features:       Features{EnableConsumableCapacity: true},
+			expectsCompile: storedExpressionsCompileExpectations,
+		},
+		"stored-expressions-list-type-attributes": {
+			envType:        environment.StoredExpressions,
+			features:       Features{EnableListTypeAttributes: true},
+			expectsCompile: storedExpressionsCompileExpectations,
+		},
+		"stored-expressions-all-features": {
+			envType:        environment.StoredExpressions,
+			features:       Features{EnableConsumableCapacity: true, EnableListTypeAttributes: true},
+			expectsCompile: storedExpressionsCompileExpectations,
+		},
+		"new-expressions-no-features": {
+			envType: environment.NewExpressions,
+			expectsCompile: compileExpectations{
+				scalarAttribute: true,
+			},
+		},
+		"new-expressions-consumable-capacity": {
+			envType:  environment.NewExpressions,
+			features: Features{EnableConsumableCapacity: true},
+			expectsCompile: compileExpectations{
+				scalarAttribute:     true,
+				multipleAllocations: true,
+			},
+		},
+		"new-expressions-list-type-attributes": {
+			envType:  environment.NewExpressions,
+			features: Features{EnableListTypeAttributes: true},
+			expectsCompile: compileExpectations{
+				scalarAttribute:    true,
+				listTypeAttributes: true,
+				includesFunc:       true,
+			},
+		},
+		"new-expressions-all-features": {
+			envType:  environment.NewExpressions,
+			features: Features{EnableConsumableCapacity: true, EnableListTypeAttributes: true},
+			expectsCompile: compileExpectations{
+				scalarAttribute:     true,
+				listTypeAttributes:  true,
+				includesFunc:        true,
+				multipleAllocations: true,
+			},
+		},
+	}
+
+	expressions := func(expectsCompile compileExpectations) map[string]expressionTest {
+		return map[string]expressionTest{
+			"scalar-attribute": {
+				expression: `device.attributes["dra.example.com"].ready`,
+				device: Device{
+					Driver: "dra.example.com",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"ready": {BoolValue: new(true)},
+					},
+				},
+				expectsCompile: expectsCompile.scalarAttribute,
+			},
+			"list-attribute": {
+				expression: `device.attributes["dra.example.com"].ids.exists(id, id == 1)`,
+				device: Device{
+					Driver: "dra.example.com",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"ids": {IntValues: []int64{1, 2}},
+					},
+				},
+				expectsCompile: expectsCompile.listTypeAttributes,
+			},
+			"includes-function": {
+				expression: `device.attributes["dra.example.com"].name.includes("fish")`,
+				device: Device{
+					Driver: "dra.example.com",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"name": {StringValue: new("fish")},
+					},
+				},
+				expectsCompile: expectsCompile.includesFunc,
+			},
+			"multiple-allocations": {
+				expression: `device.allowMultipleAllocations`,
+				device: Device{
+					Driver:                   "dra.example.com",
+					AllowMultipleAllocations: new(true),
+					Attributes:               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{},
+				},
+				expectsCompile: expectsCompile.multipleAllocations,
+			},
+			"list-attribute-with-multiple-allocations": {
+				expression: `device.allowMultipleAllocations && device.attributes["dra.example.com"].ids.exists(id, id == 1)`,
+				device: Device{
+					Driver:                   "dra.example.com",
+					AllowMultipleAllocations: new(true),
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"ids": {IntValues: []int64{1, 2}},
+					},
+				},
+				expectsCompile: expectsCompile.listTypeAttributes && expectsCompile.multipleAllocations,
+			},
+		}
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			for exprName, exprTC := range expressions(tc.expectsCompile) {
+				t.Run(exprName, func(t *testing.T) {
+					_, ctx := ktesting.NewTestContext(t)
+					envType := tc.envType
+					result := GetCompiler(tc.features).CompileCELExpression(exprTC.expression, Options{EnvType: &envType})
+					if result.Error != nil {
+						if exprTC.expectsCompile {
+							t.Fatalf("unexpected compile error: %v", result.Error)
+						}
+						return
+					}
+					if !exprTC.expectsCompile {
+						t.Fatalf("expected compile error")
+					}
+
+					match, _, err := result.DeviceMatches(ctx, exprTC.device)
+					if err != nil {
+						t.Fatalf("unexpected evaluation error: %v", err)
+					}
+					if !match {
+						t.Fatalf("expected match")
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestInterrupt(t *testing.T) {
 	for _, name := range []string{"timeout", "deadline", "cancel"} {
 		t.Run(name, func(t *testing.T) {
